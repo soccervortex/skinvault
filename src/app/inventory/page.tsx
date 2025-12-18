@@ -852,5 +852,14 @@ function InventoryContent() {
 }
 
 export default function InventoryPage() { 
-  return <Suspense fallback={null}><InventoryContent /></Suspense>; 
+  return (
+    <Suspense fallback={
+      <div className="h-screen bg-[#08090d] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin text-blue-500" size={40} />
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Loading...</p>
+      </div>
+    }>
+      <InventoryContent />
+    </Suspense>
+  ); 
 }
