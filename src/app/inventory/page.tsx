@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock } from 'lucide-react';
+import { getPriceScanConcurrency } from '@/app/utils/pro-limits';
 
 const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
 
@@ -216,7 +217,8 @@ function InventoryContent() {
 
     const results: Record<string, string> = {};
     const active = new Set<Promise<void>>();
-    const CONCURRENCY = 6;
+    // Pro users get faster scanning with higher concurrency
+    const CONCURRENCY = getPriceScanConcurrency(isPro);
 
     for (const name of missing) {
       let taskPromise: Promise<void>;
@@ -666,6 +668,18 @@ function InventoryContent() {
               <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
             </div>
             
+            {/* Pro Performance Indicator */}
+            {isPro && (
+              <div className="mt-4 flex items-center gap-2 px-2">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-[10px]">⚡</span>
+                  Pro Performance Active
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+              </div>
+            )}
+            
             {/* Pro-only Advanced Stats */}
             {playerStats && (isPro ? (
               <div className="mt-6">
@@ -819,7 +833,9 @@ function InventoryContent() {
                               ? itemPrices[item.market_hash_name] 
                               : priceScanDone 
                                 ? <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>
-                                : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">SCANNING...</span>}
+                                : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
+                                    {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
+                                  </span>}
                           </p>
                         </div>
                       </div>

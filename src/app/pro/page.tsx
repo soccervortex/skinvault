@@ -197,6 +197,10 @@ export default function ProInfoPage() {
             <p className="font-black uppercase tracking-[0.3em] text-gray-500">What you unlock</p>
             <ul className="space-y-1 text-gray-300 text-[10px]">
               <li>– Unlimited wishlist size</li>
+              <li>– ⚡ Faster price scanning (10x speed)</li>
+              <li>– ⚡ Priority API requests</li>
+              <li>– ⚡ Better caching (2x longer)</li>
+              <li>– ⚡ Fast wishlist updates</li>
               <li>– Faster, priority price scanning</li>
               <li>– Advanced compare stats & value breakdown</li>
               <li>– Early access to new tools</li>

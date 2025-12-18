@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
-import { getWishlistLimit } from '@/app/utils/pro-limits';
+import { getWishlistLimit, getWishlistBatchSize } from '@/app/utils/pro-limits';
 
 const PROXY_LIST = [
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -93,7 +93,7 @@ export default function WishlistPage() {
     setLoading(false);
   }, []);
 
-  // fetch prices for wishlist entries
+  // fetch prices for wishlist entries (Pro users get faster batch processing)
   useEffect(() => {
     if (!items.length) return;
 
@@ -103,30 +103,42 @@ export default function WishlistPage() {
       setPriceLoading(true);
       const next: Record<string, { lowest: string; median: string; volume: string }> = {};
 
-      await Promise.all(
-        items.map(async (entry) => {
-          const marketName = entry.market_hash_name || entry.name;
-          if (!marketName) return;
+      // Pro users get faster batch processing
+      const batchSize = getWishlistBatchSize(isPro);
+      const batches: typeof items[] = [];
+      for (let i = 0; i < items.length; i += batchSize) {
+        batches.push(items.slice(i, i + batchSize));
+      }
 
-          const hash = encodeURIComponent(marketName);
-          const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
+      // Process batches sequentially, but items within batch in parallel
+      for (const batch of batches) {
+        if (cancelled) break;
+        
+        await Promise.all(
+          batch.map(async (entry) => {
+            const marketName = entry.market_hash_name || entry.name;
+            if (!marketName) return;
 
-          const data = await fetchWithRotation(steamUrl);
-          if (data?.success) {
-            next[entry.key] = {
-              lowest: data.lowest_price || data.median_price || '---',
-              median: data.median_price || '---',
-              volume: data.volume || 'Low',
-            };
-          } else {
-            next[entry.key] = {
-              lowest: '---',
-              median: '---',
-              volume: 'Low',
-            };
-          }
-        })
-      );
+            const hash = encodeURIComponent(marketName);
+            const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
+
+            const data = await fetchWithRotation(steamUrl);
+            if (data?.success) {
+              next[entry.key] = {
+                lowest: data.lowest_price || data.median_price || '---',
+                median: data.median_price || '---',
+                volume: data.volume || 'Low',
+              };
+            } else {
+              next[entry.key] = {
+                lowest: '---',
+                median: '---',
+                volume: 'Low',
+              };
+            }
+          })
+        );
+      }
 
       if (!cancelled) {
         setPriceMap(next);
@@ -165,12 +177,20 @@ export default function WishlistPage() {
               <Heart className="text-rose-500 shrink-0" size={28} />
               <div>
                 <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">My Wishlist</h2>
-                <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">
-                  {items.length} / {isPro ? '∞' : getWishlistLimit(false)} {items.length === 1 ? 'item' : 'items'} saved
-                  {!isPro && items.length >= getWishlistLimit(false) && (
-                    <span className="ml-2 text-amber-500">• Limit reached</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">
+                    {items.length} / {isPro ? '∞' : getWishlistLimit(false)} {items.length === 1 ? 'item' : 'items'} saved
+                    {!isPro && items.length >= getWishlistLimit(false) && (
+                      <span className="ml-2 text-amber-500">• Limit reached</span>
+                    )}
+                  </p>
+                  {isPro && (
+                    <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-1 mt-2">
+                      <span>⚡</span>
+                      Fast Updates
+                    </span>
                   )}
-                </p>
+                </div>
               </div>
             </div>
             <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
@@ -275,7 +295,9 @@ export default function WishlistPage() {
                           )}
                           <p className="text-[11px] font-black text-emerald-500 italic">
                             {currentPrice === null ? (
-                              <span className="text-gray-600 animate-pulse text-[9px]">SCANNING...</span>
+                              <span className="text-gray-600 animate-pulse text-[9px]">
+                                {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
+                              </span>
                             ) : currentPrice === 'NO PRICE' ? (
                               <span className="text-gray-500 text-[9px]">NO PRICE</span>
                             ) : (
