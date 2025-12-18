@@ -3,23 +3,80 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Crown, CheckCircle2, ArrowRight, Loader2, CreditCard } from 'lucide-react';
+import { Crown, CheckCircle2, ArrowRight, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
 
 export default function ProInfoPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [freeMonthEligible, setFreeMonthEligible] = useState(false);
+  const [claimingFreeMonth, setClaimingFreeMonth] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const stored = window.localStorage.getItem('steam_user');
-      setUser(stored ? JSON.parse(stored) : null);
+      const parsedUser = stored ? JSON.parse(stored) : null;
+      setUser(parsedUser);
+      
+      // Check if eligible for free month (only if not Pro)
+      const userIsPro = parsedUser?.proUntil && new Date(parsedUser.proUntil) > new Date();
+      if (parsedUser?.steamId && !userIsPro) {
+        fetch(`/api/user/free-month?id=${parsedUser.steamId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.eligible) {
+              setFreeMonthEligible(true);
+            }
+          })
+          .catch(() => {
+            // ignore errors
+          });
+      }
     } catch {
       setUser(null);
     }
   }, []);
 
   const isPro = user?.proUntil && new Date(user.proUntil) > new Date();
+
+  const handleClaimFreeMonth = async () => {
+    if (!user?.steamId) {
+      alert('You must be signed in with Steam to claim the free month.');
+      window.location.href = '/inventory';
+      return;
+    }
+
+    setClaimingFreeMonth(true);
+    try {
+      const res = await fetch('/api/user/free-month', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: user.steamId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to claim free month');
+        setClaimingFreeMonth(false);
+        return;
+      }
+
+      // Update user in localStorage
+      if (data.proUntil) {
+        const updatedUser = { ...user, proUntil: data.proUntil };
+        localStorage.setItem('steam_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        window.dispatchEvent(new Event('storage'));
+        setFreeMonthEligible(false);
+        alert(data.message || 'Free month claimed successfully!');
+      }
+      setClaimingFreeMonth(false);
+    } catch (error) {
+      alert('Failed to claim free month. Please try again.');
+      setClaimingFreeMonth(false);
+    }
+  };
 
   const handleCheckout = async (plan: '1month' | '3months' | '6months') => {
     // Double-check user is signed in
@@ -90,6 +147,48 @@ export default function ProInfoPage() {
             ) : (
               <span className="text-gray-300">Free tier</span>
             )}
+          </div>
+        )}
+
+        {/* First Week Free Promotion Banner */}
+        {user && !isPro && freeMonthEligible && (
+          <div className="bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-purple-500/20 border-2 border-emerald-500/40 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-blue-500/5 to-purple-500/5 animate-pulse" />
+            <div className="relative z-10">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 shrink-0">
+                  <Gift className="text-emerald-400" size={24} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="text-amber-400" size={16} />
+                    <h3 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white">
+                      Limited Time Offer
+                    </h3>
+                  </div>
+                  <p className="text-[11px] md:text-[12px] text-gray-300 mb-4 leading-relaxed">
+                    Claim <span className="font-black text-emerald-400">1 month FREE</span> of Pro! 
+                    This special offer is available for new users in their first week. 
+                    Unlock unlimited wishlist, advanced stats, and all Pro features.
+                  </p>
+                  <button
+                    onClick={handleClaimFreeMonth}
+                    disabled={claimingFreeMonth}
+                    className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white py-3 md:py-4 px-6 md:px-8 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {claimingFreeMonth ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Claiming...
+                      </>
+                    ) : (
+                      <>
+                        <Gift size={16} /> Claim Free Month Now
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

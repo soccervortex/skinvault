@@ -3,7 +3,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
+import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { getWishlistLimit } from '@/app/utils/pro-limits';
 
 const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
@@ -24,6 +26,8 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   const [rotation, setRotation] = useState(0);
   const [wishlist, setWishlist] = useState<WishlistEntry[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const priceCacheRef = useRef<Record<string, any>>({});
@@ -97,6 +101,14 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
         setUser(parsedUser);
         const steamId = parsedUser?.steamId || null;
         setWishlist(loadWishlist(steamId));
+        
+        // Check Pro status
+        if (parsedUser?.proUntil) {
+          const proUntil = new Date(parsedUser.proUntil);
+          setIsPro(proUntil > new Date());
+        } else {
+          setIsPro(false);
+        }
       }
     } catch {
       datasetCacheRef.current = {};
@@ -351,7 +363,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
               </div>
               <button
                 onClick={() => {
-                  const next = toggleWishlistEntry(
+                  const result = toggleWishlistEntry(
                     {
                       key: wishlistKey,
                       name: item.name,
@@ -362,8 +374,13 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                       weaponName: item.weapon?.name,
                     },
                     steamId,
+                    isPro,
                   );
-                  setWishlist(next);
+                  if (result.success) {
+                    setWishlist(result.newList);
+                  } else if (result.reason === 'limit_reached') {
+                    setShowUpgradeModal(true);
+                  }
                 }}
                 className="absolute bottom-4 right-4 md:hidden inline-flex items-center justify-center p-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
                 aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -381,7 +398,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
               <button
                 onClick={() => {
-                  const next = toggleWishlistEntry(
+                  const result = toggleWishlistEntry(
                     {
                       key: wishlistKey,
                       name: item.name,
@@ -392,8 +409,13 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                       weaponName: item.weapon?.name,
                     },
                     steamId,
+                    isPro,
                   );
-                  setWishlist(next);
+                  if (result.success) {
+                    setWishlist(result.newList);
+                  } else if (result.reason === 'limit_reached') {
+                    setShowUpgradeModal(true);
+                  }
                 }}
                 className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0"
                 aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -437,6 +459,16 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
           </div>
         </div>
       </div>
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={wishlist.length}
+      />
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { canAddToWishlist, getWishlistLimit } from './pro-limits';
+
 export type WishlistEntry = {
   key: string; // stable identifier, usually market_hash_name
   name: string;
@@ -39,18 +41,45 @@ export function saveWishlist(entries: WishlistEntry[], steamId?: string | null) 
   }
 }
 
+export type ToggleWishlistResult = {
+  success: boolean;
+  newList: WishlistEntry[];
+  reason?: 'limit_reached' | 'not_logged_in';
+  limit?: number;
+  currentCount?: number;
+};
+
 export function toggleWishlistEntry(
   entry: WishlistEntry,
-  steamId?: string | null
-): WishlistEntry[] {
+  steamId?: string | null,
+  isProUser: boolean = false
+): ToggleWishlistResult {
   const current = loadWishlist(steamId);
   const idx = current.findIndex((e) => e.key === entry.key);
-  let next: WishlistEntry[];
+  
+  // If removing, always allow
   if (idx >= 0) {
-    next = [...current.slice(0, idx), ...current.slice(idx + 1)];
-  } else {
-    next = [...current, entry];
+    const next = [...current.slice(0, idx), ...current.slice(idx + 1)];
+    saveWishlist(next, steamId);
+    return { success: true, newList: next };
   }
+  
+  // If adding, check limits
+  const currentCount = current.length;
+  const canAdd = canAddToWishlist(currentCount, isProUser);
+  
+  if (!canAdd) {
+    const limit = getWishlistLimit(isProUser);
+    return {
+      success: false,
+      newList: current,
+      reason: 'limit_reached',
+      limit,
+      currentCount,
+    };
+  }
+  
+  const next = [...current, entry];
   saveWishlist(next, steamId);
-  return next;
+  return { success: true, newList: next };
 }

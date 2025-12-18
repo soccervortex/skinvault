@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
+import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { getWishlistLimit } from '@/app/utils/pro-limits';
 
 const PROXY_LIST = [
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -51,8 +53,10 @@ export default function WishlistPage() {
   >({});
   const [priceLoading, setPriceLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // hydrate wishlist + currency
+  // hydrate wishlist + currency + Pro status
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -61,10 +65,19 @@ export default function WishlistPage() {
         setUser(parsedUser);
         const steamId = parsedUser?.steamId || null;
         setItems(loadWishlist(steamId));
+        
+        // Check Pro status
+        if (parsedUser?.proUntil) {
+          const proUntil = new Date(parsedUser.proUntil);
+          setIsPro(proUntil > new Date());
+        } else {
+          setIsPro(false);
+        }
       }
     } catch {
       setUser(null);
       setItems([]);
+      setIsPro(false);
     }
     try {
       if (typeof window === 'undefined') return;
@@ -153,7 +166,10 @@ export default function WishlistPage() {
               <div>
                 <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">My Wishlist</h2>
                 <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">
-                  {items.length} {items.length === 1 ? 'item' : 'items'} saved
+                  {items.length} / {isPro ? '∞' : getWishlistLimit(false)} {items.length === 1 ? 'item' : 'items'} saved
+                  {!isPro && items.length >= getWishlistLimit(false) && (
+                    <span className="ml-2 text-amber-500">• Limit reached</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -223,8 +239,12 @@ export default function WishlistPage() {
                             e.preventDefault();
                             e.stopPropagation();
                             const steamId = user?.steamId || null;
-                            const next = toggleWishlistEntry(entry, steamId);
-                            setItems(next);
+                            const result = toggleWishlistEntry(entry, steamId, isPro);
+                            if (result.success) {
+                              setItems(result.newList);
+                            } else if (result.reason === 'limit_reached') {
+                              setShowUpgradeModal(true);
+                            }
                           }}
                           className="absolute top-4 right-4 z-20 inline-flex items-center justify-center p-2 rounded-xl border border-rose-500/30 bg-black/60 hover:border-rose-500 hover:bg-rose-500/20 transition-all"
                           aria-label="Remove from wishlist"
@@ -272,6 +292,16 @@ export default function WishlistPage() {
           )}
         </div>
       </div>
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={items.length}
+      />
     </div>
   );
 }

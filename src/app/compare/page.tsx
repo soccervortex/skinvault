@@ -4,7 +4,9 @@ import { useSearchParams } from 'next/navigation';
 import { ChevronLeft, Swords, Shield, Target, Zap, Award, TrendingUp, BarChart3, Loader2, Heart } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
+import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { getWishlistLimit } from '@/app/utils/pro-limits';
 
 type CompareSkin = {
   id: string;
@@ -29,6 +31,8 @@ function CompareContent() {
   const [priceLoading, setPriceLoading] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistEntry[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // --- PROXY ROTATION SETUP FOR PRICES ---
   const PROXY_LIST = [
@@ -100,7 +104,7 @@ function CompareContent() {
       });
   }, [searchParams]);
 
-  // Hydrate wishlist / user once
+  // Hydrate wishlist / user / Pro status once
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
@@ -109,9 +113,18 @@ function CompareContent() {
       setUser(parsedUser);
       const steamId = parsedUser?.steamId || null;
       setWishlist(loadWishlist(steamId));
+      
+      // Check Pro status
+      if (parsedUser?.proUntil) {
+        const proUntil = new Date(parsedUser.proUntil);
+        setIsPro(proUntil > new Date());
+      } else {
+        setIsPro(false);
+      }
     } catch {
       setUser(null);
       setWishlist([]);
+      setIsPro(false);
     }
   }, []);
 
@@ -268,7 +281,7 @@ function CompareContent() {
                 <div className="relative z-10 space-y-4 md:space-y-6">
                   <button
                     onClick={() => {
-                      const next = toggleWishlistEntry(
+                      const result = toggleWishlistEntry(
                         {
                           key: wishlistKey,
                           name: skin.name,
@@ -279,8 +292,13 @@ function CompareContent() {
                           weaponName: skin.weapon?.name,
                         },
                         steamId,
+                        isPro,
                       );
-                      setWishlist(next);
+                      if (result.success) {
+                        setWishlist(result.newList);
+                      } else if (result.reason === 'limit_reached') {
+                        setShowUpgradeModal(true);
+                      }
                     }}
                     className="absolute top-3 md:top-4 right-3 md:right-4 inline-flex items-center justify-center p-2 md:p-2.5 rounded-xl md:rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
                     aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -413,6 +431,16 @@ function CompareContent() {
         })()}
         </div>
       </div>
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={wishlist.length}
+      />
     </div>
   );
 }

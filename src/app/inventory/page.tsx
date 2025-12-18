@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock } from 'lucide-react';
 
 const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
 
@@ -158,12 +158,33 @@ function InventoryContent() {
         const hs = kills > 0 ? (hsKills / kills) * 100 : 0;
         const wr = matchesPlayed > 0 ? (matchesWon / matchesPlayed) * 100 : 0;
 
-        setPlayerStats({
+        // Basic stats (free for all)
+        const basicStats = {
           kd: kd.toFixed(2),
           hs: hs.toFixed(1),
           wr: wr.toFixed(1),
           kills: kills.toLocaleString(),
           wins: matchesWon.toLocaleString()
+        };
+        
+        // Pro-only advanced stats
+        const totalDamage = Number(statsObj.total_damage_done ?? 0);
+        const roundsPlayed = Number(statsObj.total_rounds_played ?? 0);
+        const mvps = Number(statsObj.total_mvps ?? 0);
+        const totalShots = Number(statsObj.total_shots_hit ?? 0) + Number(statsObj.total_shots_fired ?? 0);
+        const shotsHit = Number(statsObj.total_shots_hit ?? 0);
+        
+        const adr = roundsPlayed > 0 ? (totalDamage / roundsPlayed) : 0;
+        const accuracy = totalShots > 0 ? (shotsHit / totalShots) * 100 : 0;
+        
+        setPlayerStats({
+          ...basicStats,
+          // Pro-only stats
+          adr: adr.toFixed(1),
+          mvps: mvps.toLocaleString(),
+          accuracy: accuracy.toFixed(1),
+          roundsPlayed: roundsPlayed.toLocaleString(),
+          totalDamage: totalDamage.toLocaleString(),
         });
         setStatsPrivate(false);
       } else {
@@ -644,6 +665,105 @@ function InventoryContent() {
               <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
               <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
             </div>
+            
+            {/* Pro-only Advanced Stats */}
+            {playerStats && (isPro ? (
+              <div className="mt-6">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px]">PRO</span>
+                    Advanced Stats
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                  <StatCard label="ADR" icon={<TrendingUp size={12}/>} val={playerStats?.adr} color="text-purple-400" />
+                  <StatCard label="MVPs" icon={<Award size={12}/>} val={playerStats?.mvps} color="text-amber-400" />
+                  <StatCard label="Accuracy" icon={<Target size={12}/>} val={playerStats?.accuracy} unit="%" color="text-cyan-400" />
+                  <StatCard label="Rounds Played" icon={<PackageOpen size={12}/>} val={playerStats?.roundsPlayed} color="text-indigo-400" />
+                  <StatCard label="Total Damage" icon={<Swords size={12}/>} val={playerStats?.totalDamage} color="text-red-400" />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-600/30 to-transparent" />
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-gray-600/10 border border-gray-600/40 text-[8px]">LOCKED</span>
+                    Advanced Stats
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-600/30 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <TrendingUp size={12}/> ADR
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <Award size={12}/> MVPs
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <Target size={12}/> Accuracy
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <PackageOpen size={12}/> Rounds
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <Swords size={12}/> Damage
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
             <section className="space-y-6 md:space-y-10">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-6">
                 <div className="flex items-center gap-3 md:gap-4">
