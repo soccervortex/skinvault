@@ -295,7 +295,11 @@ function InventoryContent() {
 
     if (!viewedSteamId) return;
 
-    const isLoginCallback = !!(
+    // Check if this is a REAL Steam login callback (from /api/auth/steam redirect)
+    // vs a search query that happens to use the same parameter
+    // Real login callbacks will have 'openid.mode' or come from Steam's domain
+    const hasOpenIdMode = !!searchParams.get('openid.mode');
+    const isLoginCallback = hasOpenIdMode && !!(
       searchParams.get('openid.claimed_id') || 
       searchParams.get('openid_claimed_id')
     );

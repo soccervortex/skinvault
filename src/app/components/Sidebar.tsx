@@ -43,7 +43,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchId) {
-      router.push(`/inventory?openid.claimed_id=https://steamcommunity.com/openid/id/${searchId}`);
+      // Use 'steamId' parameter for searches, not 'openid.claimed_id' 
+      // to avoid being treated as a login callback
+      router.push(`/inventory?steamId=${searchId}`);
       setIsSearchOpen(false);
       setSearchId("");
     }
