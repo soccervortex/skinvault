@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getProUntil, grantPro } from '@/app/utils/pro-storage';
+import { 
+  getProUntil, 
+  grantPro, 
+  getFirstLoginDate, 
+  hasClaimedFreeMonth, 
+  markFreeMonthClaimed 
+} from '@/app/utils/pro-storage';
 
 // First week free promotion: Users can claim 1 month free Pro within 7 days of first login
 const FREE_MONTH_DAYS = 7;
@@ -22,17 +28,41 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Check if user has already claimed the free month
-    // We'll track this by checking if they have a "claimed_free_month" flag
-    // For now, we'll use a simple check: if they don't have Pro, they can claim it
-    // In production, you might want to track this in KV with a separate key
-    
-    // Check if user is within first 7 days
-    // Since we don't track first login date, we'll grant it if they don't have Pro
-    // In a real implementation, you'd check: (Date.now() - firstLoginDate) < 7 days
-    
-    // For now, grant the free month if they don't have Pro
+    // Check if user has already claimed the free month (one-time only)
+    const alreadyClaimed = await hasClaimedFreeMonth(steamId);
+    if (alreadyClaimed) {
+      return NextResponse.json({ 
+        error: 'You have already claimed your free month trial. This offer is only available once.',
+        alreadyClaimed: true 
+      }, { status: 400 });
+    }
+
+    // Check if user is within first 7 days of first login
+    const firstLoginDate = await getFirstLoginDate(steamId);
+    if (!firstLoginDate) {
+      return NextResponse.json({ 
+        error: 'Unable to verify your account age. Please try logging in again.',
+        noFirstLogin: true 
+      }, { status: 400 });
+    }
+
+    const firstLogin = new Date(firstLoginDate);
+    const now = new Date();
+    const daysSinceFirstLogin = (now.getTime() - firstLogin.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysSinceFirstLogin > FREE_MONTH_DAYS) {
+      return NextResponse.json({ 
+        error: `This free trial is only available within the first ${FREE_MONTH_DAYS} days of your first login. Your account is ${Math.floor(daysSinceFirstLogin)} days old.`,
+        expired: true,
+        daysSinceFirstLogin: Math.floor(daysSinceFirstLogin)
+      }, { status: 400 });
+    }
+
+    // All checks passed - grant the free month
     const newProUntil = await grantPro(steamId, FREE_MONTHS);
+    
+    // Mark as claimed (one-time only)
+    await markFreeMonthClaimed(steamId);
 
     return NextResponse.json({
       success: true,
@@ -58,16 +88,54 @@ export async function GET(request: Request) {
     const currentProUntil = await getProUntil(steamId);
     const hasPro = currentProUntil && new Date(currentProUntil) > new Date();
     
-    // For now, eligible if they don't have Pro
-    // In production, also check if within 7 days of first login
-    const eligible = !hasPro;
+    if (hasPro) {
+      return NextResponse.json({
+        eligible: false,
+        hasPro: true,
+        message: 'You already have an active Pro subscription',
+      });
+    }
 
+    // Check if already claimed
+    const alreadyClaimed = await hasClaimedFreeMonth(steamId);
+    if (alreadyClaimed) {
+      return NextResponse.json({
+        eligible: false,
+        alreadyClaimed: true,
+        message: 'You have already claimed your free month trial. This offer is only available once.',
+      });
+    }
+
+    // Check if within 7 days of first login
+    const firstLoginDate = await getFirstLoginDate(steamId);
+    if (!firstLoginDate) {
+      return NextResponse.json({
+        eligible: false,
+        noFirstLogin: true,
+        message: 'Unable to verify your account age. Please try logging in again.',
+      });
+    }
+
+    const firstLogin = new Date(firstLoginDate);
+    const now = new Date();
+    const daysSinceFirstLogin = (now.getTime() - firstLogin.getTime()) / (1000 * 60 * 60 * 24);
+    const daysRemaining = Math.max(0, FREE_MONTH_DAYS - Math.floor(daysSinceFirstLogin));
+
+    if (daysSinceFirstLogin > FREE_MONTH_DAYS) {
+      return NextResponse.json({
+        eligible: false,
+        expired: true,
+        daysSinceFirstLogin: Math.floor(daysSinceFirstLogin),
+        message: `This free trial is only available within the first ${FREE_MONTH_DAYS} days of your first login. Your account is ${Math.floor(daysSinceFirstLogin)} days old.`,
+      });
+    }
+
+    // Eligible!
     return NextResponse.json({
-      eligible,
-      hasPro,
-      message: eligible 
-        ? 'You are eligible for 1 month free Pro! Claim it now.'
-        : 'You already have an active Pro subscription',
+      eligible: true,
+      hasPro: false,
+      daysRemaining,
+      message: `You are eligible for 1 month free Pro! ${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining > 1 ? 's' : ''} remaining to claim.` : 'Claim it now!'}`,
     });
   } catch (error) {
     console.error('Failed to check free month eligibility:', error);

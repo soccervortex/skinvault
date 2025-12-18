@@ -363,6 +363,13 @@ function InventoryContent() {
         try {
           if (combinedUser && typeof window !== 'undefined') {
             if (isLoginCallback) {
+              // This is your actual login - record first login date (don't block on this)
+              fetch('/api/user/first-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steamId: viewedSteamId }),
+              }).catch(() => {}); // Silently fail if this doesn't work
+              
               // This is your actual login - update the logged-in user completely
               window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
               // Trigger storage event so sidebar updates
