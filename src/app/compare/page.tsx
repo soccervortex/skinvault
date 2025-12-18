@@ -213,7 +213,8 @@ function CompareContent() {
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 md:space-y-12 pb-32">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
             <div className="flex items-center gap-4 md:gap-6">
@@ -441,6 +442,9 @@ function CompareContent() {
         limit={getWishlistLimit(false)}
         currentCount={wishlist.length}
       />
+        </div>
+        <Footer />
+      </div>
     </div>
   );
 }

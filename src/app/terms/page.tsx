@@ -8,7 +8,8 @@ export default function TermsPage() {
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-8 pb-32">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
             <div className="flex items-center gap-4 md:gap-6">
@@ -211,6 +212,7 @@ export default function TermsPage() {
 
           </div>
         </div>
+        <Footer />
       </div>
     </div>
   );

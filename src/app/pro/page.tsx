@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
+import Footer from '@/app/components/Footer';
 import { Crown, CheckCircle2, ArrowRight, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
 
 export default function ProInfoPage() {
@@ -338,6 +339,8 @@ export default function ProInfoPage() {
           </div>
         </div>
         </div>
+        </div>
+        <Footer />
       </div>
     </div>
   );

@@ -269,7 +269,8 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-12 custom-scrollbar">
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-12 custom-scrollbar">
         <div className="w-full max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6 md:mb-10 gap-4">
             <Link href="/" className="inline-flex items-center gap-2 text-gray-500 hover:text-white font-bold text-[9px] md:text-[10px] uppercase tracking-widest transition-all shrink-0">
@@ -469,6 +470,9 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
         limit={getWishlistLimit(false)}
         currentCount={wishlist.length}
       />
+        </div>
+        <Footer />
+      </div>
     </div>
   );
 }

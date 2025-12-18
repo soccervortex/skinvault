@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
+import Footer from "@/app/components/Footer";
 import {
   Loader2,
   Shield,
@@ -127,15 +128,18 @@ export default function AdminPage() {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-500">
-              Admin
-            </p>
-            <p className="text-sm text-gray-400">
-              Sign in with Steam first to access the admin panel.
-            </p>
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <p className="text-xs uppercase tracking-[0.4em] text-gray-500">
+                Admin
+              </p>
+              <p className="text-sm text-gray-400">
+                Sign in with Steam first to access the admin panel.
+              </p>
+            </div>
           </div>
+          <Footer />
         </div>
       </div>
     );
@@ -145,16 +149,19 @@ export default function AdminPage() {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <AlertTriangle className="mx-auto text-amber-400 mb-2" />
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-500">
-              Access denied
-            </p>
-            <p className="text-sm text-gray-400">
-              This admin panel is only available to the site owner.
-            </p>
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <AlertTriangle className="mx-auto text-amber-400 mb-2" />
+              <p className="text-xs uppercase tracking-[0.4em] text-gray-500">
+                Access denied
+              </p>
+              <p className="text-sm text-gray-400">
+                This admin panel is only available to the site owner.
+              </p>
+            </div>
           </div>
+          <Footer />
         </div>
       </div>
     );
@@ -163,7 +170,8 @@ export default function AdminPage() {
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="w-full max-w-5xl mx-auto bg-[#11141d] border border-white/10 p-6 md:p-8 lg:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl space-y-6 md:space-y-8">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">

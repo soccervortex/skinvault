@@ -101,14 +101,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
                 <Mail size={16}/> Contact
               </Link>
-              <div className="mt-8 pt-8 border-t border-white/5">
-                <Link href="/terms" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${pathname === '/terms' ? 'bg-gray-600 text-white' : 'text-gray-600 hover:text-gray-400'}`}>
-                  Terms
-                </Link>
-                <Link href="/privacy" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${pathname === '/privacy' ? 'bg-gray-600 text-white' : 'text-gray-600 hover:text-gray-400'}`}>
-                  Privacy
-                </Link>
-              </div>
               {user?.steamId === OWNER_STEAM_ID && (
                 <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
                   <Shield size={16}/> Admin Panel
@@ -203,14 +195,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
             <Mail size={16}/> Contact
           </Link>
-          <div className="mt-8 pt-8 border-t border-white/5">
-            <Link href="/terms" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${pathname === '/terms' ? 'bg-gray-600 text-white' : 'text-gray-600 hover:text-gray-400'}`}>
-              Terms
-            </Link>
-            <Link href="/privacy" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${pathname === '/privacy' ? 'bg-gray-600 text-white' : 'text-gray-600 hover:text-gray-400'}`}>
-              Privacy
-            </Link>
-          </div>
           {user?.steamId === OWNER_STEAM_ID && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
               <Shield size={16}/> Admin Panel
