@@ -192,6 +192,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/pro" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-gray-500 hover:text-indigo-300'}`}>
             <Shield size={16}/> Pro
           </Link>
+          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+            <Mail size={16}/> Contact
+          </Link>
           {user?.steamId === OWNER_STEAM_ID && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
               <Shield size={16}/> Admin Panel
