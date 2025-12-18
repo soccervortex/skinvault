@@ -17,11 +17,12 @@ export const metadata: Metadata = {
   description: "Premium CS2 skin analytics and inventory management",
   icons: {
     icon: [
+      { url: '/favicon.png', type: 'image/png', sizes: 'any' },
       { url: '/icon.png', type: 'image/png', sizes: 'any' },
       { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
       { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
-    shortcut: '/icon.png',
+    shortcut: '/favicon.png',
     apple: [
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
