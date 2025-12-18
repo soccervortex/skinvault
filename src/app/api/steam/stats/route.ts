@@ -10,7 +10,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
     }
 
-    const apiKey = process.env.STEAM_API_KEY || '0FC9C1CEBB016CB0B78642A67680F500';
+    const apiKey = process.env.STEAM_API_KEY || '72E5A9A17321670AD00D422453056898';
     const url = `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=730&key=${apiKey}&steamid=${steamId}`;
 
     const res = await fetch(url, { cache: 'no-store' });

@@ -16,11 +16,11 @@ type InventoryItem = {
 
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   return (
-    <div className="bg-[#11141d] p-5 rounded-[2rem] border border-white/5">
-      <div className="flex items-center gap-2 mb-3 text-[9px] font-black uppercase text-gray-500 tracking-widest">
+    <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
+      <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
         {icon} {label}
       </div>
-      <div className={`text-xl font-black italic tracking-tighter ${color}`}>
+      <div className={`text-lg md:text-xl font-black italic tracking-tighter ${color}`}>
         {val ?? '---'}{unit}
       </div>
     </div>
@@ -513,21 +513,21 @@ function InventoryContent() {
       <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
         {viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
-            <header className="bg-[#11141d] p-10 rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8">
-              <div className="flex items-center gap-6">
-                <img src={viewedUser.avatar} className="w-24 h-24 rounded-[2.5rem] border-2 border-blue-600 shadow-2xl" alt="avatar" />
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-4xl font-black italic uppercase tracking-tighter leading-none">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
+              <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+                <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                    <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
                       {viewedUser.name}
                     </h2>
                     {isPro && (
-                      <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400">
+                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
                       </span>
                     )}
                   </div>
-                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-4 w-fit">
+                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
                     <button
                       onClick={() => {
                         setCurrency({ code: '3', symbol: '€' });
@@ -537,7 +537,7 @@ function InventoryContent() {
                           /* ignore */
                         }
                       }}
-                      className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                      className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
                     >
                       EUR
                     </button>
@@ -550,31 +550,31 @@ function InventoryContent() {
                           /* ignore */
                         }
                       }}
-                      className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                      className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
                     >
                       USD
                     </button>
                   </div>
                   {shareUrl && (
-                    <div className="mt-3 space-y-1 max-w-xs">
+                    <div className="mt-3 space-y-1 max-w-full md:max-w-xs">
                       <button
                         onClick={handleCopyShareLink}
-                        className="text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 hover:text-white transition-colors"
+                        className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 hover:text-white transition-colors"
                       >
                         {copied ? 'Link copied' : 'Copy share link'}
                       </button>
-                      <p className="text-[9px] text-gray-600 break-all bg-black/40 px-3 py-2 rounded-xl border border-white/5 select-all cursor-text">
+                      <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
                         {shareUrl}
                       </p>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="bg-emerald-500/10 border border-emerald-500/20 px-10 py-6 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
-                <TrendingUp className="text-emerald-500" size={28} />
-                <div>
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
-                  <p className="text-4xl font-black text-white italic tracking-tighter">{currency.symbol}{totalVaultValue}</p>
+              <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
+                <TrendingUp className="text-emerald-500 shrink-0" size={24} />
+                <div className="min-w-0">
+                  <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
+                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter truncate">{currency.symbol}{totalVaultValue}</p>
                 </div>
               </div>
             </header>
@@ -591,34 +591,34 @@ function InventoryContent() {
             )}
 
             {topItems.length > 0 && (
-              <section className="space-y-4">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-500">
+              <section className="space-y-3 md:space-y-4">
+                <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">
                     Top Items
                   </h3>
-                  <span className="text-[10px] text-gray-500">
+                  <span className="text-[9px] md:text-[10px] text-gray-500">
                     Most valuable skins in this vault
                   </span>
                 </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 {topItems.map(({ item, price }, idx) => (
                   <Link
                     key={item.market_hash_name + idx}
                     href={`/item/${encodeURIComponent(item.market_hash_name)}`}
-                    className="bg-[#11141d] p-4 rounded-3xl border border-yellow-500/30 flex items-center gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
+                    className="bg-[#11141d] p-3 md:p-4 rounded-[2rem] md:rounded-3xl border border-yellow-500/30 flex items-center gap-3 md:gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
                   >
-                    <div className="w-16 h-16 rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden">
+                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden shrink-0">
                       <img
                         src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
                         className="w-full h-full object-contain"
                         alt={item.market_hash_name}
                       />
                     </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
                         {item.market_hash_name}
                       </p>
-                      <p className="text-xs font-black text-emerald-400 italic">
+                      <p className="text-[10px] md:text-xs font-black text-emerald-400 italic">
                         {currency.symbol}
                         {price.toLocaleString('nl-NL', {
                           minimumFractionDigits: 2,
@@ -632,7 +632,7 @@ function InventoryContent() {
               </section>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
               <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={playerStats?.kd} />
               <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
               <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
@@ -640,23 +640,23 @@ function InventoryContent() {
               <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
               <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
             </div>
-            <section className="space-y-10">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6">
-                <div className="flex items-center gap-4">
-                  <PackageOpen className="text-blue-500" size={28} />
-                  <h3 className="text-3xl font-black uppercase tracking-tighter italic">Secured Items</h3>
+            <section className="space-y-6 md:space-y-10">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-6">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <PackageOpen className="text-blue-500 shrink-0" size={24} />
+                  <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic">Secured Items</h3>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                   <input 
                     value={searchQuery} 
                     onChange={(e) => setSearchQuery(e.target.value)} 
-                    className="bg-[#11141d] border border-white/5 rounded-2xl py-3 px-6 text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl" 
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-4 md:px-6 text-[10px] md:text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl" 
                     placeholder="SEARCH VAULT..." 
                   />
                   <select
                     value={sortMode}
                     onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
-                    className="bg-[#11141d] border border-white/5 rounded-2xl py-3 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"
                   >
                     <option value="price-desc">Sort: Price High → Low</option>
                     <option value="price-asc">Sort: Price Low → High</option>
@@ -664,7 +664,7 @@ function InventoryContent() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
                 {sortedInv.length === 0 ? (
                   <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border border-dashed border-white/10 rounded-[2.5rem] bg-black/20">
                     <PackageOpen className="text-gray-600 mb-4" size={32} />
@@ -682,20 +682,20 @@ function InventoryContent() {
                       href={`/item/${encodeURIComponent(item.market_hash_name)}`}
                       className="group"
                     >
-                      <div className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                      <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
                         <img 
                           src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
-                          className="w-full h-32 object-contain mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
+                          className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
                           alt="skin" 
                         />
-                        <div className="mt-auto space-y-2">
-                          <p className="text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
-                          <p className="text-[11px] font-black text-emerald-500 italic">
+                        <div className="mt-auto space-y-1.5 md:space-y-2">
+                          <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
+                          <p className="text-[10px] md:text-[11px] font-black text-emerald-500 italic">
                             {itemPrices[item.market_hash_name] 
                               ? itemPrices[item.market_hash_name] 
                               : priceScanDone 
-                                ? <span className="text-gray-500 text-[9px]">NO PRICE</span>
-                                : <span className="text-gray-600 animate-pulse text-[9px]">SCANNING...</span>}
+                                ? <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>
+                                : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">SCANNING...</span>}
                           </p>
                         </div>
                       </div>
