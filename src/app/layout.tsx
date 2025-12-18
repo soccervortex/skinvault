@@ -17,12 +17,40 @@ export const metadata: Metadata = {
   description: "Premium CS2 skin analytics and inventory management",
   icons: {
     icon: [
-      { url: '/icon.png', type: 'image/png' },
-      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
-      { url: '/icon.png', type: 'image/png', sizes: '16x16' },
+      { url: '/icon.png', type: 'image/png', sizes: 'any' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
     shortcut: '/icon.png',
-    apple: '/icon.png',
+    apple: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'SkinVault',
+  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
+  openGraph: {
+    title: 'SkinVault - CS2 Skin Analytics',
+    description: 'Premium CS2 skin analytics and inventory management',
+    type: 'website',
+    images: [{ url: '/icon-512.png', width: 512, height: 512 }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'SkinVault - CS2 Skin Analytics',
+    description: 'Premium CS2 skin analytics and inventory management',
+    images: ['/icon-512.png'],
   },
 };
 
