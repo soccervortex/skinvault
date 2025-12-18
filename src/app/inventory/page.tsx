@@ -1,0 +1,716 @@
+"use client";
+
+import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import Sidebar from '@/app/components/Sidebar';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp } from 'lucide-react';
+
+const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
+
+type InventoryItem = {
+  market_hash_name: string;
+  icon_url: string;
+  [key: string]: any;
+};
+
+function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
+  return (
+    <div className="bg-[#11141d] p-5 rounded-[2rem] border border-white/5">
+      <div className="flex items-center gap-2 mb-3 text-[9px] font-black uppercase text-gray-500 tracking-widest">
+        {icon} {label}
+      </div>
+      <div className={`text-xl font-black italic tracking-tighter ${color}`}>
+        {val ?? '---'}{unit}
+      </div>
+    </div>
+  );
+}
+
+function InventoryContent() {
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
+  const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
+  const [viewedUser, setViewedUser] = useState<any>(null);
+  const [playerStats, setPlayerStats] = useState<any>(null);
+  const [statsPrivate, setStatsPrivate] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priceScanDone, setPriceScanDone] = useState(false);
+  const [sortMode, setSortMode] = useState<'name-asc' | 'price-desc' | 'price-asc'>('price-desc');
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const priceCacheRef = useRef<{ [key: string]: string }>({});
+  const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
+  const isPro = useMemo(
+    () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
+    [viewedUser?.proUntil]
+  );
+
+  // --- PROXY ROTATION SETUP ---
+  const PROXY_LIST = [
+    (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
+    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+
+  const fetchWithRotation = async (steamUrl: string) => {
+    for (let i = 0; i < PROXY_LIST.length; i++) {
+      try {
+        const proxyUrl = PROXY_LIST[i](steamUrl);
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+
+        const json = await res.json();
+        // AllOrigins wraps data in .contents, corsproxy returns it directly
+        const data = typeof json.contents === 'string' ? JSON.parse(json.contents) : (json.contents || json);
+        
+        if (data && (data.success || data.descriptions)) return data;
+      } catch (e) {
+        console.warn(`Proxy ${i} failed, trying next...`);
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const stored = window.localStorage.getItem('sv_currency');
+      if (stored === '1') {
+        setCurrency({ code: '1', symbol: '$' });
+      } else if (stored === '3') {
+        setCurrency({ code: '3', symbol: '€' });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        priceCacheRef.current = parsed;
+        setItemPrices(parsed);
+      } catch {
+        priceCacheRef.current = {};
+        setItemPrices({});
+      }
+    } else {
+      priceCacheRef.current = {};
+      setItemPrices({});
+    }
+  }, [cacheKey]);
+
+  const fetchViewedProfile = async (id: string) => {
+    try {
+      const steamUrl = `https://steamcommunity.com/profiles/${id}/?xml=1`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      const text = await textRes.text();
+      const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
+      const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
+      return { steamId: id, name, avatar };
+    } catch (e) { 
+      console.warn('Profile fetch failed:', e);
+      return null; 
+    }
+  };
+
+  const fetchPlayerStats = async (id: string) => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const res = await fetch(`/api/steam/stats?id=${id}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        console.warn("Stats API error", await res.text());
+        return;
+      }
+      const data = await res.json();
+      const ps = data?.playerstats;
+      const s = ps?.stats;
+
+      if (s && Array.isArray(s)) {
+        const statsObj: any = {};
+        s.forEach((item: any) => statsObj[item.name] = item.value);
+        const kills = Number(statsObj.total_kills ?? 0);
+        const deaths = Number(statsObj.total_deaths ?? 0);
+        const hsKills = Number(statsObj.total_kills_headshot ?? 0);
+        const matchesWon = Number(statsObj.total_matches_won ?? 0);
+        const matchesPlayed = Number(statsObj.total_matches_played ?? 0);
+
+        const kd = deaths > 0 ? (kills / deaths) : kills > 0 ? kills : 0;
+        const hs = kills > 0 ? (hsKills / kills) * 100 : 0;
+        const wr = matchesPlayed > 0 ? (matchesWon / matchesPlayed) * 100 : 0;
+
+        setPlayerStats({
+          kd: kd.toFixed(2),
+          hs: hs.toFixed(1),
+          wr: wr.toFixed(1),
+          kills: kills.toLocaleString(),
+          wins: matchesWon.toLocaleString()
+        });
+        setStatsPrivate(false);
+      } else {
+        // Only flag as private when Steam explicitly says so
+        const errMsg = typeof ps?.error === 'string' ? ps.error.toLowerCase() : '';
+        if (errMsg.includes('private') || errMsg.includes('not allowed')) {
+          setStatsPrivate(true);
+        } else {
+          setStatsPrivate(false);
+        }
+      }
+    } catch (e) { console.error("Stats failed", e); }
+  };
+
+  const mergeAndStorePrices = (next: Record<string, string>) => {
+    const merged = { ...priceCacheRef.current, ...next };
+    priceCacheRef.current = merged;
+    setItemPrices(merged);
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(merged));
+    } catch {
+      // ignore quota errors
+    }
+  };
+
+  const fetchPrices = async (names: string[]) => {
+    const missing = names.filter((n) => !priceCacheRef.current[n]);
+    if (!missing.length) return;
+
+    const results: Record<string, string> = {};
+    const active = new Set<Promise<void>>();
+    const CONCURRENCY = 6;
+
+    for (const name of missing) {
+      let taskPromise: Promise<void>;
+      taskPromise = (async () => {
+        try {
+          const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${encodeURIComponent(name as string)}`;
+          const pData = await fetchWithRotation(steamUrl);
+          if (pData?.success) {
+            const price = pData.lowest_price || pData.median_price;
+            if (price) results[name] = price;
+          }
+        } catch {
+          /* ignore individual price failures */
+        }
+      })().finally(() => active.delete(taskPromise));
+
+      active.add(taskPromise);
+      if (active.size >= CONCURRENCY) {
+        await Promise.race(active);
+      }
+    }
+
+    await Promise.all(active);
+    mergeAndStorePrices(results);
+  };
+
+  const fetchInventory = async (id: string) => {
+    try {
+      const invUrl = `https://steamcommunity.com/inventory/${id}/730/2?l=english&count=500`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for inventory
+      
+      // Add timeout to fetchWithRotation by wrapping it
+      const data = await Promise.race([
+        fetchWithRotation(invUrl),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Inventory fetch timeout')), 15000)
+        )
+      ]) as any;
+      
+      clearTimeout(timeoutId);
+      const items = (data?.descriptions || []) as InventoryItem[];
+      setInventory(items);
+    } catch (e) { 
+      console.error("Inventory failed", e);
+      setInventory([]); // Set empty array so page can still render
+    }
+  };
+
+  useEffect(() => {
+    const extractSteamId = (raw: string | null) => {
+      if (!raw) return null;
+
+      // If it's a full Steam OpenID or profile URL, grab the last path segment
+      if (raw.includes('steamcommunity.com')) {
+        try {
+          const url = new URL(raw);
+          const parts = url.pathname.split('/').filter(Boolean);
+          return parts[parts.length - 1] || null;
+        } catch {
+          const parts = raw.split('/').filter(Boolean);
+          return parts[parts.length - 1] || null;
+        }
+      }
+
+      // If it's just digits, assume it's already a SteamID64
+      if (/^\d+$/.test(raw)) return raw;
+
+      return raw;
+    };
+
+    // Support multiple query keys for flexibility
+    const possibleKeys = ['steamId', 'steamid', 'id', 'openid.claimed_id', 'openid_claimed_id'];
+    let fromQuery: string | null = null;
+
+    for (const key of possibleKeys) {
+      const v = searchParams.get(key as any);
+      if (v) {
+        fromQuery = v;
+        break;
+      }
+    }
+
+    // Get logged-in user (your own account) - this should NEVER change when viewing other profiles
+    const loggedInUser = typeof window !== 'undefined' 
+      ? JSON.parse(localStorage.getItem('steam_user') || '{}')
+      : null;
+    const loggedInSteamId = loggedInUser?.steamId;
+
+    // Determine which profile to view
+    // Priority: query param > OpenID callback > logged-in user's own profile
+    const viewedSteamId =
+      extractSteamId(fromQuery) ||
+      extractSteamId(searchParams.get('openid.claimed_id')) ||
+      extractSteamId(searchParams.get('openid_claimed_id')) ||
+      loggedInSteamId;
+
+    if (!viewedSteamId) return;
+
+    const isLoginCallback = !!(
+      searchParams.get('openid.claimed_id') || 
+      searchParams.get('openid_claimed_id')
+    );
+    const isViewingOwnProfile = viewedSteamId === loggedInSteamId;
+
+    const loadAll = async () => {
+      setLoading(true);
+      
+      // Start all requests but don't wait for all - show content progressively
+      const profilePromise = fetchViewedProfile(viewedSteamId);
+      const proPromise = fetch(`/api/user/pro?id=${viewedSteamId}`)
+        .then((res) => (res.ok ? res.json() : { proUntil: null }))
+        .catch(() => ({ proUntil: null }));
+      
+      // These can load in background
+      fetchPlayerStats(viewedSteamId).catch(() => {});
+      fetchInventory(viewedSteamId).catch(() => {});
+
+      // Wait for profile and Pro info with timeout - these are critical
+      try {
+        const [profile, proInfo] = await Promise.race([
+          Promise.all([profilePromise, proPromise]),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 12000)
+          )
+        ]) as [any, any];
+
+        const combinedUser = profile
+          ? { ...profile, proUntil: proInfo?.proUntil || null }
+          : null;
+
+        setViewedUser(combinedUser);
+
+        // Only update logged-in user in localStorage when:
+        // 1. It's a Steam login callback (OpenID redirect) - always update
+        // 2. User is viewing their own profile - update Pro status but keep your account
+        // This ensures your logged-in account stays consistent and Pro status stays up-to-date
+        try {
+          if (combinedUser && typeof window !== 'undefined') {
+            if (isLoginCallback) {
+              // This is your actual login - update the logged-in user completely
+              window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
+              // Trigger storage event so sidebar updates
+              window.dispatchEvent(new Event('storage'));
+            } else if (isViewingOwnProfile && loggedInUser) {
+              // Viewing your own profile - only update Pro status, keep your account info
+              const updatedUser = {
+                ...loggedInUser,
+                proUntil: combinedUser.proUntil, // Update Pro status
+              };
+              window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
+              // Trigger storage event so sidebar updates
+              window.dispatchEvent(new Event('storage'));
+            }
+            // Otherwise, we're just viewing someone else's profile - don't touch logged-in user
+          }
+        } catch {
+          // ignore storage issues (e.g. private mode)
+        }
+      } catch (error) {
+        // If profile fetch times out, try to use cached or minimal data
+        console.warn('Critical data fetch timeout, using fallback');
+        const fallbackLoggedInUser = typeof window !== 'undefined' 
+          ? JSON.parse(localStorage.getItem('steam_user') || '{}')
+          : null;
+        
+        let fallbackUser;
+        if (fallbackLoggedInUser?.steamId === viewedSteamId) {
+          // If viewing own profile and fetch fails, use cached data
+          fallbackUser = fallbackLoggedInUser;
+        } else {
+          // Otherwise show minimal user data
+          fallbackUser = { 
+            steamId: viewedSteamId, 
+            name: "User", 
+            avatar: "",
+            proUntil: null 
+          };
+        }
+        
+        setViewedUser(fallbackUser);
+        
+        // Don't update localStorage on timeout - keep existing data
+      }
+
+      setLoading(false);
+    };
+    loadAll();
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!inventory.length) return;
+
+    const run = async () => {
+      setPriceScanDone(false);
+      const uniqueNames = Array.from(new Set(inventory.map((i) => i.market_hash_name)));
+      await fetchPrices(uniqueNames);
+      setPriceScanDone(true);
+    };
+
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency.code, inventory]);
+
+  useEffect(() => {
+    if (!viewedUser?.steamId) return;
+    try {
+      if (typeof window === 'undefined') return;
+      const origin = window.location.origin;
+      setShareUrl(`${origin}/inventory?steamId=${viewedUser.steamId}`);
+    } catch {
+      setShareUrl(null);
+    }
+  }, [viewedUser]);
+
+  const totalVaultValue = useMemo(() => {
+    let total = 0;
+    inventory.forEach(item => {
+      const priceStr = itemPrices[item.market_hash_name];
+      if (priceStr) {
+        const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (!isNaN(num)) total += num;
+      }
+    });
+    return total.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }, [inventory, itemPrices]);
+
+  const totalItems = useMemo(() => inventory.length, [inventory]);
+
+  const pricedItems = useMemo(
+    () => inventory.filter(i => itemPrices[i.market_hash_name]).length,
+    [inventory, itemPrices]
+  );
+
+  const parsePriceToNumber = (priceStr?: string) => {
+    if (!priceStr) return 0;
+    const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+    return isNaN(num) ? 0 : num;
+  };
+
+  const filteredInv = useMemo(() => 
+    inventory.filter(i => i.market_hash_name.toLowerCase().includes(searchQuery.toLowerCase())), 
+    [inventory, searchQuery]
+  );
+
+  const sortedInv = useMemo(() => {
+    const arr = [...filteredInv];
+    arr.sort((a, b) => {
+      if (sortMode === 'name-asc') {
+        return a.market_hash_name.localeCompare(b.market_hash_name);
+      }
+
+      const priceA = parsePriceToNumber(itemPrices[a.market_hash_name]);
+      const priceB = parsePriceToNumber(itemPrices[b.market_hash_name]);
+
+      if (sortMode === 'price-asc') {
+        return priceA - priceB;
+      }
+
+      // price-desc
+      return priceB - priceA;
+    });
+    return arr;
+  }, [filteredInv, itemPrices, sortMode]);
+
+  const topItems = useMemo(
+    () =>
+      inventory
+        .map((item) => ({
+          item,
+          price: parsePriceToNumber(itemPrices[item.market_hash_name])
+        }))
+        .filter((entry) => entry.price > 0)
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 3),
+    [inventory, itemPrices]
+  );
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).clipboard && typeof window !== 'undefined' && (window as any).isSecureContext) {
+        await (navigator as any).clipboard.writeText(shareUrl);
+      } else if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+      if (typeof window !== 'undefined') {
+        window.alert('Could not copy link. Please copy it manually.');
+      }
+    }
+  };
+
+  if (!viewedUser && loading) return (
+    <div className="h-screen bg-[#08090d] flex flex-col items-center justify-center gap-4">
+      <Loader2 className="animate-spin text-blue-500" size={40} />
+      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Syncing with Steam...</p>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        {viewedUser && (
+          <div className="max-w-6xl mx-auto space-y-12 pb-32">
+            <header className="bg-[#11141d] p-10 rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8">
+              <div className="flex items-center gap-6">
+                <img src={viewedUser.avatar} className="w-24 h-24 rounded-[2.5rem] border-2 border-blue-600 shadow-2xl" alt="avatar" />
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-4xl font-black italic uppercase tracking-tighter leading-none">
+                      {viewedUser.name}
+                    </h2>
+                    {isPro && (
+                      <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400">
+                        Pro
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-4 w-fit">
+                    <button
+                      onClick={() => {
+                        setCurrency({ code: '3', symbol: '€' });
+                        try {
+                          if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
+                        } catch {
+                          /* ignore */
+                        }
+                      }}
+                      className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                    >
+                      EUR
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrency({ code: '1', symbol: '$' });
+                        try {
+                          if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
+                        } catch {
+                          /* ignore */
+                        }
+                      }}
+                      className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                    >
+                      USD
+                    </button>
+                  </div>
+                  {shareUrl && (
+                    <div className="mt-3 space-y-1 max-w-xs">
+                      <button
+                        onClick={handleCopyShareLink}
+                        className="text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 hover:text-white transition-colors"
+                      >
+                        {copied ? 'Link copied' : 'Copy share link'}
+                      </button>
+                      <p className="text-[9px] text-gray-600 break-all bg-black/40 px-3 py-2 rounded-xl border border-white/5 select-all cursor-text">
+                        {shareUrl}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="bg-emerald-500/10 border border-emerald-500/20 px-10 py-6 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
+                <TrendingUp className="text-emerald-500" size={28} />
+                <div>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
+                  <p className="text-4xl font-black text-white italic tracking-tighter">{currency.symbol}{totalVaultValue}</p>
+                </div>
+              </div>
+            </header>
+
+            {statsPrivate && (
+              <div className="flex items-center gap-4 bg-amber-500/10 border border-amber-500/20 p-5 rounded-[2rem] text-xs">
+                <span className="font-black uppercase tracking-[0.25em] text-amber-400">
+                  Stats are private
+                </span>
+                <span className="text-[10px] text-gray-400">
+                  Set your Steam &quot;Game details&quot; to Public to show K/D, HS% and Wins.
+                </span>
+              </div>
+            )}
+
+            {topItems.length > 0 && (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-500">
+                    Top Items
+                  </h3>
+                  <span className="text-[10px] text-gray-500">
+                    Most valuable skins in this vault
+                  </span>
+                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {topItems.map(({ item, price }, idx) => (
+                  <Link
+                    key={item.market_hash_name + idx}
+                    href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                    className="bg-[#11141d] p-4 rounded-3xl border border-yellow-500/30 flex items-center gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden">
+                      <img
+                        src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
+                        className="w-full h-full object-contain"
+                        alt={item.market_hash_name}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
+                        {item.market_hash_name}
+                      </p>
+                      <p className="text-xs font-black text-emerald-400 italic">
+                        {currency.symbol}
+                        {price.toLocaleString('nl-NL', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              </section>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={playerStats?.kd} />
+              <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
+              <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
+              <StatCard label="HS %" icon={<Target size={12}/>} val={playerStats?.hs} unit="%" />
+              <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
+              <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
+            </div>
+            <section className="space-y-10">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6">
+                <div className="flex items-center gap-4">
+                  <PackageOpen className="text-blue-500" size={28} />
+                  <h3 className="text-3xl font-black uppercase tracking-tighter italic">Secured Items</h3>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                  <input 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-3 px-6 text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl" 
+                    placeholder="SEARCH VAULT..." 
+                  />
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-3 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"
+                  >
+                    <option value="price-desc">Sort: Price High → Low</option>
+                    <option value="price-asc">Sort: Price Low → High</option>
+                    <option value="name-asc">Sort: Name A → Z</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {sortedInv.length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border border-dashed border-white/10 rounded-[2.5rem] bg-black/20">
+                    <PackageOpen className="text-gray-600 mb-4" size={32} />
+                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">
+                      No items match your search
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-2">
+                      Try clearing your search or adjusting the sort order.
+                    </p>
+                  </div>
+                ) : (
+                  sortedInv.map((item, idx) => (
+                    <Link
+                      key={idx}
+                      href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                      className="group"
+                    >
+                      <div className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                        <img 
+                          src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
+                          className="w-full h-32 object-contain mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
+                          alt="skin" 
+                        />
+                        <div className="mt-auto space-y-2">
+                          <p className="text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
+                          <p className="text-[11px] font-black text-emerald-500 italic">
+                            {itemPrices[item.market_hash_name] 
+                              ? itemPrices[item.market_hash_name] 
+                              : priceScanDone 
+                                ? <span className="text-gray-500 text-[9px]">NO PRICE</span>
+                                : <span className="text-gray-600 animate-pulse text-[9px]">SCANNING...</span>}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default function InventoryPage() { 
+  return <Suspense fallback={null}><InventoryContent /></Suspense>; 
+}
