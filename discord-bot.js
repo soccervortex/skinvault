@@ -462,17 +462,137 @@ client.on('interactionCreate', async (interaction) => {
         const assets = invData.assets || [];
         const descriptions = invData.descriptions || [];
         
-        // Calculate total value (simplified - would need price data for accurate calculation)
-        const itemCount = assets.length;
+        // Create a map of classid_instanceid to descriptions
+        const descMap = new Map();
+        descriptions.forEach(desc => {
+          const key = `${desc.classid}_${desc.instanceid || 0}`;
+          descMap.set(key, desc);
+        });
+
+        // Match assets with descriptions and get prices
+        const items = [];
+        let totalValue = 0;
+        let tradableCount = 0;
+        let nonTradableCount = 0;
+        let pricedCount = 0;
+
+        for (const asset of assets) {
+          const key = `${asset.classid}_${asset.instanceid || 0}`;
+          const desc = descMap.get(key);
+          if (!desc) continue;
+
+          const itemName = desc.market_hash_name || desc.market_name || desc.name || `Item ${desc.classid}`;
+          const isTradable = desc.tradable !== 0 && desc.tradable !== false;
+          const isMarketable = desc.marketable !== 0 && desc.marketable !== false;
+          
+          if (isTradable) tradableCount++;
+          else nonTradableCount++;
+
+          // Get price for marketable items
+          let price = null;
+          let priceValue = 0;
+          if (isMarketable && (desc.market_hash_name || desc.market_name)) {
+            price = await getItemPrice(desc.market_hash_name || desc.market_name, '3');
+            if (price) {
+              const priceStr = price.lowest_price || price.lowest || price.median_price;
+              if (priceStr) {
+                // Parse price (handles formats like "€0,78" or "$1.23")
+                const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
+                priceValue = parseFloat(cleaned) || 0;
+                totalValue += priceValue * (asset.amount || 1);
+                pricedCount++;
+              }
+            }
+          }
+
+          items.push({
+            name: itemName,
+            price: price ? (price.lowest_price || price.lowest || price.median_price) : null,
+            priceValue,
+            isTradable,
+            isMarketable,
+            amount: asset.amount || 1,
+            marketHashName: desc.market_hash_name || desc.market_name,
+          });
+        }
+
+        // Sort items by price (highest first)
+        items.sort((a, b) => b.priceValue - a.priceValue);
+
+        // Get stats
+        let stats = null;
+        try {
+          const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?steamId=${steamId}`);
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            stats = statsData.stats || {};
+          }
+        } catch (error) {
+          // Stats are optional
+        }
+
+        const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
+        const totalItems = assets.length;
         const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
 
+        // Create main embed
         const embed = new EmbedBuilder()
           .setTitle('💎 Your Vault')
-          .setDescription(`**Total Items:** ${itemCount}\n**Unique Items:** ${uniqueItems}\n\nView detailed stats and prices on SkinVault!`)
           .setColor(0x5865F2)
-          .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
+          .setURL(vaultUrl)
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        // Add summary fields
+        const totalValueStr = totalValue > 0 ? `€${totalValue.toFixed(2).replace('.', ',')}` : '€0,00';
+        embed.addFields(
+          { name: '📦 Total Items', value: String(totalItems), inline: true },
+          { name: '🔢 Unique Items', value: String(uniqueItems), inline: true },
+          { name: '💰 Total Value', value: totalValueStr, inline: true },
+          { name: '✅ Tradable Items', value: String(tradableCount), inline: true },
+          { name: '🔒 Non-Tradable Items', value: String(nonTradableCount), inline: true },
+          { name: '💵 Priced Items', value: String(pricedCount), inline: true }
+        );
+
+        // Add stats if available
+        if (stats) {
+          if (stats.total_kills) embed.addFields({ name: '💀 Total Kills', value: String(stats.total_kills), inline: true });
+          if (stats.total_deaths) embed.addFields({ name: '☠️ Total Deaths', value: String(stats.total_deaths), inline: true });
+          if (stats.total_kills && stats.total_deaths) {
+            const kd = (stats.total_kills / stats.total_deaths).toFixed(2);
+            embed.addFields({ name: '📈 K/D Ratio', value: kd, inline: true });
+          }
+          if (stats.total_wins) embed.addFields({ name: '🏆 Wins', value: String(stats.total_wins), inline: true });
+        }
+
+        // Add items (limit to first 10 to avoid embed limits)
+        const itemsToShow = items.slice(0, 10);
+        if (itemsToShow.length > 0) {
+          embed.addFields({ name: '\u200b', value: '**Top Items:**', inline: false });
+          
+          itemsToShow.forEach((item, index) => {
+            const itemUrl = item.marketHashName 
+              ? `https://skinvaults.vercel.app/item/${encodeURIComponent(item.marketHashName)}`
+              : vaultUrl;
+            const priceText = item.price || (item.isMarketable ? 'No price data' : 'NOT MARKETABLE');
+            const tradableText = item.isTradable ? '✅' : '🔒';
+            const amountText = item.amount > 1 ? ` (x${item.amount})` : '';
+            
+            embed.addFields({
+              name: `${index + 1}. ${tradableText} ${item.name}${amountText}`,
+              value: `💰 **Price:** ${priceText}\n🔗 [View Item](${itemUrl})`,
+              inline: false,
+            });
+          });
+
+          if (items.length > 10) {
+            embed.setDescription(`Showing top 10 of ${items.length} items\n\n[View Full Vault](${vaultUrl})`);
+          } else {
+            embed.setDescription(`[View Full Vault](${vaultUrl})`);
+          }
+        } else {
+          embed.setDescription(`No items found.\n\n[View Vault](${vaultUrl})`);
+        }
 
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
