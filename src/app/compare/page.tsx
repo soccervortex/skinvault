@@ -1,12 +1,14 @@
 "use client";
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronLeft, Swords, Shield, Target, Zap, Award, TrendingUp, BarChart3, Loader2, Heart } from 'lucide-react';
+import { ChevronLeft, Swords, Shield, Target, Zap, Award, TrendingUp, BarChart3, Loader2, Heart, Bell } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
+import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 type CompareSkin = {
   id: string;
@@ -33,50 +35,9 @@ function CompareContent() {
   const [user, setUser] = useState<any>(null);
   const [isPro, setIsPro] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [trackerModalItem, setTrackerModalItem] = useState<CompareSkin | null>(null);
 
-  // --- PROXY ROTATION SETUP FOR PRICES ---
-  const PROXY_LIST = [
-    (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-
-  const fetchWithRotation = async (steamUrl: string) => {
-    const attempts = PROXY_LIST.map(async (buildUrl, index) => {
-      try {
-        const proxyUrl = buildUrl(steamUrl);
-        const res = await fetch(proxyUrl, { cache: "no-store" });
-        if (!res.ok) throw new Error(`Proxy ${index} status ${res.status}`);
-
-        let data: any;
-        const text = await res.text();
-
-        try {
-          const json = JSON.parse(text);
-          const wrapped = (json as any).contents;
-          data = typeof wrapped === "string" ? JSON.parse(wrapped) : wrapped || json;
-        } catch {
-          data = JSON.parse(text);
-        }
-
-        if (data && (data.success || data.lowest_price || data.median_price)) {
-          return data;
-        }
-        throw new Error(`Proxy ${index} no price data`);
-      } catch (e) {
-        console.warn(`Price proxy ${index} failed`, e);
-        throw e;
-      }
-    });
-
-    try {
-      // @ts-ignore Promise.any available in modern runtimes
-      return await Promise.any(attempts);
-    } catch {
-      return null;
-    }
-  };
+  // Proxy rotation will use Pro status to determine proxy count
 
   useEffect(() => {
     const id1 = searchParams.get('id1');
@@ -114,13 +75,12 @@ function CompareContent() {
       const steamId = parsedUser?.steamId || null;
       setWishlist(loadWishlist(steamId));
       
-      // Check Pro status
-      if (parsedUser?.proUntil) {
-        const proUntil = new Date(parsedUser.proUntil);
-        setIsPro(proUntil > new Date());
-      } else {
-        setIsPro(false);
-      }
+        // Check Pro status from API to ensure accuracy
+        if (steamId) {
+          checkProStatus(steamId).then(setIsPro);
+        } else {
+          setIsPro(false);
+        }
     } catch {
       setUser(null);
       setWishlist([]);
@@ -161,7 +121,11 @@ function CompareContent() {
           const hash = encodeURIComponent(marketName);
           const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
 
-          const data = await fetchWithRotation(steamUrl);
+          const data = await fetchWithProxyRotation(steamUrl, isPro, { 
+            parallel: true,
+            marketHashName: marketName,
+            currency: currency.code,
+          });
           if (data?.success) {
             next[skin.id] = {
               lowest: data.lowest_price || data.median_price || "---",
@@ -316,6 +280,18 @@ function CompareContent() {
                       className="w-full h-auto max-h-48 md:max-h-none object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
                     />
                   </div>
+                  
+                  {/* Price Tracker Button */}
+                  <div className="flex gap-2 mb-3 md:mb-4">
+                    <button
+                      onClick={() => setTrackerModalItem(skin)}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <Bell size={12} />
+                      Price Tracker
+                    </button>
+                  </div>
+                  
                   <p
                     className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.4em] mb-1"
                     style={{ color: rarityColor }}
@@ -442,6 +418,17 @@ function CompareContent() {
         limit={getWishlistLimit(false)}
         currentCount={wishlist.length}
       />
+      
+      {trackerModalItem && (
+        <PriceTrackerModal
+          isOpen={!!trackerModalItem}
+          onClose={() => setTrackerModalItem(null)}
+          item={trackerModalItem}
+          user={user}
+          isPro={isPro}
+          currency={currency}
+        />
+      )}
         </div>
       </div>
   );

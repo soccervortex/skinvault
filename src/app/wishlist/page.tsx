@@ -7,6 +7,7 @@ import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit, getWishlistBatchSize } from '@/app/utils/pro-limits';
+import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 const PROXY_LIST = [
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -66,10 +67,9 @@ export default function WishlistPage() {
         const steamId = parsedUser?.steamId || null;
         setItems(loadWishlist(steamId));
         
-        // Check Pro status
-        if (parsedUser?.proUntil) {
-          const proUntil = new Date(parsedUser.proUntil);
-          setIsPro(proUntil > new Date());
+        // Check Pro status from API to ensure accuracy
+        if (steamId) {
+          checkProStatus(steamId).then(setIsPro);
         } else {
           setIsPro(false);
         }
@@ -122,7 +122,11 @@ export default function WishlistPage() {
             const hash = encodeURIComponent(marketName);
             const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
 
-            const data = await fetchWithRotation(steamUrl);
+            const data = await fetchWithProxyRotation(steamUrl, isPro, { 
+              parallel: false,
+              marketHashName: marketName,
+              currency: currency.code,
+            });
             if (data?.success) {
               next[entry.key] = {
                 lowest: data.lowest_price || data.median_price || '---',

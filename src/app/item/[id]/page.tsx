@@ -6,6 +6,7 @@ import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
+import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
@@ -33,52 +34,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   const priceCacheRef = useRef<Record<string, any>>({});
   const [priceDone, setPriceDone] = useState(false);
 
-  // Shared proxy rotation for Steam price API
-  const PROXY_LIST = [
-    (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-    // extra generic proxies (no account)
-    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-
-  const fetchWithRotation = async (steamUrl: string) => {
-    const attempts = PROXY_LIST.map(async (buildUrl, index) => {
-      try {
-        const proxyUrl = buildUrl(steamUrl);
-        const res = await fetch(proxyUrl, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`Proxy ${index} status ${res.status}`);
-
-        let data: any;
-        const text = await res.text();
-
-        try {
-          const json = JSON.parse(text);
-          const wrapped = (json as any).contents;
-          data = typeof wrapped === 'string' ? JSON.parse(wrapped) : (wrapped || json);
-        } catch {
-          // raw JSON from /raw or similar
-          data = JSON.parse(text);
-        }
-
-        if (data && (data.success || data.lowest_price || data.median_price)) {
-          return data;
-        }
-        throw new Error(`Proxy ${index} no price data`);
-      } catch (e) {
-        console.warn(`Price proxy ${index} failed`, e);
-        throw e;
-      }
-    });
-
-    try {
-      // return first successful proxy, ignore others
-      // @ts-ignore Promise.any is available in modern runtimes
-      return await Promise.any(attempts);
-    } catch {
-      return null;
-    }
-  };
+  // Proxy rotation will use Pro status to determine proxy count
 
   // Hydrate dataset + price caches + wishlist once on mount
   useEffect(() => {
@@ -102,10 +58,9 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
         const steamId = parsedUser?.steamId || null;
         setWishlist(loadWishlist(steamId));
         
-        // Check Pro status
-        if (parsedUser?.proUntil) {
-          const proUntil = new Date(parsedUser.proUntil);
-          setIsPro(proUntil > new Date());
+        // Check Pro status from API to ensure accuracy
+        if (steamId) {
+          checkProStatus(steamId).then(setIsPro);
         } else {
           setIsPro(false);
         }
@@ -196,7 +151,12 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
       const hash = encodeURIComponent(marketName);
       const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
 
-      const data = await fetchWithRotation(steamUrl);
+      const marketHashName = item?.market_hash_name || item?.name || '';
+      const data = await fetchWithProxyRotation(steamUrl, isPro, { 
+        parallel: true,
+        marketHashName,
+        currency: currency.code,
+      });
       if (data?.success) {
         const next = {
           lowest: data.lowest_price || data.median_price || "---",

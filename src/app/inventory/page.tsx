@@ -4,8 +4,10 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell } from 'lucide-react';
 import { getPriceScanConcurrency } from '@/app/utils/pro-limits';
+import { fetchWithProxyRotation } from '@/app/utils/proxy-utils';
+import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
 
 const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
 
@@ -42,6 +44,9 @@ function InventoryContent() {
   const [sortMode, setSortMode] = useState<'name-asc' | 'price-desc' | 'price-asc'>('price-desc');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [discordStatus, setDiscordStatus] = useState<any>(null);
+  const [showManageTrackers, setShowManageTrackers] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
   const isPro = useMemo(
@@ -49,32 +54,7 @@ function InventoryContent() {
     [viewedUser?.proUntil]
   );
 
-  // --- PROXY ROTATION SETUP ---
-  const PROXY_LIST = [
-    (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-
-  const fetchWithRotation = async (steamUrl: string) => {
-    for (let i = 0; i < PROXY_LIST.length; i++) {
-      try {
-        const proxyUrl = PROXY_LIST[i](steamUrl);
-        const res = await fetch(proxyUrl);
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-
-        const json = await res.json();
-        // AllOrigins wraps data in .contents, corsproxy returns it directly
-        const data = typeof json.contents === 'string' ? JSON.parse(json.contents) : (json.contents || json);
-        
-        if (data && (data.success || data.descriptions)) return data;
-      } catch (e) {
-        console.warn(`Proxy ${i} failed, trying next...`);
-      }
-    }
-    return null;
-  };
+  // Proxy rotation will use Pro status to determine proxy count
 
   useEffect(() => {
     try {
@@ -225,7 +205,11 @@ function InventoryContent() {
       taskPromise = (async () => {
         try {
           const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${encodeURIComponent(name as string)}`;
-          const pData = await fetchWithRotation(steamUrl);
+          const pData = await fetchWithProxyRotation(steamUrl, isPro, { 
+            parallel: false,
+            marketHashName: name as string,
+            currency: currency.code,
+          });
           if (pData?.success) {
             const price = pData.lowest_price || pData.median_price;
             if (price) results[name] = price;
@@ -253,7 +237,7 @@ function InventoryContent() {
       
       // Add timeout to fetchWithRotation by wrapping it
       const data = await Promise.race([
-        fetchWithRotation(invUrl),
+        fetchWithProxyRotation(invUrl, isPro, { parallel: false }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Inventory fetch timeout')), 15000)
         )
@@ -542,9 +526,10 @@ function InventoryContent() {
   );
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+    <>
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
         {viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
             <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
@@ -560,7 +545,26 @@ function InventoryContent() {
                         Pro
                       </span>
                     )}
+                    {/* Discord Connection Status (Publicly Visible) */}
+                    {discordStatus?.connected && (
+                      <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 border border-indigo-500/40 shrink-0">
+                        <MessageSquare size={10} className="text-indigo-400" />
+                        <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
+                          Discord
+                        </span>
+                      </div>
+                    )}
                   </div>
+                  {/* Manage Button (only for own profile) */}
+                  {loggedInUser?.steamId === viewedUser?.steamId && (
+                    <button
+                      onClick={() => setShowManageTrackers(true)}
+                      className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all mt-3 md:mt-4"
+                    >
+                      <Settings size={12} />
+                      Manage Trackers
+                    </button>
+                  )}
                   <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
                     <button
                       onClick={() => {
@@ -855,6 +859,16 @@ function InventoryContent() {
         )}
         </main>
       </div>
+      
+      {showManageTrackers && loggedInUser?.steamId && (
+        <ManagePriceTrackers
+          isOpen={showManageTrackers}
+          onClose={() => setShowManageTrackers(false)}
+          steamId={loggedInUser.steamId}
+          isPro={isPro}
+        />
+      )}
+    </>
   );
 }
 

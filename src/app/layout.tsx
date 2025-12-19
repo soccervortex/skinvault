@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "./components/InstallPrompt";
+import { initDiscordBot } from "./lib/discord-bot-init";
+
+// Initialize Discord bot on server startup
+if (typeof window === 'undefined') {
+  initDiscordBot();
+}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
