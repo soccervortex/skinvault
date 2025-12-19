@@ -63,3 +63,4 @@ export function getWishlistBatchSize(isProUser: boolean): number {
     : PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
 }
 
+
