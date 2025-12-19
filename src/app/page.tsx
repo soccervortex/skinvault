@@ -144,7 +144,7 @@ export default function GlobalSkinSearch() {
   const goToRandomSkin = () => {
     if (items.length === 0) return;
     const randomIndex = Math.floor(Math.random() * items.length);
-    router.push(`/item/${items[randomIndex].id}`);
+    router.push(`/item/${encodeURIComponent(items[randomIndex].id)}`);
   };
 
   const toggleCompare = (item: any) => {
@@ -286,7 +286,7 @@ export default function GlobalSkinSearch() {
                     <div className="absolute top-2 md:top-3 lg:top-4 right-2 md:right-3 lg:right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => toggleCompare(item)} className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`}><Scale size={12} /></button>
                     </div>
-                    <Link href={`/item/${item.id}`} className="flex-1">
+                    <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                         <img loading="lazy" src={item.image} className="w-full h-full object-contain relative z-10 transition-transform group-hover:scale-110 duration-500" alt={item.name} />

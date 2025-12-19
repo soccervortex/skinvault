@@ -714,6 +714,7 @@ function InventoryContent() {
                   <Link
                     key={item.market_hash_name + idx}
                     href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                    prefetch={false}
                     className="bg-[#11141d] p-3 md:p-4 rounded-[2rem] md:rounded-3xl border border-yellow-500/30 flex items-center gap-3 md:gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
                   >
                     <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden shrink-0">
@@ -900,6 +901,7 @@ function InventoryContent() {
                     <Link
                       key={idx}
                       href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                    prefetch={false}
                       className="group"
                     >
                       <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">

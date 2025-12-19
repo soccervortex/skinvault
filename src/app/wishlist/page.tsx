@@ -257,6 +257,7 @@ export default function WishlistPage() {
                     <Link
                       key={entry.key}
                       href={`/item/${encodeURIComponent(entry.market_hash_name || entry.name)}`}
+                      prefetch={false}
                       className="group"
                     >
                       <div className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-rose-500/40 transition-all group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
