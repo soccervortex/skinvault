@@ -21,10 +21,10 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
 
   const proxyUrl = PROXIES[proxyIndex](url);
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
-    
     const response = await fetch(proxyUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -57,6 +57,7 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
     // Direct JSON response
     return JSON.parse(text);
   } catch (error) {
+    clearTimeout(timeoutId);
     // Try next proxy if not the last one
     if (proxyIndex + 1 < PROXIES.length) {
       return fetchWithProxy(url, proxyIndex + 1);
@@ -71,20 +72,30 @@ async function resolveVanityUrl(vanityUrl: string): Promise<string | null> {
     const apiKey = process.env.STEAM_API_KEY || '72E5A9A17321670AD00D422453056898';
     const resolveUrl = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=${apiKey}&vanityurl=${encodeURIComponent(vanityUrl)}`;
     
-    const response = await fetch(resolveUrl, {
-      signal: AbortSignal.timeout(10000),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     
-    if (!response.ok) {
+    try {
+      const response = await fetch(resolveUrl, {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      if (data?.response?.steamid) {
+        return data.response.steamid;
+      }
+      
       return null;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-    
-    const data = await response.json();
-    if (data?.response?.steamid) {
-      return data.response.steamid;
-    }
-    
-    return null;
   } catch (error) {
     console.error('Vanity URL resolution failed:', error);
     return null;
