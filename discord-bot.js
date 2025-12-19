@@ -522,10 +522,32 @@ client.on('interactionCreate', async (interaction) => {
         // Get stats
         let stats = null;
         try {
-          const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?steamId=${steamId}`);
+          const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
           if (statsResponse.ok) {
             const statsData = await statsResponse.json();
-            stats = statsData.stats || {};
+            // The API returns { playerstats: { stats: [...] } }
+            const ps = statsData?.playerstats;
+            const s = ps?.stats;
+            if (s && Array.isArray(s)) {
+              // Convert array format to object format
+              const statsObj = {};
+              s.forEach(stat => {
+                if (stat.name && stat.value !== undefined) {
+                  statsObj[stat.name] = stat.value;
+                }
+              });
+              
+              // Extract key stats
+              const kills = Number(statsObj.total_kills ?? 0);
+              const deaths = Number(statsObj.total_deaths ?? 0);
+              const matchesWon = Number(statsObj.total_matches_won ?? 0);
+              
+              stats = {
+                total_kills: kills,
+                total_deaths: deaths,
+                total_wins: matchesWon,
+              };
+            }
           }
         } catch (error) {
           // Stats are optional
@@ -615,7 +637,8 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       try {
-        const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?steamId=${steamId}`);
+        // API expects 'id' parameter, not 'steamId'
+        const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
         if (!statsResponse.ok) {
           await interaction.editReply({
             content: '❌ **Stats Private**\n\nYour CS2 stats are private. Set your Steam profile to public to view stats.',
@@ -624,7 +647,39 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const statsData = await statsResponse.json();
-        const stats = statsData.stats || {};
+        // The API returns { playerstats: { stats: [...] } } where stats is an array
+        const ps = statsData?.playerstats;
+        const s = ps?.stats;
+
+        if (!s || !Array.isArray(s)) {
+          await interaction.editReply({
+            content: '❌ **Stats Private**\n\nYour CS2 stats are private. Set your Steam profile to public to view stats.',
+          });
+          return;
+        }
+
+        // Convert array format to object format (like the website does)
+        const statsObj = {};
+        s.forEach((item) => {
+          if (item.name && item.value !== undefined) {
+            statsObj[item.name] = item.value;
+          }
+        });
+
+        const kills = Number(statsObj.total_kills ?? 0);
+        const deaths = Number(statsObj.total_deaths ?? 0);
+        const hsKills = Number(statsObj.total_kills_headshot ?? 0);
+        const matchesWon = Number(statsObj.total_matches_won ?? 0);
+        const totalDamage = Number(statsObj.total_damage_done ?? 0);
+        const roundsPlayed = Number(statsObj.total_rounds_played ?? 0);
+        const mvps = Number(statsObj.total_mvps ?? 0);
+        const totalShots = Number(statsObj.total_shots_hit ?? 0) + Number(statsObj.total_shots_fired ?? 0);
+        const shotsHit = Number(statsObj.total_shots_hit ?? 0);
+
+        const kd = deaths > 0 ? (kills / deaths) : kills > 0 ? kills : 0;
+        const hs = kills > 0 ? (hsKills / kills) * 100 : 0;
+        const adr = roundsPlayed > 0 ? (totalDamage / roundsPlayed) : 0;
+        const accuracy = totalShots > 0 ? (shotsHit / totalShots) * 100 : 0;
 
         const embed = new EmbedBuilder()
           .setTitle('📊 Your CS2 Stats')
@@ -633,21 +688,38 @@ client.on('interactionCreate', async (interaction) => {
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
 
-        if (stats.total_kills) {
-          embed.addFields({ name: '💀 Total Kills', value: String(stats.total_kills || 'N/A'), inline: true });
+        // Basic stats
+        if (kills > 0) {
+          embed.addFields({ name: '💀 Total Kills', value: kills.toLocaleString(), inline: true });
         }
-        if (stats.total_deaths) {
-          embed.addFields({ name: '☠️ Total Deaths', value: String(stats.total_deaths || 'N/A'), inline: true });
+        if (deaths > 0) {
+          embed.addFields({ name: '☠️ Total Deaths', value: deaths.toLocaleString(), inline: true });
         }
-        if (stats.total_kills && stats.total_deaths) {
-          const kd = (stats.total_kills / stats.total_deaths).toFixed(2);
-          embed.addFields({ name: '📈 K/D Ratio', value: kd, inline: true });
+        if (kills > 0 || deaths > 0) {
+          embed.addFields({ name: '📈 K/D Ratio', value: kd.toFixed(2), inline: true });
         }
-        if (stats.total_wins) {
-          embed.addFields({ name: '🏆 Total Wins', value: String(stats.total_wins || 'N/A'), inline: true });
+        if (matchesWon > 0) {
+          embed.addFields({ name: '🏆 Wins', value: matchesWon.toLocaleString(), inline: true });
         }
-        if (stats.total_headshots) {
-          embed.addFields({ name: '🎯 Headshots', value: String(stats.total_headshots || 'N/A'), inline: true });
+        if (hs > 0) {
+          embed.addFields({ name: '🎯 HS %', value: `${hs.toFixed(1)}%`, inline: true });
+        }
+
+        // Advanced stats
+        if (adr > 0) {
+          embed.addFields({ name: '💜 ADR', value: adr.toFixed(1), inline: true });
+        }
+        if (mvps > 0) {
+          embed.addFields({ name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true });
+        }
+        if (accuracy > 0) {
+          embed.addFields({ name: '🎯 Accuracy', value: `${accuracy.toFixed(1)}%`, inline: true });
+        }
+        if (roundsPlayed > 0) {
+          embed.addFields({ name: '🔄 Rounds Played', value: roundsPlayed.toLocaleString(), inline: true });
+        }
+        if (totalDamage > 0) {
+          embed.addFields({ name: '💥 Total Damage', value: totalDamage.toLocaleString(), inline: true });
         }
 
         if (embed.data.fields?.length === 0) {
