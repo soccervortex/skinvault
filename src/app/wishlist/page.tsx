@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit, getWishlistBatchSize } from '@/app/utils/pro-limits';
@@ -165,7 +164,6 @@ export default function WishlistPage() {
               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Loading wishlist...</p>
             </div>
           </div>
-          <Footer />
         </div>
       </div>
     );
@@ -328,7 +326,6 @@ export default function WishlistPage() {
         limit={getWishlistLimit(false)}
         currentCount={items.length}
       />
-      <Footer />
     </div>
   );
 }

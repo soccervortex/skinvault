@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import { ChevronLeft, Swords, Shield, Target, Zap, Award, TrendingUp, BarChart3, Loader2, Heart } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
@@ -444,7 +443,6 @@ function CompareContent() {
         currentCount={wishlist.length}
       />
         </div>
-        <Footer />
       </div>
   );
 }

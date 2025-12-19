@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock } from 'lucide-react';
 import { getPriceScanConcurrency } from '@/app/utils/pro-limits';
 
@@ -855,7 +854,6 @@ function InventoryContent() {
           </div>
         )}
         </main>
-        <Footer />
       </div>
   );
 }

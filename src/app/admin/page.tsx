@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
-import Footer from "@/app/components/Footer";
 import {
   Loader2,
   Shield,
@@ -322,7 +321,6 @@ export default function AdminPage() {
           </div>
         </div>
         </div>
-        <Footer />
       </div>
     </div>
   );

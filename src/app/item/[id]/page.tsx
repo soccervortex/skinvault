@@ -3,7 +3,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
@@ -472,7 +471,6 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
         currentCount={wishlist.length}
       />
         </div>
-        <Footer />
       </div>
   );
 }

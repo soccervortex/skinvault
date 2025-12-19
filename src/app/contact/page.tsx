@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 import { Mail, Copy, Check } from 'lucide-react';
 
 export default function ContactPage() {
@@ -165,9 +164,8 @@ Description:
             </section>
           </div>
         </div>
-        <Footer />
+        </div>
       </div>
-    </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -130,7 +130,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               )}
             </div>
 
-            <div className="mt-auto pt-6 border-t border-white/5">
+            <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
               {user ? (
                 <div className="bg-[#11141d] p-4 rounded-[2rem] border border-white/5 flex items-center gap-4 group">
                   <img src={user.avatar} className="w-10 h-10 rounded-full border border-blue-500/50" alt="Avatar" />
@@ -164,6 +164,29 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
                 </button>
               )}
+              
+              {/* Footer Links */}
+              <div className="space-y-2 pt-4 border-t border-white/5">
+                <div className="flex flex-wrap items-center gap-3 px-2">
+                  <Link 
+                    href="/terms" 
+                    className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <FileText size={10} />
+                    Terms
+                  </Link>
+                  <Link 
+                    href="/privacy" 
+                    className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <Shield size={10} />
+                    Privacy
+                  </Link>
+                </div>
+                <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
+                  © {new Date().getFullYear()} SkinVault. All rights reserved.
+                </div>
+              </div>
             </div>
           </aside>
         </div>
@@ -221,7 +244,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           )}
         </div>
 
-        <div className="mt-auto pt-6 border-t border-white/5">
+        <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
           {user ? (
             <div className="bg-[#11141d] p-4 rounded-[2rem] border border-white/5 flex items-center gap-4 group">
               <img src={user.avatar} className="w-10 h-10 rounded-full border border-blue-500/50" alt="Avatar" />
@@ -255,6 +278,29 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
             </button>
           )}
+          
+          {/* Footer Links */}
+          <div className="space-y-2 pt-4 border-t border-white/5">
+            <div className="flex flex-wrap items-center gap-3 px-2">
+              <Link 
+                href="/terms" 
+                className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                <FileText size={10} />
+                Terms
+              </Link>
+              <Link 
+                href="/privacy" 
+                className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                <Shield size={10} />
+                Privacy
+              </Link>
+            </div>
+            <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
+              © {new Date().getFullYear()} SkinVault. All rights reserved.
+            </div>
+          </div>
         </div>
       </aside>
 

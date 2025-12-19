@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 import { Shield } from 'lucide-react';
 
 export default function PrivacyPage() {
@@ -278,7 +277,6 @@ export default function PrivacyPage() {
 
           </div>
         </div>
-        <Footer />
       </div>
     </div>
   );

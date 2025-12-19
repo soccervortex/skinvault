@@ -4,7 +4,6 @@ import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Targ
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
 
 type SortType =
   | 'rarity-desc'
@@ -302,7 +301,6 @@ export default function GlobalSkinSearch() {
             </div>
           )}
         </main>
-        <Footer />
       </div>
     </div>
   );
