@@ -16,14 +16,46 @@ import { getWishlistLimit } from '@/app/utils/pro-limits';
 // STEAM_API_KEYS removed - using environment variables instead
 
 type InventoryItem = {
-  market_hash_name: string;
-  icon_url: string;
+  market_hash_name?: string;
+  market_name?: string;
+  name?: string;
+  display_name?: string;
+  icon_url?: string;
   classid?: string;
   instanceid?: string;
   amount?: number;
   assetid?: string;
+  tradable?: number | boolean;
+  marketable?: number | boolean;
   [key: string]: any;
 };
+
+function formatProfileName(name: string): string {
+  return String(name || '')
+    .replace(/\s*\|\s*/g, ' | ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getItemDisplayName(item: InventoryItem): string {
+  return (
+    item.display_name ||
+    item.market_hash_name ||
+    item.market_name ||
+    item.name ||
+    'Unknown Item'
+  );
+}
+
+function getMarketKey(item: InventoryItem): string | null {
+  const k = item.market_hash_name || item.market_name;
+  return k ? String(k) : null;
+}
+
+function getPriceForItem(item: InventoryItem, prices: Record<string, string>): string | undefined {
+  const k = getMarketKey(item);
+  return k ? prices[k] : undefined;
+}
 
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   return (
@@ -301,38 +333,57 @@ function InventoryContent() {
             // Create a map of classid_instanceid to descriptions for quick lookup
             const descMap = new Map<string, any>();
             data.descriptions.forEach((desc: any) => {
-              const key = `${desc.classid}_${desc.instanceid || 0}`;
-              if (!descMap.has(key) || desc.market_hash_name) {
+              const key = String(desc.classid) + '_' + String(desc.instanceid || 0);
+              // Prefer the most "complete" description (market_hash_name/market_name/name)
+              const incomingName = desc?.market_hash_name || desc?.market_name || desc?.name;
+              const existing = descMap.get(key);
+              const existingName = existing?.market_hash_name || existing?.market_name || existing?.name;
+              if (!existing || (!existingName && incomingName)) {
                 descMap.set(key, desc);
               }
             });
-            
+
+            const existingAssetIds = new Set(allItems.map((i) => i.assetid).filter(Boolean));
+
             // If we have assets, match them with descriptions
             if (data?.assets && Array.isArray(data.assets)) {
               const matchedItems: InventoryItem[] = [];
               data.assets.forEach((asset: any) => {
-                const key = `${asset.classid}_${asset.instanceid || 0}`;
+                const key = String(asset.classid) + '_' + String(asset.instanceid || 0);
                 const desc = descMap.get(key);
-                if (desc && desc.market_hash_name) {
-                  // Combine asset and description data
-                  matchedItems.push({
-                    ...desc,
-                    amount: asset.amount || 1,
-                    assetid: asset.assetid,
-                  });
-                }
+                if (!desc) return;
+
+                const displayName = desc.market_hash_name || desc.market_name || desc.name || ('Item ' + String(asset.classid));
+                const assetid = String(asset.assetid ?? '');
+                if (assetid && existingAssetIds.has(assetid)) return;
+
+                matchedItems.push({
+                  ...desc,
+                  market_hash_name: desc.market_hash_name || desc.market_name || desc.name || displayName,
+                  icon_url: desc.icon_url || '',
+                  display_name: displayName,
+                  amount: Number(asset.amount ?? 1),
+                  assetid,
+                });
+                if (assetid) existingAssetIds.add(assetid);
               });
-              
-              // Deduplicate by market_hash_name
-              const existingNames = new Set(allItems.map(i => i.market_hash_name));
-              const uniqueNewItems = matchedItems.filter(i => !existingNames.has(i.market_hash_name));
-              allItems = [...allItems, ...uniqueNewItems];
+
+              allItems = [...allItems, ...matchedItems];
             } else {
               // Fallback: use descriptions directly if no assets
-              const newItems = data.descriptions.filter((desc: any) => desc.market_hash_name) as InventoryItem[];
-              const existingNames = new Set(allItems.map(i => i.market_hash_name));
-              const uniqueNewItems = newItems.filter(i => !existingNames.has(i.market_hash_name));
-              allItems = [...allItems, ...uniqueNewItems];
+              const newItems = (data.descriptions as any[]).map((desc: any, idx: number) => {
+                const displayName = desc.market_hash_name || desc.market_name || desc.name || ('Item ' + String(idx));
+                return {
+                  ...desc,
+                  market_hash_name: desc.market_hash_name || desc.market_name || desc.name || displayName,
+                  icon_url: desc.icon_url || '',
+                  display_name: displayName,
+                  amount: 1,
+                  assetid: desc.assetid ? String(desc.assetid) : undefined,
+                } as InventoryItem;
+              });
+
+              allItems = [...allItems, ...newItems];
             }
           }
 
@@ -558,7 +609,7 @@ function InventoryContent() {
 
     const run = async () => {
       setPriceScanDone(false);
-      const uniqueNames = Array.from(new Set(inventory.map((i) => i.market_hash_name)));
+      const uniqueNames = Array.from(new Set(inventory.map((i) => getMarketKey(i)).filter(Boolean) as string[]));
       await fetchPrices(uniqueNames);
       setPriceScanDone(true);
     };
@@ -597,19 +648,20 @@ function InventoryContent() {
   const totalVaultValue = useMemo(() => {
     let total = 0;
     inventory.forEach(item => {
-      const priceStr = itemPrices[item.market_hash_name];
+      const key = getMarketKey(item);
+      const priceStr = key ? itemPrices[key] : undefined;
       if (priceStr) {
         const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
-        if (!isNaN(num)) total += num;
+        if (!isNaN(num)) total += num * Number(item.amount ?? 1);
       }
     });
     return total.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }, [inventory, itemPrices]);
 
-  const totalItems = useMemo(() => inventory.length, [inventory]);
+  const totalItems = useMemo(() => inventory.reduce((sum, i) => sum + Number(i.amount ?? 1), 0), [inventory]);
 
   const pricedItems = useMemo(
-    () => inventory.filter(i => itemPrices[i.market_hash_name]).length,
+    () => inventory.reduce((sum, i) => { const k = getMarketKey(i); return k && itemPrices[k] ? sum + Number(i.amount ?? 1) : sum; }, 0),
     [inventory, itemPrices]
   );
 
@@ -620,7 +672,7 @@ function InventoryContent() {
   };
 
   const filteredInv = useMemo(() => 
-    inventory.filter(i => i.market_hash_name.toLowerCase().includes(searchQuery.toLowerCase())), 
+    inventory.filter(i => getItemDisplayName(i).toLowerCase().includes(searchQuery.toLowerCase())), 
     [inventory, searchQuery]
   );
 
@@ -628,11 +680,13 @@ function InventoryContent() {
     const arr = [...filteredInv];
     arr.sort((a, b) => {
       if (sortMode === 'name-asc') {
-        return a.market_hash_name.localeCompare(b.market_hash_name);
+        return getItemDisplayName(a).localeCompare(getItemDisplayName(b));
       }
 
-      const priceA = parsePriceToNumber(itemPrices[a.market_hash_name]);
-      const priceB = parsePriceToNumber(itemPrices[b.market_hash_name]);
+      const keyA = getMarketKey(a);
+      const priceA = parsePriceToNumber(keyA ? itemPrices[keyA] : undefined);
+      const keyB = getMarketKey(b);
+      const priceB = parsePriceToNumber(keyB ? itemPrices[keyB] : undefined);
 
       if (sortMode === 'price-asc') {
         return priceA - priceB;
@@ -649,7 +703,7 @@ function InventoryContent() {
       inventory
         .map((item) => ({
           item,
-          price: parsePriceToNumber(itemPrices[item.market_hash_name])
+          price: parsePriceToNumber((() => { const k = getMarketKey(item); return k ? itemPrices[k] : undefined; })())
         }))
         .filter((entry) => entry.price > 0)
         .sort((a, b) => b.price - a.price)
@@ -703,7 +757,7 @@ function InventoryContent() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                     <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
-                      {viewedUser.name}
+                      {formatProfileName(viewedUser?.name || "User")}
                     </h2>
                     {isPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
@@ -824,7 +878,7 @@ function InventoryContent() {
                 <TrendingUp className="text-emerald-500 shrink-0" size={24} />
                 <div className="min-w-0">
                   <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
-                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter truncate">{currency.symbol}{totalVaultValue}</p>
+                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter truncate">{currency.symbol}{" "}{totalVaultValue}</p>
                 </div>
               </div>
             </header>
@@ -853,8 +907,8 @@ function InventoryContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 {topItems.map(({ item, price }, idx) => (
                   <Link
-                    key={item.market_hash_name + idx}
-                    href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                    key={(item.assetid || getItemDisplayName(item)) + idx}
+                    href={`/item/${encodeURIComponent(getMarketKey(item) || getItemDisplayName(item))}`}
                     prefetch={false}
                     className="bg-[#11141d] p-3 md:p-4 rounded-[2rem] md:rounded-3xl border border-yellow-500/30 flex items-center gap-3 md:gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
                   >
@@ -862,12 +916,12 @@ function InventoryContent() {
                       <img
                         src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
                         className="w-full h-full object-contain"
-                        alt={item.market_hash_name}
+                        alt={getItemDisplayName(item)}
                       />
                     </div>
                     <div className="flex-1 space-y-1 min-w-0">
                       <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
-                        {item.market_hash_name}
+                        {getItemDisplayName(item)}
                       </p>
                       <p className="text-[10px] md:text-xs font-black text-emerald-400 italic">
                         {currency.symbol}
@@ -1039,13 +1093,14 @@ function InventoryContent() {
                   </div>
                 ) : (
                   sortedInv.map((item, idx) => {
-                    const isWishlisted = wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.market_hash_name);
-                    const wishlistKey = item.market_hash_name;
+                    const itemKey = getMarketKey(item) || getItemDisplayName(item);
+                    const isWishlisted = wishlist.some(w => w.market_hash_name === itemKey || w.key === itemKey);
+                    const wishlistKey = itemKey;
                     
                     return (
                       <div key={idx} className="group relative">
                         <Link
-                          href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                          href={`/item/${encodeURIComponent(getMarketKey(item) || getItemDisplayName(item))}`}
                           prefetch={false}
                           className="block"
                         >
@@ -1056,12 +1111,12 @@ function InventoryContent() {
                               alt="skin" 
                             />
                             <div className="mt-auto space-y-1.5 md:space-y-2">
-                              <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
+                              <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{getItemDisplayName(item)}</p>
                               <p className="text-[10px] md:text-[11px] font-black text-emerald-500 italic">
-                                {itemPrices[item.market_hash_name] 
-                                  ? itemPrices[item.market_hash_name] 
+                                {getPriceForItem(item, itemPrices) 
+                                  ? getPriceForItem(item, itemPrices) 
                                   : priceScanDone 
-                                    ? <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>
+                                    ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500 text-[8px] md:text-[9px]">NOT MARKETABLE</span> : <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>)
                                     : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
                                         {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
                                       </span>}
@@ -1081,12 +1136,12 @@ function InventoryContent() {
                                 try {
                                   const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
                                   const itemToAdd = {
-                                    id: item.market_hash_name,
-                                    name: item.market_hash_name,
+                                    id: itemKey,
+                                    name: getItemDisplayName(item),
                                     image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
-                                    market_hash_name: item.market_hash_name,
+                                    market_hash_name: itemKey,
                                   };
-                                  const exists = compareList.find((i: any) => i.id === item.market_hash_name);
+                                  const exists = compareList.find((i: any) => i.id === itemKey);
                                   if (!exists) {
                                     compareList.push(itemToAdd);
                                     if (compareList.length > 2) {
@@ -1110,10 +1165,10 @@ function InventoryContent() {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setTrackerModalItem({
-                                  id: item.market_hash_name,
-                                  name: item.market_hash_name,
+                                  id: itemKey,
+                                  name: getItemDisplayName(item),
                                   image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
-                                  market_hash_name: item.market_hash_name,
+                                  market_hash_name: itemKey,
                                 });
                                 setShowTrackerModal(true);
                               }}
@@ -1131,9 +1186,9 @@ function InventoryContent() {
                                 const result = toggleWishlistEntry(
                                   {
                                     key: wishlistKey,
-                                    name: item.market_hash_name,
+                                    name: getItemDisplayName(item),
                                     image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
-                                    market_hash_name: item.market_hash_name,
+                                    market_hash_name: itemKey,
                                   },
                                   loggedInUser.steamId,
                                   loggedInUserPro,
