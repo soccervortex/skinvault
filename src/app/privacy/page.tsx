@@ -60,24 +60,48 @@ export default function PrivacyPage() {
               </p>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
-                2.2 Information You Provide
+                2.2 Information from Discord (Optional)
+              </h3>
+              <p className="text-gray-300 mb-4">
+                When you connect your Discord account (optional), we collect:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li>Discord ID (unique identifier)</li>
+                <li>Discord username (including discriminator if applicable)</li>
+                <li>Discord avatar image</li>
+                <li>Discord OAuth access token and refresh token (for sending direct messages)</li>
+                <li>Token expiration timestamp</li>
+                <li>Connection timestamp</li>
+              </ul>
+              <p className="text-gray-300 mt-4">
+                <strong>Note:</strong> Discord tokens are stored securely and expire automatically. You can disconnect your Discord account at any time, which will remove all stored Discord data and active price trackers.
+              </p>
+
+              <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
+                2.3 Information You Provide
               </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>Wishlist items (stored locally in your browser)</li>
-                <li>Currency preferences (EUR/USD)</li>
+                <li>Wishlist items (stored locally in your browser and optionally synced to server)</li>
+                <li>Currency preferences (EUR/USD, stored in browser localStorage)</li>
+                <li>Price alert/tracker settings (target prices, conditions, stored in Vercel KV database)</li>
                 <li>Contact form submissions (name, email, message, images)</li>
-                <li>Payment information (processed securely through Stripe)</li>
+                <li>Payment information (processed securely through Stripe - we do not store credit card details)</li>
+                <li>Compare list items (stored locally in browser)</li>
               </ul>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
-                2.3 Automatically Collected Information
+                2.4 Automatically Collected Information
               </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>First login timestamp (for free trial eligibility)</li>
-                <li>Pro subscription status and expiration dates</li>
+                <li>First login timestamp (for free trial eligibility, stored in Vercel KV)</li>
+                <li>Pro subscription status and expiration dates (stored in Vercel KV)</li>
+                <li>Claimed free month status (stored in Vercel KV)</li>
+                <li>Price alert trigger history (stored in Vercel KV)</li>
                 <li>Browser type and device information</li>
                 <li>IP address (for security and analytics)</li>
-                <li>Usage data (pages visited, features used)</li>
+                <li>Usage data (pages visited, features used, commands executed)</li>
+                <li>Price cache data (stored locally in browser for performance)</li>
+                <li>Dataset cache (item information, stored locally in browser)</li>
               </ul>
             </section>
 
@@ -110,9 +134,27 @@ export default function PrivacyPage() {
                 4.1 Storage Locations
               </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li><strong>Browser LocalStorage:</strong> Wishlist items, currency preferences, user session data</li>
-                <li><strong>Vercel KV Database:</strong> Pro subscription data, first login timestamps, claimed free month flags</li>
-                <li><strong>Stripe:</strong> Payment information (we do not store credit card details)</li>
+                <li><strong>Browser LocalStorage:</strong> 
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li>Wishlist items (key: <code>sv_wishlist_v1</code>)</li>
+                    <li>Currency preferences (key: <code>sv_currency</code>)</li>
+                    <li>User session data (key: <code>steam_user</code>)</li>
+                    <li>Price cache (key: <code>sv_price_cache_v1</code>)</li>
+                    <li>Dataset cache (key: <code>sv_dataset_cache_v1</code>)</li>
+                    <li>Compare list (key: <code>sv_compare_list</code>)</li>
+                  </ul>
+                </li>
+                <li><strong>Vercel KV Database:</strong> 
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li>Pro subscription data (key: <code>pro_users</code>)</li>
+                    <li>First login timestamps (key: <code>first_logins</code>)</li>
+                    <li>Claimed free month flags (key: <code>claimed_free_month</code>)</li>
+                    <li>Discord connections (key: <code>discord_connections</code>) - includes Discord ID, username, avatar, OAuth tokens</li>
+                    <li>Price alerts/trackers (key: <code>price_alerts</code>) - includes target prices, conditions, trigger status</li>
+                    <li>Discord DM queue (key: <code>discord_dm_queue</code>) - temporary queue for bot messages</li>
+                  </ul>
+                </li>
+                <li><strong>Stripe:</strong> Payment information (we do not store credit card details on our servers)</li>
               </ul>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
@@ -138,10 +180,14 @@ export default function PrivacyPage() {
                 We do not sell your personal information. We may share data with:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li><strong>Steam:</strong> For authentication and accessing your public profile data</li>
+                <li><strong>Steam:</strong> For authentication and accessing your public profile data, inventory, and statistics</li>
+                <li><strong>Discord:</strong> For sending price alert notifications via direct messages and enabling bot commands (subject to Discord's privacy policy)</li>
                 <li><strong>Stripe:</strong> For payment processing (subject to Stripe's privacy policy)</li>
-                <li><strong>Vercel:</strong> For hosting and data storage (subject to Vercel's privacy policy)</li>
+                <li><strong>Vercel:</strong> For hosting and data storage via Vercel KV (subject to Vercel's privacy policy)</li>
                 <li><strong>Email Service Providers:</strong> For sending contact form emails (Resend, SMTP providers)</li>
+                <li><strong>Proxy Services:</strong> ScraperAPI, ZenRows, ScrapingAnt for accessing Steam Community Market data</li>
+                <li><strong>steamid.io:</strong> For resolving Steam usernames to Steam64 IDs</li>
+                <li><strong>CORS Proxy Services:</strong> corsproxy.io, api.allorigins.win for accessing external APIs</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 We may also disclose information if required by law or to protect our rights and safety.
@@ -156,13 +202,15 @@ export default function PrivacyPage() {
                 We use browser localStorage (not cookies) to store:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>Your Steam authentication session</li>
-                <li>Wishlist items</li>
-                <li>Currency preferences</li>
-                <li>Price cache data</li>
+                <li>Your Steam authentication session (Steam ID, profile name, avatar)</li>
+                <li>Wishlist items (optionally synced to server for cross-device access)</li>
+                <li>Currency preferences (EUR/USD)</li>
+                <li>Price cache data (cached market prices for performance - Free: 30 min, Pro: 2 hours)</li>
+                <li>Dataset cache (item information from CS:GO API - cached for 12-24 hours)</li>
+                <li>Compare list (items selected for comparison, max 2 items)</li>
               </ul>
               <p className="text-gray-300 mt-4">
-                This data is stored locally in your browser and is not transmitted to our servers except when necessary for the Service to function.
+                This data is stored locally in your browser and is not transmitted to our servers except when necessary for the Service to function (e.g., wishlist sync, price alerts). You can clear this data at any time by clearing your browser's localStorage.
               </p>
             </section>
 
@@ -175,8 +223,10 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Steam:</strong> <a href="https://store.steampowered.com/privacy_agreement/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Steam Privacy Policy</a></li>
+                <li><strong>Discord:</strong> <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Discord Privacy Policy</a></li>
                 <li><strong>Stripe:</strong> <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Stripe Privacy Policy</a></li>
                 <li><strong>Vercel:</strong> <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Vercel Privacy Policy</a></li>
+                <li><strong>Proxy Services:</strong> ScraperAPI, ZenRows, ScrapingAnt (each has their own privacy policies)</li>
               </ul>
             </section>
 
@@ -209,11 +259,14 @@ export default function PrivacyPage() {
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Account Data:</strong> Retained while your account is active</li>
                 <li><strong>Pro Subscription Data:</strong> Retained for the duration of your subscription and for legal/accounting purposes</li>
+                <li><strong>Discord Connection Data:</strong> Retained until you disconnect your Discord account or tokens expire. Expired tokens are automatically removed.</li>
+                <li><strong>Price Alert Data:</strong> Retained until you delete the alert or disconnect your Discord account</li>
                 <li><strong>Contact Form Data:</strong> Retained for customer support purposes</li>
-                <li><strong>LocalStorage Data:</strong> Stored in your browser until you clear it</li>
+                <li><strong>LocalStorage Data:</strong> Stored in your browser until you clear it. Wishlist data may be synced to server for cross-device access.</li>
+                <li><strong>Discord DM Queue:</strong> Temporary queue cleared after messages are sent by the bot</li>
               </ul>
               <p className="text-gray-300 mt-4">
-                You can delete your local data at any time by clearing your browser's localStorage.
+                You can delete your local data at any time by clearing your browser's localStorage. You can disconnect your Discord account at any time, which will remove all Discord-related data and price trackers. To request deletion of server-stored data, contact us through our <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact Page</a>.
               </p>
             </section>
 

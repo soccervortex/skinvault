@@ -46,13 +46,17 @@ export default function TermsPage() {
                 SkinVault is a CS2 (Counter-Strike 2) skin inventory tracking and analytics platform that provides:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>Real-time inventory value tracking</li>
-                <li>Skin price monitoring and analytics</li>
-                <li>Wishlist functionality</li>
-                <li>Price alerts via Discord integration</li>
-                <li>Player statistics and portfolio analytics</li>
-                <li>Pro subscription features (unlimited wishlist, unlimited price trackers, advanced stats, faster performance)</li>
-                <li>Discord bot commands for wishlist and alerts management</li>
+                <li>Real-time inventory value tracking and portfolio management</li>
+                <li>Skin price monitoring and analytics with market data</li>
+                <li>Wishlist functionality (Free: 10 items, Pro: unlimited)</li>
+                <li>Price alerts and trackers via Discord integration (Free: 5 trackers, Pro: unlimited)</li>
+                <li>Player statistics and portfolio analytics (CS2 game stats)</li>
+                <li>Skin comparison tool (compare up to 3 items side by side)</li>
+                <li>Player search functionality (by Steam64 ID, Steam username, Discord username, or Discord ID)</li>
+                <li>Pro subscription features (unlimited wishlist, unlimited price trackers, advanced stats, faster performance, priority API requests)</li>
+                <li>Discord bot with comprehensive commands (/wishlist, /alerts, /inventory, /price, /vault, /stats, /player, /compare, /help)</li>
+                <li>Fuzzy search for items and players</li>
+                <li>Shareable inventory links</li>
               </ul>
             </section>
 
@@ -73,19 +77,34 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                4. Discord Integration and Price Alerts
+                4. Discord Integration and Bot Commands
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault offers optional Discord integration for price alerts:
+                SkinVault offers optional Discord integration with a comprehensive bot:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>You may connect your Discord account to receive price alert notifications</li>
+                <li>You may connect your Discord account to receive price alert notifications and use bot commands</li>
                 <li>Free users can create up to 5 price trackers; Pro users have unlimited trackers</li>
                 <li>Price alerts are sent via Discord direct messages when target prices are reached</li>
                 <li>You can disconnect your Discord account at any time, which will remove all active price trackers</li>
-                <li>Discord bot commands (/wishlist, /alerts, /help) are available for connected users</li>
-                <li>We store your Discord ID and username for the purpose of sending alerts</li>
+                <li><strong>Discord Bot Commands Available:</strong>
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li><code>/wishlist</code> - View your wishlist with current prices</li>
+                    <li><code>/alerts</code> - View your active price alerts</li>
+                    <li><code>/inventory</code> - View your inventory summary and item list</li>
+                    <li><code>/price &lt;item&gt;</code> - Check the current price of a CS2 skin (with fuzzy search)</li>
+                    <li><code>/vault</code> - View your total vault value, statistics, top items, and weapon stats</li>
+                    <li><code>/stats</code> - View your CS2 player statistics (basic stats for all, advanced stats for Pro users)</li>
+                    <li><code>/player &lt;query&gt; platform:&lt;platform&gt;</code> - Search for a player by Steam64 ID, Steam username, Discord username, or Discord ID</li>
+                    <li><code>/compare &lt;item1&gt; &lt;item2&gt; [item3]</code> - Compare up to 3 CS2 skins side by side</li>
+                    <li><code>/help</code> - Get help with all available commands</li>
+                  </ul>
+                </li>
+                <li>We store your Discord ID, username, avatar, and OAuth tokens (access token, refresh token) for the purpose of sending alerts and enabling bot commands</li>
+                <li>Discord OAuth tokens expire and may require re-authentication</li>
                 <li>Discord connection status is publicly visible on your profile</li>
+                <li>The bot can search for players using Steam usernames, Steam64 IDs, Discord usernames, or Discord IDs</li>
+                <li>Bot commands work in both Discord servers and direct messages (DMs)</li>
               </ul>
             </section>
 
@@ -97,12 +116,26 @@ export default function TermsPage() {
                 SkinVault offers a Pro subscription service with the following terms:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li><strong>Pricing:</strong> €9.99/month, €24.99/3 months, €44.99/6 months</li>
-                <li><strong>Payment:</strong> Processed through Stripe. All payments are final unless otherwise stated.</li>
-                <li><strong>Free Trial:</strong> New users may be eligible for a 1-month free trial within 7 days of first login. This offer is one-time only.</li>
-                <li><strong>Auto-Renewal:</strong> Subscriptions do not auto-renew. You must manually renew your subscription.</li>
+                <li><strong>Pricing:</strong> €9.99/month, €24.99/3 months (save €5), €44.99/6 months (save €15)</li>
+                <li><strong>Payment:</strong> Processed securely through Stripe. All payments are final unless otherwise stated. We do not store credit card details on our servers.</li>
+                <li><strong>Free Trial:</strong> New users may be eligible for a 1-month free trial within 7 days of first login. This offer is one-time only and must be claimed manually.</li>
+                <li><strong>Auto-Renewal:</strong> Subscriptions do not auto-renew. You must manually renew your subscription before expiration.</li>
                 <li><strong>Refunds:</strong> Refund requests are handled on a case-by-case basis. Contact support for assistance.</li>
                 <li><strong>Cancellation:</strong> You may cancel your subscription at any time. Access continues until the end of your paid period.</li>
+                <li><strong>Pro Features Include:</strong>
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li>Unlimited wishlist items (Free: 10 items max)</li>
+                    <li>Unlimited price trackers (Free: 5 trackers max)</li>
+                    <li>Advanced player statistics (ADR, MVPs, Accuracy, Rounds Played, Total Damage)</li>
+                    <li>Faster price scanning (10x speed with higher concurrency)</li>
+                    <li>Priority API requests</li>
+                    <li>Better caching (2x longer cache duration)</li>
+                    <li>Fast wishlist updates (larger batch processing)</li>
+                    <li>Advanced compare stats & value breakdown</li>
+                    <li>Early access to new tools and features</li>
+                    <li>Price alerts via Discord</li>
+                  </ul>
+                </li>
               </ul>
             </section>
 
@@ -131,12 +164,19 @@ export default function TermsPage() {
                 The Service displays data from:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>Steam Community Market (price data)</li>
-                <li>Steam API (inventory and profile data)</li>
-                <li>Your local browser storage (wishlist, preferences)</li>
+                <li>Steam Community Market (price data via proxy services)</li>
+                <li>Steam Web API (inventory, profile data, and player statistics)</li>
+                <li>Steam Community profiles (profile information, avatars)</li>
+                <li>steamid.io (for Steam username resolution)</li>
+                <li>CS:GO API dataset (item information, images, rarity data)</li>
+                <li>Your local browser storage (wishlist, preferences, price cache, compare list)</li>
+                <li>Vercel KV database (Pro subscriptions, Discord connections, price alerts)</li>
               </ul>
               <p className="text-gray-300 mt-4">
-                We do not guarantee the accuracy, completeness, or timeliness of price data. Market prices are subject to change and may not reflect real-time values.
+                We do not guarantee the accuracy, completeness, or timeliness of price data. Market prices are subject to change and may not reflect real-time values. Price data is cached for performance optimization (Free: 30 minutes, Pro: 2 hours).
+              </p>
+              <p className="text-gray-300 mt-4">
+                <strong>Proxy Services:</strong> We use multiple proxy services (ScraperAPI, ZenRows, ScrapingAnt, and fallback proxies) to access Steam Community Market data. These services help bypass rate limits and improve reliability.
               </p>
             </section>
 
