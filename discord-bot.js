@@ -443,14 +443,14 @@ client.on('interactionCreate', async (interaction) => {
       const searchResult = await searchItem(itemQuery);
       const itemName = searchResult?.market_hash_name || itemQuery;
       const displayName = searchResult?.name || itemQuery;
-      const itemImage = searchResult?.image || null;
+      let itemImage = searchResult?.image || null;
       const itemId = searchResult?.id || null;
 
       // Get price for the found item
       const price = await getItemPrice(itemName, '3');
       
+      // If no price found, try to get item info from API
       if (!price) {
-        // If no price found, try to get item info from API
         let itemInfo = null;
         try {
           const itemResponse = await fetch(`${API_BASE_URL}/api/item/info?market_hash_name=${encodeURIComponent(itemName)}`);
