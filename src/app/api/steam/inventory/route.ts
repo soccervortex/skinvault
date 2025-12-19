@@ -144,10 +144,29 @@ export async function GET(request: Request) {
       try {
         const data = await fetchWithProxy(invUrl, i);
         
-        if (data && (data.descriptions || data.assets || data.success !== false)) {
-          // Success - return the data
-          return NextResponse.json(data);
+        // Steam inventory API can return:
+        // - { success: false } for private inventories
+        // - { assets: [], descriptions: [] } for public inventories
+        // - { rgInventory: {}, rgDescriptions: {} } for older format
+        if (data && typeof data === 'object') {
+          // Check if it's a valid Steam inventory response
+          if (data.success === false) {
+            // Private inventory - this is a valid response
+            return NextResponse.json({ 
+              success: false, 
+              error: 'Inventory is private',
+              assets: [],
+              descriptions: []
+            });
+          }
+          
+          // Check for valid inventory structure
+          if (data.descriptions || data.assets || data.rgDescriptions || data.rgInventory) {
+            // Success - return the data
+            return NextResponse.json(data);
+          }
         }
+        
         // If data exists but doesn't have expected structure, try next proxy
         if (i === proxyList.length - 1) {
           lastError = new Error('Invalid response structure from all proxies');

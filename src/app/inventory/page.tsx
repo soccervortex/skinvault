@@ -14,6 +14,10 @@ const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
 type InventoryItem = {
   market_hash_name: string;
   icon_url: string;
+  classid?: string;
+  instanceid?: string;
+  amount?: number;
+  assetid?: string;
   [key: string]: any;
 };
 
@@ -267,12 +271,45 @@ function InventoryContent() {
             throw new Error(data.error);
           }
           
-          if (data?.descriptions) {
-            const newItems = data.descriptions as InventoryItem[];
-            // Deduplicate by market_hash_name
-            const existingNames = new Set(allItems.map(i => i.market_hash_name));
-            const uniqueNewItems = newItems.filter(i => !existingNames.has(i.market_hash_name));
-            allItems = [...allItems, ...uniqueNewItems];
+          // Steam inventory API returns assets and descriptions separately
+          // We need to match them together
+          if (data?.descriptions && Array.isArray(data.descriptions)) {
+            // Create a map of classid_instanceid to descriptions for quick lookup
+            const descMap = new Map<string, any>();
+            data.descriptions.forEach((desc: any) => {
+              const key = `${desc.classid}_${desc.instanceid || 0}`;
+              if (!descMap.has(key) || desc.market_hash_name) {
+                descMap.set(key, desc);
+              }
+            });
+            
+            // If we have assets, match them with descriptions
+            if (data?.assets && Array.isArray(data.assets)) {
+              const matchedItems: InventoryItem[] = [];
+              data.assets.forEach((asset: any) => {
+                const key = `${asset.classid}_${asset.instanceid || 0}`;
+                const desc = descMap.get(key);
+                if (desc && desc.market_hash_name) {
+                  // Combine asset and description data
+                  matchedItems.push({
+                    ...desc,
+                    amount: asset.amount || 1,
+                    assetid: asset.assetid,
+                  });
+                }
+              });
+              
+              // Deduplicate by market_hash_name
+              const existingNames = new Set(allItems.map(i => i.market_hash_name));
+              const uniqueNewItems = matchedItems.filter(i => !existingNames.has(i.market_hash_name));
+              allItems = [...allItems, ...uniqueNewItems];
+            } else {
+              // Fallback: use descriptions directly if no assets
+              const newItems = data.descriptions.filter((desc: any) => desc.market_hash_name) as InventoryItem[];
+              const existingNames = new Set(allItems.map(i => i.market_hash_name));
+              const uniqueNewItems = newItems.filter(i => !existingNames.has(i.market_hash_name));
+              allItems = [...allItems, ...uniqueNewItems];
+            }
           }
 
           // Check if there are more items
