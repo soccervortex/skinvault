@@ -326,15 +326,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
       )}
     </>
   );
-} 
-                      onClick={handleLogout} 
-                      className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                    >
-                      <LogOut size={8} /> Logout Session
-                    </button>
-                  </div>
-                </div>
-              ) : (
+}
                 <button 
                   onClick={handleSteamLogin}
                   className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
