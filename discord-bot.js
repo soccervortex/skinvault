@@ -165,44 +165,41 @@ async function getSteamIdFromDiscord(discordId) {
   }
 }
 
-// Get Discord user ID from username
+// Get Discord user ID from username (searches database first, then Discord servers)
 async function getDiscordUserIdFromUsername(username, client) {
   try {
-    // Remove discriminator if present (old format: username#1234)
-    const cleanUsername = username.split('#')[0].toLowerCase();
-    
-    // Search through all guilds the bot is in
-    for (const guild of client.guilds.cache.values()) {
-      try {
-        // Search for user by username (case-insensitive)
-        const member = guild.members.cache.find(m => 
-          m.user.username.toLowerCase() === cleanUsername ||
-          m.user.displayName.toLowerCase() === cleanUsername ||
-          m.user.globalName?.toLowerCase() === cleanUsername
-        );
-        
-        if (member) {
-          return member.user.id;
-        }
-      } catch (error) {
-        // Continue to next guild
-        continue;
-      }
-    }
-    
-    // If not found in guilds, try to fetch user directly (only works if bot shares a server)
-    // This is a fallback and might not work for all users
+    // First, try to find in our database (most reliable)
     try {
-      const users = await client.users.fetch();
-      const foundUser = users.find(u => 
-        u.username.toLowerCase() === cleanUsername ||
-        u.globalName?.toLowerCase() === cleanUsername
-      );
-      if (foundUser) {
-        return foundUser.id;
+      const response = await fetch(`${API_BASE_URL}/api/discord/find-by-username?username=${encodeURIComponent(username)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.discordId) {
+          return data.discordId;
+        }
       }
     } catch (error) {
-      // Can't fetch all users, that's okay
+      // Fall back to Discord server search
+    }
+    
+    // Fallback: Search through Discord servers (only works if user is in same server as bot)
+    if (client) {
+      const cleanUsername = username.split('#')[0].toLowerCase();
+      
+      for (const guild of client.guilds.cache.values()) {
+        try {
+          const member = guild.members.cache.find(m => 
+            m.user.username.toLowerCase() === cleanUsername ||
+            m.user.displayName.toLowerCase() === cleanUsername ||
+            m.user.globalName?.toLowerCase() === cleanUsername
+          );
+          
+          if (member) {
+            return member.user.id;
+          }
+        } catch (error) {
+          continue;
+        }
+      }
     }
     
     return null;
