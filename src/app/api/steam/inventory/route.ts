@@ -139,18 +139,23 @@ export async function GET(request: Request) {
 
     // Try proxies sequentially
     let lastError: any = null;
+    const errors: string[] = [];
     for (let i = 0; i < proxyList.length; i++) {
       try {
         const data = await fetchWithProxy(invUrl, i);
         
         if (data && (data.descriptions || data.assets || data.success !== false)) {
+          // Success - return the data
           return NextResponse.json(data);
         }
         // If data exists but doesn't have expected structure, try next proxy
         if (i === proxyList.length - 1) {
-          lastError = new Error('Invalid response structure');
+          lastError = new Error('Invalid response structure from all proxies');
+          errors.push('Invalid response structure');
         }
-      } catch (error) {
+      } catch (error: any) {
+        const errorMsg = error?.message || String(error);
+        errors.push(`Proxy ${i}: ${errorMsg}`);
         lastError = error;
         // Continue to next proxy if not the last one
         if (i < proxyList.length - 1) {
@@ -159,9 +164,21 @@ export async function GET(request: Request) {
       }
     }
 
+    // All proxies failed - log detailed error
+    console.error('All inventory proxies failed:', {
+      steamId,
+      isPro,
+      errors: errors.join('; '),
+      lastError: lastError?.message,
+    });
+
     // All proxies failed
     return NextResponse.json(
-      { error: lastError?.message || 'All proxies failed', details: 'Unable to fetch Steam inventory' },
+      { 
+        error: lastError?.message || 'All proxies failed', 
+        details: 'Unable to fetch Steam inventory',
+        proxyErrors: errors,
+      },
       { status: 500 }
     );
   } catch (error: any) {

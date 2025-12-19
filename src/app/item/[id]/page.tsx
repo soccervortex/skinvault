@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell } from 'lucide-react';
+import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
@@ -325,6 +325,39 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 </button>
               </div>
               <div className="absolute bottom-4 right-4 md:hidden flex items-center gap-2 z-20">
+                {/* Compare Button (Mobile) */}
+                <button
+                  onClick={() => {
+                    try {
+                      const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
+                      const itemToAdd = {
+                        id: item.id,
+                        name: item.name,
+                        image: item.image,
+                        market_hash_name: (item as any).market_hash_name,
+                      };
+                      const exists = compareList.find((i: any) => i.id === item.id);
+                      if (!exists) {
+                        compareList.push(itemToAdd);
+                        if (compareList.length > 2) {
+                          compareList.shift();
+                        }
+                        localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
+                      }
+                      if (compareList.length === 2) {
+                        window.location.href = `/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`;
+                      } else {
+                        alert('Item added to compare! Add another item to compare.');
+                      }
+                    } catch (error) {
+                      console.error('Failed to add to compare:', error);
+                    }
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                  aria-label="Add to compare"
+                >
+                  <Scale size={14} className="text-blue-400" />
+                </button>
                 {/* Price Tracker Button (Mobile) */}
                 {user && (
                   <button
@@ -373,6 +406,45 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
               <div className="flex items-center gap-2">
+                {/* Compare Button */}
+                <button
+                  onClick={() => {
+                    // Add to compare list in localStorage
+                    try {
+                      const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
+                      const itemToAdd = {
+                        id: item.id,
+                        name: item.name,
+                        image: item.image,
+                        market_hash_name: (item as any).market_hash_name,
+                      };
+                      // Check if already in compare list
+                      const exists = compareList.find((i: any) => i.id === item.id);
+                      if (!exists) {
+                        compareList.push(itemToAdd);
+                        // Keep only last 2 items for comparison
+                        if (compareList.length > 2) {
+                          compareList.shift();
+                        }
+                        localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
+                      }
+                      // Navigate to compare page if we have 2 items
+                      if (compareList.length === 2) {
+                        window.location.href = `/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`;
+                      } else {
+                        // Show feedback
+                        alert('Item added to compare! Add another item to compare.');
+                      }
+                    } catch (error) {
+                      console.error('Failed to add to compare:', error);
+                    }
+                  }}
+                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0"
+                  aria-label="Add to compare"
+                >
+                  <Scale size={18} className="text-blue-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Compare</span>
+                </button>
                 {/* Price Tracker Button */}
                 {user && (
                   <button

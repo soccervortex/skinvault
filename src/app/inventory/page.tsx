@@ -361,8 +361,17 @@ function InventoryContent() {
       // Start all requests but don't wait for all - show content progressively
       const profilePromise = fetchViewedProfile(viewedSteamId);
       const proPromise = fetch(`/api/user/pro?id=${viewedSteamId}`)
-        .then((res) => (res.ok ? res.json() : { proUntil: null }))
-        .catch(() => ({ proUntil: null }));
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            return { proUntil: data?.proUntil || null };
+          }
+          return { proUntil: null };
+        })
+        .catch((err) => {
+          console.error('Pro status fetch error:', err);
+          return { proUntil: null };
+        });
       
       // These can load in background
       fetchPlayerStats(viewedSteamId).catch(() => {});
@@ -472,7 +481,7 @@ function InventoryContent() {
     }
   }, [viewedUser]);
 
-  // Load Discord status for viewed user
+  // Load Discord status for viewed user (publicly visible)
   useEffect(() => {
     if (!viewedUser?.steamId) {
       setDiscordStatus(null);
@@ -481,8 +490,11 @@ function InventoryContent() {
     
     fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
       .then(res => res.ok ? res.json() : null)
-      .then(setDiscordStatus)
-      .catch(() => setDiscordStatus(null));
+      .then(data => {
+        // Ensure we set connected status correctly
+        setDiscordStatus(data?.connected ? data : { connected: false });
+      })
+      .catch(() => setDiscordStatus({ connected: false }));
   }, [viewedUser?.steamId]);
 
   const totalVaultValue = useMemo(() => {
@@ -614,8 +626,8 @@ function InventoryContent() {
                   {/* Action Buttons (only for own profile) */}
                   {loggedInUser?.steamId === viewedUser?.steamId && (
                     <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
-                      {/* Connect Discord Button */}
-                      {!discordStatus?.connected && (
+                      {/* Connect/Disconnect Discord Button */}
+                      {!discordStatus?.connected ? (
                         <button
                           onClick={() => {
                             if (!loggedInUser?.steamId) return;
@@ -632,6 +644,30 @@ function InventoryContent() {
                         >
                           <MessageSquare size={12} />
                           Connect Discord
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (!loggedInUser?.steamId) return;
+                            try {
+                              const res = await fetch('/api/discord/disconnect', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ steamId: loggedInUser.steamId }),
+                              });
+                              if (res.ok) {
+                                setDiscordStatus({ connected: false });
+                                // Refresh page to update UI
+                                window.location.reload();
+                              }
+                            } catch (error) {
+                              console.error('Failed to disconnect Discord:', error);
+                            }
+                          }}
+                          className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          <MessageSquare size={12} />
+                          Disconnect Discord
                         </button>
                       )}
                       {/* Manage Trackers Button */}
