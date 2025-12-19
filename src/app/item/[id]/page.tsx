@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
+import CompareModal from '@/app/components/CompareModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
@@ -31,6 +32,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   const [isPro, setIsPro] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showTrackerModal, setShowTrackerModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const priceCacheRef = useRef<Record<string, any>>({});
@@ -327,60 +329,9 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
               <div className="absolute bottom-4 right-4 md:hidden flex items-center gap-2 z-20">
                 {/* Compare Button (Mobile) */}
                 <button
-                  onClick={() => {
-                    try {
-                      const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
-                      const itemToAdd = {
-                        id: item.id,
-                        name: item.name,
-                        image: item.image,
-                        market_hash_name: (item as any).market_hash_name,
-                      };
-                      
-                      // Check if already in compare list (toggle behavior)
-                      const exists = compareList.find((i: any) => i.id === item.id);
-                      if (exists) {
-                        // Remove if already exists
-                        const newList = compareList.filter((i: any) => i.id !== item.id);
-                        localStorage.setItem('sv_compare_list', JSON.stringify(newList));
-                        
-                        // Show feedback
-                        const notification = document.createElement('div');
-                        notification.className = 'fixed top-4 right-4 bg-yellow-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
-                        notification.textContent = 'Item removed from compare!';
-                        document.body.appendChild(notification);
-                        setTimeout(() => {
-                          notification.remove();
-                        }, 2000);
-                        return;
-                      }
-                      
-                      // Add item
-                      compareList.push(itemToAdd);
-                      if (compareList.length > 2) {
-                        compareList.shift();
-                      }
-                      localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
-                      
-                      // Navigate to compare page if we have 2 items
-                      if (compareList.length === 2) {
-                        window.location.href = `/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`;
-                      } else {
-                        // Show visual feedback
-                        const notification = document.createElement('div');
-                        notification.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
-                        notification.textContent = `Item added to compare! ${compareList.length === 1 ? 'Add another item to compare.' : ''}`;
-                        document.body.appendChild(notification);
-                        setTimeout(() => {
-                          notification.remove();
-                        }, 3000);
-                      }
-                    } catch (error) {
-                      console.error('Failed to add to compare:', error);
-                    }
-                  }}
+                  onClick={() => setShowCompareModal(true)}
                   className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
-                  aria-label="Add to compare"
+                  aria-label="Compare items"
                 >
                   <Scale size={14} className="text-blue-400" />
                 </button>
@@ -435,7 +386,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 {/* Compare Button */}
                 <button
                   onClick={() => {
-                    // Add to compare list in localStorage (same logic as market page)
+                    // Add current item to compare list first, then show modal
                     try {
                       const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
                       const itemToAdd = {
@@ -447,49 +398,24 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                       
                       // Check if already in compare list
                       const exists = compareList.find((i: any) => i.id === item.id);
-                      if (exists) {
-                        // Remove if already exists (toggle behavior like market page)
-                        const newList = compareList.filter((i: any) => i.id !== item.id);
-                        localStorage.setItem('sv_compare_list', JSON.stringify(newList));
-                        
-                        // Show feedback
-                        const notification = document.createElement('div');
-                        notification.className = 'fixed top-4 right-4 bg-yellow-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
-                        notification.textContent = 'Item removed from compare!';
-                        document.body.appendChild(notification);
-                        setTimeout(() => {
-                          notification.remove();
-                        }, 2000);
-                        return;
-                      }
-                      
-                      // Add item
-                      compareList.push(itemToAdd);
-                      // Keep only last 2 items for comparison (like market page)
-                      if (compareList.length > 2) {
-                        compareList.shift();
-                      }
-                      localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
-                      
-                      // Navigate to compare page if we have 2 items
-                      if (compareList.length === 2) {
-                        window.location.href = `/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`;
-                      } else {
-                        // Show visual feedback
-                        const notification = document.createElement('div');
-                        notification.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
-                        notification.textContent = `Item added to compare! ${compareList.length === 1 ? 'Add another item to compare.' : ''}`;
-                        document.body.appendChild(notification);
-                        setTimeout(() => {
-                          notification.remove();
-                        }, 3000);
+                      if (!exists) {
+                        // Add item if not already in list
+                        compareList.push(itemToAdd);
+                        // Keep only last 2 items
+                        if (compareList.length > 2) {
+                          compareList.shift();
+                        }
+                        localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
                       }
                     } catch (error) {
                       console.error('Failed to add to compare:', error);
                     }
+                    
+                    // Show modal
+                    setShowCompareModal(true);
                   }}
                   className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0"
-                  aria-label="Add to compare"
+                  aria-label="Compare items"
                 >
                   <Scale size={18} className="text-blue-400" />
                   <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Compare</span>
@@ -596,6 +522,17 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
           currency={currency}
         />
       )}
+      
+      <CompareModal
+        isOpen={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
+        currentItem={item ? {
+          id: item.id || decodedId,
+          name: item.name,
+          image: item.image,
+          market_hash_name: (item as any).market_hash_name,
+        } : undefined}
+      />
         </div>
       </div>
   );
