@@ -274,7 +274,7 @@ async function getSteamProfile(steamId) {
   }
 }
 
-// Resolve Steam username to Steam64 ID
+// Resolve Steam username to Steam64 ID using steamid.io
 async function resolveSteamUsername(username) {
   try {
     // Clean username: extract first part before | or special chars
@@ -291,36 +291,68 @@ async function resolveSteamUsername(username) {
     
     if (!cleanUsername || cleanUsername.length < 3) return null;
     
-    // Try to access profile by custom URL
-    const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
-    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(profileUrl)}`, {
-      signal: AbortSignal.timeout(10000)
-    });
-    
-    if (!response.ok) {
-      // Try alternative proxy if first fails
-      try {
-        const altResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(profileUrl)}`, {
-          signal: AbortSignal.timeout(10000)
-        });
-        if (altResponse.ok) {
-          const text = await altResponse.text();
-          const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
-          if (steamId64 && /^\d{17}$/.test(steamId64)) {
+    // Method 1: Try steamid.io API/lookup
+    try {
+      // steamid.io allows lookup via URL: https://steamid.io/lookup/{username}
+      const steamIdIoUrl = `https://steamid.io/lookup/${encodeURIComponent(cleanUsername)}`;
+      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamIdIoUrl)}`, {
+        signal: AbortSignal.timeout(10000),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        }
+      });
+      
+      if (response.ok) {
+        const html = await response.text();
+        // Extract Steam64 ID from steamid.io page (looks for pattern like "76561199235618867")
+        const steamId64Match = html.match(/steamID64[^>]*>[\s\S]*?(\d{17})/i) || 
+                               html.match(/7656\d{13}/);
+        if (steamId64Match && steamId64Match[1]) {
+          const steamId64 = steamId64Match[1];
+          if (/^\d{17}$/.test(steamId64)) {
             return steamId64;
           }
         }
-      } catch {
-        // Ignore
       }
-      return null;
+    } catch (error) {
+      // Continue to fallback method
     }
     
-    const text = await response.text();
-    const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
-    if (steamId64 && /^\d{17}$/.test(steamId64)) {
-      return steamId64;
+    // Method 2: Try Steam Community XML (fallback)
+    try {
+      const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
+      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(profileUrl)}`, {
+        signal: AbortSignal.timeout(10000)
+      });
+      
+      if (response.ok) {
+        const text = await response.text();
+        const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
+        if (steamId64 && /^\d{17}$/.test(steamId64)) {
+          return steamId64;
+        }
+      }
+    } catch (error) {
+      // Ignore
     }
+    
+    // Method 3: Try alternative proxy
+    try {
+      const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
+      const altResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(profileUrl)}`, {
+        signal: AbortSignal.timeout(10000)
+      });
+      if (altResponse.ok) {
+        const text = await altResponse.text();
+        const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
+        if (steamId64 && /^\d{17}$/.test(steamId64)) {
+          return steamId64;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    
     return null;
   } catch (error) {
     console.error('Error resolving Steam username:', error);
