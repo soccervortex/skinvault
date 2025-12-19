@@ -185,6 +185,7 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
           `View on SkinVault: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`;
 
         // Send as embed if we have image, otherwise as plain message
+        let sent = false;
         if (itemImage) {
           const embed = {
             title: '🔔 Price Alert Triggered!',
@@ -196,15 +197,9 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
             url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`,
             color: 0x5865F2,
           };
-          const sent = await sendDiscordDMEmbed(alert.discordId, embed);
-          if (sent) {
-            await markAlertTriggered(alert.id);
-          }
+          sent = await sendDiscordDMEmbed(alert.discordId, embed);
         } else {
-          const sent = await sendDiscordDM(alert.discordId, message);
-          if (sent) {
-            await markAlertTriggered(alert.id);
-          }
+          sent = await sendDiscordDM(alert.discordId, message);
         }
         
         if (sent) {
