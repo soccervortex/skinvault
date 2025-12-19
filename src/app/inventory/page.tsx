@@ -57,6 +57,10 @@ function getPriceForItem(item: InventoryItem, prices: Record<string, string>): s
   return k ? prices[k] : undefined;
 }
 
+function isNonTradable(item: InventoryItem): boolean {
+  return item.tradable === 0 || item.tradable === false;
+}
+
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   return (
     <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
@@ -679,6 +683,11 @@ function InventoryContent() {
   const sortedInv = useMemo(() => {
     const arr = [...filteredInv];
     arr.sort((a, b) => {
+      // Always show non-tradable items first (then tradable), regardless of the selected sort mode.
+      const ntA = isNonTradable(a) ? 0 : 1;
+      const ntB = isNonTradable(b) ? 0 : 1;
+      if (ntA !== ntB) return ntA - ntB;
+
       if (sortMode === 'name-asc') {
         return getItemDisplayName(a).localeCompare(getItemDisplayName(b));
       }
