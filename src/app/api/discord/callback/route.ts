@@ -3,7 +3,7 @@ import { kv } from '@vercel/kv';
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/discord/callback`;
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/discord/callback`;
 
 // Discord OAuth callback - exchange code for token and link to Steam account
 export async function GET(request: Request) {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const state = url.searchParams.get('state');
     
     if (!code || !state) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_auth_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_auth_failed`);
     }
 
     // Decode state to get steamId
@@ -24,10 +24,10 @@ export async function GET(request: Request) {
       
       // Verify state is recent (within 10 minutes)
       if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_auth_expired`);
+        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_auth_expired`);
       }
     } catch {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_auth_invalid`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_auth_invalid`);
     }
 
     // Exchange code for access token
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     });
 
     if (!tokenResponse.ok) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_token_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_token_failed`);
     }
 
     const tokenData = await tokenResponse.json();
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     });
 
     if (!userResponse.ok) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_user_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_user_failed`);
     }
 
     const discordUser = await userResponse.json();
@@ -83,13 +83,13 @@ export async function GET(request: Request) {
       await kv.set(discordConnectionsKey, connections);
     } catch (error) {
       console.error('Failed to store Discord connection:', error);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_storage_failed`);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_storage_failed`);
     }
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?discord=connected`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?discord=connected`);
   } catch (error) {
     console.error('Discord callback error:', error);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/pro?error=discord_callback_failed`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_callback_failed`);
   }
 }
 

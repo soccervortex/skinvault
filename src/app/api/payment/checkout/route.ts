@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     const priceInfo = PRICES[plan];
-    const origin = request.headers.get('origin') || 'http://localhost:3000';
+    const origin = request.headers.get('origin') || 'https://skinvaults.vercel.app';
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],

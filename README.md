@@ -43,7 +43,7 @@ Create a `.env.local` file in the root directory:
 
 ```env
 # Base URL
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
+NEXT_PUBLIC_BASE_URL=https://skinvaults.vercel.app
 
 # Vercel KV (Database for Pro users)
 KV_REST_API_URL=https://your-kv-instance.upstash.io
@@ -53,7 +53,7 @@ KV_REST_API_TOKEN=your-kv-token
 DISCORD_CLIENT_ID=your-discord-client-id
 DISCORD_CLIENT_SECRET=your-discord-client-secret
 DISCORD_BOT_TOKEN=your-discord-bot-token
-DISCORD_REDIRECT_URI=http://localhost:3000/api/discord/callback
+DISCORD_REDIRECT_URI=https://skinvaults.vercel.app/api/discord/callback
 
 # Stripe
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
@@ -94,7 +94,7 @@ SMTP_PASS=your-app-password
 2. Copy **Client ID** → `DISCORD_CLIENT_ID`
 3. Click "Reset Secret" and copy → `DISCORD_CLIENT_SECRET`
 4. Add Redirect URI:
-   - Development: `http://localhost:3000/api/discord/callback`
+   - Development: `https://skinvaults.vercel.app/api/discord/callback`
    - Production: `https://yourdomain.com/api/discord/callback`
 5. Scopes needed:
    - `identify` (to get user info)
