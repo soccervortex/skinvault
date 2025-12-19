@@ -108,6 +108,82 @@ async function resolveVanityUrl(vanityUrl: string): Promise<string | null> {
   }
 }
 
+// Fetch inventory using official Steam Web API (IEconItems_730/GetPlayerItems)
+// This is the official Steam API method for CS2 inventories
+async function fetchInventoryViaSteamWebAPI(steamId: string): Promise<any> {
+  try {
+    const apiKey = process.env.STEAM_API_KEY;
+    if (!apiKey) {
+      return null;
+    }
+    
+    // Official Steam Web API endpoint for CS2 inventories
+    // IEconItems_730/GetPlayerItems/v0001/
+    const apiUrl = `https://api.steampowered.com/IEconItems_730/GetPlayerItems/v0001/?key=${apiKey}&SteamID=${steamId}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // Steam Web API returns items in a different format
+    // Convert to standard Steam inventory format
+    if (data?.result && data.result.items) {
+      const items = data.result.items;
+      const assets: any[] = [];
+      const descriptions: any[] = [];
+      
+      // Create a map of unique items by classid_instanceid
+      const itemMap = new Map<string, any>();
+      
+      items.forEach((item: any) => {
+        const key = `${item.classid}_${item.instanceid || 0}`;
+        if (!itemMap.has(key)) {
+          itemMap.set(key, item);
+        }
+      });
+      
+      // Convert to assets and descriptions format
+      itemMap.forEach((item) => {
+        assets.push({
+          assetid: item.id || item.assetid,
+          classid: item.classid,
+          instanceid: item.instanceid || 0,
+          amount: item.amount || 1,
+        });
+        
+        descriptions.push({
+          classid: item.classid,
+          instanceid: item.instanceid || 0,
+          market_hash_name: item.market_hash_name || item.market_name,
+          icon_url: item.icon_url || item.icon_url_large,
+          tradable: item.tradable !== 0,
+          marketable: item.marketable !== 0,
+        });
+      });
+      
+      return { assets, descriptions, success: true };
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
 // Fetch inventory using third-party APIs (like skinpock.com uses)
 async function fetchInventoryViaAPI(steamId: string, apiType: 'steamwebapi' | 'csinventoryapi' | 'steamapis'): Promise<any> {
   try {
@@ -227,7 +303,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Method 2: Try direct Steam API with proxies (fallback)
+    // Method 3: Try direct Steam Community API with proxies (fallback)
     let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=5000`;
     if (startAssetId) {
       invUrl += `&start_assetid=${startAssetId}`;
