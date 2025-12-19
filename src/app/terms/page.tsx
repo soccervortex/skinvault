@@ -216,16 +216,20 @@ export default function TermsPage() {
                 10. Third-Party Services
               </h2>
               <p className="text-gray-300 mb-4">
-                The Service integrates with:
+                The Service integrates with third-party services that have their own privacy policies:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li><strong>Steam:</strong> For authentication and inventory data</li>
-                <li><strong>Discord:</strong> For price alert notifications and bot commands</li>
-                <li><strong>Stripe:</strong> For payment processing</li>
-                <li><strong>Vercel:</strong> For hosting and data storage</li>
+                <li><strong>Steam:</strong> For authentication, inventory data, player statistics, and profile information</li>
+                <li><strong>Discord:</strong> For price alert notifications, bot commands, and OAuth authentication</li>
+                <li><strong>Stripe:</strong> For secure payment processing (we do not store credit card details)</li>
+                <li><strong>Vercel:</strong> For hosting, data storage (Vercel KV), and infrastructure</li>
+                <li><strong>Proxy Services:</strong> ScraperAPI, ZenRows, ScrapingAnt, and other proxy services for accessing Steam Community Market data</li>
+                <li><strong>steamid.io:</strong> For resolving Steam usernames to Steam64 IDs</li>
+                <li><strong>CORS Proxy Services:</strong> corsproxy.io, api.allorigins.win for accessing external APIs</li>
+                <li><strong>Email Services:</strong> Resend, SMTP providers for contact form submissions</li>
               </ul>
               <p className="text-gray-300 mt-4">
-                Your use of these third-party services is subject to their respective terms and privacy policies.
+                Your use of these third-party services is subject to their respective terms and privacy policies. We are not responsible for the privacy practices or content of these third-party services.
               </p>
             </section>
 
