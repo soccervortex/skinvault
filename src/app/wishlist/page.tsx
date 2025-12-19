@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
+import Footer from '@/app/components/Footer';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit, getWishlistBatchSize } from '@/app/utils/pro-limits';

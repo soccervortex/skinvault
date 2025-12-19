@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Sidebar from '@/app/components/Sidebar';
+import Footer from '@/app/components/Footer';
 import { FileText } from 'lucide-react';
 
 export default function TermsPage() {
@@ -211,6 +212,7 @@ export default function TermsPage() {
             </section>
 
           </div>
+        </div>
         </div>
         <Footer />
       </div>
