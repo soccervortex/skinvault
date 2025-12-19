@@ -108,7 +108,88 @@ async function resolveVanityUrl(vanityUrl: string): Promise<string | null> {
   }
 }
 
+// Fetch inventory using third-party APIs (like skinpock.com uses)
+async function fetchInventoryViaAPI(steamId: string, apiType: 'steamwebapi' | 'csinventoryapi' | 'steamapis'): Promise<any> {
+  try {
+    let apiUrl = '';
+    const headers: HeadersInit = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    };
+
+    if (apiType === 'steamwebapi') {
+      const apiKey = process.env.STEAM_WEB_API_KEY || 'HA8REWE7GQER9I0N';
+      apiUrl = `https://api.steamwebapi.com/steam/api/inventory?key=${apiKey}&steamid=${steamId}&appid=730&contextid=2`;
+      headers['X-API-Key'] = apiKey;
+    } else if (apiType === 'csinventoryapi') {
+      const apiKey = process.env.CS_INVENTORY_API_KEY || '3f85b8d7-7731-43ba-8124-e015015d9c84';
+      apiUrl = `https://csinventoryapi.com/api/v1/inventory?steamid=${steamId}&apikey=${apiKey}`;
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else if (apiType === 'steamapis') {
+      // SteamApis format
+      const apiKey = process.env.STEAMAPIS_KEY;
+      if (!apiKey) return null;
+      apiUrl = `https://api.steamapis.com/steam/inventory/${steamId}/730/2?api_key=${apiKey}`;
+    }
+
+    if (!apiUrl) return null;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const response = await fetch(apiUrl, {
+      headers,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // Convert different API formats to Steam format
+    if (data.data && Array.isArray(data.data)) {
+      // CSInventoryAPI format
+      const assets: any[] = [];
+      const descriptions: any[] = [];
+      data.data.forEach((item: any, idx: number) => {
+        assets.push({
+          assetid: item.assetid || item.id || `temp_${idx}`,
+          classid: item.classid || item.class_id,
+          instanceid: item.instanceid || item.instance_id || 0,
+          amount: item.amount || 1,
+        });
+        descriptions.push({
+          classid: item.classid || item.class_id,
+          instanceid: item.instanceid || item.instance_id || 0,
+          market_hash_name: item.market_hash_name || item.name,
+          icon_url: item.icon_url || item.icon,
+          tradable: item.tradable !== false,
+          marketable: item.marketable !== false,
+        });
+      });
+      return { assets, descriptions, success: true };
+    }
+    
+    // SteamWebAPI or SteamApis format (closer to Steam format)
+    if (data.assets || data.descriptions || data.items) {
+      return {
+        assets: data.assets || data.items || [],
+        descriptions: data.descriptions || [],
+        success: true,
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
 // Fetch Steam inventory (server-side proxy to avoid CORS)
+// Uses multiple methods: direct Steam API, proxies, and third-party APIs (like skinpock.com)
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -128,12 +209,25 @@ export async function GET(request: Request) {
       if (resolvedId) {
         steamId = resolvedId;
       } else {
-        // If resolution fails, try using the vanity URL directly (Steam API might accept it)
-        // But prefer numeric ID, so we'll still try but log a warning
         console.warn(`Could not resolve vanity URL: ${steamId}, trying direct access`);
       }
     }
 
+    // Method 1: Try third-party APIs first (like skinpock.com uses) - these are more reliable
+    const thirdPartyAPIs: Array<'steamwebapi' | 'csinventoryapi' | 'steamapis'> = ['steamwebapi', 'csinventoryapi', 'steamapis'];
+    for (const apiType of thirdPartyAPIs) {
+      try {
+        const data = await fetchInventoryViaAPI(steamId, apiType);
+        if (data && (data.assets || data.descriptions)) {
+          return NextResponse.json(data);
+        }
+      } catch (error) {
+        // Continue to next API
+        continue;
+      }
+    }
+
+    // Method 2: Try direct Steam API with proxies (fallback)
     let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=5000`;
     if (startAssetId) {
       invUrl += `&start_assetid=${startAssetId}`;
@@ -206,19 +300,19 @@ export async function GET(request: Request) {
       }
     }
 
-    // All proxies failed - log detailed error
-    console.error('All inventory proxies failed:', {
+    // All methods failed - log detailed error
+    console.error('All inventory methods failed:', {
       steamId,
       isPro,
       errors: errors.join('; '),
       lastError: lastError?.message,
     });
 
-    // All proxies failed
+    // All methods failed
     return NextResponse.json(
       { 
-        error: lastError?.message || 'All proxies failed', 
-        details: 'Unable to fetch Steam inventory',
+        error: lastError?.message || 'All inventory methods failed', 
+        details: 'Unable to fetch Steam inventory using direct API, proxies, or third-party services',
         proxyErrors: errors,
       },
       { status: 500 }
