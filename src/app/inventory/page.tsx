@@ -239,23 +239,25 @@ function InventoryContent() {
 
       while (hasMore && attempts < maxAttempts) {
         attempts++;
-        let invUrl = `https://steamcommunity.com/inventory/${id}/730/2?l=english&count=5000`;
-        if (startAssetId) {
-          invUrl += `&start_assetid=${startAssetId}`;
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
         
         try {
-          const data = await Promise.race([
-            fetchWithProxyRotation(invUrl, isPro, { parallel: false }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Inventory fetch timeout')), 20000)
-            )
-          ]) as any;
+          // Use server-side API route to avoid CORS issues
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${isPro}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+          
+          const res: Response = await fetch(apiUrl, {
+            signal: controller.signal,
+            cache: 'no-store',
+          });
           
           clearTimeout(timeoutId);
+          
+          if (!res.ok) {
+            throw new Error(`API returned ${res.status}`);
+          }
+          
+          const data: any = await res.json();
           
           if (data?.descriptions) {
             const newItems = data.descriptions as InventoryItem[];
