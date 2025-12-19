@@ -21,6 +21,8 @@ const client = new Client({
 });
 
 // Register slash commands
+// Note: For User Installs, commands must be registered globally and the bot must have
+// "applications.commands" scope. Global commands can take up to 1 hour to appear.
 const commands = [
   new SlashCommandBuilder()
     .setName('wishlist')
@@ -34,21 +36,55 @@ const commands = [
     .setName('alerts')
     .setDescription('View your active price alerts')
     .toJSON(),
+  new SlashCommandBuilder()
+    .setName('inventory')
+    .setDescription('View your inventory summary and stats')
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('price')
+    .setDescription('Check the current price of a CS2 skin')
+    .addStringOption(option =>
+      option.setName('item')
+        .setDescription('The name of the item to check')
+        .setRequired(true)
+    )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('vault')
+    .setDescription('View your total vault value and statistics')
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('stats')
+    .setDescription('View your CS2 player statistics')
+    .toJSON(),
 ];
 
 async function registerCommands() {
   try {
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     console.log('Started refreshing application (/) commands.');
+    console.log(`Registering ${commands.length} commands:`, commands.map(c => c.name).join(', '));
 
+    // Register commands globally (works for both server and user installs)
+    // Global commands can take up to 1 hour to propagate, but work everywhere
     await rest.put(
       Routes.applicationCommands(DISCORD_CLIENT_ID),
       { body: commands }
     );
 
-    console.log('Successfully registered application commands.');
+    console.log('✅ Successfully registered application commands globally.');
+    console.log('📋 Commands registered:', commands.map(c => `/${c.name}`).join(', '));
+    console.log('⏳ Global commands may take up to 1 hour to appear in Discord.');
+    console.log('💡 Tip: Commands will appear in DMs and servers where the bot is present.');
   } catch (error) {
-    console.error('Error registering commands:', error);
+    console.error('❌ Error registering commands:', error);
+    if (error.code === 50001) {
+      console.error('Missing Access: Make sure the bot has "applications.commands" scope');
+    } else if (error.code === 50035) {
+      console.error('Invalid Form Body: Check command definitions');
+    } else if (error.code === 30034) {
+      console.error('Maximum number of global commands reached (100). Consider using guild commands.');
+    }
   }
 }
 
@@ -312,6 +348,200 @@ client.on('interactionCreate', async (interaction) => {
 
       await interaction.editReply({ embeds: [embed] });
 
+    } else if (commandName === 'price') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const itemName = interaction.options.getString('item');
+      if (!itemName) {
+        await interaction.editReply({
+          content: '❌ **Missing Item Name**\n\nPlease provide an item name. Example: `/price AK-47 | Redline (Field-Tested)`',
+        });
+        return;
+      }
+
+      const price = await getItemPrice(itemName, '3');
+      
+      if (!price) {
+        await interaction.editReply({
+          content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemName}"\n\nMake sure the item name is correct. You can search for items on: https://skinvaults.vercel.app`,
+        });
+        return;
+      }
+
+      const priceText = price.lowest_price || price.lowest || price.median_price || 'No price data';
+      const embed = new EmbedBuilder()
+        .setTitle(`💰 ${itemName}`)
+        .setDescription(`**Current Price:** ${priceText}`)
+        .setColor(0x5865F2)
+        .setURL(`https://skinvaults.vercel.app/item/${encodeURIComponent(itemName)}`)
+        .setTimestamp()
+        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+      // Try to get item image
+      try {
+        const itemResponse = await fetch(`${API_BASE_URL}/api/item/info?market_hash_name=${encodeURIComponent(itemName)}`);
+        if (itemResponse.ok) {
+          const itemData = await itemResponse.json();
+          if (itemData.image) {
+            embed.setThumbnail(itemData.image);
+          }
+        }
+      } catch (error) {
+        // Ignore errors getting image
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } else if (commandName === 'inventory') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const steamId = await getSteamIdFromDiscord(user.id);
+      
+      if (!steamId) {
+        await interaction.editReply({
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+        });
+        return;
+      }
+
+      try {
+        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
+        if (!invResponse.ok) {
+          await interaction.editReply({
+            content: '❌ **Failed to Load Inventory**\n\nCould not fetch your inventory. Please try again later.',
+          });
+          return;
+        }
+
+        const invData = await invResponse.json();
+        const assets = invData.assets || [];
+        const descriptions = invData.descriptions || [];
+        
+        // Count items
+        const itemCount = assets.length;
+        const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
+
+        const embed = new EmbedBuilder()
+          .setTitle('📦 Your Inventory')
+          .setDescription(`**Total Items:** ${itemCount}\n**Unique Items:** ${uniqueItems}`)
+          .setColor(0x5865F2)
+          .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Error getting inventory:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to load inventory. Please try again later.',
+        });
+      }
+
+    } else if (commandName === 'vault') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const steamId = await getSteamIdFromDiscord(user.id);
+      
+      if (!steamId) {
+        await interaction.editReply({
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+        });
+        return;
+      }
+
+      try {
+        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
+        if (!invResponse.ok) {
+          await interaction.editReply({
+            content: '❌ **Failed to Load Inventory**\n\nCould not fetch your inventory. Please try again later.',
+          });
+          return;
+        }
+
+        const invData = await invResponse.json();
+        const assets = invData.assets || [];
+        const descriptions = invData.descriptions || [];
+        
+        // Calculate total value (simplified - would need price data for accurate calculation)
+        const itemCount = assets.length;
+        const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
+
+        const embed = new EmbedBuilder()
+          .setTitle('💎 Your Vault')
+          .setDescription(`**Total Items:** ${itemCount}\n**Unique Items:** ${uniqueItems}\n\nView detailed stats and prices on SkinVault!`)
+          .setColor(0x5865F2)
+          .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Error getting vault:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to load vault data. Please try again later.',
+        });
+      }
+
+    } else if (commandName === 'stats') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const steamId = await getSteamIdFromDiscord(user.id);
+      
+      if (!steamId) {
+        await interaction.editReply({
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+        });
+        return;
+      }
+
+      try {
+        const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?steamId=${steamId}`);
+        if (!statsResponse.ok) {
+          await interaction.editReply({
+            content: '❌ **Stats Private**\n\nYour CS2 stats are private. Set your Steam profile to public to view stats.',
+          });
+          return;
+        }
+
+        const statsData = await statsResponse.json();
+        const stats = statsData.stats || {};
+
+        const embed = new EmbedBuilder()
+          .setTitle('📊 Your CS2 Stats')
+          .setColor(0x5865F2)
+          .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        if (stats.total_kills) {
+          embed.addFields({ name: '💀 Total Kills', value: String(stats.total_kills || 'N/A'), inline: true });
+        }
+        if (stats.total_deaths) {
+          embed.addFields({ name: '☠️ Total Deaths', value: String(stats.total_deaths || 'N/A'), inline: true });
+        }
+        if (stats.total_kills && stats.total_deaths) {
+          const kd = (stats.total_kills / stats.total_deaths).toFixed(2);
+          embed.addFields({ name: '📈 K/D Ratio', value: kd, inline: true });
+        }
+        if (stats.total_wins) {
+          embed.addFields({ name: '🏆 Total Wins', value: String(stats.total_wins || 'N/A'), inline: true });
+        }
+        if (stats.total_headshots) {
+          embed.addFields({ name: '🎯 Headshots', value: String(stats.total_headshots || 'N/A'), inline: true });
+        }
+
+        if (embed.data.fields?.length === 0) {
+          embed.setDescription('No stats available. Make sure your Steam profile is public.');
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Error getting stats:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to load stats. Please try again later.',
+        });
+      }
+
     } else if (commandName === 'help') {
       const embed = new EmbedBuilder()
         .setTitle('🤖 SkinVault Bot Help')
@@ -326,6 +556,26 @@ client.on('interactionCreate', async (interaction) => {
           {
             name: '🔔 `/alerts`',
             value: 'View your active price alerts',
+            inline: false,
+          },
+          {
+            name: '📦 `/inventory`',
+            value: 'View your inventory summary',
+            inline: false,
+          },
+          {
+            name: '💰 `/price <item>`',
+            value: 'Check the current price of a CS2 skin',
+            inline: false,
+          },
+          {
+            name: '💎 `/vault`',
+            value: 'View your total vault value and statistics',
+            inline: false,
+          },
+          {
+            name: '📊 `/stats`',
+            value: 'View your CS2 player statistics',
             inline: false,
           },
           {
