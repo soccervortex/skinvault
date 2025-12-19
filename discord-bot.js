@@ -67,8 +67,8 @@ const commands = [
     )
     .addStringOption(option =>
       option.setName('platform')
-        .setDescription('Platform to search on (optional, auto-detects if not specified)')
-        .setRequired(false)
+        .setDescription('Platform to search on')
+        .setRequired(true)
         .addChoices(
           { name: 'Steam64 ID', value: 'steam64' },
           { name: 'Steam Username', value: 'steam' },
