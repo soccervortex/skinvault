@@ -22,12 +22,17 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
   const proxyUrl = PROXIES[proxyIndex](url);
   
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    
     const response = await fetch(proxyUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-      signal: AbortSignal.timeout(20000), // 20 second timeout
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Proxy ${proxyIndex} returned ${response.status}`);
@@ -52,8 +57,11 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
     // Direct JSON response
     return JSON.parse(text);
   } catch (error) {
-    // Try next proxy
-    return fetchWithProxy(url, proxyIndex + 1);
+    // Try next proxy if not the last one
+    if (proxyIndex + 1 < PROXIES.length) {
+      return fetchWithProxy(url, proxyIndex + 1);
+    }
+    throw error;
   }
 }
 
@@ -79,22 +87,32 @@ export async function GET(request: Request) {
     const proxyList = PROXIES.slice(0, maxProxies);
 
     // Try proxies sequentially
+    let lastError: any = null;
     for (let i = 0; i < proxyList.length; i++) {
       try {
         const data = await fetchWithProxy(invUrl, i);
         
-        if (data && (data.descriptions || data.assets)) {
+        if (data && (data.descriptions || data.assets || data.success !== false)) {
           return NextResponse.json(data);
         }
-      } catch (error) {
-        // Continue to next proxy
+        // If data exists but doesn't have expected structure, try next proxy
         if (i === proxyList.length - 1) {
-          throw error; // Last proxy failed
+          lastError = new Error('Invalid response structure');
+        }
+      } catch (error) {
+        lastError = error;
+        // Continue to next proxy if not the last one
+        if (i < proxyList.length - 1) {
+          continue;
         }
       }
     }
 
-    return NextResponse.json({ error: 'All proxies failed' }, { status: 500 });
+    // All proxies failed
+    return NextResponse.json(
+      { error: lastError?.message || 'All proxies failed', details: 'Unable to fetch Steam inventory' },
+      { status: 500 }
+    );
   } catch (error: any) {
     console.error('Steam inventory fetch error:', error);
     return NextResponse.json(
