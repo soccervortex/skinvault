@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut } from 'lucide-react';
+import { Tag, Wallet, Heart, User, Search, X, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -69,6 +69,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/inventory" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
             <Wallet size={16}/> My Vault
           </Link>
+          <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+            <Heart size={16}/> Wishlist
+          </Link>
           <button 
             onClick={() => setIsSearchOpen(true)}
             className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
@@ -115,6 +118,14 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
             </button>
           )}
+          <div className="mt-4 space-y-2">
+            <Link href="/terms" className="block text-[10px] font-black text-gray-500 uppercase tracking-widest hover:text-white transition-colors">
+              Terms
+            </Link>
+            <Link href="/privacy" className="block text-[10px] font-black text-gray-500 uppercase tracking-widest hover:text-white transition-colors">
+              Privacy
+            </Link>
+          </div>
         </div>
       </aside>
 
