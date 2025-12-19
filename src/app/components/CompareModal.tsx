@@ -35,6 +35,16 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
       const stored = localStorage.getItem('sv_compare_list');
       let list: CompareItem[] = stored ? JSON.parse(stored) : [];
       
+      // Remove any duplicates first (by ID)
+      const seen = new Set<string>();
+      list = list.filter(item => {
+        if (seen.has(item.id)) {
+          return false; // Duplicate, remove it
+        }
+        seen.add(item.id);
+        return true;
+      });
+      
       // If currentItem is provided and not already in list, add it
       if (currentItem) {
         const exists = list.find(i => i.id === currentItem.id);
@@ -148,29 +158,45 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
   }, [searchQuery, isOpen, datasetCache]);
 
   const addToCompare = (item: CompareItem) => {
-    const newList = [...compareList];
-    
-    // Check if already exists
-    if (newList.find(i => i.id === item.id)) {
-      return; // Already in list
-    }
-    
-    // Add item to the end (maintains order: first item slot 1, second item slot 2)
-    newList.push({
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      market_hash_name: item.market_hash_name || item.name,
-    });
-    
-    // Keep only last 2 items (preserve order)
-    const finalList = newList.length > 2 ? newList.slice(-2) : newList;
-    
-    setCompareList(finalList);
-    localStorage.setItem('sv_compare_list', JSON.stringify(finalList));
-    
-    if (onItemSelect) {
-      onItemSelect(finalList[finalList.length - 1]);
+    // Start fresh from localStorage to avoid stale state
+    try {
+      const stored = localStorage.getItem('sv_compare_list');
+      let newList: CompareItem[] = stored ? JSON.parse(stored) : [];
+      
+      // Remove duplicates first
+      const seen = new Set<string>();
+      newList = newList.filter(i => {
+        if (seen.has(i.id)) {
+          return false;
+        }
+        seen.add(i.id);
+        return true;
+      });
+      
+      // Check if already exists
+      if (newList.find(i => i.id === item.id)) {
+        return; // Already in list
+      }
+      
+      // Add item to the end (maintains order: first item slot 1, second item slot 2)
+      newList.push({
+        id: item.id,
+        name: item.name,
+        image: item.image,
+        market_hash_name: item.market_hash_name || item.name,
+      });
+      
+      // Keep only last 2 items (preserve order)
+      const finalList = newList.length > 2 ? newList.slice(-2) : newList;
+      
+      setCompareList(finalList);
+      localStorage.setItem('sv_compare_list', JSON.stringify(finalList));
+      
+      if (onItemSelect) {
+        onItemSelect(finalList[finalList.length - 1]);
+      }
+    } catch (error) {
+      console.error('Failed to add to compare:', error);
     }
   };
 
