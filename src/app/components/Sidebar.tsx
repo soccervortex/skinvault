@@ -28,7 +28,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     const rootUrl = window.location.origin;
     const steamLoginUrl = "https://steamcommunity.com/openid/login" +
       "?openid.ns=http://specs.openid.net/auth/2.0" +
-      "&openid.mode=checkid_setup" +
+      "?openid.mode=checkid_setup" +
       "&openid.return_to=" + encodeURIComponent(`${rootUrl}/inventory`) + 
       "&openid.realm=" + encodeURIComponent(rootUrl) +
       "&openid.identity=http://specs.openid.net/auth/2.0/identifier_select" +
