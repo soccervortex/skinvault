@@ -266,9 +266,19 @@ async function getSteamProfile(steamId) {
 // Resolve Steam username to Steam64 ID
 async function resolveSteamUsername(username) {
   try {
-    // Clean username (remove special chars, spaces)
-    const cleanUsername = username.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-    if (!cleanUsername) return null;
+    // Clean username: extract first part before | or special chars
+    // "TheRembler | Bloodycase.com" -> "TheRembler"
+    let cleanUsername = username.trim();
+    
+    // If it contains |, take the part before it
+    if (cleanUsername.includes('|')) {
+      cleanUsername = cleanUsername.split('|')[0].trim();
+    }
+    
+    // Remove special chars that aren't allowed in Steam URLs (keep alphanumeric, underscore, hyphen)
+    cleanUsername = cleanUsername.replace(/[^a-zA-Z0-9_-]/g, '');
+    
+    if (!cleanUsername || cleanUsername.length < 3) return null;
     
     // Try to access profile by custom URL
     const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
