@@ -10,7 +10,8 @@ const PRICE_CACHE_KEY = 'sv_price_cache_item_v1';
 
 export default function ItemDetail({ params }: { params: Promise<{ id: string }> }) {
   // In app router client components, params is a Promise – unwrap via React.use
-  const { id } = React.use(params as any);
+  const resolvedParams = React.use(params) as { id: string };
+  const { id } = resolvedParams;
   const decodedId = decodeURIComponent(id);
   
   const [item, setItem] = useState<any>(null);
