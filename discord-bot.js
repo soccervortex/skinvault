@@ -1297,7 +1297,7 @@ client.on('interactionCreate', async (interaction) => {
 
           // Advanced stats (Pro-only, like on website)
           // Show if: viewing own profile and you're pro, OR you're pro viewing anyone
-          if (viewingOwnProfile && playerIsPro || viewerIsPro) {
+          if ((viewingOwnProfile && playerIsPro) || viewerIsPro) {
             if (mvps > 0) {
               embed.addFields({ name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true });
             }
