@@ -65,16 +65,56 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
   }
 }
 
+// Resolve vanity URL to Steam ID64
+async function resolveVanityUrl(vanityUrl: string): Promise<string | null> {
+  try {
+    const apiKey = process.env.STEAM_API_KEY || '72E5A9A17321670AD00D422453056898';
+    const resolveUrl = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=${apiKey}&vanityurl=${encodeURIComponent(vanityUrl)}`;
+    
+    const response = await fetch(resolveUrl, {
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const data = await response.json();
+    if (data?.response?.steamid) {
+      return data.response.steamid;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Vanity URL resolution failed:', error);
+    return null;
+  }
+}
+
 // Fetch Steam inventory (server-side proxy to avoid CORS)
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const steamId = url.searchParams.get('steamId');
+    let steamId = url.searchParams.get('steamId');
     const startAssetId = url.searchParams.get('start_assetid');
     const isPro = url.searchParams.get('isPro') === 'true';
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
+    }
+
+    // Check if it's a vanity URL (not numeric Steam ID64)
+    // Steam ID64 is always 17 digits
+    if (!/^\d{17}$/.test(steamId)) {
+      // Try to resolve vanity URL to Steam ID
+      const resolvedId = await resolveVanityUrl(steamId);
+      if (resolvedId) {
+        steamId = resolvedId;
+      } else {
+        // If resolution fails, try using the vanity URL directly (Steam API might accept it)
+        // But prefer numeric ID, so we'll still try but log a warning
+        console.warn(`Could not resolve vanity URL: ${steamId}, trying direct access`);
+      }
     }
 
     let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=5000`;
