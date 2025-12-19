@@ -336,18 +336,44 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                         image: item.image,
                         market_hash_name: (item as any).market_hash_name,
                       };
+                      
+                      // Check if already in compare list (toggle behavior)
                       const exists = compareList.find((i: any) => i.id === item.id);
-                      if (!exists) {
-                        compareList.push(itemToAdd);
-                        if (compareList.length > 2) {
-                          compareList.shift();
-                        }
-                        localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
+                      if (exists) {
+                        // Remove if already exists
+                        const newList = compareList.filter((i: any) => i.id !== item.id);
+                        localStorage.setItem('sv_compare_list', JSON.stringify(newList));
+                        
+                        // Show feedback
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-yellow-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
+                        notification.textContent = 'Item removed from compare!';
+                        document.body.appendChild(notification);
+                        setTimeout(() => {
+                          notification.remove();
+                        }, 2000);
+                        return;
                       }
+                      
+                      // Add item
+                      compareList.push(itemToAdd);
+                      if (compareList.length > 2) {
+                        compareList.shift();
+                      }
+                      localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
+                      
+                      // Navigate to compare page if we have 2 items
                       if (compareList.length === 2) {
                         window.location.href = `/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`;
                       } else {
-                        alert('Item added to compare! Add another item to compare.');
+                        // Show visual feedback
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
+                        notification.textContent = `Item added to compare! ${compareList.length === 1 ? 'Add another item to compare.' : ''}`;
+                        document.body.appendChild(notification);
+                        setTimeout(() => {
+                          notification.remove();
+                        }, 3000);
                       }
                     } catch (error) {
                       console.error('Failed to add to compare:', error);
