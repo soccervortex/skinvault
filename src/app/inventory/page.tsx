@@ -857,7 +857,6 @@ function InventoryContent() {
         </main>
         <Footer />
       </div>
-    </div>
   );
 }
 
