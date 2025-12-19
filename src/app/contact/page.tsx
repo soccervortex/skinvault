@@ -167,6 +167,5 @@ Description:
         </div>
         <Footer />
       </div>
-    </div>
   );
 }

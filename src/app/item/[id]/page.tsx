@@ -473,6 +473,5 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
         </div>
         <Footer />
       </div>
-    </div>
   );
 }

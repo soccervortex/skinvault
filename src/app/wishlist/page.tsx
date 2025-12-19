@@ -327,9 +327,7 @@ export default function WishlistPage() {
         limit={getWishlistLimit(false)}
         currentCount={items.length}
       />
-        </div>
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 }
