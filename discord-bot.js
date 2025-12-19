@@ -57,6 +57,15 @@ const commands = [
     .setName('stats')
     .setDescription('View your CS2 player statistics')
     .toJSON(),
+  new SlashCommandBuilder()
+    .setName('player')
+    .setDescription('Search for a player by Steam ID, Discord username, or Steam username')
+    .addStringOption(option =>
+      option.setName('query')
+        .setDescription('Steam64 ID, Discord username, or Steam username')
+        .setRequired(true)
+    )
+    .toJSON(),
 ];
 
 async function registerCommands() {
@@ -153,6 +162,134 @@ async function getSteamIdFromDiscord(discordId) {
   } catch (error) {
     console.error('Error getting Steam ID:', error);
     return null;
+  }
+}
+
+// Get Discord user ID from username
+async function getDiscordUserIdFromUsername(username) {
+  try {
+    // Try to find user in Discord (this requires the bot to be in a server with the user)
+    // For now, we'll check via our API if there's a connection
+    const response = await fetch(`${API_BASE_URL}/api/discord/find-by-username?username=${encodeURIComponent(username)}`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.discordId;
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Get Steam profile by Steam64 ID
+async function getSteamProfile(steamId) {
+  try {
+    const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
+    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    
+    if (!response.ok) return null;
+    
+    const text = await response.text();
+    const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
+    const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
+    return { steamId, name, avatar };
+  } catch (error) {
+    console.error('Error getting Steam profile:', error);
+    return null;
+  }
+}
+
+// Resolve Steam username to Steam64 ID
+async function resolveSteamUsername(username) {
+  try {
+    // Try to access profile by custom URL
+    const profileUrl = `https://steamcommunity.com/id/${username}/?xml=1`;
+    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(profileUrl)}`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    
+    if (!response.ok) return null;
+    
+    const text = await response.text();
+    const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
+    if (steamId64) {
+      return steamId64;
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Get top weapons from inventory
+async function getTopWeapons(steamId, limit = 3) {
+  try {
+    const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
+    if (!invResponse.ok) return [];
+
+    const invData = await invResponse.json();
+    const assets = invData.assets || [];
+    const descriptions = invData.descriptions || [];
+    
+    const descMap = new Map();
+    descriptions.forEach(desc => {
+      const key = `${desc.classid}_${desc.instanceid || 0}`;
+      descMap.set(key, desc);
+    });
+
+    const weapons = [];
+    for (const asset of assets) {
+      const key = `${asset.classid}_${asset.instanceid || 0}`;
+      const desc = descMap.get(key);
+      if (!desc) continue;
+
+      const itemName = desc.market_hash_name || desc.market_name || desc.name;
+      const isWeapon = desc.type === 'Weapon' || 
+                      (itemName && (itemName.includes('Knife') || itemName.includes('AK-47') || 
+                       itemName.includes('M4A4') || itemName.includes('AWP') || 
+                       itemName.includes('Glock') || itemName.includes('USP') ||
+                       itemName.includes('Desert Eagle') || itemName.includes('P250') ||
+                       itemName.includes('Five-SeveN') || itemName.includes('Tec-9') ||
+                       itemName.includes('CZ75') || itemName.includes('R8') ||
+                       itemName.includes('P2000') || itemName.includes('Dual Berettas') ||
+                       itemName.includes('P90') || itemName.includes('MP9') ||
+                       itemName.includes('MAC-10') || itemName.includes('UMP-45') ||
+                       itemName.includes('MP7') || itemName.includes('MP5') ||
+                       itemName.includes('FAMAS') || itemName.includes('Galil') ||
+                       itemName.includes('M4A1-S') || itemName.includes('AUG') ||
+                       itemName.includes('SG 553') || itemName.includes('SCAR-20') ||
+                       itemName.includes('G3SG1') || itemName.includes('SSG 08') ||
+                       itemName.includes('Nova') || itemName.includes('XM1014') ||
+                       itemName.includes('Sawed-Off') || itemName.includes('MAG-7') ||
+                       itemName.includes('M249') || itemName.includes('Negev')));
+
+      if (isWeapon && itemName) {
+        const price = await getItemPrice(itemName, '3');
+        let priceValue = 0;
+        if (price) {
+          const priceStr = price.lowest_price || price.lowest || price.median_price;
+          if (priceStr) {
+            const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
+            priceValue = parseFloat(cleaned) || 0;
+          }
+        }
+        
+        weapons.push({
+          name: itemName,
+          price: price ? (price.lowest_price || price.lowest || price.median_price) : null,
+          priceValue,
+        });
+      }
+    }
+
+    // Sort by price and return top weapons
+    weapons.sort((a, b) => b.priceValue - a.priceValue);
+    return weapons.slice(0, limit);
+  } catch (error) {
+    console.error('Error getting top weapons:', error);
+    return [];
   }
 }
 
@@ -924,6 +1061,154 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
+    } else if (commandName === 'player') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const query = interaction.options.getString('query');
+      if (!query) {
+        await interaction.editReply({
+          content: '❌ **Missing Query**\n\nPlease provide a Steam64 ID, Discord username, or Steam username.',
+        });
+        return;
+      }
+
+      try {
+        let steamId = null;
+        let profile = null;
+
+        // Check if query is a Steam64 ID (numeric, 17 digits)
+        if (/^\d{17}$/.test(query)) {
+          steamId = query;
+          profile = await getSteamProfile(steamId);
+        } else {
+          // Try Discord username first
+          const discordUserId = await getDiscordUserIdFromUsername(query);
+          if (discordUserId) {
+            steamId = await getSteamIdFromDiscord(discordUserId);
+            if (steamId) {
+              profile = await getSteamProfile(steamId);
+            } else {
+              await interaction.editReply({
+                content: `❌ **Discord Account Not Connected**\n\nThe Discord user "${query}" is not connected to a Steam account.\n\nThey need to:\n1. Visit https://skinvaults.vercel.app/inventory\n2. Sign in with Steam\n3. Click "Connect Discord"\n\nOr use a Steam64 ID instead.`,
+              });
+              return;
+            }
+          } else {
+            // Try Steam username
+            steamId = await resolveSteamUsername(query);
+            if (steamId) {
+              profile = await getSteamProfile(steamId);
+            } else {
+              await interaction.editReply({
+                content: `❌ **Player Not Found**\n\nCould not find player: "${query}"\n\n💡 **Try:**\n- Steam64 ID (17 digits)\n- Discord username (if connected to Steam)\n- Steam custom URL/username`,
+              });
+              return;
+            }
+          }
+        }
+
+        if (!steamId || !profile) {
+          await interaction.editReply({
+            content: '❌ **Profile Not Found**\n\nCould not load Steam profile. The profile might be private or invalid.',
+          });
+          return;
+        }
+
+        // Get stats
+        let stats = null;
+        try {
+          const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            const ps = statsData?.playerstats;
+            const s = ps?.stats;
+            if (s && Array.isArray(s)) {
+              const statsObj = {};
+              s.forEach((item) => {
+                if (item.name && item.value !== undefined) {
+                  statsObj[item.name] = item.value;
+                }
+              });
+              stats = statsObj;
+            }
+          }
+        } catch (error) {
+          // Stats are optional
+        }
+
+        // Get top 3 weapons
+        const topWeapons = await getTopWeapons(steamId, 3);
+
+        const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
+        const embed = new EmbedBuilder()
+          .setTitle(`👤 ${profile.name}`)
+          .setColor(0x5865F2)
+          .setURL(vaultUrl)
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        // Set profile avatar
+        if (profile.avatar) {
+          embed.setThumbnail(profile.avatar);
+        }
+
+        // Add Steam ID
+        embed.addFields({ name: '🆔 Steam64 ID', value: steamId, inline: false });
+
+        // Add stats if available
+        if (stats) {
+          const kills = Number(stats.total_kills ?? 0);
+          const deaths = Number(stats.total_deaths ?? 0);
+          const matchesWon = Number(stats.total_matches_won ?? 0);
+          const hsKills = Number(stats.total_kills_headshot ?? 0);
+          const totalDamage = Number(stats.total_damage_done ?? 0);
+          const roundsPlayed = Number(stats.total_rounds_played ?? 0);
+          const mvps = Number(stats.total_mvps ?? 0);
+
+          const kd = deaths > 0 ? (kills / deaths) : kills > 0 ? kills : 0;
+          const hs = kills > 0 ? (hsKills / kills) * 100 : 0;
+          const adr = roundsPlayed > 0 ? (totalDamage / roundsPlayed) : 0;
+
+          embed.addFields(
+            { name: '💀 Kills', value: kills.toLocaleString(), inline: true },
+            { name: '☠️ Deaths', value: deaths.toLocaleString(), inline: true },
+            { name: '📈 K/D Ratio', value: kd.toFixed(2), inline: true },
+            { name: '🏆 Wins', value: matchesWon.toLocaleString(), inline: true },
+            { name: '🎯 HS %', value: `${hs.toFixed(1)}%`, inline: true },
+            { name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true }
+          );
+
+          if (adr > 0) {
+            embed.addFields({ name: '💜 ADR', value: adr.toFixed(1), inline: true });
+          }
+        } else {
+          embed.addFields({ name: '📊 Stats', value: 'Profile is private or stats unavailable', inline: false });
+        }
+
+        // Add top 3 weapons
+        if (topWeapons.length > 0) {
+          const weaponsList = topWeapons.map((weapon, index) => {
+            const priceText = weapon.price || 'No price data';
+            return `${index + 1}. **${weapon.name}** - ${priceText}`;
+          }).join('\n');
+
+          embed.addFields({
+            name: '🔫 Top 3 Weapons',
+            value: weaponsList,
+            inline: false,
+          });
+        }
+
+        embed.setDescription(`[View Full Profile](${vaultUrl})`);
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Error getting player:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to load player data. Please try again later.',
+        });
+      }
+
     } else if (commandName === 'help') {
       const embed = new EmbedBuilder()
         .setTitle('🤖 SkinVault Bot Help')
@@ -958,6 +1243,11 @@ client.on('interactionCreate', async (interaction) => {
           {
             name: '📊 `/stats`',
             value: 'View your CS2 player statistics',
+            inline: false,
+          },
+          {
+            name: '👤 `/player <query>`',
+            value: 'Search for a player by Steam ID, Discord username, or Steam username',
             inline: false,
           },
           {
