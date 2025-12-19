@@ -4,12 +4,16 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale } from 'lucide-react';
 import { getPriceScanConcurrency } from '@/app/utils/pro-limits';
-import { fetchWithProxyRotation } from '@/app/utils/proxy-utils';
+import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
+import PriceTrackerModal from '@/app/components/PriceTrackerModal';
+import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
+import { getWishlistLimit } from '@/app/utils/pro-limits';
 
-const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
+// STEAM_API_KEYS removed - using environment variables instead
 
 type InventoryItem = {
   market_hash_name: string;
@@ -51,6 +55,11 @@ function InventoryContent() {
   const [discordStatus, setDiscordStatus] = useState<any>(null);
   const [showManageTrackers, setShowManageTrackers] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
+  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [showTrackerModal, setShowTrackerModal] = useState(false);
+  const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [loggedInUserPro, setLoggedInUserPro] = useState(false);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
   const isPro = useMemo(
@@ -367,10 +376,23 @@ function InventoryContent() {
     }
 
     // Get logged-in user (your own account) - this should NEVER change when viewing other profiles
-    const loggedInUser = typeof window !== 'undefined' 
+    const storedLoggedInUser = typeof window !== 'undefined' 
       ? JSON.parse(localStorage.getItem('steam_user') || '{}')
       : null;
-    const loggedInSteamId = loggedInUser?.steamId;
+    const loggedInSteamId = storedLoggedInUser?.steamId;
+    
+    // Set logged-in user state and check Pro status
+    if (storedLoggedInUser?.steamId) {
+      setLoggedInUser(storedLoggedInUser);
+      // Load wishlist for logged-in user
+      setWishlist(loadWishlist(storedLoggedInUser.steamId));
+      // Check Pro status from API
+      checkProStatus(storedLoggedInUser.steamId).then(setLoggedInUserPro);
+    } else {
+      setLoggedInUser(null);
+      setWishlist([]);
+      setLoggedInUserPro(false);
+    }
 
     // Determine which profile to view
     // Priority: query param > OpenID callback > logged-in user's own profile
@@ -428,6 +450,26 @@ function InventoryContent() {
           : null;
 
         setViewedUser(combinedUser);
+        
+        // Also update Pro status for logged-in user if viewing own profile
+        if (isViewingOwnProfile && storedLoggedInUser?.steamId) {
+          checkProStatus(storedLoggedInUser.steamId).then((proStatus) => {
+            setLoggedInUserPro(proStatus);
+            // Update localStorage with latest Pro status
+            if (proStatus && combinedUser?.proUntil) {
+              const updatedUser = {
+                ...storedLoggedInUser,
+                proUntil: combinedUser.proUntil,
+              };
+              try {
+                if (typeof window !== 'undefined') {
+                  window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
+                  setLoggedInUser(updatedUser);
+                }
+              } catch {}
+            }
+          });
+        }
 
         // Only update logged-in user in localStorage when:
         // 1. It's a Steam login callback (OpenID redirect) - always update
@@ -978,34 +1020,129 @@ function InventoryContent() {
                     </p>
                   </div>
                 ) : (
-                  sortedInv.map((item, idx) => (
-                    <Link
-                      key={idx}
-                      href={`/item/${encodeURIComponent(item.market_hash_name)}`}
-                    prefetch={false}
-                      className="group"
-                    >
-                      <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
-                        <img 
-                          src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
-                          className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
-                          alt="skin" 
-                        />
-                        <div className="mt-auto space-y-1.5 md:space-y-2">
-                          <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
-                          <p className="text-[10px] md:text-[11px] font-black text-emerald-500 italic">
-                            {itemPrices[item.market_hash_name] 
-                              ? itemPrices[item.market_hash_name] 
-                              : priceScanDone 
-                                ? <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>
-                                : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
-                                    {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
-                                  </span>}
-                          </p>
-                        </div>
+                  sortedInv.map((item, idx) => {
+                    const isWishlisted = wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.market_hash_name);
+                    const wishlistKey = item.market_hash_name;
+                    
+                    return (
+                      <div key={idx} className="group relative">
+                        <Link
+                          href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                          prefetch={false}
+                          className="block"
+                        >
+                          <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                            <img 
+                              src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
+                              className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
+                              alt="skin" 
+                            />
+                            <div className="mt-auto space-y-1.5 md:space-y-2">
+                              <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
+                              <p className="text-[10px] md:text-[11px] font-black text-emerald-500 italic">
+                                {itemPrices[item.market_hash_name] 
+                                  ? itemPrices[item.market_hash_name] 
+                                  : priceScanDone 
+                                    ? <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>
+                                    : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
+                                        {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
+                                      </span>}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                        
+                        {/* Action Buttons - Only show for logged-in user */}
+                        {loggedInUser?.steamId && (
+                          <div className="absolute top-2 right-2 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Compare Button */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                try {
+                                  const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
+                                  const itemToAdd = {
+                                    id: item.market_hash_name,
+                                    name: item.market_hash_name,
+                                    image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
+                                    market_hash_name: item.market_hash_name,
+                                  };
+                                  const exists = compareList.find((i: any) => i.id === item.market_hash_name);
+                                  if (!exists) {
+                                    compareList.push(itemToAdd);
+                                    if (compareList.length > 2) {
+                                      compareList.shift();
+                                    }
+                                    localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to add to compare:', err);
+                                }
+                              }}
+                              className="p-2 rounded-lg border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                              title="Add to Compare"
+                            >
+                              <Scale size={12} className="text-blue-400" />
+                            </button>
+                            
+                            {/* Price Tracker Button */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setTrackerModalItem({
+                                  id: item.market_hash_name,
+                                  name: item.market_hash_name,
+                                  image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
+                                  market_hash_name: item.market_hash_name,
+                                });
+                                setShowTrackerModal(true);
+                              }}
+                              className="p-2 rounded-lg border border-white/10 bg-black/60 hover:border-purple-500 hover:bg-purple-500/10 transition-all"
+                              title="Price Tracker"
+                            >
+                              <Bell size={12} className="text-purple-400" />
+                            </button>
+                            
+                            {/* Wishlist Button */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const result = toggleWishlistEntry(
+                                  {
+                                    key: wishlistKey,
+                                    name: item.market_hash_name,
+                                    image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
+                                    market_hash_name: item.market_hash_name,
+                                  },
+                                  loggedInUser.steamId,
+                                  loggedInUserPro,
+                                );
+                                if (result.success) {
+                                  setWishlist(result.newList);
+                                } else if (result.reason === 'limit_reached') {
+                                  setShowUpgradeModal(true);
+                                }
+                              }}
+                              className={`p-2 rounded-lg border border-white/10 bg-black/60 transition-all ${
+                                isWishlisted 
+                                  ? 'border-rose-500 bg-rose-500/20 hover:bg-rose-500/30' 
+                                  : 'hover:border-rose-500 hover:bg-rose-500/10'
+                              }`}
+                              title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                            >
+                              <Heart 
+                                size={12} 
+                                className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'} 
+                              />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </Link>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>
@@ -1019,9 +1156,33 @@ function InventoryContent() {
           isOpen={showManageTrackers}
           onClose={() => setShowManageTrackers(false)}
           steamId={loggedInUser.steamId}
-          isPro={isPro}
+          isPro={loggedInUserPro}
         />
       )}
+      
+      {showTrackerModal && trackerModalItem && loggedInUser && (
+        <PriceTrackerModal
+          isOpen={showTrackerModal}
+          onClose={() => {
+            setShowTrackerModal(false);
+            setTrackerModalItem(null);
+          }}
+          item={trackerModalItem}
+          user={loggedInUser}
+          isPro={loggedInUserPro}
+          currency={currency}
+        />
+      )}
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={wishlist.length}
+      />
     </>
   );
 }

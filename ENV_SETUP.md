@@ -1,27 +1,84 @@
 # Environment Variables Setup
 
-## Required for KV Storage (Upstash Redis)
+## Required Environment Variables
 
-Add these to your `.env.local` file:
+Create a `.env.local` file in the root directory with the following variables:
 
+### Steam API Configuration
 ```env
-KV_REST_API_URL=https://premium-dane-32006.upstash.io
-KV_REST_API_TOKEN=AX0GAAIncDEyOWE1N2UwMmQ5OWM0YWRmOGNmZDUyNTZmNzVjNGY1M3AxMzIwMDY
+# Get your Steam Web API Key from: https://steamcommunity.com/dev/apikey
+STEAM_API_KEY=your_steam_api_key_here
 ```
 
-## Optional (for read-only access if needed)
-
+### Discord OAuth Configuration
 ```env
-KV_REST_API_READ_ONLY_TOKEN=An0GAAIgcDHLLz8SXNtM5w-hdHdY6ebuRODdU3YWQ7wuCWCySoxAQw
+# Get these from: https://discord.com/developers/applications
+DISCORD_CLIENT_ID=your_discord_client_id_here
+DISCORD_CLIENT_SECRET=your_discord_client_secret_here
+DISCORD_REDIRECT_URI=https://your-domain.com/api/discord/callback
+
+# Discord Bot API Token (for bot gateway authentication)
+# This is a custom token you generate for securing the bot gateway endpoint
+DISCORD_BOT_API_TOKEN=your_discord_bot_api_token_here
+```
+
+### Stripe Payment Configuration
+```env
+# Get your Stripe keys from: https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+```
+
+### Email Configuration (Resend)
+```env
+# Get your API key from: https://resend.com/api-keys
+RESEND_API_KEY=re_your_resend_api_key_here
+```
+
+### Vercel KV (Upstash Redis) Configuration
+```env
+# Get these from: https://vercel.com/dashboard → Your Project → Storage → KV
+KV_REST_API_URL=https://your-kv-instance.upstash.io
+KV_REST_API_TOKEN=your_kv_rest_api_token_here
+
+# Optional (for read-only access if needed)
+KV_REST_API_READ_ONLY_TOKEN=your_kv_read_only_token_here
+```
+
+### Base URL Configuration
+```env
+# Set this to your production domain (e.g., https://skinvaults.vercel.app)
+NEXT_PUBLIC_BASE_URL=https://your-domain.com
+```
+
+### Optional: Alternative Proxy Service API Keys
+```env
+# These are for alternative inventory fetching services if needed
+# Steam Web API: https://www.steamwebapi.com/dashboard
+STEAM_WEB_API_KEY=your_steam_web_api_key_here
+
+# CS Inventory API: https://csinventoryapi.com/profile
+CS_INVENTORY_API_KEY=your_cs_inventory_api_key_here
+
+# CSGO Empire API: https://csgoempire.com/trading/apikey
+CSGO_EMPIRE_API_KEY=your_csgo_empire_api_key_here
 ```
 
 ## For Vercel Production
 
 1. Go to your Vercel project → **Settings** → **Environment Variables**
-2. Add the same `KV_REST_API_URL` and `KV_REST_API_TOKEN` variables
+2. Add all the required environment variables listed above
 3. Make sure to add them for **Production**, **Preview**, and **Development** environments
 
-## Note
+## Security Notes
+
+- **Never commit `.env.local` to version control** - it's already in `.gitignore`
+- All API keys should be kept secret and never exposed in client-side code
+- Use different keys for development and production environments
+- Rotate keys regularly for security
+
+## Notes
 
 - `KV_URL` and `REDIS_URL` are for direct Redis connections (not needed for REST API)
 - The `@vercel/kv` package uses the REST API, so you only need `KV_REST_API_URL` and `KV_REST_API_TOKEN`
+- If an environment variable is missing, the application will show appropriate error messages

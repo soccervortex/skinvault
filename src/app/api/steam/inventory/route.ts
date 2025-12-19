@@ -6,12 +6,14 @@ const PROXIES = [
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
   (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url: string) => `https://cors-anywhere.herokuapp.com/${url}`,
   (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   (url: string) => `https://yacdn.org/proxy/${url}`,
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}&_nocache=1`,
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_nocache=1`,
   (url: string) => `https://thingproxy.freeboard.io/fetch/${url}?_nocache=1`,
+  // Additional proxies for better reliability
+  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}&_nocache=1`,
+  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}&_t=${Date.now()}`,
 ];
 
 async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any> {
@@ -69,7 +71,11 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
 // Resolve vanity URL to Steam ID64
 async function resolveVanityUrl(vanityUrl: string): Promise<string | null> {
   try {
-    const apiKey = process.env.STEAM_API_KEY || '72E5A9A17321670AD00D422453056898';
+    const apiKey = process.env.STEAM_API_KEY;
+    if (!apiKey) {
+      console.error('STEAM_API_KEY not configured');
+      return null;
+    }
     const resolveUrl = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=${apiKey}&vanityurl=${encodeURIComponent(vanityUrl)}`;
     
     const controller = new AbortController();
@@ -142,7 +148,7 @@ export async function GET(request: Request) {
     const errors: string[] = [];
     for (let i = 0; i < proxyList.length; i++) {
       try {
-        const data = await fetchWithProxy(invUrl, i);
+        const data = await fetchWithProxy(invUrl, i, steamId);
         
         // Steam inventory API can return:
         // - { success: false } for private inventories
