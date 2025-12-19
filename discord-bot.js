@@ -1227,9 +1227,10 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // Check if viewing own profile or other player
-        const viewingOwnProfile = steamId === await getSteamIdFromDiscord(user.id);
-        const isPro = viewingOwnProfile ? await checkProStatus(steamId) : await checkProStatus(steamId);
-        const viewerIsPro = await checkProStatus(await getSteamIdFromDiscord(user.id) || '');
+        const viewerSteamId = await getSteamIdFromDiscord(user.id);
+        const viewingOwnProfile = steamId === viewerSteamId;
+        const playerIsPro = await checkProStatus(steamId);
+        const viewerIsPro = viewerSteamId ? await checkProStatus(viewerSteamId) : false;
 
         // Get stats
         let stats = null;
