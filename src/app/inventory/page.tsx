@@ -887,7 +887,7 @@ function InventoryContent() {
                 <TrendingUp className="text-emerald-500 shrink-0" size={24} />
                 <div className="min-w-0">
                   <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
-                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter truncate">{currency.symbol}{" "}{totalVaultValue}</p>
+                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter break-words">{currency.symbol}{"\u00A0"}{totalVaultValue}</p>
                 </div>
               </div>
             </header>
