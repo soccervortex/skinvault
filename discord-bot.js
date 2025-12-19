@@ -166,17 +166,48 @@ async function getSteamIdFromDiscord(discordId) {
 }
 
 // Get Discord user ID from username
-async function getDiscordUserIdFromUsername(username) {
+async function getDiscordUserIdFromUsername(username, client) {
   try {
-    // Try to find user in Discord (this requires the bot to be in a server with the user)
-    // For now, we'll check via our API if there's a connection
-    const response = await fetch(`${API_BASE_URL}/api/discord/find-by-username?username=${encodeURIComponent(username)}`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.discordId;
+    // Remove discriminator if present (old format: username#1234)
+    const cleanUsername = username.split('#')[0].toLowerCase();
+    
+    // Search through all guilds the bot is in
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        // Search for user by username (case-insensitive)
+        const member = guild.members.cache.find(m => 
+          m.user.username.toLowerCase() === cleanUsername ||
+          m.user.displayName.toLowerCase() === cleanUsername ||
+          m.user.globalName?.toLowerCase() === cleanUsername
+        );
+        
+        if (member) {
+          return member.user.id;
+        }
+      } catch (error) {
+        // Continue to next guild
+        continue;
+      }
     }
+    
+    // If not found in guilds, try to fetch user directly (only works if bot shares a server)
+    // This is a fallback and might not work for all users
+    try {
+      const users = await client.users.fetch();
+      const foundUser = users.find(u => 
+        u.username.toLowerCase() === cleanUsername ||
+        u.globalName?.toLowerCase() === cleanUsername
+      );
+      if (foundUser) {
+        return foundUser.id;
+      }
+    } catch (error) {
+      // Can't fetch all users, that's okay
+    }
+    
     return null;
   } catch (error) {
+    console.error('Error finding Discord user:', error);
     return null;
   }
 }
@@ -1081,8 +1112,8 @@ client.on('interactionCreate', async (interaction) => {
           steamId = query;
           profile = await getSteamProfile(steamId);
         } else {
-          // Try Discord username first
-          const discordUserId = await getDiscordUserIdFromUsername(query);
+          // Try Discord username first (using the client to search)
+          const discordUserId = await getDiscordUserIdFromUsername(query, interaction.client || client);
           if (discordUserId) {
             steamId = await getSteamIdFromDiscord(discordUserId);
             if (steamId) {
