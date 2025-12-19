@@ -242,8 +242,23 @@ function InventoryContent() {
     mergeAndStorePrices(results);
   };
 
-  const fetchInventory = async (id: string) => {
+  const fetchInventory = async (id: string, proStatus?: boolean) => {
     try {
+      // Check Pro status if not provided
+      let actualProStatus = proStatus;
+      if (actualProStatus === undefined) {
+        // Check Pro status from API
+        try {
+          const proRes = await fetch(`/api/user/pro?id=${id}`);
+          if (proRes.ok) {
+            const proData = await proRes.json();
+            actualProStatus = !!(proData?.proUntil && new Date(proData.proUntil) > new Date());
+          }
+        } catch {
+          actualProStatus = false;
+        }
+      }
+      
       let allItems: InventoryItem[] = [];
       let startAssetId: string | null = null;
       let hasMore = true;
@@ -255,7 +270,7 @@ function InventoryContent() {
         
         try {
           // Use server-side API route to avoid CORS issues
-          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${isPro}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
           
@@ -417,33 +432,36 @@ function InventoryContent() {
     const loadAll = async () => {
       setLoading(true);
       
+      // Fetch Pro status FIRST so we can use it for inventory fetch
+      let proInfo: any = { proUntil: null };
+      try {
+        const proRes = await fetch(`/api/user/pro?id=${viewedSteamId}`);
+        if (proRes.ok) {
+          const proData = await proRes.json();
+          proInfo = { proUntil: proData?.proUntil || null };
+        }
+      } catch (err) {
+        console.error('Pro status fetch error:', err);
+      }
+      
+      // Calculate Pro status for inventory fetch
+      const proStatusForInventory = !!(proInfo?.proUntil && new Date(proInfo.proUntil) > new Date());
+      
       // Start all requests but don't wait for all - show content progressively
       const profilePromise = fetchViewedProfile(viewedSteamId);
-      const proPromise = fetch(`/api/user/pro?id=${viewedSteamId}`)
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            return { proUntil: data?.proUntil || null };
-          }
-          return { proUntil: null };
-        })
-        .catch((err) => {
-          console.error('Pro status fetch error:', err);
-          return { proUntil: null };
-        });
       
-      // These can load in background
+      // These can load in background - use correct Pro status for inventory
       fetchPlayerStats(viewedSteamId).catch(() => {});
-      fetchInventory(viewedSteamId).catch(() => {});
+      fetchInventory(viewedSteamId, proStatusForInventory).catch(() => {});
 
-      // Wait for profile and Pro info with timeout - these are critical
+      // Wait for profile with timeout - Pro info already fetched above
       try {
-        const [profile, proInfo] = await Promise.race([
-          Promise.all([profilePromise, proPromise]),
+        const profile = await Promise.race([
+          profilePromise,
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Timeout')), 12000)
           )
-        ]) as [any, any];
+        ]) as any;
 
         const combinedUser = profile
           ? { ...profile, proUntil: proInfo?.proUntil || null }
