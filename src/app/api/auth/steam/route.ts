@@ -3,9 +3,13 @@ import { NextResponse } from 'next/server';
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const host = request.headers.get('host');
-  const protocol = host?.includes('localhost') ? 'http' : 'https';
+  // Derive protocol from the actual request URL and X-Forwarded-Proto
+  const url = new URL(request.url);
+  const host = url.host;
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const protoFromUrl = url.protocol.replace(':', '');
+  const protocol = forwardedProto || protoFromUrl || 'http';
+
   const returnUrl = `${protocol}://${host}/inventory`;
 
   const params = new URLSearchParams({

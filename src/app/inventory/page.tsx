@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp } from 'lucide-react';
+import Footer from '@/app/components/Footer';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock } from 'lucide-react';
+import { getPriceScanConcurrency } from '@/app/utils/pro-limits';
 
 const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
 
@@ -15,11 +18,11 @@ type InventoryItem = {
 
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   return (
-    <div className="bg-[#11141d] p-5 rounded-[2rem] border border-white/5">
-      <div className="flex items-center gap-2 mb-3 text-[9px] font-black uppercase text-gray-500 tracking-widest">
+    <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
+      <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
         {icon} {label}
       </div>
-      <div className={`text-xl font-black italic tracking-tighter ${color}`}>
+      <div className={`text-lg md:text-xl font-black italic tracking-tighter ${color}`}>
         {val ?? '---'}{unit}
       </div>
     </div>
@@ -37,8 +40,15 @@ function InventoryContent() {
   const [statsPrivate, setStatsPrivate] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [priceScanDone, setPriceScanDone] = useState(false);
+  const [sortMode, setSortMode] = useState<'name-asc' | 'price-desc' | 'price-asc'>('price-desc');
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
+  const isPro = useMemo(
+    () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
+    [viewedUser?.proUntil]
+  );
 
   // --- PROXY ROTATION SETUP ---
   const PROXY_LIST = [
@@ -68,6 +78,20 @@ function InventoryContent() {
   };
 
   useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const stored = window.localStorage.getItem('sv_currency');
+      if (stored === '1') {
+        setCurrency({ code: '1', symbol: '$' });
+      } else if (stored === '3') {
+        setCurrency({ code: '3', symbol: '€' });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
@@ -87,17 +111,34 @@ function InventoryContent() {
   const fetchViewedProfile = async (id: string) => {
     try {
       const steamUrl = `https://steamcommunity.com/profiles/${id}/?xml=1`;
-      const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       const text = await textRes.text();
       const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
       const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
       return { steamId: id, name, avatar };
-    } catch (e) { return null; }
+    } catch (e) { 
+      console.warn('Profile fetch failed:', e);
+      return null; 
+    }
   };
 
   const fetchPlayerStats = async (id: string) => {
     try {
-      const res = await fetch(`/api/steam/stats?id=${id}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const res = await fetch(`/api/steam/stats?id=${id}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       if (!res.ok) {
         console.warn("Stats API error", await res.text());
         return;
@@ -119,12 +160,33 @@ function InventoryContent() {
         const hs = kills > 0 ? (hsKills / kills) * 100 : 0;
         const wr = matchesPlayed > 0 ? (matchesWon / matchesPlayed) * 100 : 0;
 
-        setPlayerStats({
+        // Basic stats (free for all)
+        const basicStats = {
           kd: kd.toFixed(2),
           hs: hs.toFixed(1),
           wr: wr.toFixed(1),
           kills: kills.toLocaleString(),
           wins: matchesWon.toLocaleString()
+        };
+        
+        // Pro-only advanced stats
+        const totalDamage = Number(statsObj.total_damage_done ?? 0);
+        const roundsPlayed = Number(statsObj.total_rounds_played ?? 0);
+        const mvps = Number(statsObj.total_mvps ?? 0);
+        const totalShots = Number(statsObj.total_shots_hit ?? 0) + Number(statsObj.total_shots_fired ?? 0);
+        const shotsHit = Number(statsObj.total_shots_hit ?? 0);
+        
+        const adr = roundsPlayed > 0 ? (totalDamage / roundsPlayed) : 0;
+        const accuracy = totalShots > 0 ? (shotsHit / totalShots) * 100 : 0;
+        
+        setPlayerStats({
+          ...basicStats,
+          // Pro-only stats
+          adr: adr.toFixed(1),
+          mvps: mvps.toLocaleString(),
+          accuracy: accuracy.toFixed(1),
+          roundsPlayed: roundsPlayed.toLocaleString(),
+          totalDamage: totalDamage.toLocaleString(),
         });
         setStatsPrivate(false);
       } else {
@@ -156,7 +218,8 @@ function InventoryContent() {
 
     const results: Record<string, string> = {};
     const active = new Set<Promise<void>>();
-    const CONCURRENCY = 6;
+    // Pro users get faster scanning with higher concurrency
+    const CONCURRENCY = getPriceScanConcurrency(isPro);
 
     for (const name of missing) {
       let taskPromise: Promise<void>;
@@ -185,35 +248,203 @@ function InventoryContent() {
 
   const fetchInventory = async (id: string) => {
     try {
-      setPriceScanDone(false);
       const invUrl = `https://steamcommunity.com/inventory/${id}/730/2?l=english&count=500`;
-      const data = await fetchWithRotation(invUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for inventory
+      
+      // Add timeout to fetchWithRotation by wrapping it
+      const data = await Promise.race([
+        fetchWithRotation(invUrl),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Inventory fetch timeout')), 15000)
+        )
+      ]) as any;
+      
+      clearTimeout(timeoutId);
       const items = (data?.descriptions || []) as InventoryItem[];
       setInventory(items);
-
-      const uniqueNames = Array.from(new Set(items.map((i) => i.market_hash_name)));
-      await fetchPrices(uniqueNames);
-      setPriceScanDone(true);
-    } catch (e) { console.error("Inventory failed", e); }
+    } catch (e) { 
+      console.error("Inventory failed", e);
+      setInventory([]); // Set empty array so page can still render
+    }
   };
 
   useEffect(() => {
-    const steamId = searchParams.get('openid.claimed_id')?.split('/').pop() || 
-                    JSON.parse(localStorage.getItem('steam_user') || '{}')?.steamId;
-    if (!steamId) return;
+    const extractSteamId = (raw: string | null) => {
+      if (!raw) return null;
+
+      // If it's a full Steam OpenID or profile URL, grab the last path segment
+      if (raw.includes('steamcommunity.com')) {
+        try {
+          const url = new URL(raw);
+          const parts = url.pathname.split('/').filter(Boolean);
+          return parts[parts.length - 1] || null;
+        } catch {
+          const parts = raw.split('/').filter(Boolean);
+          return parts[parts.length - 1] || null;
+        }
+      }
+
+      // If it's just digits, assume it's already a SteamID64
+      if (/^\d+$/.test(raw)) return raw;
+
+      return raw;
+    };
+
+    // Support multiple query keys for flexibility
+    const possibleKeys = ['steamId', 'steamid', 'id', 'openid.claimed_id', 'openid_claimed_id'];
+    let fromQuery: string | null = null;
+
+    for (const key of possibleKeys) {
+      const v = searchParams.get(key as any);
+      if (v) {
+        fromQuery = v;
+        break;
+      }
+    }
+
+    // Get logged-in user (your own account) - this should NEVER change when viewing other profiles
+    const loggedInUser = typeof window !== 'undefined' 
+      ? JSON.parse(localStorage.getItem('steam_user') || '{}')
+      : null;
+    const loggedInSteamId = loggedInUser?.steamId;
+
+    // Determine which profile to view
+    // Priority: query param > OpenID callback > logged-in user's own profile
+    const viewedSteamId =
+      extractSteamId(fromQuery) ||
+      extractSteamId(searchParams.get('openid.claimed_id')) ||
+      extractSteamId(searchParams.get('openid_claimed_id')) ||
+      loggedInSteamId;
+
+    if (!viewedSteamId) return;
+
+    // Check if this is a REAL Steam login callback (from /api/auth/steam redirect)
+    // vs a search query that happens to use the same parameter
+    // Real login callbacks will have 'openid.mode' or come from Steam's domain
+    const hasOpenIdMode = !!searchParams.get('openid.mode');
+    const isLoginCallback = hasOpenIdMode && !!(
+      searchParams.get('openid.claimed_id') || 
+      searchParams.get('openid_claimed_id')
+    );
+    const isViewingOwnProfile = viewedSteamId === loggedInSteamId;
 
     const loadAll = async () => {
       setLoading(true);
-      const [profile] = await Promise.all([
-        fetchViewedProfile(steamId),
-        fetchPlayerStats(steamId),
-        fetchInventory(steamId)
-      ]);
-      setViewedUser(profile);
+      
+      // Start all requests but don't wait for all - show content progressively
+      const profilePromise = fetchViewedProfile(viewedSteamId);
+      const proPromise = fetch(`/api/user/pro?id=${viewedSteamId}`)
+        .then((res) => (res.ok ? res.json() : { proUntil: null }))
+        .catch(() => ({ proUntil: null }));
+      
+      // These can load in background
+      fetchPlayerStats(viewedSteamId).catch(() => {});
+      fetchInventory(viewedSteamId).catch(() => {});
+
+      // Wait for profile and Pro info with timeout - these are critical
+      try {
+        const [profile, proInfo] = await Promise.race([
+          Promise.all([profilePromise, proPromise]),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 12000)
+          )
+        ]) as [any, any];
+
+        const combinedUser = profile
+          ? { ...profile, proUntil: proInfo?.proUntil || null }
+          : null;
+
+        setViewedUser(combinedUser);
+
+        // Only update logged-in user in localStorage when:
+        // 1. It's a Steam login callback (OpenID redirect) - always update
+        // 2. User is viewing their own profile - update Pro status but keep your account
+        // This ensures your logged-in account stays consistent and Pro status stays up-to-date
+        try {
+          if (combinedUser && typeof window !== 'undefined') {
+            if (isLoginCallback) {
+              // This is your actual login - record first login date (don't block on this)
+              fetch('/api/user/first-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steamId: viewedSteamId }),
+              }).catch(() => {}); // Silently fail if this doesn't work
+              
+              // This is your actual login - update the logged-in user completely
+              window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
+              // Trigger storage event so sidebar updates
+              window.dispatchEvent(new Event('storage'));
+            } else if (isViewingOwnProfile && loggedInUser) {
+              // Viewing your own profile - only update Pro status, keep your account info
+              const updatedUser = {
+                ...loggedInUser,
+                proUntil: combinedUser.proUntil, // Update Pro status
+              };
+              window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
+              // Trigger storage event so sidebar updates
+              window.dispatchEvent(new Event('storage'));
+            }
+            // Otherwise, we're just viewing someone else's profile - don't touch logged-in user
+          }
+        } catch {
+          // ignore storage issues (e.g. private mode)
+        }
+      } catch (error) {
+        // If profile fetch times out, try to use cached or minimal data
+        console.warn('Critical data fetch timeout, using fallback');
+        const fallbackLoggedInUser = typeof window !== 'undefined' 
+          ? JSON.parse(localStorage.getItem('steam_user') || '{}')
+          : null;
+        
+        let fallbackUser;
+        if (fallbackLoggedInUser?.steamId === viewedSteamId) {
+          // If viewing own profile and fetch fails, use cached data
+          fallbackUser = fallbackLoggedInUser;
+        } else {
+          // Otherwise show minimal user data
+          fallbackUser = { 
+            steamId: viewedSteamId, 
+            name: "User", 
+            avatar: "",
+            proUntil: null 
+          };
+        }
+        
+        setViewedUser(fallbackUser);
+        
+        // Don't update localStorage on timeout - keep existing data
+      }
+
       setLoading(false);
     };
     loadAll();
-  }, [searchParams, currency.code]);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!inventory.length) return;
+
+    const run = async () => {
+      setPriceScanDone(false);
+      const uniqueNames = Array.from(new Set(inventory.map((i) => i.market_hash_name)));
+      await fetchPrices(uniqueNames);
+      setPriceScanDone(true);
+    };
+
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency.code, inventory]);
+
+  useEffect(() => {
+    if (!viewedUser?.steamId) return;
+    try {
+      if (typeof window === 'undefined') return;
+      const origin = window.location.origin;
+      setShareUrl(`${origin}/inventory?steamId=${viewedUser.steamId}`);
+    } catch {
+      setShareUrl(null);
+    }
+  }, [viewedUser]);
 
   const totalVaultValue = useMemo(() => {
     let total = 0;
@@ -234,10 +465,75 @@ function InventoryContent() {
     [inventory, itemPrices]
   );
 
+  const parsePriceToNumber = (priceStr?: string) => {
+    if (!priceStr) return 0;
+    const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+    return isNaN(num) ? 0 : num;
+  };
+
   const filteredInv = useMemo(() => 
     inventory.filter(i => i.market_hash_name.toLowerCase().includes(searchQuery.toLowerCase())), 
     [inventory, searchQuery]
   );
+
+  const sortedInv = useMemo(() => {
+    const arr = [...filteredInv];
+    arr.sort((a, b) => {
+      if (sortMode === 'name-asc') {
+        return a.market_hash_name.localeCompare(b.market_hash_name);
+      }
+
+      const priceA = parsePriceToNumber(itemPrices[a.market_hash_name]);
+      const priceB = parsePriceToNumber(itemPrices[b.market_hash_name]);
+
+      if (sortMode === 'price-asc') {
+        return priceA - priceB;
+      }
+
+      // price-desc
+      return priceB - priceA;
+    });
+    return arr;
+  }, [filteredInv, itemPrices, sortMode]);
+
+  const topItems = useMemo(
+    () =>
+      inventory
+        .map((item) => ({
+          item,
+          price: parsePriceToNumber(itemPrices[item.market_hash_name])
+        }))
+        .filter((entry) => entry.price > 0)
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 3),
+    [inventory, itemPrices]
+  );
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).clipboard && typeof window !== 'undefined' && (window as any).isSecureContext) {
+        await (navigator as any).clipboard.writeText(shareUrl);
+      } else if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+      if (typeof window !== 'undefined') {
+        window.alert('Could not copy link. Please copy it manually.');
+      }
+    }
+  };
 
   if (!viewedUser && loading) return (
     <div className="h-screen bg-[#08090d] flex flex-col items-center justify-center gap-4">
@@ -252,22 +548,68 @@ function InventoryContent() {
       <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
         {viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
-            <header className="bg-[#11141d] p-10 rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8">
-              <div className="flex items-center gap-6">
-                <img src={viewedUser.avatar} className="w-24 h-24 rounded-[2.5rem] border-2 border-blue-600 shadow-2xl" alt="avatar" />
-                <div>
-                  <h2 className="text-4xl font-black italic uppercase tracking-tighter leading-none">{viewedUser.name}</h2>
-                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-4 w-fit">
-                    <button onClick={() => setCurrency({code: '3', symbol: '€'})} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}>EUR</button>
-                    <button onClick={() => setCurrency({code: '1', symbol: '$'})} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}>USD</button>
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
+              <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+                <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                    <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
+                      {viewedUser.name}
+                    </h2>
+                    {isPro && (
+                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
+                        Pro
+                      </span>
+                    )}
                   </div>
+                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
+                    <button
+                      onClick={() => {
+                        setCurrency({ code: '3', symbol: '€' });
+                        try {
+                          if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
+                        } catch {
+                          /* ignore */
+                        }
+                      }}
+                      className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                    >
+                      EUR
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrency({ code: '1', symbol: '$' });
+                        try {
+                          if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
+                        } catch {
+                          /* ignore */
+                        }
+                      }}
+                      className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                    >
+                      USD
+                    </button>
+                  </div>
+                  {shareUrl && (
+                    <div className="mt-3 space-y-1 max-w-full md:max-w-xs">
+                      <button
+                        onClick={handleCopyShareLink}
+                        className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 hover:text-white transition-colors"
+                      >
+                        {copied ? 'Link copied' : 'Copy share link'}
+                      </button>
+                      <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
+                        {shareUrl}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="bg-emerald-500/10 border border-emerald-500/20 px-10 py-6 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
-                <TrendingUp className="text-emerald-500" size={28} />
-                <div>
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
-                  <p className="text-4xl font-black text-white italic tracking-tighter">{currency.symbol}{totalVaultValue}</p>
+              <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
+                <TrendingUp className="text-emerald-500 shrink-0" size={24} />
+                <div className="min-w-0">
+                  <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
+                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter truncate">{currency.symbol}{totalVaultValue}</p>
                 </div>
               </div>
             </header>
@@ -283,7 +625,49 @@ function InventoryContent() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {topItems.length > 0 && (
+              <section className="space-y-3 md:space-y-4">
+                <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">
+                    Top Items
+                  </h3>
+                  <span className="text-[9px] md:text-[10px] text-gray-500">
+                    Most valuable skins in this vault
+                  </span>
+                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                {topItems.map(({ item, price }, idx) => (
+                  <Link
+                    key={item.market_hash_name + idx}
+                    href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                    className="bg-[#11141d] p-3 md:p-4 rounded-[2rem] md:rounded-3xl border border-yellow-500/30 flex items-center gap-3 md:gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
+                  >
+                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden shrink-0">
+                      <img
+                        src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
+                        className="w-full h-full object-contain"
+                        alt={item.market_hash_name}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
+                        {item.market_hash_name}
+                      </p>
+                      <p className="text-[10px] md:text-xs font-black text-emerald-400 italic">
+                        {currency.symbol}
+                        {price.toLocaleString('nl-NL', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              </section>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
               <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={playerStats?.kd} />
               <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
               <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
@@ -291,48 +675,201 @@ function InventoryContent() {
               <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
               <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
             </div>
-            <section className="space-y-10">
-              <div className="flex items-center justify-between px-6">
-                <div className="flex items-center gap-4">
-                  <PackageOpen className="text-blue-500" size={28} />
-                  <h3 className="text-3xl font-black uppercase tracking-tighter italic">Secured Items</h3>
-                </div>
-                <input 
-                  value={searchQuery} 
-                  onChange={(e) => setSearchQuery(e.target.value)} 
-                  className="bg-[#11141d] border border-white/5 rounded-2xl py-4 px-8 text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-80 transition-all shadow-xl" 
-                  placeholder="SEARCH VAULT..." 
-                />
+            
+            {/* Pro Performance Indicator */}
+            {isPro && (
+              <div className="mt-4 flex items-center gap-2 px-2">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-[10px]">⚡</span>
+                  Pro Performance Active
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                {filteredInv.map((item, idx) => (
-                  <div key={idx} className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group hover:border-blue-500/40 transition-all hover:-translate-y-2 relative overflow-hidden shadow-xl">
-                    <img 
-                      src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
-                      className="w-full h-32 object-contain mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
-                      alt="skin" 
-                    />
-                    <div className="mt-auto space-y-2">
-                      <p className="text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
-                      <p className="text-[11px] font-black text-emerald-500 italic">
-                        {itemPrices[item.market_hash_name] 
-                          ? itemPrices[item.market_hash_name] 
-                          : priceScanDone 
-                            ? <span className="text-gray-500 text-[9px]">NO PRICE</span>
-                            : <span className="text-gray-600 animate-pulse text-[9px]">SCANNING...</span>}
-                      </p>
+            )}
+            
+            {/* Pro-only Advanced Stats */}
+            {playerStats && (isPro ? (
+              <div className="mt-6">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px]">PRO</span>
+                    Advanced Stats
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                  <StatCard label="ADR" icon={<TrendingUp size={12}/>} val={playerStats?.adr} color="text-purple-400" />
+                  <StatCard label="MVPs" icon={<Award size={12}/>} val={playerStats?.mvps} color="text-amber-400" />
+                  <StatCard label="Accuracy" icon={<Target size={12}/>} val={playerStats?.accuracy} unit="%" color="text-cyan-400" />
+                  <StatCard label="Rounds Played" icon={<PackageOpen size={12}/>} val={playerStats?.roundsPlayed} color="text-indigo-400" />
+                  <StatCard label="Total Damage" icon={<Swords size={12}/>} val={playerStats?.totalDamage} color="text-red-400" />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-600/30 to-transparent" />
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-gray-600/10 border border-gray-600/40 text-[8px]">LOCKED</span>
+                    Advanced Stats
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-600/30 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <TrendingUp size={12}/> ADR
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
                     </div>
                   </div>
-                ))}
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <Award size={12}/> MVPs
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <Target size={12}/> Accuracy
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <PackageOpen size={12}/> Rounds
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      <Swords size={12}/> Damage
+                    </div>
+                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
+                      ---
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <section className="space-y-6 md:space-y-10">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-6">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <PackageOpen className="text-blue-500 shrink-0" size={24} />
+                  <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic">Secured Items</h3>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                  <input 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-4 md:px-6 text-[10px] md:text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl" 
+                    placeholder="SEARCH VAULT..." 
+                  />
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"
+                  >
+                    <option value="price-desc">Sort: Price High → Low</option>
+                    <option value="price-asc">Sort: Price Low → High</option>
+                    <option value="name-asc">Sort: Name A → Z</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                {sortedInv.length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border border-dashed border-white/10 rounded-[2.5rem] bg-black/20">
+                    <PackageOpen className="text-gray-600 mb-4" size={32} />
+                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">
+                      No items match your search
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-2">
+                      Try clearing your search or adjusting the sort order.
+                    </p>
+                  </div>
+                ) : (
+                  sortedInv.map((item, idx) => (
+                    <Link
+                      key={idx}
+                      href={`/item/${encodeURIComponent(item.market_hash_name)}`}
+                      className="group"
+                    >
+                      <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                        <img 
+                          src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
+                          className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
+                          alt="skin" 
+                        />
+                        <div className="mt-auto space-y-1.5 md:space-y-2">
+                          <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{item.market_hash_name}</p>
+                          <p className="text-[10px] md:text-[11px] font-black text-emerald-500 italic">
+                            {itemPrices[item.market_hash_name] 
+                              ? itemPrices[item.market_hash_name] 
+                              : priceScanDone 
+                                ? <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>
+                                : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
+                                    {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
+                                  </span>}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
               </div>
             </section>
           </div>
         )}
-      </main>
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 }
 
 export default function InventoryPage() { 
-  return <Suspense fallback={null}><InventoryContent /></Suspense>; 
+  return (
+    <Suspense fallback={
+      <div className="h-screen bg-[#08090d] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin text-blue-500" size={40} />
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Loading...</p>
+      </div>
+    }>
+      <InventoryContent />
+    </Suspense>
+  ); 
 }

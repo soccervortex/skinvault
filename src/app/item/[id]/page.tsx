@@ -1,7 +1,11 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins } from 'lucide-react';
+import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart } from 'lucide-react';
 import Link from 'next/link';
+import Sidebar from '@/app/components/Sidebar';
+import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { getWishlistLimit } from '@/app/utils/pro-limits';
 
 const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
@@ -10,8 +14,8 @@ const PRICE_CACHE_KEY = 'sv_price_cache_item_v1';
 
 export default function ItemDetail({ params }: { params: Promise<{ id: string }> }) {
   // In app router client components, params is a Promise – unwrap via React.use
-  const resolvedParams = React.use(params) as { id: string };
-  const { id } = resolvedParams;
+  const unwrappedParams = React.use(params as any) as { id: string };
+  const { id } = unwrappedParams;
   const decodedId = decodeURIComponent(id);
   
   const [item, setItem] = useState<any>(null);
@@ -19,7 +23,11 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' }); // Default Euro
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
+  const [wishlist, setWishlist] = useState<WishlistEntry[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const priceCacheRef = useRef<Record<string, any>>({});
@@ -72,7 +80,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
     }
   };
 
-  // Hydrate dataset + price caches once on mount
+  // Hydrate dataset + price caches + wishlist once on mount
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -80,10 +88,33 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
         if (ds) datasetCacheRef.current = JSON.parse(ds);
         const pc = window.localStorage.getItem(PRICE_CACHE_KEY);
         if (pc) priceCacheRef.current = JSON.parse(pc);
+
+        const storedCurrency = window.localStorage.getItem('sv_currency');
+        if (storedCurrency === '1') {
+          setCurrency({ code: '1', symbol: '$' });
+        } else if (storedCurrency === '3') {
+          setCurrency({ code: '3', symbol: '€' });
+        }
+
+        const storedUser = window.localStorage.getItem('steam_user');
+        const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+        setUser(parsedUser);
+        const steamId = parsedUser?.steamId || null;
+        setWishlist(loadWishlist(steamId));
+        
+        // Check Pro status
+        if (parsedUser?.proUntil) {
+          const proUntil = new Date(parsedUser.proUntil);
+          setIsPro(proUntil > new Date());
+        } else {
+          setIsPro(false);
+        }
       }
     } catch {
       datasetCacheRef.current = {};
       priceCacheRef.current = {};
+      setUser(null);
+      setWishlist([]);
     }
   }, []);
 
@@ -192,6 +223,31 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
     fetchPrice();
   }, [item, currency.code]);
 
+  // Simple 3D spin animation when in 3D view
+  useEffect(() => {
+    if (viewMode !== '3D') {
+      setRotation(0);
+      return;
+    }
+
+    let frameId: number;
+    let last = performance.now();
+
+    const animate = (time: number) => {
+      const delta = time - last;
+      last = time;
+      // ~360deg every 6 seconds
+      setRotation((prev) => (prev + delta * 0.06) % 360);
+      frameId = requestAnimationFrame(animate);
+    };
+
+    frameId = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [viewMode]);
+
   if (loading) return <div className="min-h-screen bg-[#08090d] flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={40} /></div>;
 
   if (!item) {
@@ -206,63 +262,216 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   }
 
   const rarityColor = item?.rarity?.color || '#3b82f6';
+  const wishlistKey = (item as any).market_hash_name || item.name || decodedId;
+  const steamId = user?.steamId || null;
+  const isWishlisted = wishlist.some((w) => w.key === wishlistKey);
 
   return (
-    <div className="min-h-screen bg-[#08090d] text-white p-6 md:p-12 font-sans flex flex-col items-center">
-      <div className="w-full max-w-6xl">
-        <div className="flex justify-between items-center mb-10">
-          <Link href="/" className="inline-flex items-center gap-2 text-gray-500 hover:text-white font-bold text-[10px] uppercase tracking-widest transition-all">
-            <ChevronLeft size={14} /> Back
-          </Link>
-          
-          {/* CURRENCY SWITCHER */}
-          <div className="flex bg-[#11141d] p-1 rounded-2xl border border-white/5">
-            <button onClick={() => setCurrency({code: '3', symbol: '€'})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}>EUR</button>
-            <button onClick={() => setCurrency({code: '1', symbol: '$'})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}>USD</button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-              <div className="lg:col-span-5">
-                <div ref={cardRef} className="bg-[#11141d] rounded-[3.5rem] aspect-square border border-white/5 flex items-center justify-center relative overflow-hidden shadow-2xl">
-                   <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
-                   <img src={item?.image} className="w-[80%] h-auto object-contain z-10" alt={item?.name || ''} />
-                </div>
-              </div>
-
-          <div className="lg:col-span-7 space-y-8">
-            <h1 className="text-6xl font-black italic uppercase text-white tracking-tighter">{item?.name}</h1>
+    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <Sidebar />
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-12 custom-scrollbar">
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-6 md:mb-10 gap-4">
+            <Link href="/" className="inline-flex items-center gap-2 text-gray-500 hover:text-white font-bold text-[9px] md:text-[10px] uppercase tracking-widest transition-all shrink-0">
+              <ChevronLeft size={12} /> <span className="hidden sm:inline">Back</span>
+            </Link>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="bg-[#11141d] p-8 rounded-[3rem] border border-white/5 relative overflow-hidden">
-                <span className="text-[10px] font-black text-gray-500 uppercase block mb-2">Current Value</span>
-                <p className="text-4xl font-black text-green-400 italic">
-                  {priceData?.lowest
-                    ? priceData.lowest
-                    : priceDone
-                      ? <span className="text-[14px] text-gray-500">NO PRICE</span>
-                      : <span className="text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
-                </p>
-                <TrendingUp className="absolute right-6 bottom-6 text-green-500/5 w-20 h-20" />
+            <div className="flex items-center gap-2 md:gap-3">
+              {/* VIEW MODE SWITCHER */}
+              <div className="hidden md:flex bg-[#11141d] p-1 rounded-2xl border border-white/5">
+                <button
+                  onClick={() => setViewMode('2D')}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                    viewMode === '2D' ? 'bg-white text-black' : 'text-gray-500'
+                  }`}
+                >
+                  2D
+                </button>
+                <button
+                  onClick={() => setViewMode('3D')}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                    viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-500'
+                  }`}
+                >
+                  3D
+                </button>
               </div>
-              <div className="bg-[#11141d] p-8 rounded-[3rem] border border-white/5 relative">
-                <span className="text-[10px] font-black text-gray-500 uppercase block mb-2">24h Median</span>
-                <p className="text-4xl font-black text-white/90 italic">
-                  {priceData?.median
-                    ? priceData.median
-                    : priceDone
-                      ? <span className="text-[14px] text-gray-500">NO PRICE</span>
-                      : <span className="text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
-                </p>
-                <BarChart3 className="absolute right-6 bottom-6 text-white/5 w-20 h-20" />
+
+              {/* CURRENCY SWITCHER */}
+              <div className="flex bg-[#11141d] p-1 rounded-xl md:rounded-2xl border border-white/5">
+                <button
+                  onClick={() => {
+                    setCurrency({ code: '3', symbol: '€' });
+                    try {
+                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                >
+                  EUR
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrency({ code: '1', symbol: '$' });
+                    try {
+                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                >
+                  USD
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 items-start">
+            <div className="lg:col-span-5">
+              <div
+                ref={cardRef}
+                className="bg-[#11141d] rounded-[2rem] md:rounded-[3.5rem] aspect-square border border-white/5 flex items-center justify-center relative overflow-hidden shadow-2xl"
+                style={{ perspective: '1200px' }}
+              >
+              <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
+              <img
+                src={item?.image}
+                className="w-[80%] h-auto object-contain z-10"
+                alt={item?.name || ''}
+                style={{
+                  transform: viewMode === '3D' ? `rotateY(${rotation}deg)` : 'rotateY(0deg)',
+                  transformStyle: 'preserve-3d',
+                  transition: viewMode === '2D' ? 'transform 0.4s ease-out' : undefined,
+                }}
+              />
+              <div className="absolute top-4 right-4 flex bg-black/40 rounded-2xl border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] overflow-hidden md:hidden z-20">
+                <button
+                  onClick={() => setViewMode('2D')}
+                  className={`px-3 py-1.5 transition-all ${viewMode === '2D' ? 'bg-white text-black' : 'text-gray-400'}`}
+                >
+                  2D
+                </button>
+                <button
+                  onClick={() => setViewMode('3D')}
+                  className={`px-3 py-1.5 transition-all ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+                >
+                  3D
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  const result = toggleWishlistEntry(
+                    {
+                      key: wishlistKey,
+                      name: item.name,
+                      image: item.image,
+                      market_hash_name: (item as any).market_hash_name,
+                      rarityName: item.rarity?.name,
+                      rarityColor: item.rarity?.color,
+                      weaponName: item.weapon?.name,
+                    },
+                    steamId,
+                    isPro,
+                  );
+                  if (result.success) {
+                    setWishlist(result.newList);
+                  } else if (result.reason === 'limit_reached') {
+                    setShowUpgradeModal(true);
+                  }
+                }}
+                className="absolute bottom-4 right-4 md:hidden inline-flex items-center justify-center p-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
+                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              >
+                <Heart
+                  size={16}
+                  className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'}
+                />
+              </button>
               </div>
             </div>
 
-            <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-4 w-full py-8 bg-blue-600 hover:bg-blue-500 text-white rounded-[2.5rem] font-black text-xs uppercase tracking-widest transition-all">
-              Trade on Steam Market <ExternalLink size={18} />
+            <div className="lg:col-span-7 space-y-6 md:space-y-8">
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
+              <button
+                onClick={() => {
+                  const result = toggleWishlistEntry(
+                    {
+                      key: wishlistKey,
+                      name: item.name,
+                      image: item.image,
+                      market_hash_name: (item as any).market_hash_name,
+                      rarityName: item.rarity?.name,
+                      rarityColor: item.rarity?.color,
+                      weaponName: item.weapon?.name,
+                    },
+                    steamId,
+                    isPro,
+                  );
+                  if (result.success) {
+                    setWishlist(result.newList);
+                  } else if (result.reason === 'limit_reached') {
+                    setShowUpgradeModal(true);
+                  }
+                }}
+                className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0"
+                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              >
+                <Heart
+                  size={18}
+                  className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-500'}
+                />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 relative overflow-hidden">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">Current Value</span>
+                <p className="text-3xl md:text-4xl font-black text-green-400 italic">
+                  {priceData?.lowest
+                    ? priceData.lowest
+                    : priceDone
+                      ? <span className="text-[12px] md:text-[14px] text-gray-500">NO PRICE</span>
+                      : <span className="text-[12px] md:text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
+                </p>
+                <TrendingUp className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-green-500/5 w-16 h-16 md:w-20 md:h-20" />
+              </div>
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 relative">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">24h Median</span>
+                <p className="text-3xl md:text-4xl font-black text-white/90 italic">
+                  {priceData?.median
+                    ? priceData.median
+                    : priceDone
+                      ? <span className="text-[12px] md:text-[14px] text-gray-500">NO PRICE</span>
+                      : <span className="text-[12px] md:text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
+                </p>
+                <BarChart3 className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-white/5 w-16 h-16 md:w-20 md:h-20" />
+              </div>
+            </div>
+
+            <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-3 md:gap-4 w-full py-6 md:py-8 bg-blue-600 hover:bg-blue-500 text-white rounded-[2rem] md:rounded-[2.5rem] font-black text-[10px] md:text-xs uppercase tracking-widest transition-all">
+              Trade on Steam Market <ExternalLink size={16} />
             </a>
           </div>
+          </div>
         </div>
+      </div>
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={wishlist.length}
+      />
+        </div>
+        <Footer />
       </div>
     </div>
   );
