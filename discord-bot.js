@@ -1198,6 +1198,8 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
 
       const query = interaction.options.getString('query');
+      const platform = interaction.options.getString('platform');
+      
       if (!query) {
         await interaction.editReply({
           content: '❌ **Missing Query**\n\nPlease provide a Steam64 ID, Discord username, or Steam username.',
@@ -1210,13 +1212,30 @@ client.on('interactionCreate', async (interaction) => {
         let profile = null;
         let searchMethod = '';
 
-        // Step 1: Check if query is a Steam64 ID (numeric, 17 digits)
-        if (/^\d{17}$/.test(query)) {
+        // If platform is specified, search only that platform
+        if (platform === 'steam64') {
+          if (!/^\d{17}$/.test(query)) {
+            await interaction.editReply({
+              content: '❌ **Invalid Steam64 ID**\n\nSteam64 ID must be exactly 17 digits. Example: `76561199052427203`',
+            });
+            return;
+          }
           steamId = query;
           profile = await getSteamProfile(steamId);
           searchMethod = 'Steam64 ID';
-        } else {
-          // Step 2: Try Discord username in database first (most reliable)
+        } else if (platform === 'steam') {
+          steamId = await resolveSteamUsername(query);
+          if (steamId) {
+            profile = await getSteamProfile(steamId);
+            searchMethod = 'Steam username';
+          } else {
+            await interaction.editReply({
+              content: `❌ **Steam Username Not Found**\n\nCould not find Steam profile for: "${query}"\n\n💡 **Tips:**\n• Use just the username part (e.g., "TheRembler" instead of "TheRembler | Bloodycase.com")\n• Make sure the Steam custom URL is correct\n• Try using Steam64 ID instead`,
+            });
+            return;
+          }
+        } else if (platform === 'discord_username') {
+          // Try Discord username in database first
           try {
             const discordResponse = await fetch(`${API_BASE_URL}/api/discord/find-by-username?username=${encodeURIComponent(query)}`);
             if (discordResponse.ok) {
@@ -1224,31 +1243,14 @@ client.on('interactionCreate', async (interaction) => {
               if (discordData.discordId && discordData.steamId) {
                 steamId = discordData.steamId;
                 profile = await getSteamProfile(steamId);
-                searchMethod = 'Discord username';
+                searchMethod = 'Discord username (database)';
               }
             }
           } catch (error) {
-            // Continue to next method
+            // Continue to fallback
           }
-
-          // Step 3: Try Discord ID lookup (if query looks like a Discord ID - 17-19 digits)
-          if (!steamId && /^\d{17,19}$/.test(query)) {
-            try {
-              const discordIdResponse = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${query}`);
-              if (discordIdResponse.ok) {
-                const discordIdData = await discordIdResponse.json();
-                if (discordIdData.steamId) {
-                  steamId = discordIdData.steamId;
-                  profile = await getSteamProfile(steamId);
-                  searchMethod = 'Discord ID';
-                }
-              }
-            } catch (error) {
-              // Continue to next method
-            }
-          }
-
-          // Step 4: Try Discord username via client (fallback if not in database)
+          
+          // Fallback: Try via Discord client
           if (!steamId) {
             const discordUserId = await getDiscordUserIdFromUsername(query, client);
             if (discordUserId) {
@@ -1259,26 +1261,114 @@ client.on('interactionCreate', async (interaction) => {
               }
             }
           }
-
-          // Step 5: Try Steam username/custom URL (last resort)
-          if (!steamId) {
-            // Clean username for Steam search (remove special chars that aren't allowed in Steam URLs)
-            const cleanQuery = query.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-            if (cleanQuery && cleanQuery.length > 0) {
-              steamId = await resolveSteamUsername(cleanQuery);
-              if (steamId) {
-                profile = await getSteamProfile(steamId);
-                searchMethod = 'Steam username';
-              }
-            }
-          }
-
-          // If still not found, show helpful error
+          
           if (!steamId || !profile) {
             await interaction.editReply({
-              content: `❌ **Player Not Found**\n\nCould not find player: "${query}"\n\n💡 **Try one of these formats:**\n• **Steam64 ID:** \`76561199052427203\`\n• **Steam Username:** \`TheRembler\` (without special chars)\n• **Discord Username:** \`therembler\` (if connected)\n• **Discord ID:** \`661557499056619520\` (if connected)\n\n**Note:** For Steam usernames with special characters like "|", use just the username part (e.g., "TheRembler" instead of "TheRembler | Bloodycase.com")`,
+              content: `❌ **Discord Username Not Found**\n\nCould not find Discord user: "${query}"\n\n💡 **Make sure:**\n• The user has connected their Discord account to SkinVault\n• You're using the correct Discord username\n• The user is in a server with the bot (if not in database)\n\nOr try using their Steam64 ID instead.`,
             });
             return;
+          }
+        } else if (platform === 'discord_id') {
+          if (!/^\d{17,19}$/.test(query)) {
+            await interaction.editReply({
+              content: '❌ **Invalid Discord ID**\n\nDiscord ID must be 17-19 digits. Example: `661557499056619520`',
+            });
+            return;
+          }
+          try {
+            const discordIdResponse = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${query}`);
+            if (discordIdResponse.ok) {
+              const discordIdData = await discordIdResponse.json();
+              if (discordIdData.steamId) {
+                steamId = discordIdData.steamId;
+                profile = await getSteamProfile(steamId);
+                searchMethod = 'Discord ID';
+              } else {
+                await interaction.editReply({
+                  content: `❌ **Discord Account Not Connected**\n\nThe Discord ID "${query}" is not connected to a Steam account.\n\nThey need to:\n1. Visit https://skinvaults.vercel.app/inventory\n2. Sign in with Steam\n3. Click "Connect Discord"`,
+                });
+                return;
+              }
+            } else {
+              await interaction.editReply({
+                content: `❌ **Discord ID Not Found**\n\nCould not find Discord connection for ID: "${query}"\n\nThe user may not have connected their Discord account to SkinVault.`,
+              });
+              return;
+            }
+          } catch (error) {
+            await interaction.editReply({
+              content: '❌ **Error**\n\nFailed to lookup Discord ID. Please try again later.',
+            });
+            return;
+          }
+        } else {
+          // Auto-detect platform (original behavior)
+          // Step 1: Check if query is a Steam64 ID (numeric, 17 digits)
+          if (/^\d{17}$/.test(query)) {
+            steamId = query;
+            profile = await getSteamProfile(steamId);
+            searchMethod = 'Steam64 ID (auto-detected)';
+          } else {
+            // Step 2: Try Discord username in database first (most reliable)
+            try {
+              const discordResponse = await fetch(`${API_BASE_URL}/api/discord/find-by-username?username=${encodeURIComponent(query)}`);
+              if (discordResponse.ok) {
+                const discordData = await discordResponse.json();
+                if (discordData.discordId && discordData.steamId) {
+                  steamId = discordData.steamId;
+                  profile = await getSteamProfile(steamId);
+                  searchMethod = 'Discord username (auto-detected)';
+                }
+              }
+            } catch (error) {
+              // Continue to next method
+            }
+
+            // Step 3: Try Discord ID lookup (if query looks like a Discord ID - 17-19 digits)
+            if (!steamId && /^\d{17,19}$/.test(query)) {
+              try {
+                const discordIdResponse = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${query}`);
+                if (discordIdResponse.ok) {
+                  const discordIdData = await discordIdResponse.json();
+                  if (discordIdData.steamId) {
+                    steamId = discordIdData.steamId;
+                    profile = await getSteamProfile(steamId);
+                    searchMethod = 'Discord ID (auto-detected)';
+                  }
+                }
+              } catch (error) {
+                // Continue to next method
+              }
+            }
+
+            // Step 4: Try Discord username via client (fallback if not in database)
+            if (!steamId) {
+              const discordUserId = await getDiscordUserIdFromUsername(query, client);
+              if (discordUserId) {
+                steamId = await getSteamIdFromDiscord(discordUserId);
+                if (steamId) {
+                  profile = await getSteamProfile(steamId);
+                  searchMethod = 'Discord username (server, auto-detected)';
+                }
+              }
+            }
+
+            // Step 5: Try Steam username/custom URL (last resort)
+            if (!steamId) {
+              steamId = await resolveSteamUsername(query);
+              if (steamId) {
+                profile = await getSteamProfile(steamId);
+                searchMethod = 'Steam username (auto-detected)';
+              }
+            }
+
+            // If still not found, show helpful error
+            if (!steamId || !profile) {
+              await interaction.editReply({
+                content: `❌ **Player Not Found**\n\nCould not find player: "${query}"\n\n💡 **Try specifying the platform:**\n\`/player query:"${query}" platform:Steam64 ID\`\n\`/player query:"${query}" platform:Steam Username\`\n\`/player query:"${query}" platform:Discord Username\`\n\`/player query:"${query}" platform:Discord ID\`\n\n**Or try one of these formats:**\n• **Steam64 ID:** \`76561199052427203\`\n• **Steam Username:** \`TheRembler\` (without special chars)\n• **Discord Username:** \`therembler\` (if connected)\n• **Discord ID:** \`661557499056619520\` (if connected)`,
+              });
+              return;
+            }
           }
         }
 
