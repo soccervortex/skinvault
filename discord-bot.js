@@ -1113,7 +1113,7 @@ client.on('interactionCreate', async (interaction) => {
           profile = await getSteamProfile(steamId);
         } else {
           // Try Discord username first (using the client to search)
-          const discordUserId = await getDiscordUserIdFromUsername(query, interaction.client || client);
+          const discordUserId = await getDiscordUserIdFromUsername(query, client);
           if (discordUserId) {
             steamId = await getSteamIdFromDiscord(discordUserId);
             if (steamId) {
