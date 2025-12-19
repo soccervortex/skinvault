@@ -2,12 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "./components/InstallPrompt";
-import { initDiscordBot } from "./lib/discord-bot-init";
-
-// Initialize Discord bot on server startup
-if (typeof window === 'undefined') {
-  initDiscordBot();
-}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,18 +18,17 @@ export const metadata: Metadata = {
   description: "Premium CS2 skin analytics and inventory management",
   icons: {
     icon: [
-      { url: '/favicon.png', type: 'image/png', sizes: '512x512' },
-      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
-      { url: '/icon-32.png', type: 'image/png', sizes: '32x32' },
-      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
-      { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
+      { url: '/icons/favicon.ico', type: 'image/x-icon' },
+      { url: '/icons/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icons/favicon-96x96.png', type: 'image/png', sizes: '96x96' },
+      { url: '/icons/web-app-manifest-192x192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icons/web-app-manifest-512x512.png', type: 'image/png', sizes: '512x512' },
     ],
     shortcut: [
-      { url: '/favicon.png', type: 'image/png', sizes: '512x512' },
+      { url: '/icons/favicon.ico', type: 'image/x-icon' },
     ],
     apple: [
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   manifest: '/manifest.json',
@@ -55,13 +48,13 @@ export const metadata: Metadata = {
     title: 'SkinVault - CS2 Skin Analytics',
     description: 'Premium CS2 skin analytics and inventory management',
     type: 'website',
-    images: [{ url: '/icon-512.png', width: 512, height: 512 }],
+    images: [{ url: '/icons/web-app-manifest-512x512.png', width: 512, height: 512 }],
   },
   twitter: {
     card: 'summary',
     title: 'SkinVault - CS2 Skin Analytics',
     description: 'Premium CS2 skin analytics and inventory management',
-    images: ['/icon-512.png'],
+    images: ['/icons/web-app-manifest-512x512.png'],
   },
 };
 
