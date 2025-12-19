@@ -382,29 +382,51 @@ export async function GET(request: Request) {
       }
     }
 
-    // Method 1: Try third-party APIs first (like skinpock.com uses) - these are more reliable
+    // METHOD 1: Try official Steam Web API FIRST (100% working method - highest priority)
+    // This is the official Steam API endpoint for CS2 inventories (IEconItems_730/GetPlayerItems)
+    try {
+      const steamWebAPIData = await fetchInventoryViaSteamWebAPI(steamId);
+      if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
+        console.log('✅ Inventory fetched via Official Steam Web API');
+        return NextResponse.json(steamWebAPIData);
+      }
+    } catch (error) {
+      console.warn('⚠️ Official Steam Web API failed, trying next method:', error);
+    }
+
+    // METHOD 2: Try third-party APIs (SteamWebAPI, CSInventoryAPI, SteamApis)
+    // These are reliable services that specialize in Steam inventory data
     const thirdPartyAPIs: Array<'steamwebapi' | 'csinventoryapi' | 'steamapis'> = ['steamwebapi', 'csinventoryapi', 'steamapis'];
     for (const apiType of thirdPartyAPIs) {
       try {
         const data = await fetchInventoryViaAPI(steamId, apiType);
         if (data && (data.assets || data.descriptions)) {
+          console.log(`✅ Inventory fetched via third-party API: ${apiType}`);
           return NextResponse.json(data);
         }
       } catch (error) {
-        // Continue to next API
+        console.warn(`⚠️ Third-party API ${apiType} failed, trying next...`);
         continue;
       }
     }
 
-    // Method 3: Try direct Steam Community API with proxies (fallback)
+    // METHOD 3: Try direct Steam Community API with scraping services (ScraperAPI, ZenRows, ScrapingAnt)
+    // These use API keys and are more reliable than free proxies
     let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=5000`;
     if (startAssetId) {
       invUrl += `&start_assetid=${startAssetId}`;
     }
 
-    // Use more proxies for Pro users
-    const allProxies = getAllProxies();
-    const maxProxies = isPro ? allProxies.length : Math.min(3, allProxies.length);
+    // Get scraping services first (with API keys), then fallback free proxies
+    const scrapingProxies = getScrapingProxies();
+    const allProxies = getAllProxies(); // This includes scraping + fallback
+    
+    // Pro users get more proxies, free users get limited
+    // Prioritize scraping services (with API keys) over free proxies
+    const maxProxies = isPro ? allProxies.length : Math.min(
+      scrapingProxies.length > 0 ? scrapingProxies.length + 2 : 3, // Prefer scraping services
+      allProxies.length
+    );
     const proxyList = allProxies.slice(0, maxProxies);
 
     // Try proxies sequentially
