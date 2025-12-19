@@ -66,6 +66,25 @@ const commands = [
         .setRequired(true)
     )
     .toJSON(),
+  new SlashCommandBuilder()
+    .setName('compare')
+    .setDescription('Compare up to 3 CS2 skins side by side')
+    .addStringOption(option =>
+      option.setName('item1')
+        .setDescription('First item name (required)')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('item2')
+        .setDescription('Second item name (required)')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('item3')
+        .setDescription('Third item name (optional)')
+        .setRequired(false)
+    )
+    .toJSON(),
 ];
 
 async function registerCommands() {
@@ -165,6 +184,21 @@ async function getSteamIdFromDiscord(discordId) {
   }
 }
 
+// Check if user has Pro status
+async function checkProStatus(steamId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/user/pro?id=${steamId}`);
+    if (!response.ok) return false;
+    const data = await response.json();
+    if (data?.proUntil) {
+      return new Date(data.proUntil) > new Date();
+    }
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
 // Get Discord user ID from username (searches database first, then Discord servers)
 async function getDiscordUserIdFromUsername(username, client) {
   try {
@@ -232,26 +266,48 @@ async function getSteamProfile(steamId) {
 // Resolve Steam username to Steam64 ID
 async function resolveSteamUsername(username) {
   try {
+    // Clean username (remove special chars, spaces)
+    const cleanUsername = username.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!cleanUsername) return null;
+    
     // Try to access profile by custom URL
-    const profileUrl = `https://steamcommunity.com/id/${username}/?xml=1`;
+    const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
     const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(profileUrl)}`, {
       signal: AbortSignal.timeout(10000)
     });
     
-    if (!response.ok) return null;
+    if (!response.ok) {
+      // Try alternative proxy if first fails
+      try {
+        const altResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(profileUrl)}`, {
+          signal: AbortSignal.timeout(10000)
+        });
+        if (altResponse.ok) {
+          const text = await altResponse.text();
+          const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
+          if (steamId64 && /^\d{17}$/.test(steamId64)) {
+            return steamId64;
+          }
+        }
+      } catch {
+        // Ignore
+      }
+      return null;
+    }
     
     const text = await response.text();
     const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
-    if (steamId64) {
+    if (steamId64 && /^\d{17}$/.test(steamId64)) {
       return steamId64;
     }
     return null;
   } catch (error) {
+    console.error('Error resolving Steam username:', error);
     return null;
   }
 }
 
-// Get top weapons from inventory
+// Get top weapons from inventory (returns immediately with what it has, max 3)
 async function getTopWeapons(steamId, limit = 3) {
   try {
     const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
@@ -268,53 +324,70 @@ async function getTopWeapons(steamId, limit = 3) {
     });
 
     const weapons = [];
+    const weaponTypes = [
+      'Knife', 'AK-47', 'M4A4', 'AWP', 'Glock', 'USP', 'Desert Eagle', 'P250',
+      'Five-SeveN', 'Tec-9', 'CZ75', 'R8', 'P2000', 'Dual Berettas',
+      'P90', 'MP9', 'MAC-10', 'UMP-45', 'MP7', 'MP5',
+      'FAMAS', 'Galil', 'M4A1-S', 'AUG', 'SG 553', 'SCAR-20',
+      'G3SG1', 'SSG 08', 'Nova', 'XM1014', 'Sawed-Off', 'MAG-7',
+      'M249', 'Negev'
+    ];
+
+    // Collect all weapons first (without prices)
     for (const asset of assets) {
       const key = `${asset.classid}_${asset.instanceid || 0}`;
       const desc = descMap.get(key);
       if (!desc) continue;
 
       const itemName = desc.market_hash_name || desc.market_name || desc.name;
-      const isWeapon = desc.type === 'Weapon' || 
-                      (itemName && (itemName.includes('Knife') || itemName.includes('AK-47') || 
-                       itemName.includes('M4A4') || itemName.includes('AWP') || 
-                       itemName.includes('Glock') || itemName.includes('USP') ||
-                       itemName.includes('Desert Eagle') || itemName.includes('P250') ||
-                       itemName.includes('Five-SeveN') || itemName.includes('Tec-9') ||
-                       itemName.includes('CZ75') || itemName.includes('R8') ||
-                       itemName.includes('P2000') || itemName.includes('Dual Berettas') ||
-                       itemName.includes('P90') || itemName.includes('MP9') ||
-                       itemName.includes('MAC-10') || itemName.includes('UMP-45') ||
-                       itemName.includes('MP7') || itemName.includes('MP5') ||
-                       itemName.includes('FAMAS') || itemName.includes('Galil') ||
-                       itemName.includes('M4A1-S') || itemName.includes('AUG') ||
-                       itemName.includes('SG 553') || itemName.includes('SCAR-20') ||
-                       itemName.includes('G3SG1') || itemName.includes('SSG 08') ||
-                       itemName.includes('Nova') || itemName.includes('XM1014') ||
-                       itemName.includes('Sawed-Off') || itemName.includes('MAG-7') ||
-                       itemName.includes('M249') || itemName.includes('Negev')));
+      if (!itemName) continue;
 
-      if (isWeapon && itemName) {
-        const price = await getItemPrice(itemName, '3');
-        let priceValue = 0;
-        if (price) {
-          const priceStr = price.lowest_price || price.lowest || price.median_price;
-          if (priceStr) {
-            const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
-            priceValue = parseFloat(cleaned) || 0;
-          }
-        }
-        
+      const isWeapon = desc.type === 'Weapon' || 
+                      weaponTypes.some(weaponType => itemName.includes(weaponType));
+
+      if (isWeapon) {
         weapons.push({
           name: itemName,
-          price: price ? (price.lowest_price || price.lowest || price.median_price) : null,
-          priceValue,
+          price: null,
+          priceValue: 0,
         });
       }
     }
 
-    // Sort by price and return top weapons
-    weapons.sort((a, b) => b.priceValue - a.priceValue);
-    return weapons.slice(0, limit);
+    // Limit to top candidates before fetching prices (to speed up)
+    const candidates = weapons.slice(0, limit * 2); // Get a few extra for safety
+    
+    // Fetch prices in parallel with timeout - return what we have after 3 seconds max
+    const pricePromises = candidates.map(async (weapon, index) => {
+      try {
+        const price = await Promise.race([
+          getItemPrice(weapon.name, '3'),
+          new Promise(resolve => setTimeout(() => resolve(null), 2000)) // 2 second timeout per price
+        ]);
+        
+        if (price) {
+          const priceStr = price.lowest_price || price.lowest || price.median_price;
+          if (priceStr) {
+            const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
+            weapon.priceValue = parseFloat(cleaned) || 0;
+            weapon.price = priceStr;
+          }
+        }
+      } catch (error) {
+        // Ignore price fetch errors
+      }
+      return weapon;
+    });
+
+    // Wait max 3 seconds total for prices
+    const results = await Promise.race([
+      Promise.all(pricePromises),
+      new Promise(resolve => setTimeout(() => resolve(candidates), 3000))
+    ]);
+
+    // Sort by price and return top weapons (even if some don't have prices yet)
+    const sorted = (results || candidates).sort((a, b) => b.priceValue - a.priceValue);
+    return sorted.slice(0, limit);
   } catch (error) {
     console.error('Error getting top weapons:', error);
     return [];
@@ -992,6 +1065,9 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       try {
+        // Check Pro status for your own stats
+        const isPro = await checkProStatus(steamId);
+        
         // API expects 'id' parameter, not 'steamId'
         const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
         if (!statsResponse.ok) {
@@ -1037,13 +1113,13 @@ client.on('interactionCreate', async (interaction) => {
         const accuracy = totalShots > 0 ? (shotsHit / totalShots) * 100 : 0;
 
         const embed = new EmbedBuilder()
-          .setTitle('📊 Your CS2 Stats')
+          .setTitle(`📊 Your CS2 Stats${isPro ? ' ⚡ PRO' : ''}`)
           .setColor(0x5865F2)
           .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
 
-        // Basic stats
+        // Basic stats (always shown)
         if (kills > 0) {
           embed.addFields({ name: '💀 Total Kills', value: kills.toLocaleString(), inline: true });
         }
@@ -1060,21 +1136,29 @@ client.on('interactionCreate', async (interaction) => {
           embed.addFields({ name: '🎯 HS %', value: `${hs.toFixed(1)}%`, inline: true });
         }
 
-        // Advanced stats
-        if (adr > 0) {
-          embed.addFields({ name: '💜 ADR', value: adr.toFixed(1), inline: true });
-        }
-        if (mvps > 0) {
-          embed.addFields({ name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true });
-        }
-        if (accuracy > 0) {
-          embed.addFields({ name: '🎯 Accuracy', value: `${accuracy.toFixed(1)}%`, inline: true });
-        }
-        if (roundsPlayed > 0) {
-          embed.addFields({ name: '🔄 Rounds Played', value: roundsPlayed.toLocaleString(), inline: true });
-        }
-        if (totalDamage > 0) {
-          embed.addFields({ name: '💥 Total Damage', value: totalDamage.toLocaleString(), inline: true });
+        // Advanced stats (Pro-only, like on website)
+        if (isPro) {
+          if (adr > 0) {
+            embed.addFields({ name: '💜 ADR', value: adr.toFixed(1), inline: true });
+          }
+          if (mvps > 0) {
+            embed.addFields({ name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true });
+          }
+          if (accuracy > 0) {
+            embed.addFields({ name: '🎯 Accuracy', value: `${accuracy.toFixed(1)}%`, inline: true });
+          }
+          if (roundsPlayed > 0) {
+            embed.addFields({ name: '🔄 Rounds Played', value: roundsPlayed.toLocaleString(), inline: true });
+          }
+          if (totalDamage > 0) {
+            embed.addFields({ name: '💥 Total Damage', value: totalDamage.toLocaleString(), inline: true });
+          }
+        } else {
+          embed.addFields({ 
+            name: '🔒 Advanced Stats', 
+            value: 'Upgrade to **PRO** to see ADR, MVPs, Accuracy, Rounds Played, and Total Damage!\n\n[Get PRO](https://skinvaults.vercel.app/pro)',
+            inline: false 
+          });
         }
 
         if (embed.data.fields?.length === 0) {
@@ -1142,6 +1226,11 @@ client.on('interactionCreate', async (interaction) => {
           return;
         }
 
+        // Check if viewing own profile or other player
+        const viewingOwnProfile = steamId === await getSteamIdFromDiscord(user.id);
+        const isPro = viewingOwnProfile ? await checkProStatus(steamId) : await checkProStatus(steamId);
+        const viewerIsPro = await checkProStatus(await getSteamIdFromDiscord(user.id) || '');
+
         // Get stats
         let stats = null;
         try {
@@ -1164,7 +1253,7 @@ client.on('interactionCreate', async (interaction) => {
           // Stats are optional
         }
 
-        // Get top 3 weapons
+        // Get top 3 weapons (returns immediately, doesn't wait)
         const topWeapons = await getTopWeapons(steamId, 3);
 
         const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
@@ -1197,17 +1286,36 @@ client.on('interactionCreate', async (interaction) => {
           const hs = kills > 0 ? (hsKills / kills) * 100 : 0;
           const adr = roundsPlayed > 0 ? (totalDamage / roundsPlayed) : 0;
 
+          // Basic stats (always shown)
           embed.addFields(
             { name: '💀 Kills', value: kills.toLocaleString(), inline: true },
             { name: '☠️ Deaths', value: deaths.toLocaleString(), inline: true },
             { name: '📈 K/D Ratio', value: kd.toFixed(2), inline: true },
             { name: '🏆 Wins', value: matchesWon.toLocaleString(), inline: true },
-            { name: '🎯 HS %', value: `${hs.toFixed(1)}%`, inline: true },
-            { name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true }
+            { name: '🎯 HS %', value: `${hs.toFixed(1)}%`, inline: true }
           );
 
-          if (adr > 0) {
-            embed.addFields({ name: '💜 ADR', value: adr.toFixed(1), inline: true });
+          // Advanced stats (Pro-only, like on website)
+          // Show if: viewing own profile and you're pro, OR you're pro viewing anyone
+          if (viewingOwnProfile && playerIsPro || viewerIsPro) {
+            if (mvps > 0) {
+              embed.addFields({ name: '⭐ MVPs', value: mvps.toLocaleString(), inline: true });
+            }
+            if (adr > 0) {
+              embed.addFields({ name: '💜 ADR', value: adr.toFixed(1), inline: true });
+            }
+            if (roundsPlayed > 0) {
+              embed.addFields({ name: '🔄 Rounds Played', value: roundsPlayed.toLocaleString(), inline: true });
+            }
+            if (totalDamage > 0) {
+              embed.addFields({ name: '💥 Total Damage', value: totalDamage.toLocaleString(), inline: true });
+            }
+          } else if (!viewingOwnProfile) {
+            embed.addFields({ 
+              name: '🔒 Advanced Stats', 
+              value: 'Upgrade to **PRO** to see advanced stats for other players!\n\n[Get PRO](https://skinvaults.vercel.app/pro)',
+              inline: false 
+            });
           }
         } else {
           embed.addFields({ name: '📊 Stats', value: 'Profile is private or stats unavailable', inline: false });
@@ -1234,6 +1342,103 @@ client.on('interactionCreate', async (interaction) => {
         console.error('Error getting player:', error);
         await interaction.editReply({
           content: '❌ **Error**\n\nFailed to load player data. Please try again later.',
+        });
+      }
+
+    } else if (commandName === 'compare') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const item1Query = interaction.options.getString('item1');
+      const item2Query = interaction.options.getString('item2');
+      const item3Query = interaction.options.getString('item3');
+
+      if (!item1Query || !item2Query) {
+        await interaction.editReply({
+          content: '❌ **Missing Items**\n\nPlease provide at least 2 items to compare. Example: `/compare item1: "AK-47 Redline" item2: "M4A4 Asiimov"`',
+        });
+        return;
+      }
+
+      try {
+        // Search for items
+        const items = [];
+        const queries = [item1Query, item2Query, item3Query].filter(Boolean);
+        
+        for (const query of queries) {
+          const searchResult = await searchItem(query);
+          if (searchResult) {
+            const price = await getItemPrice(searchResult.market_hash_name, '3');
+            items.push({
+              name: searchResult.name || searchResult.market_hash_name,
+              marketHashName: searchResult.market_hash_name,
+              price: price ? (price.lowest_price || price.lowest || price.median_price) : null,
+              image: searchResult.image,
+              id: searchResult.id,
+            });
+          } else {
+            items.push({
+              name: query,
+              marketHashName: query,
+              price: null,
+              image: null,
+              id: null,
+            });
+          }
+        }
+
+        if (items.length < 2) {
+          await interaction.editReply({
+            content: '❌ **Items Not Found**\n\nCould not find enough items to compare. Make sure the item names are correct.',
+          });
+          return;
+        }
+
+        // Build compare URL
+        const itemIds = items.filter(i => i.id).map(i => i.id);
+        let compareUrl = '';
+        if (itemIds.length === 2) {
+          compareUrl = `https://skinvaults.vercel.app/compare?id1=${encodeURIComponent(itemIds[0])}&id2=${encodeURIComponent(itemIds[1])}`;
+        } else if (itemIds.length === 3) {
+          compareUrl = `https://skinvaults.vercel.app/compare?id1=${encodeURIComponent(itemIds[0])}&id2=${encodeURIComponent(itemIds[1])}&id3=${encodeURIComponent(itemIds[2])}`;
+        } else {
+          // Fallback to market hash names
+          const names = items.map(i => i.marketHashName).filter(Boolean);
+          compareUrl = `https://skinvaults.vercel.app/compare?name1=${encodeURIComponent(names[0])}&name2=${encodeURIComponent(names[1])}`;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('⚖️ Compare Skins')
+          .setColor(0x5865F2)
+          .setURL(compareUrl)
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        // Add items to embed
+        items.forEach((item, index) => {
+          const priceText = item.price || 'No price data';
+          const itemUrl = item.id 
+            ? `https://skinvaults.vercel.app/item/${encodeURIComponent(item.id)}`
+            : `https://skinvaults.vercel.app/item/${encodeURIComponent(item.marketHashName)}`;
+          
+          embed.addFields({
+            name: `${index + 1}. ${item.name}`,
+            value: `💰 **Price:** ${priceText}\n🔗 [View Item](${itemUrl})`,
+            inline: false,
+          });
+        });
+
+        embed.setDescription(`[View Full Comparison](${compareUrl})`);
+
+        // Set thumbnail from first item if available
+        if (items[0]?.image) {
+          embed.setThumbnail(items[0].image);
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Error comparing items:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to compare items. Please try again later.',
         });
       }
 
@@ -1276,6 +1481,11 @@ client.on('interactionCreate', async (interaction) => {
           {
             name: '👤 `/player <query>`',
             value: 'Search for a player by Steam ID, Discord username, or Steam username',
+            inline: false,
+          },
+          {
+            name: '⚖️ `/compare <item1> <item2> [item3]`',
+            value: 'Compare up to 3 CS2 skins side by side',
             inline: false,
           },
           {

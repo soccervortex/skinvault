@@ -387,11 +387,11 @@ export async function GET(request: Request) {
     try {
       const steamWebAPIData = await fetchInventoryViaSteamWebAPI(steamId);
       if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
-        console.log('[OK] Inventory fetched via Official Steam Web API');
+        console.log('âœ… Inventory fetched via Official Steam Web API');
         return NextResponse.json(steamWebAPIData);
       }
     } catch (error) {
-      console.warn('[WARN] Official Steam Web API failed, trying next method:', error);
+      console.warn('âš ï¸ Official Steam Web API failed, trying next method:', error);
     }
 
     // METHOD 2: Try third-party APIs (SteamWebAPI, CSInventoryAPI, SteamApis)
@@ -401,19 +401,19 @@ export async function GET(request: Request) {
       try {
         const data = await fetchInventoryViaAPI(steamId, apiType);
         if (data && (data.assets || data.descriptions)) {
-          console.log(`[OK] Inventory fetched via third-party API: ${apiType}`);
+          console.log(`âœ… Inventory fetched via third-party API: ${apiType}`);
           return NextResponse.json(data);
         }
       } catch (error) {
-        console.warn(`[WARN] Third-party API ${apiType} failed, trying next...`);
+        console.warn(`âš ï¸ Third-party API ${apiType} failed, trying next...`);
         continue;
       }
     }
 
     // METHOD 3: Try direct Steam Community API with scraping services (ScraperAPI, ZenRows, ScrapingAnt)
     // These use API keys and are more reliable than free proxies
-    // IMPORTANT: Steam returns HTTP 400 with body `null` when count is too large (e.g. 5000).
-    // Empirically, 2000-2500 works; we use 2000 for safety and rely on pagination when needed.
+        // IMPORTANT: Steam returns HTTP 400 with body `null` when count is too large (e.g. 5000).
+    // Empirically, 2000â€“2500 works; we use 2000 for safety and rely on pagination when needed.
     let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=2000`;
     if (startAssetId) {
       invUrl += `&start_assetid=${startAssetId}`;
@@ -482,9 +482,7 @@ export async function GET(request: Request) {
       }
     } catch {
       // If direct fetch fails, we'll fall back to proxies below.
-    }
-
-    // Get scraping services first (with API keys), then fallback free proxies
+    }    // Get scraping services first (with API keys), then fallback free proxies
     const scrapingProxies = getScrapingProxies();
     const allProxies = getAllProxies(); // This includes scraping + fallback
     
@@ -584,3 +582,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+

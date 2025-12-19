@@ -432,8 +432,14 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                       if (compareList.length === 2) {
                         window.location.href = `/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`;
                       } else {
-                        // Show feedback
-                        alert('Item added to compare! Add another item to compare.');
+                        // Show visual feedback
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold';
+                        notification.textContent = `Item added to compare! ${compareList.length === 1 ? 'Add another item to compare.' : ''}`;
+                        document.body.appendChild(notification);
+                        setTimeout(() => {
+                          notification.remove();
+                        }, 3000);
                       }
                     } catch (error) {
                       console.error('Failed to add to compare:', error);
