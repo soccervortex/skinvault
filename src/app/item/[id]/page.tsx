@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart } from 'lucide-react';
+import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
@@ -29,6 +30,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   const [user, setUser] = useState<any>(null);
   const [isPro, setIsPro] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showTrackerModal, setShowTrackerModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const priceCacheRef = useRef<Record<string, any>>({});
@@ -272,6 +274,184 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                   className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
                 >
                   EUR
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrency({ code: '1', symbol: '$' });
+                    try {
+                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                >
+                  USD
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 items-start">
+            <div className="lg:col-span-5">
+              <div
+                ref={cardRef}
+                className="bg-[#11141d] rounded-[2rem] md:rounded-[3.5rem] aspect-square border border-white/5 flex items-center justify-center relative overflow-hidden shadow-2xl"
+                style={{ perspective: '1200px' }}
+              >
+              <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
+              <img
+                src={item?.image}
+                className="w-[80%] h-auto object-contain z-10"
+                alt={item?.name || ''}
+                style={{
+                  transform: viewMode === '3D' ? `rotateY(${rotation}deg)` : 'rotateY(0deg)',
+                  transformStyle: 'preserve-3d',
+                  transition: viewMode === '2D' ? 'transform 0.4s ease-out' : undefined,
+                }}
+              />
+              <div className="absolute top-4 right-4 flex bg-black/40 rounded-2xl border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] overflow-hidden md:hidden z-20">
+                <button
+                  onClick={() => setViewMode('2D')}
+                  className={`px-3 py-1.5 transition-all ${viewMode === '2D' ? 'bg-white text-black' : 'text-gray-400'}`}
+                >
+                  2D
+                </button>
+                <button
+                  onClick={() => setViewMode('3D')}
+                  className={`px-3 py-1.5 transition-all ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+                >
+                  3D
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  const result = toggleWishlistEntry(
+                    {
+                      key: wishlistKey,
+                      name: item.name,
+                      image: item.image,
+                      market_hash_name: (item as any).market_hash_name,
+                      rarityName: item.rarity?.name,
+                      rarityColor: item.rarity?.color,
+                      weaponName: item.weapon?.name,
+                    },
+                    steamId,
+                    isPro,
+                  );
+                  if (result.success) {
+                    setWishlist(result.newList);
+                  } else if (result.reason === 'limit_reached') {
+                    setShowUpgradeModal(true);
+                  }
+                }}
+                className="absolute bottom-4 right-4 md:hidden inline-flex items-center justify-center p-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
+                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              >
+                <Heart
+                  size={16}
+                  className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'}
+                />
+              </button>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 space-y-6 md:space-y-8">
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
+              <button
+                onClick={() => {
+                  const result = toggleWishlistEntry(
+                    {
+                      key: wishlistKey,
+                      name: item.name,
+                      image: item.image,
+                      market_hash_name: (item as any).market_hash_name,
+                      rarityName: item.rarity?.name,
+                      rarityColor: item.rarity?.color,
+                      weaponName: item.weapon?.name,
+                    },
+                    steamId,
+                    isPro,
+                  );
+                  if (result.success) {
+                    setWishlist(result.newList);
+                  } else if (result.reason === 'limit_reached') {
+                    setShowUpgradeModal(true);
+                  }
+                }}
+                className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0"
+                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              >
+                <Heart
+                  size={18}
+                  className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-500'}
+                />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 relative overflow-hidden">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">Current Value</span>
+                <p className="text-3xl md:text-4xl font-black text-green-400 italic">
+                  {priceData?.lowest
+                    ? priceData.lowest
+                    : priceDone
+                      ? <span className="text-[12px] md:text-[14px] text-gray-500">NO PRICE</span>
+                      : <span className="text-[12px] md:text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
+                </p>
+                <TrendingUp className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-green-500/5 w-16 h-16 md:w-20 md:h-20" />
+              </div>
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 relative">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">24h Median</span>
+                <p className="text-3xl md:text-4xl font-black text-white/90 italic">
+                  {priceData?.median
+                    ? priceData.median
+                    : priceDone
+                      ? <span className="text-[12px] md:text-[14px] text-gray-500">NO PRICE</span>
+                      : <span className="text-[12px] md:text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
+                </p>
+                <BarChart3 className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-white/5 w-16 h-16 md:w-20 md:h-20" />
+              </div>
+            </div>
+
+            <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-3 md:gap-4 w-full py-6 md:py-8 bg-blue-600 hover:bg-blue-500 text-white rounded-[2rem] md:rounded-[2.5rem] font-black text-[10px] md:text-xs uppercase tracking-widest transition-all">
+              Trade on Steam Market <ExternalLink size={16} />
+            </a>
+          </div>
+          </div>
+        </div>
+      </div>
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={wishlist.length}
+      />
+      
+      {item && (
+        <PriceTrackerModal
+          isOpen={showTrackerModal}
+          onClose={() => setShowTrackerModal(false)}
+          item={{
+            id: item.id || decodedId,
+            name: item.name,
+            image: item.image,
+            market_hash_name: (item as any).market_hash_name,
+          }}
+          user={user}
+          isPro={isPro}
+          currency={currency}
+        />
+      )}
+        </div>
+      </div>
+  );
+}
                 </button>
                 <button
                   onClick={() => {

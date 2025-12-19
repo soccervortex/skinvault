@@ -70,7 +70,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
       const data = await res.json();
       
-      if (res.ok) {
+      if (res.ok && data.success) {
         // Refresh alerts
         const listRes = await fetch(`/api/alerts/list?steamId=${user.steamId}`);
         const listData = await listRes.json();

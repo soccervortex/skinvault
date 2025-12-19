@@ -19,7 +19,19 @@ export async function POST(request: Request) {
       await kv.set(discordConnectionsKey, connections);
     }
 
-    return NextResponse.json({ success: true });
+    // Remove all price trackers for this user
+    const alertsKey = 'price_alerts';
+    const alerts = await kv.get<Record<string, any>>(alertsKey) || {};
+    const userAlertIds = Object.keys(alerts).filter(alertId => alerts[alertId].steamId === steamId);
+    
+    if (userAlertIds.length > 0) {
+      userAlertIds.forEach(alertId => {
+        delete alerts[alertId];
+      });
+      await kv.set(alertsKey, alerts);
+    }
+
+    return NextResponse.json({ success: true, removedAlerts: userAlertIds.length });
   } catch (error) {
     console.error('Discord disconnect error:', error);
     return NextResponse.json({ error: 'Failed to disconnect Discord' }, { status: 500 });

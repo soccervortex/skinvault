@@ -49,8 +49,10 @@ export default function TermsPage() {
                 <li>Real-time inventory value tracking</li>
                 <li>Skin price monitoring and analytics</li>
                 <li>Wishlist functionality</li>
+                <li>Price alerts via Discord integration</li>
                 <li>Player statistics and portfolio analytics</li>
-                <li>Pro subscription features (unlimited wishlist, advanced stats, faster performance)</li>
+                <li>Pro subscription features (unlimited wishlist, unlimited price trackers, advanced stats, faster performance)</li>
+                <li>Discord bot commands for wishlist and alerts management</li>
               </ul>
             </section>
 
@@ -71,7 +73,25 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                4. Pro Subscription
+                4. Discord Integration and Price Alerts
+              </h2>
+              <p className="text-gray-300 mb-4">
+                SkinVault offers optional Discord integration for price alerts:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li>You may connect your Discord account to receive price alert notifications</li>
+                <li>Free users can create up to 5 price trackers; Pro users have unlimited trackers</li>
+                <li>Price alerts are sent via Discord direct messages when target prices are reached</li>
+                <li>You can disconnect your Discord account at any time, which will remove all active price trackers</li>
+                <li>Discord bot commands (/wishlist, /alerts, /help) are available for connected users</li>
+                <li>We store your Discord ID and username for the purpose of sending alerts</li>
+                <li>Discord connection status is publicly visible on your profile</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
+                5. Pro Subscription
               </h2>
               <p className="text-gray-300 mb-4">
                 SkinVault offers a Pro subscription service with the following terms:
@@ -105,7 +125,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                6. Data and Content
+                7. Data and Content
               </h2>
               <p className="text-gray-300 mb-4">
                 The Service displays data from:
@@ -122,7 +142,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                7. Intellectual Property
+                8. Intellectual Property
               </h2>
               <p className="text-gray-300 mb-4">
                 All content, features, and functionality of the Service are owned by SkinVault and are protected by international copyright, trademark, and other intellectual property laws. You may not:
@@ -137,7 +157,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                8. Limitation of Liability
+                9. Limitation of Liability
               </h2>
               <p className="text-gray-300 mb-4">
                 SkinVault is provided "as is" without warranties of any kind. We are not liable for:
@@ -153,13 +173,14 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                9. Third-Party Services
+                10. Third-Party Services
               </h2>
               <p className="text-gray-300 mb-4">
                 The Service integrates with:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Steam:</strong> For authentication and inventory data</li>
+                <li><strong>Discord:</strong> For price alert notifications and bot commands</li>
                 <li><strong>Stripe:</strong> For payment processing</li>
                 <li><strong>Vercel:</strong> For hosting and data storage</li>
               </ul>
@@ -170,7 +191,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                10. Termination
+                11. Termination
               </h2>
               <p className="text-gray-300 mb-4">
                 We reserve the right to terminate or suspend your access to the Service at any time, without prior notice, for any reason, including:

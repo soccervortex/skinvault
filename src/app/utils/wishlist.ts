@@ -36,6 +36,17 @@ export function saveWishlist(entries: WishlistEntry[], steamId?: string | null) 
   try {
     const key = getStorageKeyForUser(steamId);
     window.localStorage.setItem(key, JSON.stringify(entries));
+    
+    // Also sync to KV for Discord bot access
+    if (steamId) {
+      fetch('/api/wishlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId, wishlist: entries }),
+      }).catch(() => {
+        // Silently fail - this is just for bot sync
+      });
+    }
   } catch {
     // ignore quota / privacy errors
   }

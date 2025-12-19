@@ -1,141 +1,162 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { Bell, Trash2, X, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Trash2, AlertCircle, Bell } from 'lucide-react';
 
 interface PriceAlert {
   id: string;
   marketHashName: string;
   targetPrice: number;
-  currency: string;
   condition: 'above' | 'below';
+  currency: string;
   triggered: boolean;
-  createdAt: string;
+  createdAt: number;
 }
 
 interface ManagePriceTrackersProps {
   isOpen: boolean;
   onClose: () => void;
-  steamId: string | null;
+  steamId: string;
   isPro: boolean;
 }
 
 export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }: ManagePriceTrackersProps) {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !steamId) {
-      setLoading(false);
-      return;
+    if (isOpen && steamId) {
+      loadAlerts();
     }
-
-    fetch(`/api/alerts/list?steamId=${steamId}`)
-      .then(res => res.json())
-      .then(data => {
-        setAlerts(data.alerts || []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
   }, [isOpen, steamId]);
 
-  const handleDelete = async (alertId: string) => {
-    if (!steamId) return;
-
+  const loadAlerts = async () => {
     try {
-      await fetch('/api/alerts/delete', {
+      setLoading(true);
+      const res = await fetch(`/api/alerts/list?steamId=${steamId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAlerts(data.alerts || []);
+      }
+    } catch (error) {
+      console.error('Failed to load alerts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAlert = async (alertId: string) => {
+    try {
+      setDeleting(alertId);
+      const res = await fetch(`/api/alerts/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alertId, steamId }),
       });
 
-      setAlerts(alerts.filter(a => a.id !== alertId));
+      if (res.ok) {
+        setAlerts(alerts.filter(a => a.id !== alertId));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete alert');
+      }
     } catch (error) {
       console.error('Failed to delete alert:', error);
+      alert('Failed to delete alert');
+    } finally {
+      setDeleting(null);
     }
   };
 
   if (!isOpen) return null;
 
-  const maxAlerts = isPro ? Infinity : 5;
+  const currencySymbol = (code: string) => code === '1' ? '$' : '€';
+  const formatPrice = (price: number, currency: string) => {
+    return `${currencySymbol(currency)}${price.toFixed(2)}`;
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-4 md:top-6 right-4 md:right-6 text-gray-500 hover:text-white transition-colors z-10"
-        >
-          <X size={24} />
-        </button>
-
-        <div className="p-6 md:p-8 space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Bell size={20} className="text-blue-400" />
-            <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-white">
-              Manage Price Trackers
-            </h2>
+            <div className="p-2 rounded-xl bg-blue-600/20 border border-blue-500/40">
+              <Bell className="text-blue-400" size={20} />
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+                Manage Price Trackers
+              </h2>
+              <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">
+                {alerts.length} active tracker{alerts.length !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-white/5 transition-colors"
+          >
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
 
-          <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-            <p className="text-[9px] text-gray-400 text-center">
-              {isPro ? 'Unlimited' : `${alerts.length} / ${maxAlerts}`} price trackers
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+            <p className="text-gray-400 mt-4 text-sm">Loading trackers...</p>
+          </div>
+        ) : alerts.length === 0 ? (
+          <div className="text-center py-12">
+            <AlertCircle className="mx-auto text-gray-500 mb-4" size={48} />
+            <p className="text-gray-400 text-sm">No price trackers set up yet.</p>
+            <p className="text-gray-500 text-xs mt-2">Set up trackers on item pages to get price alerts!</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="bg-black/40 border border-white/5 rounded-xl p-4 flex items-center justify-between gap-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm md:text-base font-bold text-white truncate">
+                    {alert.marketHashName}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-400">
+                      {alert.condition === 'below' ? '≤' : '≥'} {formatPrice(alert.targetPrice, alert.currency)}
+                    </span>
+                    {alert.triggered && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                        Triggered
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => deleteAlert(alert.id)}
+                  disabled={deleting === alert.id}
+                  className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors disabled:opacity-50"
+                >
+                  {deleting === alert.id ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                  ) : (
+                    <Trash2 size={16} />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isPro && alerts.length >= 5 && (
+          <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <p className="text-xs text-blue-400">
+              <strong>Free tier limit:</strong> You've reached the maximum of 5 price trackers. Upgrade to Pro for unlimited trackers!
             </p>
           </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={24} className="animate-spin text-gray-500" />
-            </div>
-          ) : alerts.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-[10px] text-gray-500">No price trackers set</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="bg-black/40 border border-white/5 rounded-lg p-4 flex items-start justify-between gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-black text-white mb-2 truncate">{alert.marketHashName}</p>
-                    <div className="flex items-center gap-2">
-                      {alert.condition === 'below' ? (
-                        <TrendingDown size={12} className="text-emerald-400" />
-                      ) : (
-                        <TrendingUp size={12} className="text-red-400" />
-                      )}
-                      <span className="text-[10px] text-gray-300">
-                        {alert.condition === 'below' ? '≤' : '≥'}{' '}
-                        {new Intl.NumberFormat('en-US', {
-                          style: 'currency',
-                          currency: alert.currency === '1' ? 'USD' : 'EUR',
-                        }).format(alert.targetPrice)}
-                      </span>
-                      {alert.triggered && (
-                        <span className="text-[8px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded">
-                          Triggered
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[8px] text-gray-500 mt-1">
-                      Created: {new Date(alert.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(alert.id)}
-                    className="p-2 text-red-500 hover:text-red-400 transition-colors shrink-0"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

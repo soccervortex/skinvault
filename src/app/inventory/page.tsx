@@ -231,21 +231,54 @@ function InventoryContent() {
 
   const fetchInventory = async (id: string) => {
     try {
-      const invUrl = `https://steamcommunity.com/inventory/${id}/730/2?l=english&count=500`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for inventory
-      
-      // Add timeout to fetchWithRotation by wrapping it
-      const data = await Promise.race([
-        fetchWithProxyRotation(invUrl, isPro, { parallel: false }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Inventory fetch timeout')), 15000)
-        )
-      ]) as any;
-      
-      clearTimeout(timeoutId);
-      const items = (data?.descriptions || []) as InventoryItem[];
-      setInventory(items);
+      let allItems: InventoryItem[] = [];
+      let startAssetId: string | null = null;
+      let hasMore = true;
+      let attempts = 0;
+      const maxAttempts = 20; // Prevent infinite loops
+
+      while (hasMore && attempts < maxAttempts) {
+        attempts++;
+        let invUrl = `https://steamcommunity.com/inventory/${id}/730/2?l=english&count=5000`;
+        if (startAssetId) {
+          invUrl += `&start_assetid=${startAssetId}`;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+        
+        try {
+          const data = await Promise.race([
+            fetchWithProxyRotation(invUrl, isPro, { parallel: false }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Inventory fetch timeout')), 20000)
+            )
+          ]) as any;
+          
+          clearTimeout(timeoutId);
+          
+          if (data?.descriptions) {
+            const newItems = data.descriptions as InventoryItem[];
+            // Deduplicate by market_hash_name
+            const existingNames = new Set(allItems.map(i => i.market_hash_name));
+            const uniqueNewItems = newItems.filter(i => !existingNames.has(i.market_hash_name));
+            allItems = [...allItems, ...uniqueNewItems];
+          }
+
+          // Check if there are more items
+          if (data?.more_items && data?.last_assetid) {
+            startAssetId = data.last_assetid;
+            hasMore = true;
+          } else {
+            hasMore = false;
+          }
+        } catch (e) {
+          console.error(`Inventory fetch attempt ${attempts} failed:`, e);
+          hasMore = false; // Stop trying if we get an error
+        }
+      }
+
+      setInventory(allItems);
     } catch (e) { 
       console.error("Inventory failed", e);
       setInventory([]); // Set empty array so page can still render
@@ -428,6 +461,19 @@ function InventoryContent() {
       setShareUrl(null);
     }
   }, [viewedUser]);
+
+  // Load Discord status for viewed user
+  useEffect(() => {
+    if (!viewedUser?.steamId) {
+      setDiscordStatus(null);
+      return;
+    }
+    
+    fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(setDiscordStatus)
+      .catch(() => setDiscordStatus(null));
+  }, [viewedUser?.steamId]);
 
   const totalVaultValue = useMemo(() => {
     let total = 0;

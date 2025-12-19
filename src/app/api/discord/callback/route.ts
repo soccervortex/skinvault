@@ -81,6 +81,35 @@ export async function GET(request: Request) {
       };
       
       await kv.set(discordConnectionsKey, connections);
+      
+      // Queue welcome message via bot gateway
+      try {
+        const welcomeQueueKey = 'discord_dm_queue';
+        const welcomeQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
+        const welcomeMessage = `🎉 **Thanks for connecting with SkinVault Bot!**
+
+You can now:
+• Set up **price alerts** for CS2 skins
+• Get notified when prices hit your target
+• Use **/wishlist** to view your tracked items
+• Manage alerts from your profile at skinvaults.vercel.app
+
+**Commands:**
+\`/wishlist\` - View your wishlist with prices
+\`/help\` - Get help with commands
+
+Happy trading! 🚀`;
+        
+        welcomeQueue.push({
+          discordId: discordUser.id,
+          message: welcomeMessage,
+          timestamp: Date.now(),
+        });
+        await kv.set(welcomeQueueKey, welcomeQueue);
+      } catch (welcomeError) {
+        console.error('Failed to queue welcome message:', welcomeError);
+        // Don't fail the connection if welcome message fails
+      }
     } catch (error) {
       console.error('Failed to store Discord connection:', error);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_storage_failed`);

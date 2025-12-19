@@ -3,9 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import DiscordConnection from '@/app/components/DiscordConnection';
-import PriceAlerts from '@/app/components/PriceAlerts';
-import { Crown, CheckCircle2, ArrowRight, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
+import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
 
 export default function ProInfoPage() {
   const [user, setUser] = useState<any>(null);
@@ -206,12 +204,13 @@ export default function ProInfoPage() {
               <li>– Faster, priority price scanning</li>
               <li>– Advanced compare stats & value breakdown</li>
               <li>– Early access to new tools</li>
+              <li>– Price alerts via Discord</li>
+              <li>– Unlimited price trackers</li>
             </ul>
           </div>
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5 space-y-2">
             <p className="font-black uppercase tracking-[0.3em] text-gray-500">Coming soon</p>
             <ul className="space-y-1 text-gray-300 text-[10px]">
-              <li>– Price alerts (Discord) ✓</li>
               <li>– Multi-account portfolio overview</li>
               <li>– ROI & flip-helper suggestions</li>
             </ul>
@@ -339,21 +338,6 @@ export default function ProInfoPage() {
             </p>
           </div>
         </div>
-
-        {/* Discord Connection & Price Alerts Section */}
-        {isPro && user?.steamId && (
-          <div className="mt-8 space-y-6">
-            <div className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl">
-              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-6 text-blue-400">
-                Discord Integration
-              </h2>
-              <div className="space-y-6">
-                <DiscordConnection steamId={user.steamId} />
-                <PriceAlerts steamId={user.steamId} isPro={isPro} />
-              </div>
-            </div>
-          </div>
-        )}
         </div>
       </div>
     </div>
