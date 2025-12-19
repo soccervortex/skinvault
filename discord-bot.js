@@ -535,17 +535,73 @@ client.on('interactionCreate', async (interaction) => {
         const assets = invData.assets || [];
         const descriptions = invData.descriptions || [];
         
-        // Count items
-        const itemCount = assets.length;
-        const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
+        // Create a map of classid_instanceid to descriptions
+        const descMap = new Map();
+        descriptions.forEach(desc => {
+          const key = `${desc.classid}_${desc.instanceid || 0}`;
+          descMap.set(key, desc);
+        });
+
+        // Match assets with descriptions and get item names
+        const items = [];
+        const itemCounts = new Map(); // Track counts per item name
+
+        for (const asset of assets) {
+          const key = `${asset.classid}_${asset.instanceid || 0}`;
+          const desc = descMap.get(key);
+          if (!desc) continue;
+
+          const itemName = desc.market_hash_name || desc.market_name || desc.name || `Item ${desc.classid}`;
+          const amount = asset.amount || 1;
+          
+          // Track counts
+          const currentCount = itemCounts.get(itemName) || 0;
+          itemCounts.set(itemName, currentCount + amount);
+        }
+
+        // Convert to array and sort alphabetically
+        const sortedItems = Array.from(itemCounts.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        const totalItems = assets.length;
+        const uniqueItems = sortedItems.length;
+        const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
 
         const embed = new EmbedBuilder()
           .setTitle('📦 Your Inventory')
-          .setDescription(`**Total Items:** ${itemCount}\n**Unique Items:** ${uniqueItems}`)
           .setColor(0x5865F2)
-          .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
+          .setURL(vaultUrl)
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+
+        // Add summary
+        embed.addFields(
+          { name: '📊 Summary', value: `**Total Items:** ${totalItems}\n**Unique Items:** ${uniqueItems}`, inline: false }
+        );
+
+        // Add items list (limit to 20 to avoid embed limits)
+        const itemsToShow = sortedItems.slice(0, 20);
+        if (itemsToShow.length > 0) {
+          const itemsList = itemsToShow.map((item, index) => {
+            const countText = item.count > 1 ? ` (x${item.count})` : '';
+            return `${index + 1}. ${item.name}${countText}`;
+          }).join('\n');
+
+          embed.addFields({
+            name: `📋 Items (${itemsToShow.length}${sortedItems.length > 20 ? ` of ${sortedItems.length}` : ''})`,
+            value: itemsList.length > 1024 ? itemsList.substring(0, 1020) + '...' : itemsList,
+            inline: false,
+          });
+
+          if (sortedItems.length > 20) {
+            embed.setDescription(`Showing first 20 of ${sortedItems.length} unique items\n\n[View Full Inventory](${vaultUrl})`);
+          } else {
+            embed.setDescription(`[View Full Inventory with Prices](${vaultUrl})`);
+          }
+        } else {
+          embed.setDescription(`No items found.\n\n[View Inventory](${vaultUrl})`);
+        }
 
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
