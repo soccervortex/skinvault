@@ -338,7 +338,9 @@ export default function ProInfoPage() {
             </p>
           </div>
         </div>
+        </div>
         <Footer />
       </div>
+    </div>
   );
 }
