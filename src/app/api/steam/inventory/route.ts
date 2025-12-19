@@ -148,7 +148,7 @@ export async function GET(request: Request) {
     const errors: string[] = [];
     for (let i = 0; i < proxyList.length; i++) {
       try {
-        const data = await fetchWithProxy(invUrl, i, steamId);
+        const data = await fetchWithProxy(invUrl, i);
         
         // Steam inventory API can return:
         // - { success: false } for private inventories
