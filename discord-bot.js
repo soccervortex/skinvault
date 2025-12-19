@@ -191,6 +191,16 @@ async function getItemPrice(marketHashName, currency = '3') {
   }
 }
 
+// Normalize text for fuzzy matching (remove special chars, normalize spaces)
+function normalizeForSearch(text) {
+  return text
+    .toLowerCase()
+    .replace(/[★☆★☆|()\[\]{}]/g, ' ') // Remove special characters
+    .replace(/[^\w\s]/g, ' ') // Remove other special chars, keep alphanumeric and spaces
+    .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+    .trim();
+}
+
 // Fuzzy search for items
 async function searchItem(query) {
   try {
@@ -202,8 +212,13 @@ async function searchItem(query) {
       'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/agents.json',
     ];
 
-    const queryLower = query.toLowerCase().trim();
-    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+    // Normalize query: remove special chars, normalize spaces
+    const normalizedQuery = normalizeForSearch(query);
+    const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0);
+
+    if (queryWords.length === 0) {
+      return null;
+    }
 
     // Search through all datasets
     for (const datasetUrl of datasets) {
@@ -214,10 +229,10 @@ async function searchItem(query) {
         const data = await response.json();
         const items = Array.isArray(data) ? data : Object.values(data);
         
-        // First try exact match
+        // First try exact match (normalized)
         let found = items.find(item => {
-          const name = (item.market_hash_name || item.name || '').toLowerCase();
-          return name === queryLower;
+          const name = normalizeForSearch(item.market_hash_name || item.name || '');
+          return name === normalizedQuery;
         });
 
         if (found) {
@@ -229,9 +244,9 @@ async function searchItem(query) {
           };
         }
 
-        // Then try fuzzy match (all words must be in the name)
+        // Then try fuzzy match (all words must be in the normalized name)
         found = items.find(item => {
-          const name = (item.market_hash_name || item.name || '').toLowerCase();
+          const name = normalizeForSearch(item.market_hash_name || item.name || '');
           return queryWords.every(word => name.includes(word));
         });
 
@@ -244,10 +259,11 @@ async function searchItem(query) {
           };
         }
 
-        // Then try partial match (any word matches)
+        // Then try partial match (most words match)
         found = items.find(item => {
-          const name = (item.market_hash_name || item.name || '').toLowerCase();
-          return queryWords.some(word => name.includes(word));
+          const name = normalizeForSearch(item.market_hash_name || item.name || '');
+          const matchingWords = queryWords.filter(word => name.includes(word));
+          return matchingWords.length >= Math.ceil(queryWords.length * 0.7); // At least 70% of words match
         });
 
         if (found) {
