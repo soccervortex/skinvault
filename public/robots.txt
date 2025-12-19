@@ -1,0 +1,24 @@
+# robots.txt for SkinVault
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+Allow: /inventory
+Allow: /wishlist
+Allow: /pro
+Allow: /compare
+Allow: /item/
+
+# Disallow admin and API routes (private/sensitive)
+Disallow: /admin
+Disallow: /api/
+
+# Disallow payment pages from indexing (no need to index these)
+Disallow: /payment/
+
+# Sitemap location - must be absolute URL
+# Replace with your actual domain after deployment
+Sitemap: https://skinvault.app/sitemap.xml
+
+# Crawl delay (optional, helps prevent server overload)
+Crawl-delay: 1
+
