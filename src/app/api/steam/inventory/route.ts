@@ -387,11 +387,11 @@ export async function GET(request: Request) {
     try {
       const steamWebAPIData = await fetchInventoryViaSteamWebAPI(steamId);
       if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
-        console.log('✅ Inventory fetched via Official Steam Web API');
+        console.log('[OK] Inventory fetched via Official Steam Web API');
         return NextResponse.json(steamWebAPIData);
       }
     } catch (error) {
-      console.warn('⚠️ Official Steam Web API failed, trying next method:', error);
+      console.warn('[WARN] Official Steam Web API failed, trying next method:', error);
     }
 
     // METHOD 2: Try third-party APIs (SteamWebAPI, CSInventoryAPI, SteamApis)
@@ -401,20 +401,87 @@ export async function GET(request: Request) {
       try {
         const data = await fetchInventoryViaAPI(steamId, apiType);
         if (data && (data.assets || data.descriptions)) {
-          console.log(`✅ Inventory fetched via third-party API: ${apiType}`);
+          console.log(`[OK] Inventory fetched via third-party API: ${apiType}`);
           return NextResponse.json(data);
         }
       } catch (error) {
-        console.warn(`⚠️ Third-party API ${apiType} failed, trying next...`);
+        console.warn(`[WARN] Third-party API ${apiType} failed, trying next...`);
         continue;
       }
     }
 
     // METHOD 3: Try direct Steam Community API with scraping services (ScraperAPI, ZenRows, ScrapingAnt)
     // These use API keys and are more reliable than free proxies
-    let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=5000`;
+    // IMPORTANT: Steam returns HTTP 400 with body `null` when count is too large (e.g. 5000).
+    // Empirically, 2000-2500 works; we use 2000 for safety and rely on pagination when needed.
+    let invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=2000`;
     if (startAssetId) {
       invUrl += `&start_assetid=${startAssetId}`;
+    }
+
+    // METHOD 3A: Try DIRECT Steam Community fetch first (best for local dev; avoids flaky public proxies)
+    // If Steam rejects the chosen count (400 + `null`), retry without the count parameter.
+    try {
+      const tryDirect = async (url: string) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        try {
+          const res = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/json,text/plain,*/*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Referer': 'https://steamcommunity.com/',
+            },
+            signal: controller.signal,
+            cache: 'no-store',
+          });
+
+          const text = await res.text();
+          if (!res.ok) return null;
+          if (!text) return null;
+          if (/<html|<!doctype/i.test(text)) return null;
+
+          try {
+            return JSON.parse(text);
+          } catch {
+            return null;
+          }
+        } catch {
+          return null;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      let direct: any = await tryDirect(invUrl);
+      if (direct === null) {
+        const noCountUrl = invUrl.replace(/([?&])count=\d+&?/, '$1').replace(/[?&]$/, '');
+        if (noCountUrl !== invUrl) {
+          direct = await tryDirect(noCountUrl);
+        }
+      }
+
+      if (direct && typeof direct === 'object') {
+        if (direct.success === false) {
+          return NextResponse.json({
+            success: false,
+            error: 'Inventory is private',
+            assets: [],
+            descriptions: [],
+          });
+        }
+
+        if (Array.isArray(direct.assets) || Array.isArray(direct.descriptions)) {
+          return NextResponse.json({
+            ...direct,
+            assets: Array.isArray(direct.assets) ? direct.assets : [],
+            descriptions: Array.isArray(direct.descriptions) ? direct.descriptions : [],
+          });
+        }
+      }
+    } catch {
+      // If direct fetch fails, we'll fall back to proxies below.
     }
 
     // Get scraping services first (with API keys), then fallback free proxies
@@ -517,4 +584,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
