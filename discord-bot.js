@@ -291,7 +291,7 @@ async function resolveSteamUsername(username) {
     
     if (!cleanUsername || cleanUsername.length < 3) return null;
     
-    // Method 1: Try steamid.io API/lookup
+    // Method 1: Try steamid.io lookup (most reliable)
     try {
       // steamid.io allows lookup via URL: https://steamid.io/lookup/{username}
       const steamIdIoUrl = `https://steamid.io/lookup/${encodeURIComponent(cleanUsername)}`;
@@ -304,17 +304,23 @@ async function resolveSteamUsername(username) {
       
       if (response.ok) {
         const html = await response.text();
-        // Extract Steam64 ID from steamid.io page (looks for pattern like "76561199235618867")
-        const steamId64Match = html.match(/steamID64[^>]*>[\s\S]*?(\d{17})/i) || 
-                               html.match(/7656\d{13}/);
-        if (steamId64Match && steamId64Match[1]) {
-          const steamId64 = steamId64Match[1];
-          if (/^\d{17}$/.test(steamId64)) {
+        // Extract Steam64 ID from steamid.io page
+        // Look for patterns like: steamID64</label>...76561199235618867 or "76561199235618867"
+        const steamId64Matches = [
+          html.match(/steamID64[^>]*>[\s\S]{0,200}?(\d{17})/i),
+          html.match(/7656\d{13}/),
+          html.match(/steamID64.*?copy[^>]*>[\s\S]{0,300}?(\d{17})/i),
+        ].filter(Boolean);
+        
+        for (const match of steamId64Matches) {
+          const steamId64 = match[1] || match[0];
+          if (steamId64 && /^7656\d{13}$/.test(steamId64)) {
             return steamId64;
           }
         }
       }
     } catch (error) {
+      console.error('steamid.io lookup failed:', error);
       // Continue to fallback method
     }
     
