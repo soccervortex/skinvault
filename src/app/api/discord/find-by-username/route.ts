@@ -14,8 +14,8 @@ export async function GET(request: Request) {
     const discordConnectionsKey = 'discord_connections';
     const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
     
-    // Normalize search query (remove discriminator if present, lowercase)
-    const normalizedQuery = username.split('#')[0].toLowerCase().trim();
+    // Normalize search query (remove discriminator if present, lowercase, trim)
+    const normalizedQuery = username.split('#')[0].toLowerCase().trim().replace(/\s+/g, '');
     
     // Search through all connections
     for (const [steamId, connection] of Object.entries(connections)) {
@@ -27,10 +27,13 @@ export async function GET(request: Request) {
       }
       
       // Normalize stored username (handle both old format with # and new format without)
-      const storedUsername = connection.discordUsername.split('#')[0].toLowerCase().trim();
+      const storedUsername = String(connection.discordUsername).split('#')[0].toLowerCase().trim().replace(/\s+/g, '');
       
       // Match username (case-insensitive, without discriminator)
-      if (storedUsername === normalizedQuery) {
+      // Also try partial match (in case of extra characters)
+      if (storedUsername === normalizedQuery || 
+          storedUsername.includes(normalizedQuery) || 
+          normalizedQuery.includes(storedUsername)) {
         return NextResponse.json({ 
           discordId: connection.discordId, 
           steamId,
