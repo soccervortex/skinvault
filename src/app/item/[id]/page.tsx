@@ -386,32 +386,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 {/* Compare Button */}
                 <button
                   onClick={() => {
-                    // Add current item to compare list first, then show modal
-                    try {
-                      const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
-                      const itemToAdd = {
-                        id: item.id,
-                        name: item.name,
-                        image: item.image,
-                        market_hash_name: (item as any).market_hash_name,
-                      };
-                      
-                      // Check if already in compare list
-                      const exists = compareList.find((i: any) => i.id === item.id);
-                      if (!exists) {
-                        // Add item if not already in list
-                        compareList.push(itemToAdd);
-                        // Keep only last 2 items
-                        if (compareList.length > 2) {
-                          compareList.shift();
-                        }
-                        localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
-                      }
-                    } catch (error) {
-                      console.error('Failed to add to compare:', error);
-                    }
-                    
-                    // Show modal
+                    // Just show modal - it will handle adding the current item automatically
                     setShowCompareModal(true);
                   }}
                   className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0"

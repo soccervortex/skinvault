@@ -33,12 +33,32 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
     // Load compare list from localStorage
     try {
       const stored = localStorage.getItem('sv_compare_list');
-      if (stored) {
-        const list = JSON.parse(stored);
-        setCompareList(list);
+      let list: CompareItem[] = stored ? JSON.parse(stored) : [];
+      
+      // If currentItem is provided and not already in list, add it
+      if (currentItem) {
+        const exists = list.find(i => i.id === currentItem.id);
+        if (!exists) {
+          // Add current item to the list
+          list.push({
+            id: currentItem.id,
+            name: currentItem.name,
+            image: currentItem.image,
+            market_hash_name: currentItem.market_hash_name || currentItem.name,
+          });
+          // Keep only last 2 items (maintain order: first item in slot 1, second in slot 2)
+          if (list.length > 2) {
+            list = list.slice(-2); // Keep last 2 items
+          }
+          // Save updated list
+          localStorage.setItem('sv_compare_list', JSON.stringify(list));
+        }
       }
+      
+      setCompareList(list);
     } catch (error) {
       console.error('Failed to load compare list:', error);
+      setCompareList([]);
     }
 
     // Load dataset cache
@@ -57,7 +77,7 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
     } catch (error) {
       console.error('Failed to load dataset cache:', error);
     }
-  }, [isOpen]);
+  }, [isOpen, currentItem]);
 
   // Search items
   useEffect(() => {
@@ -135,7 +155,7 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
       return; // Already in list
     }
     
-    // Add item
+    // Add item to the end (maintains order: first item slot 1, second item slot 2)
     newList.push({
       id: item.id,
       name: item.name,
@@ -143,16 +163,14 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
       market_hash_name: item.market_hash_name || item.name,
     });
     
-    // Keep only last 2 items
-    if (newList.length > 2) {
-      newList.shift();
-    }
+    // Keep only last 2 items (preserve order)
+    const finalList = newList.length > 2 ? newList.slice(-2) : newList;
     
-    setCompareList(newList);
-    localStorage.setItem('sv_compare_list', JSON.stringify(newList));
+    setCompareList(finalList);
+    localStorage.setItem('sv_compare_list', JSON.stringify(finalList));
     
     if (onItemSelect) {
-      onItemSelect(newList[newList.length - 1]);
+      onItemSelect(finalList[finalList.length - 1]);
     }
   };
 
