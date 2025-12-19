@@ -14,7 +14,31 @@ export async function GET(request: Request) {
     if (marketHashName && !steamUrl) {
       const builtUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency}&market_hash_name=${encodeURIComponent(marketHashName)}`;
       
-      // Use proxy rotation to fetch price
+      // METHOD 1: Try direct Steam API first (100% working method - highest priority)
+      try {
+        const directResponse = await fetch(builtUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+          },
+          cache: 'no-store',
+        });
+        
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          if (directData && (directData.success || directData.lowest_price || directData.median_price)) {
+            console.log('✅ Price fetched via Direct Steam API');
+            return NextResponse.json({
+              success: true,
+              ...directData,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Direct Steam API failed, trying proxies:', error);
+      }
+      
+      // METHOD 2: Use proxy rotation (scraping services with API keys, then free proxies)
       try {
         const data = await fetchWithProxyRotation(builtUrl, true, {
           parallel: false,
@@ -23,13 +47,14 @@ export async function GET(request: Request) {
         });
         
         if (data && (data.success || data.lowest_price || data.median_price)) {
+          console.log('✅ Price fetched via proxy');
           return NextResponse.json({
             success: true,
             ...data,
           });
         }
       } catch (error) {
-        console.error('Price fetch via proxy failed:', error);
+        console.error('⚠️ Price fetch via proxy failed:', error);
       }
     }
 
