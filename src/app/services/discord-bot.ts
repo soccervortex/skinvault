@@ -64,6 +64,52 @@ export async function sendDiscordDM(discordId: string, message: string): Promise
   }
 }
 
+// Send Discord DM with embed
+export async function sendDiscordDMEmbed(discordId: string, embed: any): Promise<boolean> {
+  if (!DISCORD_BOT_TOKEN) {
+    console.warn('Discord bot token not configured');
+    return false;
+  }
+
+  try {
+    // Create DM channel
+    const channelResponse = await fetch('https://discord.com/api/users/@me/channels', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        recipient_id: discordId,
+      }),
+    });
+
+    if (!channelResponse.ok) {
+      console.error('Failed to create DM channel:', await channelResponse.text());
+      return false;
+    }
+
+    const channel = await channelResponse.json();
+
+    // Send message with embed
+    const messageResponse = await fetch(`https://discord.com/api/channels/${channel.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        embeds: [embed],
+      }),
+    });
+
+    return messageResponse.ok;
+  } catch (error) {
+    console.error('Failed to send Discord DM embed:', error);
+    return false;
+  }
+}
+
 // Get all active price alerts
 export async function getAllPriceAlerts(): Promise<PriceAlert[]> {
   try {
@@ -117,6 +163,18 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
           currency: currency === '1' ? 'USD' : 'EUR',
         }).format(price);
 
+        // Try to get item image
+        let itemImage = null;
+        try {
+          const itemResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/item/info?market_hash_name=${encodeURIComponent(marketHashName)}`);
+          if (itemResponse.ok) {
+            const itemData = await itemResponse.json();
+            itemImage = itemData.image;
+          }
+        } catch (error) {
+          // Ignore errors getting image
+        }
+
         const message = `🔔 **Price Alert Triggered!**\n\n` +
           `**Item:** ${marketHashName}\n` +
           `**Current Price:** ${priceStr}\n` +
@@ -126,7 +184,28 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
           }).format(alert.targetPrice)}\n\n` +
           `View on SkinVault: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`;
 
-        const sent = await sendDiscordDM(alert.discordId, message);
+        // Send as embed if we have image, otherwise as plain message
+        if (itemImage) {
+          const embed = {
+            title: '🔔 Price Alert Triggered!',
+            description: `**Item:** ${marketHashName}\n**Current Price:** ${priceStr}\n**Target Price:** ${alert.condition === 'below' ? '≤' : '≥'} ${new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: currency === '1' ? 'USD' : 'EUR',
+            }).format(alert.targetPrice)}`,
+            thumbnail: { url: itemImage },
+            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`,
+            color: 0x5865F2,
+          };
+          const sent = await sendDiscordDMEmbed(alert.discordId, embed);
+          if (sent) {
+            await markAlertTriggered(alert.id);
+          }
+        } else {
+          const sent = await sendDiscordDM(alert.discordId, message);
+          if (sent) {
+            await markAlertTriggered(alert.id);
+          }
+        }
         
         if (sent) {
           // Mark alert as triggered

@@ -171,6 +171,23 @@ export async function GET(request: Request) {
             // Success - return the data
             return NextResponse.json(data);
           }
+          
+          // Check if it's an empty inventory (valid response)
+          if (data.success === true && (!data.descriptions || data.descriptions.length === 0)) {
+            return NextResponse.json({
+              success: true,
+              assets: [],
+              descriptions: []
+            });
+          }
+          
+          // Check if response is an empty object or has no useful data
+          if (Object.keys(data).length === 0 || (data.success === undefined && !data.descriptions && !data.assets)) {
+            // This might be a valid empty response, but try next proxy to be sure
+            if (i < proxyList.length - 1) {
+              continue;
+            }
+          }
         }
         
         // If data exists but doesn't have expected structure, try next proxy

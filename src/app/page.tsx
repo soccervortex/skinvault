@@ -1,9 +1,14 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices } from 'lucide-react';
+import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
+import PriceTrackerModal from '@/app/components/PriceTrackerModal';
+import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
+import { getWishlistLimit } from '@/app/utils/pro-limits';
+import { checkProStatus } from '@/app/utils/proxy-utils';
 
 type SortType =
   | 'rarity-desc'
@@ -55,6 +60,13 @@ export default function GlobalSkinSearch() {
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const [visibleCount, setVisibleCount] = useState(80);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [isPro, setIsPro] = useState(false);
+  const [showTrackerModal, setShowTrackerModal] = useState(false);
+  const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
 
   // VEILIGE SYNC VOOR LOCALSTORAGE
   useEffect(() => {
@@ -66,6 +78,24 @@ export default function GlobalSkinSearch() {
         if (savedInv) {
           const parsed = JSON.parse(savedInv);
           setOwnedItems(Array.isArray(parsed) ? parsed : []);
+        }
+        
+        // Load user and wishlist
+        const storedUser = window.localStorage.getItem('steam_user');
+        const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+        setUser(parsedUser);
+        
+        if (parsedUser?.steamId) {
+          setWishlist(loadWishlist(parsedUser.steamId));
+          checkProStatus(parsedUser.steamId).then(setIsPro);
+        }
+        
+        // Load currency
+        const storedCurrency = window.localStorage.getItem('sv_currency');
+        if (storedCurrency === '1') {
+          setCurrency({ code: '1', symbol: '$' });
+        } else if (storedCurrency === '3') {
+          setCurrency({ code: '3', symbol: '€' });
         }
       } catch (e) {
         console.warn("LocalStorage access denied by browser:", e);
@@ -283,8 +313,70 @@ export default function GlobalSkinSearch() {
                         <span className="text-[7px] md:text-[8px] font-black uppercase tracking-widest text-white">Owned</span>
                       </div>
                     )}
-                    <div className="absolute top-2 md:top-3 lg:top-4 right-2 md:right-3 lg:right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => toggleCompare(item)} className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`}><Scale size={12} /></button>
+                    <div className="absolute top-2 md:top-3 lg:top-4 right-2 md:right-3 lg:right-4 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Compare Button */}
+                      <button onClick={() => toggleCompare(item)} className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} title="Add to Compare"><Scale size={12} /></button>
+                      
+                      {/* Price Tracker Button - Only show if logged in */}
+                      {user?.steamId && (
+                        <>
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setTrackerModalItem({
+                                id: item.id,
+                                name: item.name,
+                                image: item.image,
+                                market_hash_name: item.market_hash_name,
+                              });
+                              setShowTrackerModal(true);
+                            }}
+                            className="p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all text-white border-white/10 hover:text-purple-500 hover:border-purple-500"
+                            title="Price Tracker"
+                          >
+                            <Bell size={12} />
+                          </button>
+                          
+                          {/* Wishlist Button */}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const isWishlisted = wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id);
+                              const result = toggleWishlistEntry(
+                                {
+                                  key: item.id,
+                                  name: item.name,
+                                  image: item.image,
+                                  market_hash_name: item.market_hash_name,
+                                  rarityName: item.rarity?.name,
+                                  rarityColor: item.rarity?.color,
+                                  weaponName: item.weapon?.name,
+                                },
+                                user.steamId,
+                                isPro,
+                              );
+                              if (result.success) {
+                                setWishlist(result.newList);
+                              } else if (result.reason === 'limit_reached') {
+                                setShowUpgradeModal(true);
+                              }
+                            }}
+                            className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${
+                              wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id)
+                                ? 'text-rose-500 border-rose-500'
+                                : 'text-white border-white/10 hover:text-rose-500 hover:border-rose-500'
+                            }`}
+                            title={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                          >
+                            <Heart 
+                              size={12} 
+                              className={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'fill-current' : ''} 
+                            />
+                          </button>
+                        </>
+                      )}
                     </div>
                     <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
@@ -302,6 +394,30 @@ export default function GlobalSkinSearch() {
           )}
         </main>
       </div>
+      
+      {showTrackerModal && trackerModalItem && user && (
+        <PriceTrackerModal
+          isOpen={showTrackerModal}
+          onClose={() => {
+            setShowTrackerModal(false);
+            setTrackerModalItem(null);
+          }}
+          item={trackerModalItem}
+          user={user}
+          isPro={isPro}
+          currency={currency}
+        />
+      )}
+      
+      <ProUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Wishlist Limit Reached"
+        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+        feature="Wishlist"
+        limit={getWishlistLimit(false)}
+        currentCount={wishlist.length}
+      />
     </div>
   );
 }

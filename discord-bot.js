@@ -139,7 +139,16 @@ async function getItemPrice(marketHashName, currency = '3') {
     const response = await fetch(`${API_BASE_URL}/api/steam/price?market_hash_name=${encodeURIComponent(marketHashName)}&currency=${currency}`);
     if (!response.ok) return null;
     const data = await response.json();
-    return data;
+    // Return price data in consistent format
+    if (data.success && (data.lowest_price || data.median_price)) {
+      return {
+        lowest_price: data.lowest_price || data.median_price,
+        lowest: data.lowest_price || data.median_price,
+        median_price: data.median_price,
+        median: data.median_price,
+      };
+    }
+    return null;
   } catch (error) {
     console.error('Error getting price:', error);
     return null;
@@ -194,7 +203,8 @@ client.on('interactionCreate', async (interaction) => {
       );
       const prices = await Promise.all(pricePromises);
 
-      // Create embed
+      // Create embed with thumbnail from first item
+      const firstItem = itemsToShow[0];
       const embed = new EmbedBuilder()
         .setTitle('📋 Your Wishlist')
         .setDescription(`Showing ${itemsToShow.length} of ${wishlist.length} items`)
@@ -202,9 +212,14 @@ client.on('interactionCreate', async (interaction) => {
         .setTimestamp()
         .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
 
+      // Add thumbnail if first item has image
+      if (firstItem?.image) {
+        embed.setThumbnail(firstItem.image);
+      }
+
       const fields = itemsToShow.map((item, index) => {
         const price = prices[index];
-        const priceText = price?.lowest ? price.lowest : 'No price data';
+        const priceText = price?.lowest_price || price?.lowest || price?.median_price || 'No price data';
         const itemUrl = `https://skinvaults.vercel.app/item/${encodeURIComponent(item.market_hash_name || item.key)}`;
         
         return {
@@ -244,6 +259,12 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
 
+      // Get current prices for alerts
+      const pricePromises = alerts.slice(0, 10).map(alert => 
+        getItemPrice(alert.marketHashName, alert.currency)
+      );
+      const prices = await Promise.all(pricePromises);
+
       const embed = new EmbedBuilder()
         .setTitle('🔔 Your Price Alerts')
         .setDescription(`You have ${alerts.length} active price alert${alerts.length > 1 ? 's' : ''}`)
@@ -255,15 +276,35 @@ client.on('interactionCreate', async (interaction) => {
         const currency = alert.currency === '1' ? 'USD' : 'EUR';
         const symbol = alert.currency === '1' ? '$' : '€';
         const status = alert.triggered ? '✅ Triggered' : '⏳ Active';
+        const price = prices[index];
+        const currentPrice = price?.lowest_price || price?.lowest || price?.median_price || 'No price data';
+        const itemUrl = `https://skinvaults.vercel.app/item/${encodeURIComponent(alert.marketHashName)}`;
         
         return {
           name: `${index + 1}. ${alert.marketHashName}`,
-          value: `**Target:** ${condition} ${symbol}${alert.targetPrice.toFixed(2)}\n**Status:** ${status}`,
+          value: `💰 **Current:** ${currentPrice}\n🎯 **Target:** ${condition} ${symbol}${alert.targetPrice.toFixed(2)}\n**Status:** ${status}\n🔗 [View Item](${itemUrl})`,
           inline: false,
         };
       });
 
       embed.addFields(fields);
+
+      // Add thumbnail from first alert item if available
+      if (alerts.length > 0) {
+        // Try to get item image from API
+        try {
+          const firstAlert = alerts[0];
+          const itemResponse = await fetch(`${API_BASE_URL}/api/item/info?market_hash_name=${encodeURIComponent(firstAlert.marketHashName)}`);
+          if (itemResponse.ok) {
+            const itemData = await itemResponse.json();
+            if (itemData.image) {
+              embed.setThumbnail(itemData.image);
+            }
+          }
+        } catch (error) {
+          // Ignore errors getting image
+        }
+      }
 
       if (alerts.length > 10) {
         embed.setDescription(`Showing first 10 of ${alerts.length} alerts\n\nManage alerts: https://skinvaults.vercel.app/inventory`);
