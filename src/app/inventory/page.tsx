@@ -254,10 +254,18 @@ function InventoryContent() {
           clearTimeout(timeoutId);
           
           if (!res.ok) {
-            throw new Error(`API returned ${res.status}`);
+            const errorText = await res.text();
+            console.error(`Inventory API error (${res.status}):`, errorText);
+            throw new Error(`API returned ${res.status}: ${errorText}`);
           }
           
           const data: any = await res.json();
+          
+          // Check for error response
+          if (data?.error) {
+            console.error('Inventory API error:', data.error);
+            throw new Error(data.error);
+          }
           
           if (data?.descriptions) {
             const newItems = data.descriptions as InventoryItem[];
