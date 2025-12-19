@@ -191,6 +191,86 @@ async function getItemPrice(marketHashName, currency = '3') {
   }
 }
 
+// Fuzzy search for items
+async function searchItem(query) {
+  try {
+    // Try to fetch from the item database
+    const datasets = [
+      'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json',
+      'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/crates.json',
+      'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/stickers.json',
+      'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/agents.json',
+    ];
+
+    const queryLower = query.toLowerCase().trim();
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+
+    // Search through all datasets
+    for (const datasetUrl of datasets) {
+      try {
+        const response = await fetch(datasetUrl, { cache: 'force-cache' });
+        if (!response.ok) continue;
+        
+        const data = await response.json();
+        const items = Array.isArray(data) ? data : Object.values(data);
+        
+        // First try exact match
+        let found = items.find(item => {
+          const name = (item.market_hash_name || item.name || '').toLowerCase();
+          return name === queryLower;
+        });
+
+        if (found) {
+          return {
+            market_hash_name: found.market_hash_name || found.name,
+            name: found.name || found.market_hash_name,
+            image: found.image || found.icon_url,
+            id: found.id,
+          };
+        }
+
+        // Then try fuzzy match (all words must be in the name)
+        found = items.find(item => {
+          const name = (item.market_hash_name || item.name || '').toLowerCase();
+          return queryWords.every(word => name.includes(word));
+        });
+
+        if (found) {
+          return {
+            market_hash_name: found.market_hash_name || found.name,
+            name: found.name || found.market_hash_name,
+            image: found.image || found.icon_url,
+            id: found.id,
+          };
+        }
+
+        // Then try partial match (any word matches)
+        found = items.find(item => {
+          const name = (item.market_hash_name || item.name || '').toLowerCase();
+          return queryWords.some(word => name.includes(word));
+        });
+
+        if (found) {
+          return {
+            market_hash_name: found.market_hash_name || found.name,
+            name: found.name || found.market_hash_name,
+            image: found.image || found.icon_url,
+            id: found.id,
+          };
+        }
+      } catch (error) {
+        // Continue to next dataset
+        continue;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error searching item:', error);
+    return null;
+  }
+}
+
 // Get alerts for user
 async function getAlerts(steamId) {
   try {
@@ -351,43 +431,81 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'price') {
       await interaction.deferReply({ ephemeral: true });
 
-      const itemName = interaction.options.getString('item');
-      if (!itemName) {
+      const itemQuery = interaction.options.getString('item');
+      if (!itemQuery) {
         await interaction.editReply({
-          content: '❌ **Missing Item Name**\n\nPlease provide an item name. Example: `/price AK-47 | Redline (Field-Tested)`',
+          content: '❌ **Missing Item Name**\n\nPlease provide an item name. Example: `/price AK-47 | Redline (Field-Tested)` or `/price snakebite`',
         });
         return;
       }
 
+      // First try fuzzy search to find the item
+      const searchResult = await searchItem(itemQuery);
+      const itemName = searchResult?.market_hash_name || itemQuery;
+      const displayName = searchResult?.name || itemQuery;
+      const itemImage = searchResult?.image || null;
+      const itemId = searchResult?.id || null;
+
+      // Get price for the found item
       const price = await getItemPrice(itemName, '3');
       
       if (!price) {
-        await interaction.editReply({
-          content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemName}"\n\nMake sure the item name is correct. You can search for items on: https://skinvaults.vercel.app`,
-        });
-        return;
+        // If no price found, try to get item info from API
+        let itemInfo = null;
+        try {
+          const itemResponse = await fetch(`${API_BASE_URL}/api/item/info?market_hash_name=${encodeURIComponent(itemName)}`);
+          if (itemResponse.ok) {
+            itemInfo = await itemResponse.json();
+            if (itemInfo.image && !itemImage) {
+              itemImage = itemInfo.image;
+            }
+          }
+        } catch (error) {
+          // Ignore
+        }
+
+        if (!itemInfo && !searchResult) {
+          await interaction.editReply({
+            content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemQuery}"\n\n💡 **Tip:** Try a partial name like "snakebite" or "ak redline"\n\nSearch for items on: https://skinvaults.vercel.app`,
+          });
+          return;
+        }
       }
 
-      const priceText = price.lowest_price || price.lowest || price.median_price || 'No price data';
+      const priceText = price ? (price.lowest_price || price.lowest || price.median_price || 'No price data') : 'No price data';
+      const itemUrl = itemId 
+        ? `https://skinvaults.vercel.app/item/${encodeURIComponent(itemId)}`
+        : `https://skinvaults.vercel.app/item/${encodeURIComponent(itemName)}`;
+
       const embed = new EmbedBuilder()
-        .setTitle(`💰 ${itemName}`)
+        .setTitle(`💰 ${displayName}`)
         .setDescription(`**Current Price:** ${priceText}`)
         .setColor(0x5865F2)
-        .setURL(`https://skinvaults.vercel.app/item/${encodeURIComponent(itemName)}`)
+        .setURL(itemUrl)
         .setTimestamp()
         .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
 
-      // Try to get item image
-      try {
-        const itemResponse = await fetch(`${API_BASE_URL}/api/item/info?market_hash_name=${encodeURIComponent(itemName)}`);
-        if (itemResponse.ok) {
-          const itemData = await itemResponse.json();
-          if (itemData.image) {
-            embed.setThumbnail(itemData.image);
+      // Set image if available
+      if (itemImage) {
+        embed.setThumbnail(itemImage);
+      } else {
+        // Try to get image from item info API
+        try {
+          const itemResponse = await fetch(`${API_BASE_URL}/api/item/info?market_hash_name=${encodeURIComponent(itemName)}`);
+          if (itemResponse.ok) {
+            const itemData = await itemResponse.json();
+            if (itemData.image) {
+              embed.setThumbnail(itemData.image);
+            }
           }
+        } catch (error) {
+          // Ignore errors getting image
         }
-      } catch (error) {
-        // Ignore errors getting image
+      }
+
+      // If fuzzy search found a different item, mention it
+      if (searchResult && searchResult.market_hash_name !== itemQuery) {
+        embed.setDescription(`**Current Price:** ${priceText}\n\n*Found: "${displayName}"*`);
       }
 
       await interaction.editReply({ embeds: [embed] });
