@@ -324,70 +324,97 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                   3D
                 </button>
               </div>
-              <button
-                onClick={() => {
-                  const result = toggleWishlistEntry(
-                    {
-                      key: wishlistKey,
-                      name: item.name,
-                      image: item.image,
-                      market_hash_name: (item as any).market_hash_name,
-                      rarityName: item.rarity?.name,
-                      rarityColor: item.rarity?.color,
-                      weaponName: item.weapon?.name,
-                    },
-                    steamId,
-                    isPro,
-                  );
-                  if (result.success) {
-                    setWishlist(result.newList);
-                  } else if (result.reason === 'limit_reached') {
-                    setShowUpgradeModal(true);
-                  }
-                }}
-                className="absolute bottom-4 right-4 md:hidden inline-flex items-center justify-center p-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
-                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-              >
-                <Heart
-                  size={16}
-                  className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'}
-                />
-              </button>
+              <div className="absolute bottom-4 right-4 md:hidden flex items-center gap-2 z-20">
+                {/* Price Tracker Button (Mobile) */}
+                {user && (
+                  <button
+                    onClick={() => setShowTrackerModal(true)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                    aria-label="Set price tracker"
+                  >
+                    <Bell size={14} className="text-blue-400" />
+                  </button>
+                )}
+                {/* Wishlist Button (Mobile) */}
+                <button
+                  onClick={() => {
+                    const result = toggleWishlistEntry(
+                      {
+                        key: wishlistKey,
+                        name: item.name,
+                        image: item.image,
+                        market_hash_name: (item as any).market_hash_name,
+                        rarityName: item.rarity?.name,
+                        rarityColor: item.rarity?.color,
+                        weaponName: item.weapon?.name,
+                      },
+                      steamId,
+                      isPro,
+                    );
+                    if (result.success) {
+                      setWishlist(result.newList);
+                    } else if (result.reason === 'limit_reached') {
+                      setShowUpgradeModal(true);
+                    }
+                  }}
+                  className="inline-flex items-center justify-center p-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all"
+                  aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  <Heart
+                    size={16}
+                    className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'}
+                  />
+                </button>
+              </div>
               </div>
             </div>
 
             <div className="lg:col-span-7 space-y-6 md:space-y-8">
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
-              <button
-                onClick={() => {
-                  const result = toggleWishlistEntry(
-                    {
-                      key: wishlistKey,
-                      name: item.name,
-                      image: item.image,
-                      market_hash_name: (item as any).market_hash_name,
-                      rarityName: item.rarity?.name,
-                      rarityColor: item.rarity?.color,
-                      weaponName: item.weapon?.name,
-                    },
-                    steamId,
-                    isPro,
-                  );
-                  if (result.success) {
-                    setWishlist(result.newList);
-                  } else if (result.reason === 'limit_reached') {
-                    setShowUpgradeModal(true);
-                  }
-                }}
-                className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0"
-                aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-              >
-                <Heart
-                  size={18}
-                  className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-500'}
-                />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Price Tracker Button */}
+                {user && (
+                  <button
+                    onClick={() => setShowTrackerModal(true)}
+                    className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0"
+                    aria-label="Set price tracker"
+                  >
+                    <Bell size={18} className="text-blue-400" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Tracker</span>
+                  </button>
+                )}
+                {/* Wishlist Button */}
+                <button
+                  onClick={() => {
+                    const result = toggleWishlistEntry(
+                      {
+                        key: wishlistKey,
+                        name: item.name,
+                        image: item.image,
+                        market_hash_name: (item as any).market_hash_name,
+                        rarityName: item.rarity?.name,
+                        rarityColor: item.rarity?.color,
+                        weaponName: item.weapon?.name,
+                      },
+                      steamId,
+                      isPro,
+                    );
+                    if (result.success) {
+                      setWishlist(result.newList);
+                    } else if (result.reason === 'limit_reached') {
+                      setShowUpgradeModal(true);
+                    }
+                  }}
+                  className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0"
+                  aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  <Heart
+                    size={18}
+                    className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-500'}
+                  />
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">

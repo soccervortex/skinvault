@@ -601,15 +601,38 @@ function InventoryContent() {
                       </div>
                     )}
                   </div>
-                  {/* Manage Button (only for own profile) */}
+                  {/* Action Buttons (only for own profile) */}
                   {loggedInUser?.steamId === viewedUser?.steamId && (
-                    <button
-                      onClick={() => setShowManageTrackers(true)}
-                      className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all mt-3 md:mt-4"
-                    >
-                      <Settings size={12} />
-                      Manage Trackers
-                    </button>
+                    <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
+                      {/* Connect Discord Button */}
+                      {!discordStatus?.connected && (
+                        <button
+                          onClick={() => {
+                            if (!loggedInUser?.steamId) return;
+                            fetch(`/api/discord/auth?steamId=${loggedInUser.steamId}`)
+                              .then(res => res.json())
+                              .then(data => {
+                                if (data.authUrl) {
+                                  window.location.href = data.authUrl;
+                                }
+                              })
+                              .catch(console.error);
+                          }}
+                          className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          <MessageSquare size={12} />
+                          Connect Discord
+                        </button>
+                      )}
+                      {/* Manage Trackers Button */}
+                      <button
+                        onClick={() => setShowManageTrackers(true)}
+                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        <Settings size={12} />
+                        Manage Trackers
+                      </button>
+                    </div>
                   )}
                   <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
                     <button
