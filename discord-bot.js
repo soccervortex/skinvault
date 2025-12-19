@@ -65,6 +65,17 @@ const commands = [
         .setDescription('Steam64 ID, Discord username, or Steam username')
         .setRequired(true)
     )
+    .addStringOption(option =>
+      option.setName('platform')
+        .setDescription('Platform to search on (optional, auto-detects if not specified)')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Steam64 ID', value: 'steam64' },
+          { name: 'Steam Username', value: 'steam' },
+          { name: 'Discord Username', value: 'discord_username' },
+          { name: 'Discord ID', value: 'discord_id' }
+        )
+    )
     .toJSON(),
   new SlashCommandBuilder()
     .setName('compare')
