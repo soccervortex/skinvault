@@ -10,18 +10,39 @@ import { getWishlistLimit, getWishlistBatchSize } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 const PROXY_LIST = [
-  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url: string) => `https://yacdn.org/proxy/${url}`,
 ];
 
-const fetchWithRotation = async (steamUrl: string) => {
+const fetchWithRotation = async (steamUrl: string, retryCount: number = 0): Promise<any> => {
   // try proxies sequentially to avoid noisy errors in dev
   for (let i = 0; i < PROXY_LIST.length; i++) {
     try {
       const proxyUrl = PROXY_LIST[i](steamUrl);
-      const res = await fetch(proxyUrl, { cache: 'no-store' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      
+      const res = await fetch(proxyUrl, { 
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+
+      // Handle retry for rate limits and timeouts
+      if (res.status === 429 || res.status === 408) {
+        const errorMsg = res.status === 429 ? 'Rate limit (429)' : 'Timeout (408)';
+        console.warn(`Proxy ${i} ${errorMsg}, retrying...`);
+        
+        if (retryCount === 0) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return fetchWithRotation(steamUrl, retryCount + 1);
+        }
+        continue; // Try next proxy
+      }
+
       if (!res.ok) continue;
 
       let data: any;
@@ -29,16 +50,23 @@ const fetchWithRotation = async (steamUrl: string) => {
 
       try {
         const json = JSON.parse(text);
-        const wrapped = (json as any).contents;
-        data = typeof wrapped === 'string' ? JSON.parse(wrapped) : wrapped || json;
+        // Handle different proxy response formats (no more allorigins.win)
+        data = json;
       } catch {
-        data = JSON.parse(text);
+        try {
+          data = JSON.parse(text);
+        } catch {
+          continue; // Invalid JSON, try next proxy
+        }
       }
 
       if (data && (data.success || data.lowest_price || data.median_price)) {
         return data;
       }
-    } catch {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.warn(`Proxy ${i} timeout/aborted`);
+      }
       // swallow individual proxy errors; we'll fall back to next
     }
   }

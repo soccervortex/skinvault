@@ -62,6 +62,24 @@ CS_INVENTORY_API_KEY=your_cs_inventory_api_key_here
 
 # CSGO Empire API: https://csgoempire.com/trading/apikey
 CSGO_EMPIRE_API_KEY=your_csgo_empire_api_key_here
+
+# SteamApis: https://steamapis.com
+STEAMAPIS_KEY=your_steamapis_key_here
+```
+
+### Scraping Service API Keys (for reliable proxy services)
+```env
+# ScraperAPI: https://www.scraperapi.com
+SCRAPERAPI_KEY_1=f954ef2d72fbb57dec5d9a8f1c6fd870
+
+# ZenRows: https://www.zenrows.com
+ZENROWS_API_KEY=54e690af65971d3121cb5f6564f587054b4e3b31
+
+# ScrapingAnt: https://www.scrapingant.com
+SCRAPINGANT_API_KEY_1=33ba01076eb14ecda75b23cb7d6eb95a
+SCRAPINGANT_API_KEY_2=94948a3cd6c24d72844137d152942697
+SCRAPINGANT_API_KEY_3=59ce5beb2c3a49aeb6b4cc8221213b1b
+SCRAPINGANT_API_KEY_4=95ce666ac8664988a3130f2a02929cf9
 ```
 
 ## For Vercel Production

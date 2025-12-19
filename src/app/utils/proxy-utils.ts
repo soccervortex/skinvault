@@ -1,19 +1,27 @@
 // Proxy utilities with Pro-based proxy selection
 // Free users: 3 proxies, Pro users: 10 proxies
 
-// All available free proxies (10 total)
-export const ALL_PROXIES = [
-  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+// Get scraping service proxies (server-side only, uses env vars)
+function getScrapingProxies(): Array<(url: string) => string> {
+  const proxies: Array<(url: string) => string> = [];
+  
+  // Note: These require server-side environment variables
+  // For client-side, we'll use fallback proxies
+  
+  return proxies;
+}
+
+// Fallback free proxies (used when scraping services unavailable)
+const FALLBACK_PROXIES = [
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url: string) => `https://cors-anywhere.herokuapp.com/${url}`,
   (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   (url: string) => `https://yacdn.org/proxy/${url}`,
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}&_nocache=1`,
-  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_nocache=1`,
-  (url: string) => `https://thingproxy.freeboard.io/fetch/${url}?_nocache=1`,
 ];
+
+// All available proxies (client-side uses fallbacks, server-side can use scraping services)
+export const ALL_PROXIES = [...getScrapingProxies(), ...FALLBACK_PROXIES];
 
 // Get proxy list based on Pro status
 export function getProxyList(isPro: boolean): Array<(url: string) => string> {
@@ -97,31 +105,80 @@ export async function fetchWithProxyRotation(
   const proxyList = getProxyList(isPro);
   const { parallel = false } = options;
 
+  // Helper function to fetch with retry logic
+  const fetchWithRetry = async (proxyUrl: string, retryCount: number = 0): Promise<any> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    
+    try {
+      const res = await fetch(proxyUrl, { 
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+      
+      clearTimeout(timeoutId);
+
+      // Handle specific error codes with retry
+      if (res.status === 429 || res.status === 408) {
+        const errorMsg = res.status === 429 ? 'Rate limit (429)' : 'Timeout (408)';
+        console.warn(`${errorMsg} on ${proxyUrl}, retrying...`);
+        
+        // Wait 2 seconds and retry once
+        if (retryCount === 0) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return fetchWithRetry(proxyUrl, retryCount + 1);
+        }
+        throw new Error(`${errorMsg} after retry`);
+      }
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      let data: any;
+      const text = await res.text();
+
+      try {
+        const json = JSON.parse(text);
+        // Handle different proxy response formats
+        const wrapped = (json as any).contents;
+        data = typeof wrapped === 'string' ? JSON.parse(wrapped) : (wrapped || json);
+      } catch {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error('Invalid JSON response');
+        }
+      }
+
+      if (data && (data.success || data.lowest_price || data.median_price || data.descriptions)) {
+        return data;
+      }
+      throw new Error('No valid data in response');
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      // Log specific error types
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout/aborted');
+      } else if (error.message?.includes('429') || error.message?.includes('408')) {
+        throw error; // Already handled retry
+      }
+      throw error;
+    }
+  };
+
   if (parallel) {
     // Parallel approach: try all proxies at once, return first success
     const attempts = proxyList.map(async (buildUrl, index) => {
       try {
         const proxyUrl = buildUrl(steamUrl);
-        const res = await fetch(proxyUrl, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`Proxy ${index} status ${res.status}`);
-
-        let data: any;
-        const text = await res.text();
-
-        try {
-          const json = JSON.parse(text);
-          const wrapped = (json as any).contents;
-          data = typeof wrapped === 'string' ? JSON.parse(wrapped) : (wrapped || json);
-        } catch {
-          data = JSON.parse(text);
-        }
-
-        if (data && (data.success || data.lowest_price || data.median_price || data.descriptions)) {
-          return data;
-        }
-        throw new Error(`Proxy ${index} no valid data`);
-      } catch (e) {
-        console.warn(`Price proxy ${index} failed`, e);
+        return await fetchWithRetry(proxyUrl);
+      } catch (e: any) {
+        console.warn(`Price proxy ${index} failed:`, e.message || e);
         throw e;
       }
     });
@@ -133,29 +190,18 @@ export async function fetchWithProxyRotation(
       return null;
     }
   } else {
-    // Sequential approach: try proxies one by one
+    // Sequential approach: try proxies one by one with retry
     for (let i = 0; i < proxyList.length; i++) {
       try {
         const proxyUrl = proxyList[i](steamUrl);
-        const res = await fetch(proxyUrl, { cache: 'no-store' });
-        if (!res.ok) continue;
-
-        let data: any;
-        const text = await res.text();
-
-        try {
-          const json = JSON.parse(text);
-          const wrapped = (json as any).contents;
-          data = typeof wrapped === 'string' ? JSON.parse(wrapped) : (wrapped || json);
-        } catch {
-          data = JSON.parse(text);
+        const data = await fetchWithRetry(proxyUrl);
+        if (data) return data;
+      } catch (error: any) {
+        // Log error but continue to next proxy
+        if (error.message?.includes('429') || error.message?.includes('408')) {
+          console.warn(`Proxy ${i} ${error.message}, trying next...`);
         }
-
-        if (data && (data.success || data.lowest_price || data.median_price || data.descriptions)) {
-          return data;
-        }
-      } catch {
-        // swallow individual proxy errors; we'll fall back to next
+        // Continue to next proxy
       }
     }
     return null;

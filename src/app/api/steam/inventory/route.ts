@@ -1,40 +1,96 @@
 import { NextResponse } from 'next/server';
 
-// Proxy endpoints for fetching Steam inventory (server-side to avoid CORS)
-const PROXIES = [
-  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+// Scraping service proxies (more reliable than free proxies)
+function getScrapingProxies(): Array<(url: string) => string> {
+  const proxies: Array<(url: string) => string> = [];
+  
+  // ScraperAPI
+  const scraperApiKey = process.env.SCRAPERAPI_KEY_1;
+  if (scraperApiKey) {
+    proxies.push((url: string) => 
+      `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}`
+    );
+  }
+  
+  // ZenRows
+  const zenRowsKey = process.env.ZENROWS_API_KEY;
+  if (zenRowsKey) {
+    proxies.push((url: string) => 
+      `https://api.zenrows.com/v1/?apikey=${zenRowsKey}&url=${encodeURIComponent(url)}`
+    );
+  }
+  
+  // ScrapingAnt (multiple keys for rotation)
+  const scrapingAntKeys = [
+    process.env.SCRAPINGANT_API_KEY_1,
+    process.env.SCRAPINGANT_API_KEY_2,
+    process.env.SCRAPINGANT_API_KEY_3,
+    process.env.SCRAPINGANT_API_KEY_4,
+  ].filter(Boolean);
+  
+  scrapingAntKeys.forEach((key) => {
+    if (key) {
+      proxies.push((url: string) => 
+        `https://api.scrapingant.com/v2/general?url=${encodeURIComponent(url)}&x-api-key=${key}`
+      );
+    }
+  });
+  
+  return proxies;
+}
+
+// Fallback free proxies (used if scraping services fail)
+const FALLBACK_PROXIES = [
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   (url: string) => `https://yacdn.org/proxy/${url}`,
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}&_nocache=1`,
-  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_nocache=1`,
-  (url: string) => `https://thingproxy.freeboard.io/fetch/${url}?_nocache=1`,
-  // Additional proxies for better reliability
-  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}&_nocache=1`,
-  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}&_t=${Date.now()}`,
 ];
 
-async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any> {
-  if (proxyIndex >= PROXIES.length) {
+// Get all proxies (scraping services first, then fallbacks)
+function getAllProxies(): Array<(url: string) => string> {
+  return [...getScrapingProxies(), ...FALLBACK_PROXIES];
+}
+
+async function fetchWithProxy(
+  url: string, 
+  proxyIndex: number = 0, 
+  retryCount: number = 0,
+  proxyList: Array<(url: string) => string> = getAllProxies()
+): Promise<any> {
+  if (proxyIndex >= proxyList.length) {
     throw new Error('All proxies failed');
   }
 
-  const proxyUrl = PROXIES[proxyIndex](url);
+  const proxyUrl = proxyList[proxyIndex](url);
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
   
   try {
     const response = await fetch(proxyUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
+
+    // Handle specific error codes with retry logic
+    if (response.status === 429 || response.status === 408) {
+      const errorMsg = response.status === 429 ? 'Rate limit (429)' : 'Timeout (408)';
+      console.warn(`Proxy ${proxyIndex} ${errorMsg}, retrying...`);
+      
+      // Wait 2 seconds and retry once
+      if (retryCount === 0) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return fetchWithProxy(url, proxyIndex, retryCount + 1, proxyList);
+      }
+      // If retry also failed, try next proxy
+      throw new Error(`${errorMsg} after retry`);
+    }
 
     if (!response.ok) {
       throw new Error(`Proxy ${proxyIndex} returned ${response.status}`);
@@ -43,26 +99,63 @@ async function fetchWithProxy(url: string, proxyIndex: number = 0): Promise<any>
     const text = await response.text();
     
     // Handle different proxy response formats
-    if (proxyUrl.includes('allorigins.win')) {
-      try {
-        const json = JSON.parse(text);
-        if (json.contents) {
-          return JSON.parse(json.contents);
+    let data: any;
+    try {
+      const json = JSON.parse(text);
+      
+      // ScrapingAnt returns data in 'content' field
+      if (json.content) {
+        try {
+          data = JSON.parse(json.content);
+        } catch {
+          data = json.content; // Might be HTML/text
         }
-        return json;
+      }
+      // ScraperAPI returns direct content
+      else if (json.body) {
+        try {
+          data = JSON.parse(json.body);
+        } catch {
+          data = json.body;
+        }
+      }
+      // ZenRows returns direct content
+      else if (json.html || json.text) {
+        try {
+          data = JSON.parse(json.html || json.text);
+        } catch {
+          data = json;
+        }
+      }
+      // Standard JSON response
+      else {
+        data = json;
+      }
+    } catch {
+      // If parsing fails, try direct JSON
+      try {
+        data = JSON.parse(text);
       } catch {
-        // If parsing fails, try direct JSON
-        return JSON.parse(text);
+        throw new Error('Invalid JSON response');
       }
     }
     
-    // Direct JSON response
-    return JSON.parse(text);
-  } catch (error) {
+    return data;
+  } catch (error: any) {
     clearTimeout(timeoutId);
+    
+    // Log specific error types
+    if (error.name === 'AbortError') {
+      console.warn(`Proxy ${proxyIndex} timeout/aborted`);
+    } else if (error.message?.includes('429') || error.message?.includes('408')) {
+      console.warn(`Proxy ${proxyIndex} ${error.message}`);
+    } else {
+      console.warn(`Proxy ${proxyIndex} error:`, error.message || error);
+    }
+    
     // Try next proxy if not the last one
-    if (proxyIndex + 1 < PROXIES.length) {
-      return fetchWithProxy(url, proxyIndex + 1);
+    if (proxyIndex + 1 < proxyList.length) {
+      return fetchWithProxy(url, proxyIndex + 1, 0, proxyList);
     }
     throw error;
   }
@@ -310,8 +403,9 @@ export async function GET(request: Request) {
     }
 
     // Use more proxies for Pro users
-    const maxProxies = isPro ? PROXIES.length : 3;
-    const proxyList = PROXIES.slice(0, maxProxies);
+    const allProxies = getAllProxies();
+    const maxProxies = isPro ? allProxies.length : Math.min(3, allProxies.length);
+    const proxyList = allProxies.slice(0, maxProxies);
 
     // Try proxies sequentially
     let lastError: any = null;
