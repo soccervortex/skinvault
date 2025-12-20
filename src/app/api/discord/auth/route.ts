@@ -24,22 +24,22 @@ export async function GET(request: Request) {
     })).toString('base64');
 
     // Discord OAuth2 scopes for user installs
-    // Note: For user installs, we only need 'identify' to get user info
-    // The bot itself is installed separately via user install flow
-    // 'guilds' is not needed for user installs (only for server installs)
-    const scopes = ['identify'];
+    // Using 'identify' and 'applications.commands' for user installs
+    // integration_type=1 indicates this is a user install (not guild install)
+    const scopes = ['identify', 'applications.commands'];
     
     console.log('[Discord Auth] Generating OAuth URL for user install with scopes:', scopes.join(' '));
     
-    // Build authorization URL
-    const authUrl = `https://discord.com/api/oauth2/authorize?` +
+    // Build authorization URL with integration_type=1 for user installs
+    const authUrl = `https://discord.com/oauth2/authorize?` +
       `client_id=${DISCORD_CLIENT_ID}&` +
-      `redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&` +
       `response_type=code&` +
+      `redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&` +
       `scope=${encodeURIComponent(scopes.join(' '))}&` +
+      `integration_type=1&` +
       `state=${encodeURIComponent(state)}`;
     
-    console.log('[Discord Auth] Generated auth URL (redirect_uri hidden for security)');
+    console.log('[Discord Auth] Generated auth URL with integration_type=1 (user install)');
 
     return NextResponse.json({ authUrl });
   } catch (error) {
