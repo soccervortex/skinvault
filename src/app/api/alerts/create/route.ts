@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import { getProUntil } from '@/app/utils/pro-storage';
-import { getUserGiftReward } from '@/app/utils/gift-storage';
-import type { ThemeType } from '@/app/utils/theme-storage';
 
 interface PriceAlert {
   id: string;
@@ -25,23 +23,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if user is Pro (for unlimited alerts)
+    // Check if user is Pro - Discord alerts require Pro subscription
     const proUntil = await getProUntil(steamId);
     const isPro = proUntil && new Date(proUntil) > new Date();
     
-    // Free users can have max 5 alerts (plus rewards), Pro users unlimited
-    let maxAlerts = isPro ? Infinity : 5;
-    
-    // Check for extra price trackers from rewards (check all themes)
     if (!isPro) {
-      const themes: ThemeType[] = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
-      for (const theme of themes) {
-        const reward = await getUserGiftReward(steamId, theme);
-        if (reward?.type === 'price_tracker_free' && reward?.value) {
-          maxAlerts += reward.value;
-        }
-      }
+      return NextResponse.json({ 
+        error: 'Pro subscription required. Discord price alerts are a Pro feature. Please upgrade to Pro to use this feature.',
+        requiresPro: true
+      }, { status: 403 });
     }
+    
+    // Pro users have unlimited alerts
+    const maxAlerts = Infinity;
     
     // Check current alert count
     const alertsKey = 'price_alerts';
@@ -50,22 +44,23 @@ export async function POST(request: Request) {
     
     if (userAlerts.length >= maxAlerts) {
       return NextResponse.json({ 
-        error: isPro 
-          ? 'Failed to create alert' 
-          : `You've reached the free tier limit of ${maxAlerts} price trackers. Upgrade to Pro for unlimited trackers.`,
+        error: 'Failed to create alert',
         limitReached: true,
         maxAlerts,
         currentCount: userAlerts.length,
       }, { status: 403 });
     }
 
-    // Check Discord connection
+    // Check Discord connection (Pro already verified above)
     const discordConnectionsKey = 'discord_connections';
     const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
     const connection = connections[steamId];
 
     if (!connection || (connection.expiresAt && Date.now() > connection.expiresAt)) {
-      return NextResponse.json({ error: 'Discord not connected or expired. Please connect Discord to receive price alerts.' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Discord not connected or expired. Pro subscription is required and Discord must be connected to receive price alerts.',
+        requiresPro: true
+      }, { status: 400 });
     }
 
     // Create alert

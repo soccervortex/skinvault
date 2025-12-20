@@ -116,18 +116,21 @@ export async function GET(request: Request) {
       
       const welcomeMessage = `🎉 **Thanks for connecting to SkinVault Bot!**
 
+**⚠️ IMPORTANT:** Discord bot features require an active **Pro subscription**. If your Pro subscription expires, Discord features will be disabled.
+
 You can now:
 • Set **price alerts** for CS2 skins
 • Receive notifications when prices hit your target
 • Use **/wishlist** to view your tracked items
+• Use **/vault** to view your total vault value
 • Manage alerts from your profile on skinvaults.vercel.app
 
-**Commands:**
+**Commands (Pro Required):**
 \`/wishlist\` - View your wishlist with prices
-\`/price\` - Check the price of a skin
 \`/vault\` - View your total vault value
-\`/stats\` - View your CS2 statistics
 \`/help\` - Get help with commands
+
+**Note:** All Discord bot commands require Pro. Upgrade at skinvaults.vercel.app/pro
 
 Happy trading! 🚀`;
       

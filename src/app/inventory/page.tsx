@@ -636,21 +636,27 @@ function InventoryContent() {
     }
   }, [viewedUser]);
 
-  // Load Discord status for viewed user (publicly visible)
+  // Load Discord status for viewed user (only show if Pro)
   useEffect(() => {
     if (!viewedUser?.steamId) {
       setDiscordStatus(null);
       return;
     }
     
+    // Only check Discord status if user is Pro
+    if (!isPro) {
+      setDiscordStatus({ connected: false, requiresPro: true });
+      return;
+    }
+    
     fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        // Ensure we set connected status correctly
-        setDiscordStatus(data?.connected ? data : { connected: false });
+        // Ensure we set connected status correctly - only show if Pro and connected
+        setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: true });
       })
-      .catch(() => setDiscordStatus({ connected: false }));
-  }, [viewedUser?.steamId]);
+      .catch(() => setDiscordStatus({ connected: false, requiresPro: true }));
+  }, [viewedUser?.steamId, isPro]);
 
   const totalVaultValue = useMemo(() => {
     // Always return a valid number, never Infinity
@@ -786,8 +792,8 @@ function InventoryContent() {
                         Pro
                       </span>
                     )}
-                    {/* Discord Connection Status (Publicly Visible) */}
-                    {discordStatus?.connected && (
+                    {/* Discord Connection Status (Only show if Pro AND connected) */}
+                    {isPro && discordStatus?.connected && (
                       <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 border border-indigo-500/40 shrink-0">
                         <MessageSquare size={10} className="text-indigo-400" />
                         <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
@@ -799,49 +805,51 @@ function InventoryContent() {
                   {/* Action Buttons (only for own profile) */}
                   {loggedInUser?.steamId === viewedUser?.steamId && (
                     <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
-                      {/* Connect/Disconnect Discord Button */}
-                      {!discordStatus?.connected ? (
-                        <button
-                          onClick={() => {
-                            if (!loggedInUser?.steamId) return;
-                            fetch(`/api/discord/auth?steamId=${loggedInUser.steamId}`)
-                              .then(res => res.json())
-                              .then(data => {
-                                if (data.authUrl) {
-                                  window.location.href = data.authUrl;
+                      {/* Connect/Disconnect Discord Button (Only show if Pro) */}
+                      {isPro && (
+                        !discordStatus?.connected ? (
+                          <button
+                            onClick={() => {
+                              if (!loggedInUser?.steamId) return;
+                              fetch(`/api/discord/auth?steamId=${loggedInUser.steamId}`)
+                                .then(res => res.json())
+                                .then(data => {
+                                  if (data.authUrl) {
+                                    window.location.href = data.authUrl;
+                                  }
+                                })
+                                .catch(console.error);
+                            }}
+                            className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            <MessageSquare size={12} />
+                            Connect Discord
+                          </button>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              if (!loggedInUser?.steamId) return;
+                              try {
+                                const res = await fetch('/api/discord/disconnect', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ steamId: loggedInUser.steamId }),
+                                });
+                                if (res.ok) {
+                                  setDiscordStatus({ connected: false });
+                                  // Refresh page to update UI
+                                  window.location.reload();
                                 }
-                              })
-                              .catch(console.error);
-                          }}
-                          className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                          <MessageSquare size={12} />
-                          Connect Discord
-                        </button>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            if (!loggedInUser?.steamId) return;
-                            try {
-                              const res = await fetch('/api/discord/disconnect', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ steamId: loggedInUser.steamId }),
-                              });
-                              if (res.ok) {
-                                setDiscordStatus({ connected: false });
-                                // Refresh page to update UI
-                                window.location.reload();
+                              } catch (error) {
+                                console.error('Failed to disconnect Discord:', error);
                               }
-                            } catch (error) {
-                              console.error('Failed to disconnect Discord:', error);
-                            }
-                          }}
-                          className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                          <MessageSquare size={12} />
-                          Disconnect Discord
-                        </button>
+                            }}
+                            className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            <MessageSquare size={12} />
+                            Disconnect Discord
+                          </button>
+                        )
                       )}
                       {/* Manage Trackers Button */}
                       <button
