@@ -240,11 +240,16 @@ export function saveReward(reward: Reward, theme: ThemeType): void {
   if (typeof window === 'undefined') return;
   
   try {
+    // Test if localStorage is accessible
+    const testKey = '__localStorage_test__';
+    window.localStorage.setItem(testKey, 'test');
+    window.localStorage.removeItem(testKey);
+    
     // Use theme-specific key for consistency with getStoredRewards fallback
     const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
     const storageKey = `sv_${theme}_rewards_${year}`;
     
-    const existing = localStorage.getItem(storageKey);
+    const existing = window.localStorage.getItem(storageKey);
     const rewards: StoredReward[] = existing ? JSON.parse(existing) : [];
     
     // Permanent rewards (wishlist_extra_slots, price_tracker_free) should never expire
@@ -259,9 +264,10 @@ export function saveReward(reward: Reward, theme: ThemeType): void {
     };
     
     rewards.push(stored);
-    localStorage.setItem(storageKey, JSON.stringify(rewards));
+    window.localStorage.setItem(storageKey, JSON.stringify(rewards));
   } catch (e) {
-    console.error('Failed to save reward:', e);
+    // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
+    // Don't log to avoid console noise in production
   }
 }
 
@@ -269,11 +275,16 @@ export function getStoredRewards(theme?: ThemeType): StoredReward[] {
   if (typeof window === 'undefined') return [];
   
   try {
+    // Test if localStorage is accessible
+    const testKey = '__localStorage_test__';
+    window.localStorage.setItem(testKey, 'test');
+    window.localStorage.removeItem(testKey);
+    
     // If theme is specified, only get rewards for that theme
     if (theme) {
       const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
       const storageKey = `sv_${theme}_rewards_${year}`;
-      const existing = localStorage.getItem(storageKey);
+      const existing = window.localStorage.getItem(storageKey);
       if (!existing) return [];
       
       const rewards: StoredReward[] = JSON.parse(existing);
@@ -290,39 +301,65 @@ export function getStoredRewards(theme?: ThemeType): StoredReward[] {
     const allRewards: StoredReward[] = [];
     
     themes.forEach(t => {
-      const year = t === 'christmas' || t === 'oldyear' ? '2025' : '2026';
-      const storageKey = `sv_${t}_rewards_${year}`;
-      const existing = localStorage.getItem(storageKey);
-      if (existing) {
-        try {
-          const rewards: StoredReward[] = JSON.parse(existing);
-          const now = Date.now();
-          // Permanent rewards should never be filtered out
-          rewards.forEach(r => {
-            const isPermanent = r.reward?.type === 'wishlist_extra_slots' || r.reward?.type === 'price_tracker_free';
-            if (isPermanent || !r.expiresAt || r.expiresAt > now) {
-              allRewards.push(r);
-            }
-          });
-        } catch {
-          // Skip invalid JSON
+      try {
+        const year = t === 'christmas' || t === 'oldyear' ? '2025' : '2026';
+        const storageKey = `sv_${t}_rewards_${year}`;
+        const existing = window.localStorage.getItem(storageKey);
+        if (existing) {
+          try {
+            const rewards: StoredReward[] = JSON.parse(existing);
+            const now = Date.now();
+            // Permanent rewards should never be filtered out
+            rewards.forEach(r => {
+              const isPermanent = r.reward?.type === 'wishlist_extra_slots' || r.reward?.type === 'price_tracker_free';
+              if (isPermanent || !r.expiresAt || r.expiresAt > now) {
+                allRewards.push(r);
+              }
+            });
+          } catch {
+            // Skip invalid JSON
+          }
         }
+      } catch {
+        // Skip this theme if localStorage access fails
       }
     });
     
     return allRewards;
   } catch (e) {
+    // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
     return [];
   }
 }
 
 export function hasClaimedGift(theme: ThemeType): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem(`sv_${theme}_gift_claimed_2025`) === 'true';
+  try {
+    // Test if localStorage is accessible
+    const testKey = '__localStorage_test__';
+    window.localStorage.setItem(testKey, 'test');
+    window.localStorage.removeItem(testKey);
+    
+    const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+    return window.localStorage.getItem(`sv_${theme}_gift_claimed_${year}`) === 'true';
+  } catch {
+    // Ignore localStorage errors
+    return false;
+  }
 }
 
 export function markGiftClaimed(theme: ThemeType): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(`sv_${theme}_gift_claimed_2025`, 'true');
+  try {
+    // Test if localStorage is accessible
+    const testKey = '__localStorage_test__';
+    window.localStorage.setItem(testKey, 'test');
+    window.localStorage.removeItem(testKey);
+    
+    const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+    window.localStorage.setItem(`sv_${theme}_gift_claimed_${year}`, 'true');
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 

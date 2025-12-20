@@ -269,29 +269,38 @@ export function getPriceTrackerLimitSync(isProUser: boolean): number {
   } else if (typeof window !== 'undefined') {
     // Fallback to localStorage if cache is empty (for immediate use before API loads)
     try {
+      // Check if localStorage is accessible
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
       const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
       themes.forEach(theme => {
-        const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
-        const key = `sv_${theme}_rewards_${year}`;
-        const rewardsStr = localStorage.getItem(key);
-        if (rewardsStr) {
-          try {
-            const rewards = JSON.parse(rewardsStr);
-            if (Array.isArray(rewards)) {
-              rewards.forEach((stored: any) => {
-                const reward = stored.reward || stored;
-                if (reward?.type === 'price_tracker_free' && reward?.value) {
-                  extraTrackers += reward.value;
-                }
-              });
+        try {
+          const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+          const key = `sv_${theme}_rewards_${year}`;
+          const rewardsStr = window.localStorage.getItem(key);
+          if (rewardsStr) {
+            try {
+              const rewards = JSON.parse(rewardsStr);
+              if (Array.isArray(rewards)) {
+                rewards.forEach((stored: any) => {
+                  const reward = stored.reward || stored;
+                  if (reward?.type === 'price_tracker_free' && reward?.value) {
+                    extraTrackers += reward.value;
+                  }
+                });
+              }
+            } catch {
+              // Skip invalid JSON
             }
-          } catch {
-            // Skip invalid JSON
           }
+        } catch {
+          // Skip this theme if localStorage access fails
         }
       });
     } catch {
-      // Ignore errors
+      // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
     }
   }
   
