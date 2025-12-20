@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./christmas-theme.css";
 import InstallPrompt from "./components/InstallPrompt";
+import ChristmasThemeProvider from "./components/ChristmasThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +72,7 @@ export default function RootLayout({
       >
         {children}
         <InstallPrompt />
+        <ChristmasThemeProvider />
       </body>
     </html>
   );

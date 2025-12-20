@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Snowflake } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { isChristmasThemeEnabled, setChristmasThemeEnabled } from '@/app/utils/christmas-theme';
 
 const OWNER_STEAM_ID = '76561199235618867';
 
@@ -13,6 +14,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchId, setSearchId] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [christmasThemeEnabled, setChristmasThemeEnabledState] = useState(true);
 
   // 1. Sync User state met LocalStorage & andere tabbladen
   useEffect(() => {
@@ -25,6 +27,42 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     window.addEventListener('storage', checkUser);
     return () => window.removeEventListener('storage', checkUser);
   }, []);
+
+  // Sync Christmas theme state
+  useEffect(() => {
+    setChristmasThemeEnabledState(isChristmasThemeEnabled());
+    
+    const handleThemeChange = (e: CustomEvent) => {
+      setChristmasThemeEnabledState(e.detail);
+      // Update body class
+      if (typeof document !== 'undefined') {
+        if (e.detail) {
+          document.body.classList.add('christmas-theme');
+        } else {
+          document.body.classList.remove('christmas-theme');
+        }
+      }
+    };
+
+    window.addEventListener('christmasThemeChange', handleThemeChange as EventListener);
+    
+    // Initial class setup
+    if (typeof document !== 'undefined') {
+      if (isChristmasThemeEnabled()) {
+        document.body.classList.add('christmas-theme');
+      }
+    }
+    
+    return () => {
+      window.removeEventListener('christmasThemeChange', handleThemeChange as EventListener);
+    };
+  }, []);
+
+  const handleToggleChristmasTheme = () => {
+    const newValue = !christmasThemeEnabled;
+    setChristmasThemeEnabled(newValue);
+    setChristmasThemeEnabledState(newValue);
+  };
 
   // 2. Steam Login Handler
   const handleSteamLogin = () => {
@@ -145,12 +183,26 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                         </span>
                       )}
                     </div>
-                    <button 
-                      onClick={handleLogout} 
-                      className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                    >
-                      <LogOut size={8} /> Logout Session
-                    </button>
+                    <div className="flex items-center gap-3 mt-2">
+                      <button 
+                        onClick={handleLogout} 
+                        className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
+                      >
+                        <LogOut size={8} /> Logout Session
+                      </button>
+                      <button 
+                        onClick={handleToggleChristmasTheme}
+                        className={`flex items-center gap-1 text-[8px] font-black uppercase transition-colors ${
+                          christmasThemeEnabled 
+                            ? 'text-rose-400 hover:text-rose-300' 
+                            : 'text-gray-500 hover:text-gray-400'
+                        }`}
+                        title={christmasThemeEnabled ? 'Disable Christmas Theme' : 'Enable Christmas Theme'}
+                      >
+                        <Snowflake size={8} className={christmasThemeEnabled ? 'fill-rose-400' : ''} /> 
+                        {christmasThemeEnabled ? 'Christmas ON' : 'Christmas OFF'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -259,12 +311,26 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     </span>
                   )}
                 </div>
-                <button 
-                  onClick={handleLogout} 
-                  className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                >
-                  <LogOut size={8} /> Logout Session
-                </button>
+                <div className="flex items-center gap-3 mt-2">
+                  <button 
+                    onClick={handleLogout} 
+                    className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
+                  >
+                    <LogOut size={8} /> Logout Session
+                  </button>
+                  <button 
+                    onClick={handleToggleChristmasTheme}
+                    className={`flex items-center gap-1 text-[8px] font-black uppercase transition-colors ${
+                      christmasThemeEnabled 
+                        ? 'text-rose-400 hover:text-rose-300' 
+                        : 'text-gray-500 hover:text-gray-400'
+                    }`}
+                    title={christmasThemeEnabled ? 'Disable Christmas Theme' : 'Enable Christmas Theme'}
+                  >
+                    <Snowflake size={8} className={christmasThemeEnabled ? 'fill-rose-400' : ''} /> 
+                    {christmasThemeEnabled ? 'Christmas ON' : 'Christmas OFF'}
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
