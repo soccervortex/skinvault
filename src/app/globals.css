@@ -52,6 +52,22 @@ body {
   animation: spin-weapon 8s linear infinite;
 }
 
+/* Confetti animation for gift rewards */
+@keyframes confetti {
+  0% {
+    transform: translateY(-100%) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) translateX(var(--confetti-drift, 0)) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-confetti {
+  animation: confetti 2s ease-out forwards;
+}
+
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e2230; border-radius: 10px; }

@@ -193,17 +193,25 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
           >
             {/* Confetti effect */}
             <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
-              {[...Array(20)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-2 h-2 bg-yellow-300 rounded-full animate-confetti"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 1}s`,
-                    animationDuration: `${1 + Math.random() * 1}s`,
-                  }}
-                />
-              ))}
+              {[...Array(20)].map((_, i) => {
+                const randomLeft = Math.random() * 100;
+                const randomDelay = Math.random() * 0.5;
+                const randomDuration = 1.5 + Math.random() * 1;
+                const randomDrift = (Math.random() - 0.5) * 100;
+                return (
+                  <div
+                    key={i}
+                    className="absolute w-2 h-2 bg-yellow-300 rounded-full animate-confetti"
+                    style={{
+                      left: `${randomLeft}%`,
+                      top: '-10px',
+                      animationDelay: `${randomDelay}s`,
+                      animationDuration: `${randomDuration}s`,
+                      '--confetti-drift': `${randomDrift}px`,
+                    } as React.CSSProperties}
+                  />
+                );
+              })}
             </div>
 
             <button
