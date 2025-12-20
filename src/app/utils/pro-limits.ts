@@ -5,27 +5,44 @@ export const PRO_LIMITS = {
   WISHLIST_PRO: Infinity, // Pro users have unlimited
 } as const;
 
-// Helper to get extra slots from rewards
-function getExtraWishlistSlots(): number {
-  if (typeof window === 'undefined') return 0;
+// Helper to get rewards from localStorage
+function getStoredRewards(): any[] {
+  if (typeof window === 'undefined') return [];
   try {
     const rewardsStr = localStorage.getItem('sv_theme_rewards_2024');
-    if (!rewardsStr) return 0;
-    
-    const rewards = JSON.parse(rewardsStr);
-    let extraSlots = 0;
-    
-    // Check for wishlist_extra_slots rewards
-    rewards.forEach((stored: any) => {
-      if (stored.reward?.type === 'wishlist_extra_slots' && stored.reward?.value) {
-        extraSlots += stored.reward.value;
-      }
-    });
-    
-    return extraSlots;
+    if (!rewardsStr) return [];
+    return JSON.parse(rewardsStr);
   } catch {
-    return 0;
+    return [];
   }
+}
+
+// Helper to get extra wishlist slots from rewards
+function getExtraWishlistSlots(): number {
+  const rewards = getStoredRewards();
+  let extraSlots = 0;
+  
+  rewards.forEach((stored: any) => {
+    if (stored.reward?.type === 'wishlist_extra_slots' && stored.reward?.value) {
+      extraSlots += stored.reward.value;
+    }
+  });
+  
+  return extraSlots;
+}
+
+// Helper to get extra price trackers from rewards
+function getExtraPriceTrackers(): number {
+  const rewards = getStoredRewards();
+  let extraTrackers = 0;
+  
+  rewards.forEach((stored: any) => {
+    if (stored.reward?.type === 'price_tracker_free' && stored.reward?.value) {
+      extraTrackers += stored.reward.value;
+    }
+  });
+  
+  return extraTrackers;
 }
 
 // Performance settings
@@ -87,6 +104,20 @@ export function getWishlistBatchSize(isProUser: boolean): number {
   return isProUser 
     ? PRO_PERFORMANCE.WISHLIST_BATCH_PRO 
     : PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
+}
+
+// Get price tracker limit (includes rewards)
+export function getPriceTrackerLimit(isProUser: boolean): number {
+  if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
+  const baseLimit = PRO_LIMITS.PRICE_TRACKER_FREE;
+  const extraTrackers = getExtraPriceTrackers();
+  return baseLimit + extraTrackers;
+}
+
+// Check if user can add more price trackers
+export function canAddPriceTracker(currentCount: number, isProUser: boolean): boolean {
+  const limit = getPriceTrackerLimit(isProUser);
+  return currentCount < limit;
 }
 
 

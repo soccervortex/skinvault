@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Bell, TrendingUp, TrendingDown, Loader2, User, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { getPriceTrackerLimit } from '@/app/utils/pro-limits';
 
 interface PriceTrackerModalProps {
   isOpen: boolean;

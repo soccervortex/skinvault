@@ -27,8 +27,19 @@ export async function POST(request: Request) {
     const proUntil = await getProUntil(steamId);
     const isPro = proUntil && new Date(proUntil) > new Date();
     
-    // Free users can have max 5 alerts, Pro users unlimited
-    const maxAlerts = isPro ? Infinity : 5;
+    // Free users can have max 5 alerts (plus rewards), Pro users unlimited
+    let maxAlerts = isPro ? Infinity : 5;
+    
+    // Check for extra price trackers from rewards (check all themes)
+    if (!isPro) {
+      const themes: ThemeType[] = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+      for (const theme of themes) {
+        const reward = await getUserGiftReward(steamId, theme);
+        if (reward?.type === 'price_tracker_free' && reward?.value) {
+          maxAlerts += reward.value;
+        }
+      }
+    }
     
     // Check current alert count
     const alertsKey = 'price_alerts';
