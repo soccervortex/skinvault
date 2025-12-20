@@ -243,12 +243,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-2">
-                      <button 
-                        onClick={handleLogout} 
-                        className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                      >
-                        <LogOut size={8} /> Logout Session
-                      </button>
+                    <button 
+                      onClick={handleLogout} 
+                      className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
+                    >
+                      <LogOut size={8} /> Logout Session
+                    </button>
                       {hasActiveTheme && (
                         <button 
                           onClick={handleToggleTheme}
@@ -282,15 +282,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                       {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                     </button>
                   )}
-                  <button 
-                    onClick={handleSteamLogin}
-                    className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
-                  >
-                    <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                      <User size={18} />
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
-                  </button>
+                <button 
+                  onClick={handleSteamLogin}
+                  className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
+                >
+                  <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                    <User size={18} />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
+                </button>
                 </div>
               )}
               
@@ -389,12 +389,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-2">
-                  <button 
-                    onClick={handleLogout} 
-                    className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                  >
-                    <LogOut size={8} /> Logout Session
-                  </button>
+                <button 
+                  onClick={handleLogout} 
+                  className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
+                >
+                  <LogOut size={8} /> Logout Session
+                </button>
                   {hasActiveTheme && (
                     <button 
                       onClick={handleToggleTheme}
@@ -428,15 +428,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                 </button>
               )}
-              <button 
-                onClick={handleSteamLogin}
-                className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
-              >
-                <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                  <User size={18} />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
-              </button>
+            <button 
+              onClick={handleSteamLogin}
+              className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
+            >
+              <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                <User size={18} />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
+            </button>
             </div>
           )}
           
