@@ -82,32 +82,64 @@ export async function GET(request: Request) {
       
       await kv.set(discordConnectionsKey, connections);
       
-      // Queue welcome message via bot gateway
+      // Send welcome message via bot gateway (try direct send first, then queue as fallback)
       try {
-        const welcomeQueueKey = 'discord_dm_queue';
-        const welcomeQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
-        const welcomeMessage = `🎉 **Thanks for connecting with SkinVault Bot!**
+        const welcomeMessage = `🎉 **Bedankt voor het koppelen met SkinVault Bot!**
 
-You can now:
-• Set up **price alerts** for CS2 skins
-• Get notified when prices hit your target
-• Use **/wishlist** to view your tracked items
-• Manage alerts from your profile at skinvaults.vercel.app
+Je kunt nu:
+• **Price alerts** instellen voor CS2 skins
+• Meldingen ontvangen wanneer prijzen je doel bereiken
+• **/wishlist** gebruiken om je tracked items te bekijken
+• Alerts beheren vanuit je profiel op skinvaults.vercel.app
 
 **Commands:**
-\`/wishlist\` - View your wishlist with prices
-\`/help\` - Get help with commands
+\`/wishlist\` - Bekijk je wishlist met prijzen
+\`/price\` - Check de prijs van een skin
+\`/vault\` - Bekijk je totale vault waarde
+\`/stats\` - Bekijk je CS2 statistieken
+\`/help\` - Krijg hulp met commands
 
-Happy trading! 🚀`;
+Veel succes met trading! 🚀`;
         
-        welcomeQueue.push({
-          discordId: discordUser.id,
-          message: welcomeMessage,
-          timestamp: Date.now(),
-        });
-        await kv.set(welcomeQueueKey, welcomeQueue);
+        // Try to send via bot gateway API (direct send)
+        try {
+          const botGatewayUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/discord/bot-gateway`;
+          const apiToken = process.env.DISCORD_BOT_API_TOKEN;
+          
+          const response = await fetch(botGatewayUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(apiToken ? { 'Authorization': `Bearer ${apiToken}` } : {}),
+            },
+            body: JSON.stringify({
+              action: 'send_dm',
+              discordId: discordUser.id,
+              message: welcomeMessage,
+            }),
+          });
+
+          if (!response.ok) {
+            // Fallback: queue the message
+            throw new Error('Direct send failed, queueing instead');
+          }
+          
+          console.log(`✅ Welcome message queued for Discord user ${discordUser.id}`);
+        } catch (directSendError) {
+          // Fallback: queue the message for bot to process
+          const welcomeQueueKey = 'discord_dm_queue';
+          const welcomeQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
+          
+          welcomeQueue.push({
+            discordId: discordUser.id,
+            message: welcomeMessage,
+            timestamp: Date.now(),
+          });
+          await kv.set(welcomeQueueKey, welcomeQueue);
+          console.log(`📬 Welcome message queued for Discord user ${discordUser.id}`);
+        }
       } catch (welcomeError) {
-        console.error('Failed to queue welcome message:', welcomeError);
+        console.error('Failed to send/queue welcome message:', welcomeError);
         // Don't fail the connection if welcome message fails
       }
     } catch (error) {
