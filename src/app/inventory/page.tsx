@@ -10,6 +10,7 @@ import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils'
 import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import CompareModal from '@/app/components/CompareModal';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimit } from '@/app/utils/pro-limits';
 
@@ -96,6 +97,8 @@ function InventoryContent() {
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedInUserPro, setLoggedInUserPro] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [compareModalItem, setCompareModalItem] = useState<any>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
   const isPro = useMemo(
@@ -1142,25 +1145,13 @@ function InventoryContent() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                try {
-                                  const compareList = JSON.parse(localStorage.getItem('sv_compare_list') || '[]');
-                                  const itemToAdd = {
-                                    id: itemKey,
-                                    name: getItemDisplayName(item),
-                                    image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
-                                    market_hash_name: itemKey,
-                                  };
-                                  const exists = compareList.find((i: any) => i.id === itemKey);
-                                  if (!exists) {
-                                    compareList.push(itemToAdd);
-                                    if (compareList.length > 2) {
-                                      compareList.shift();
-                                    }
-                                    localStorage.setItem('sv_compare_list', JSON.stringify(compareList));
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to add to compare:', err);
-                                }
+                                setCompareModalItem({
+                                  id: itemKey,
+                                  name: getItemDisplayName(item),
+                                  image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
+                                  market_hash_name: itemKey,
+                                });
+                                setShowCompareModal(true);
                               }}
                               className="p-2 rounded-lg border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
                               title="Add to Compare"
@@ -1265,6 +1256,17 @@ function InventoryContent() {
         limit={getWishlistLimit(false)}
         currentCount={wishlist.length}
       />
+      
+      {showCompareModal && compareModalItem && (
+        <CompareModal
+          isOpen={showCompareModal}
+          onClose={() => {
+            setShowCompareModal(false);
+            setCompareModalItem(null);
+          }}
+          currentItem={compareModalItem}
+        />
+      )}
     </>
   );
 }
