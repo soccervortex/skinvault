@@ -19,7 +19,7 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
 
-  // Northern Lights Effect
+  // Enhanced Northern Lights Effect
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -31,40 +31,56 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
     canvas.height = window.innerHeight;
 
     let time = 0;
+    const layers: Array<{ speed: number; offset: number; colors: string[] }> = [
+      { speed: 0.0005, offset: 0, colors: ['rgba(34, 197, 94, 0)', 'rgba(34, 197, 94, 0.4)', 'rgba(34, 197, 94, 0.2)', 'rgba(34, 197, 94, 0)'] },
+      { speed: 0.0007, offset: Math.PI / 3, colors: ['rgba(16, 185, 129, 0)', 'rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0)'] },
+      { speed: 0.0006, offset: Math.PI / 2, colors: ['rgba(59, 130, 246, 0)', 'rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0)'] },
+    ];
 
     const drawNorthernLights = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Create aurora effect with green gradient
-      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, 'rgba(34, 197, 94, 0)');
-      gradient.addColorStop(0.3, 'rgba(34, 197, 94, 0.15)');
-      gradient.addColorStop(0.6, 'rgba(34, 197, 94, 0.2)');
-      gradient.addColorStop(1, 'rgba(34, 197, 94, 0)');
+      layers.forEach((layer, layerIndex) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        layer.colors.forEach((color, i) => {
+          gradient.addColorStop(i / (layer.colors.length - 1), color);
+        });
 
-      ctx.fillStyle = gradient;
-      
-      // Create wave effect
-      const wave1 = Math.sin(time * 0.001) * 50;
-      const wave2 = Math.sin(time * 0.0015 + 1) * 40;
-      const wave3 = Math.sin(time * 0.002 + 2) * 60;
+        ctx.fillStyle = gradient;
+        ctx.globalAlpha = 0.8;
+        
+        // Create multiple wave bands
+        for (let band = 0; band < 3; band++) {
+          const bandOffset = band * (canvas.width / 3);
+          const wavePhase = time * layer.speed + layer.offset + (band * Math.PI / 3);
+          
+          ctx.beginPath();
+          ctx.moveTo(bandOffset, canvas.height);
+          
+          // Create flowing, organic wave shapes
+          for (let x = bandOffset; x < bandOffset + canvas.width / 3; x += 2) {
+            const normalizedX = (x - bandOffset) / (canvas.width / 3);
+            const wave1 = Math.sin(normalizedX * Math.PI * 2 + wavePhase) * 40;
+            const wave2 = Math.sin(normalizedX * Math.PI * 4 + wavePhase * 1.5) * 20;
+            const wave3 = Math.sin(normalizedX * Math.PI * 6 + wavePhase * 2) * 10;
+            const y = canvas.height * 0.3 + wave1 + wave2 + wave3;
+            ctx.lineTo(x, y);
+          }
+          
+          ctx.lineTo(bandOffset + canvas.width / 3, canvas.height);
+          ctx.lineTo(bandOffset, canvas.height);
+          ctx.fill();
+        }
+        
+        // Add glow effect
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = layer.colors[1];
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
 
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height);
-      ctx.bezierCurveTo(
-        canvas.width * 0.2 + wave1, canvas.height * 0.3,
-        canvas.width * 0.4 + wave2, canvas.height * 0.5,
-        canvas.width * 0.6 + wave3, canvas.height * 0.4
-      );
-      ctx.bezierCurveTo(
-        canvas.width * 0.8 + wave1, canvas.height * 0.3,
-        canvas.width, canvas.height * 0.2,
-        canvas.width, canvas.height
-      );
-      ctx.lineTo(0, canvas.height);
-      ctx.fill();
-
-      time += 10;
+      ctx.globalAlpha = 1.0;
+      time += 1;
       animationFrameRef.current = requestAnimationFrame(drawNorthernLights);
     };
 
@@ -86,30 +102,22 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
   }, []);
 
   useEffect(() => {
-    // Show santa animation
     const timer = setTimeout(() => {
       setSantaVisible(true);
       setThrowAttempt(1);
     }, 1000);
-
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (throwAttempt === 1) {
-      const timer = setTimeout(() => {
-        setThrowAttempt(2);
-      }, 2000);
+      const timer = setTimeout(() => setThrowAttempt(2), 2500);
       return () => clearTimeout(timer);
     } else if (throwAttempt === 2) {
-      const timer = setTimeout(() => {
-        setThrowAttempt(3);
-      }, 2000);
+      const timer = setTimeout(() => setThrowAttempt(3), 2500);
       return () => clearTimeout(timer);
     } else if (throwAttempt === 3) {
-      const timer = setTimeout(() => {
-        setGiftOpened(true);
-      }, 1500);
+      const timer = setTimeout(() => setGiftOpened(true), 2000);
       return () => clearTimeout(timer);
     }
   }, [throwAttempt]);
@@ -136,86 +144,117 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
           style={{ pointerEvents: 'none' }}
         />
 
-        {/* Santa with Sleigh and Reindeer */}
+        {/* Santa with Sleigh and Reindeer - Enhanced */}
         {santaVisible && (
           <div 
-            className={`absolute top-[-10%] right-[-10%] transform transition-all duration-3000 ease-in-out ${
-              throwAttempt === 1 ? 'translate-x-[-20vw] translate-y-[20vh]' : 
-              throwAttempt === 2 ? 'translate-x-[-40vw] translate-y-[40vh]' : 
-              throwAttempt === 3 ? 'translate-x-[-60vw] translate-y-[60vh]' :
-              'translate-x-[-80vw] translate-y-[80vh]'
+            className={`absolute top-[-5%] right-[-5%] transform transition-all duration-[4000ms] ease-in-out ${
+              throwAttempt === 1 ? 'translate-x-[-25vw] translate-y-[25vh] rotate-[5deg]' : 
+              throwAttempt === 2 ? 'translate-x-[-50vw] translate-y-[50vh] rotate-[10deg]' : 
+              throwAttempt === 3 ? 'translate-x-[-75vw] translate-y-[75vh] rotate-[15deg]' :
+              'translate-x-[-100vw] translate-y-[100vh] rotate-[20deg]'
             }`}
             style={{ 
-              width: '400px',
-              height: '200px',
+              width: '450px',
+              height: '220px',
               zIndex: 10001,
-              filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 0.3))'
+              filter: 'drop-shadow(0 0 30px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 15px rgba(34, 197, 94, 0.3))'
             }}
           >
-            <svg viewBox="0 0 400 200" className="w-full h-full">
-              {/* Reindeer */}
-              <g transform="translate(50, 100)">
+            <svg viewBox="0 0 450 220" className="w-full h-full">
+              {/* Reindeer - Enhanced */}
+              <g transform="translate(40, 110)">
                 {/* Body */}
-                <ellipse cx="0" cy="0" rx="25" ry="15" fill="#8B4513" />
+                <ellipse cx="0" cy="0" rx="28" ry="18" fill="#8B4513" />
                 {/* Head */}
-                <circle cx="0" cy="-15" r="12" fill="#8B4513" />
-                {/* Antlers */}
-                <path d="M-5 -20 L-10 -35 L-8 -30 L-12 -40 M5 -20 L10 -35 L8 -30 L12 -40" stroke="#654321" strokeWidth="2" fill="none" />
+                <circle cx="0" cy="-18" r="14" fill="#8B4513" />
+                {/* Antlers - More detailed */}
+                <path d="M-6 -25 L-12 -42 L-10 -36 L-14 -48 M6 -25 L12 -42 L10 -36 L14 -48" stroke="#654321" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                {/* Eyes */}
+                <circle cx="-5" cy="-20" r="2" fill="#000" />
+                <circle cx="5" cy="-20" r="2" fill="#000" />
+                {/* Nose */}
+                <circle cx="0" cy="-15" r="2" fill="#FF6347" />
                 {/* Legs */}
-                <line x1="-15" y1="10" x2="-15" y2="25" stroke="#8B4513" strokeWidth="3" />
-                <line x1="15" y1="10" x2="15" y2="25" stroke="#8B4513" strokeWidth="3" />
+                <line x1="-20" y1="12" x2="-20" y2="28" stroke="#8B4513" strokeWidth="4" strokeLinecap="round" />
+                <line x1="20" y1="12" x2="20" y2="28" stroke="#8B4513" strokeWidth="4" strokeLinecap="round" />
+                {/* Harness */}
+                <path d="M-25 0 Q0 -15 25 0" stroke="#4A4A4A" strokeWidth="2" fill="none" />
               </g>
               
-              {/* Sleigh */}
-              <g transform="translate(150, 130)">
+              {/* Sleigh - Enhanced with more detail */}
+              <g transform="translate(170, 140)">
                 {/* Sleigh body */}
-                <path d="M-40 0 Q-40 -20 0 -20 Q40 -20 40 0 L40 10 L-40 10 Z" fill="#C41E3A" />
-                <rect x="-40" y="0" width="80" height="15" fill="#8B0000" rx="5" />
-                {/* Runners */}
-                <ellipse cx="-30" cy="25" rx="30" ry="5" fill="#4A4A4A" />
-                <ellipse cx="30" cy="25" rx="30" ry="5" fill="#4A4A4A" />
+                <path d="M-50 0 Q-50 -25 0 -25 Q50 -25 50 0 L50 12 L-50 12 Z" fill="#C41E3A" />
+                <path d="M-50 0 Q-50 -25 0 -25 Q50 -25 50 0" stroke="#8B0000" strokeWidth="2" fill="none" />
+                <rect x="-50" y="0" width="100" height="18" fill="#8B0000" rx="6" />
+                {/* Decorative lines */}
+                <line x1="-40" y1="-15" x2="40" y2="-15" stroke="#FFD700" strokeWidth="2" />
+                <line x1="-30" y1="-20" x2="30" y2="-20" stroke="#FFD700" strokeWidth="1.5" />
+                {/* Runners - More curved */}
+                <path d="M-35 30 Q-35 32 -30 33 Q-10 35 0 33 Q10 35 30 33 Q35 32 35 30" fill="#2A2A2A" />
+                <path d="M-35 30 Q-35 32 -30 33 Q-10 35 0 33 Q10 35 30 33 Q35 32 35 30" stroke="#1A1A1A" strokeWidth="1" fill="none" />
+                {/* Runner supports */}
+                <line x1="-35" y1="18" x2="-35" y2="30" stroke="#4A4A4A" strokeWidth="3" />
+                <line x1="35" y1="18" x2="35" y2="30" stroke="#4A4A4A" strokeWidth="3" />
               </g>
 
-              {/* Santa */}
-              <g transform="translate(200, 80)">
+              {/* Santa - Enhanced */}
+              <g transform="translate(280, 70)">
                 {/* Body */}
-                <ellipse cx="0" cy="30" rx="35" ry="40" fill="#C41E3A" />
+                <ellipse cx="0" cy="35" rx="38" ry="45" fill="#C41E3A" />
+                {/* Belt */}
+                <rect x="-38" y="35" width="76" height="12" fill="#000000" />
+                <circle cx="0" cy="41" r="6" fill="#FFD700" />
                 {/* Head */}
-                <circle cx="0" cy="0" r="25" fill="#FDBCB4" />
+                <circle cx="0" cy="0" r="28" fill="#FDBCB4" />
                 {/* Hat */}
-                <path d="M-25 -15 L-25 -35 L0 -50 L25 -35 L25 -15 Z" fill="#C41E3A" />
-                <circle cx="0" cy="-35" r="8" fill="white" />
-                {/* Beard */}
-                <path d="M-20 5 Q0 25 20 5" stroke="white" strokeWidth="8" fill="none" strokeLinecap="round" />
-                {/* Arms (throwing) */}
-                <g transform={`rotate(${throwAttempt === 3 ? 45 : 0})`}>
-                  <ellipse cx="-30" cy="20" rx="8" ry="25" fill="#C41E3A" />
-                  <circle cx="-30" cy="5" r="12" fill="#FDBCB4" />
+                <path d="M-28 -18 L-28 -40 L0 -58 L28 -40 L28 -18 Z" fill="#C41E3A" />
+                <circle cx="0" cy="-40" r="10" fill="white" />
+                <ellipse cx="0" cy="-40" rx="8" ry="4" fill="#FFD700" />
+                {/* Beard - More detailed */}
+                <path d="M-25 12 Q0 45 25 12" stroke="white" strokeWidth="14" fill="white" strokeLinecap="round" />
+                <path d="M-20 8 Q0 35 20 8" stroke="white" strokeWidth="10" fill="white" strokeLinecap="round" />
+                {/* Eyes */}
+                <circle cx="-10" cy="-8" r="4" fill="#000" />
+                <circle cx="10" cy="-8" r="4" fill="#000" />
+                {/* Nose */}
+                <circle cx="0" cy="2" r="5" fill="#FF8C69" />
+                {/* Cheeks */}
+                <circle cx="-18" cy="2" r="6" fill="#FFB6C1" opacity="0.6" />
+                <circle cx="18" cy="2" r="6" fill="#FFB6C1" opacity="0.6" />
+                {/* Arms - Throwing motion */}
+                <g transform={`rotate(${throwAttempt === 3 ? 50 : throwAttempt === 2 ? 30 : 0}, -40, 25)`}>
+                  <ellipse cx="-40" cy="25" rx="10" ry="32" fill="#C41E3A" />
+                  <circle cx="-40" cy="8" r="13" fill="#FDBCB4" />
                 </g>
-                <g transform={`rotate(${throwAttempt === 3 ? -45 : 0})`}>
-                  <ellipse cx="30" cy="20" rx="8" ry="25" fill="#C41E3A" />
-                  <circle cx="30" cy="5" r="12" fill="#FDBCB4" />
+                <g transform={`rotate(${throwAttempt === 3 ? -50 : throwAttempt === 2 ? -30 : 0}, 40, 25)`}>
+                  <ellipse cx="40" cy="25" rx="10" ry="32" fill="#C41E3A" />
+                  <circle cx="40" cy="8" r="13" fill="#FDBCB4" />
                 </g>
               </g>
 
-              {/* Gift being thrown */}
+              {/* Gift being thrown - Enhanced */}
               {throwAttempt > 0 && throwAttempt <= 3 && (
                 <g 
                   transform={`translate(${
-                    throwAttempt === 1 ? 280 : 
-                    throwAttempt === 2 ? 300 : 
-                    400
+                    throwAttempt === 1 ? 320 : 
+                    throwAttempt === 2 ? 360 : 
+                    450
                   }, ${
-                    throwAttempt === 1 ? 100 : 
-                    throwAttempt === 2 ? 120 : 
-                    180
-                  }) rotate(${throwAttempt * 45})`}
-                  opacity={throwAttempt === 3 ? 1 : 0.3}
+                    throwAttempt === 1 ? 110 : 
+                    throwAttempt === 2 ? 140 : 
+                    200
+                  }) rotate(${throwAttempt * 50}) scale(${throwAttempt === 3 ? 1.2 : 0.6})`}
+                  opacity={throwAttempt === 3 ? 1 : 0.4}
                 >
-                  <rect x="-15" y="-15" width="30" height="30" fill="#C41E3A" rx="3" />
-                  <rect x="-12" y="-12" width="24" height="24" fill="#16A34A" rx="2" />
-                  <line x1="0" y1="-15" x2="0" y2="15" stroke="#DC2626" strokeWidth="2" />
-                  <line x1="-15" y1="0" x2="15" y2="0" stroke="#DC2626" strokeWidth="2" />
+                  <rect x="-20" y="-20" width="40" height="40" fill="#C41E3A" rx="5" />
+                  <rect x="-17" y="-17" width="34" height="34" fill="#16A34A" rx="4" />
+                  <line x1="0" y1="-20" x2="0" y2="20" stroke="#DC2626" strokeWidth="3" />
+                  <line x1="-20" y1="0" x2="20" y2="0" stroke="#DC2626" strokeWidth="3" />
+                  {/* Ribbon bow */}
+                  <circle cx="0" cy="0" r="8" fill="#FFD700" opacity="0.8" />
+                  <ellipse cx="-8" cy="0" rx="6" ry="4" fill="#FFD700" />
+                  <ellipse cx="8" cy="0" rx="6" ry="4" fill="#FFD700" />
                 </g>
               )}
             </svg>
@@ -236,7 +275,6 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
         </button>
 
         <div className="text-center space-y-6">
-          {/* Gift icon */}
           <div className="mx-auto w-24 h-24 flex items-center justify-center">
             <svg viewBox="0 0 100 100" className="w-full h-full animate-bounce">
               <rect x="20" y="20" width="60" height="60" fill="#C41E3A" rx="5" />
