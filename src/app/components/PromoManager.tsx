@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import { ThemeType } from '@/app/utils/theme-storage';
 import ChristmasPromo from './ChristmasPromo';
+import HalloweenPromo from './HalloweenPromo';
+import EasterPromo from './EasterPromo';
+import SinterklaasPromo from './SinterklaasPromo';
+import NewYearPromo from './NewYearPromo';
+import OldYearPromo from './OldYearPromo';
 
 interface PromoManagerProps {
   theme: ThemeType | null;
@@ -88,11 +93,21 @@ export default function PromoManager({ theme, steamId }: PromoManagerProps) {
   if (!showPromo || !theme) return null;
 
   // Render theme-specific promo
-  if (theme === 'christmas') {
-    return <ChristmasPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+  switch (theme) {
+    case 'christmas':
+      return <ChristmasPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+    case 'halloween':
+      return <HalloweenPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+    case 'easter':
+      return <EasterPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+    case 'sinterklaas':
+      return <SinterklaasPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+    case 'newyear':
+      return <NewYearPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+    case 'oldyear':
+      return <OldYearPromo steamId={steamId} onDismiss={handleDismiss} onClaim={handleClaim} />;
+    default:
+      return null;
   }
-
-  // Add other theme promos here
-  return null;
 }
 
