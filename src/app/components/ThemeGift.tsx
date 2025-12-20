@@ -249,7 +249,7 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
                         navigator.clipboard.writeText(reward.value as string);
                       }}
                       className="text-white/80 hover:text-white transition-colors"
-                      title="Kopieer code"
+                      title="Copy code"
                     >
                       📋
                     </button>
