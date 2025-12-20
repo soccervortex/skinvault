@@ -17,7 +17,7 @@ export default function HalloweenPromo({ steamId, onDismiss, onClaim }: Hallowee
   const [throwAttempt, setThrowAttempt] = useState(0);
   const [claiming, setClaiming] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
 
   // Spooky orange/purple effect
   useEffect(() => {
