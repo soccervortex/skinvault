@@ -5,7 +5,8 @@ export type RewardType =
   | 'wishlist_boost'
   | 'price_tracker_free'
   | 'speed_boost'
-  | 'wishlist_extra_slots';
+  | 'wishlist_extra_slots'
+  | 'pro_extension'; // For Pro users: extends their Pro subscription
 
 export interface Reward {
   type: RewardType;
@@ -13,10 +14,11 @@ export interface Reward {
   description: string;
   icon: string;
   duration?: number; // Duration in days if temporary
-  value?: any; // Specific value (e.g., promo code string, slot count)
+  value?: any; // Specific value (e.g., promo code string, slot count, months for Pro extension)
 }
 
-export const REWARDS: Reward[] = [
+// Rewards for non-Pro users
+export const REWARDS_FREE: Reward[] = [
   {
     type: 'promo_code',
     name: 'Kerst Korting!',
@@ -55,15 +57,61 @@ export const REWARDS: Reward[] = [
   },
 ];
 
-export function getRandomReward(): Reward {
-  // Weighted random - promo code is more common (40%), others 15% each
-  const rand = Math.random();
-  if (rand < 0.4) return REWARDS[0]; // promo_code
-  if (rand < 0.55) return REWARDS[1]; // wishlist_boost
-  if (rand < 0.70) return REWARDS[2]; // price_tracker_free
-  if (rand < 0.85) return REWARDS[3]; // speed_boost
-  return REWARDS[4]; // wishlist_extra_slots
+// Rewards for Pro users (Pro extensions only, no speed boost)
+export const REWARDS_PRO: Reward[] = [
+  {
+    type: 'pro_extension',
+    name: '1 Maand Gratis!',
+    description: 'Je Pro abonnement wordt met 1 maand verlengd',
+    icon: '👑',
+    value: 1, // 1 month
+  },
+  {
+    type: 'pro_extension',
+    name: '1 Week Gratis!',
+    description: 'Je Pro abonnement wordt met 1 week verlengd',
+    icon: '🎄',
+    value: 0.25, // 0.25 months = 1 week
+  },
+  {
+    type: 'pro_extension',
+    name: '3 Dagen Gratis!',
+    description: 'Je Pro abonnement wordt met 3 dagen verlengd',
+    icon: '🎅',
+    value: 0.1, // ~0.1 months = 3 days
+  },
+  {
+    type: 'pro_extension',
+    name: '6 Maanden Gratis!',
+    description: 'Je Pro abonnement wordt met 6 maanden verlengd! (Zeldzaam)',
+    icon: '🌟',
+    value: 6, // 6 months (rare)
+  },
+];
+
+export function getRandomReward(isPro: boolean = false): Reward {
+  if (isPro) {
+    // Pro users get Pro extensions with weighted random
+    // 1 month: 50%, 1 week: 25%, 3 days: 20%, 6 months: 5% (rare)
+    const rand = Math.random();
+    if (rand < 0.5) return REWARDS_PRO[0]; // 1 month
+    if (rand < 0.75) return REWARDS_PRO[1]; // 1 week
+    if (rand < 0.95) return REWARDS_PRO[2]; // 3 days
+    return REWARDS_PRO[3]; // 6 months (rare)
+  } else {
+    // Non-Pro users get regular rewards
+    // Weighted random - promo code is more common (40%), others 15% each
+    const rand = Math.random();
+    if (rand < 0.4) return REWARDS_FREE[0]; // promo_code
+    if (rand < 0.55) return REWARDS_FREE[1]; // wishlist_boost
+    if (rand < 0.70) return REWARDS_FREE[2]; // price_tracker_free
+    if (rand < 0.85) return REWARDS_FREE[3]; // speed_boost
+    return REWARDS_FREE[4]; // wishlist_extra_slots
+  }
 }
+
+// Keep for backward compatibility
+export const REWARDS = REWARDS_FREE;
 
 const REWARD_STORAGE_KEY = 'sv_christmas_rewards_2024';
 
@@ -113,11 +161,11 @@ export function getStoredRewards(): StoredReward[] {
 
 export function hasClaimedGift(): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem('sv_christmas_gift_claimed_2024') === 'true';
+  return localStorage.getItem('sv_christmas_gift_claimed_2025') === 'true';
 }
 
 export function markGiftClaimed(): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('sv_christmas_gift_claimed_2024', 'true');
+  localStorage.setItem('sv_christmas_gift_claimed_2025', 'true');
 }
 

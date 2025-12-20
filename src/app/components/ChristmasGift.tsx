@@ -54,24 +54,24 @@ export default function ChristmasGift({ steamId }: ChristmasGiftProps) {
     
     setIsOpening(true);
     
-    // Get random reward
-    const randomReward = getRandomReward();
-    setReward(randomReward);
-    
     // Animate box opening
     setTimeout(async () => {
       setIsOpening(false);
       setIsOpen(true);
       
-      // Save to database
+      // Save to database (server will generate reward based on Pro status)
       try {
         const response = await fetch('/api/gift/claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ steamId, reward: randomReward }),
+          body: JSON.stringify({ steamId }),
         });
 
         if (response.ok) {
+          const data = await response.json();
+          const randomReward = data.reward;
+          setReward(randomReward);
+          
           // Also save to localStorage as backup
           saveReward(randomReward);
           setShowModal(true);
