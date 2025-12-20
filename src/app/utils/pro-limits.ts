@@ -163,9 +163,11 @@ export async function canAddToWishlist(currentCount: number, isProUser: boolean,
 export function getWishlistLimitSync(isProUser: boolean): number {
   if (isProUser) return PRO_LIMITS.WISHLIST_PRO;
   const baseLimit = PRO_LIMITS.WISHLIST_FREE;
-  // Use cached rewards if available, otherwise return base limit
+  let extraSlots = 0;
+  
+  // First try cached rewards
   if (rewardsCache.rewards.length > 0) {
-    const extraSlots = rewardsCache.rewards.reduce((sum, reward) => {
+    extraSlots = rewardsCache.rewards.reduce((sum, reward) => {
       // Check for permanent extra slots
       if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
         return sum + reward.value;
@@ -176,9 +178,39 @@ export function getWishlistLimitSync(isProUser: boolean): number {
       }
       return sum;
     }, 0);
-    return baseLimit + extraSlots;
+  } else if (typeof window !== 'undefined') {
+    // Fallback to localStorage if cache is empty (for immediate use before API loads)
+    try {
+      const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+      themes.forEach(theme => {
+        const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+        const key = `sv_${theme}_rewards_${year}`;
+        const rewardsStr = localStorage.getItem(key);
+        if (rewardsStr) {
+          try {
+            const rewards = JSON.parse(rewardsStr);
+            if (Array.isArray(rewards)) {
+              rewards.forEach((stored: any) => {
+                const reward = stored.reward || stored;
+                if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
+                  extraSlots += reward.value;
+                }
+                if (reward?.type === 'wishlist_boost' && reward?.value) {
+                  extraSlots += reward.value;
+                }
+              });
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      });
+    } catch {
+      // Ignore errors
+    }
   }
-  return baseLimit;
+  
+  return baseLimit + extraSlots;
 }
 
 // Performance helpers
