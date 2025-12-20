@@ -9,7 +9,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowLeft,
+  Sparkles,
 } from "lucide-react";
+import { ThemeType } from "@/app/utils/theme-storage";
 
 const OWNER_STEAM_ID = "76561199235618867";
 
@@ -36,6 +38,17 @@ export default function AdminPage() {
     active: 0,
     expired: 0,
   });
+  const [themeSettings, setThemeSettings] = useState<Record<ThemeType, { enabled: boolean }>>({
+    christmas: { enabled: false },
+    halloween: { enabled: false },
+    easter: { enabled: false },
+    sinterklaas: { enabled: false },
+    newyear: { enabled: false },
+    oldyear: { enabled: false },
+  });
+  const [loadingThemes, setLoadingThemes] = useState(true);
+  const [themeMessage, setThemeMessage] = useState<string | null>(null);
+  const [themeError, setThemeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -74,6 +87,26 @@ export default function AdminPage() {
       }
     };
     loadStats();
+
+    const loadThemes = async () => {
+      setLoadingThemes(true);
+      try {
+        const res = await fetch("/api/admin/themes", {
+          headers: {
+            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+          },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setThemeSettings(data);
+        }
+      } catch (e: any) {
+        console.error("Failed to load themes:", e);
+      } finally {
+        setLoadingThemes(false);
+      }
+    };
+    loadThemes();
   }, [isOwner]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,6 +154,44 @@ export default function AdminPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleThemeToggle = async (theme: ThemeType, enabled: boolean) => {
+    setThemeMessage(null);
+    setThemeError(null);
+    
+    try {
+      const res = await fetch("/api/admin/themes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+        body: JSON.stringify({ theme, enabled }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setThemeError(data?.error || "Failed to update theme.");
+      } else {
+        setThemeSettings(data.settings);
+        setThemeMessage(`${theme} theme ${enabled ? "enabled" : "disabled"}`);
+        setTimeout(() => setThemeMessage(null), 3000);
+        // Trigger theme update for all users
+        window.dispatchEvent(new CustomEvent('themeChanged'));
+      }
+    } catch (e: any) {
+      setThemeError(e?.message || "Request failed.");
+    }
+  };
+
+  const themeLabels: Record<ThemeType, string> = {
+    christmas: "Kerst (Christmas)",
+    halloween: "Halloween",
+    easter: "Pasen (Easter)",
+    sinterklaas: "Sinterklaas",
+    newyear: "Nieuwjaar (New Year)",
+    oldyear: "Oudjaar (Old Year)",
   };
 
   if (!user) {
@@ -319,6 +390,71 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Theme Management Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-purple-500/10 border border-purple-500/40 shrink-0">
+              <Sparkles className="text-purple-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Theme Management
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Holiday Themes
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-6">
+            Enable or disable holiday themes. When enabled, themes are <span className="text-purple-400 font-bold">ON by default</span> for all users, but users can turn them off in their profile.
+          </p>
+
+          {themeMessage && (
+            <div className="mb-4 flex items-center gap-2 text-emerald-400 text-[10px] md:text-[11px]">
+              <CheckCircle2 size={12} /> <span>{themeMessage}</span>
+            </div>
+          )}
+          {themeError && (
+            <div className="mb-4 flex items-center gap-2 text-red-400 text-[10px] md:text-[11px]">
+              <AlertTriangle size={12} /> <span>{themeError}</span>
+            </div>
+          )}
+
+          {loadingThemes ? (
+            <div className="flex items-center justify-center gap-2 text-gray-400 text-[11px] py-8">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading themes...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(Object.keys(themeLabels) as ThemeType[]).map((theme) => (
+                <div
+                  key={theme}
+                  className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 flex items-center justify-between"
+                >
+                  <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-gray-300">
+                    {themeLabels[theme]}
+                  </span>
+                  <button
+                    onClick={() => handleThemeToggle(theme, !themeSettings[theme]?.enabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      themeSettings[theme]?.enabled
+                        ? "bg-purple-600"
+                        : "bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        themeSettings[theme]?.enabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         </div>
       </div>

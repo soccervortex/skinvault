@@ -1,0 +1,93 @@
+/* Sinterklaas Theme Styles */
+
+/* Red and white theme */
+@keyframes sinterklaas-fall {
+  0% {
+    transform: translateY(-100vh) translateX(0);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(100vh) translateX(var(--sinterklaas-drift));
+    opacity: 0.2;
+  }
+}
+
+.sinterklaas-particles-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.sinterklaas-particle {
+  position: absolute;
+  top: -10px;
+  color: rgba(220, 20, 60, 0.8);
+  font-size: 1em;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+  user-select: none;
+  animation: sinterklaas-fall linear infinite;
+  pointer-events: none;
+}
+
+body.sinterklaas-theme {
+  --sinterklaas-red: #dc143c;
+  --sinterklaas-white: #ffffff;
+}
+
+.sinterklaas-theme .bg-blue-600 {
+  background: linear-gradient(135deg, #dc143c 0%, #c4123a 100%) !important;
+}
+
+.sinterklaas-theme .border-blue-500,
+.sinterklaas-theme .border-blue-500\/50 {
+  border-color: rgba(220, 20, 60, 0.5) !important;
+}
+
+.sinterklaas-theme .text-blue-500 {
+  color: #dc143c !important;
+}
+
+.sinterklaas-theme .bg-blue-500\/10,
+.sinterklaas-theme .bg-blue-500\/20 {
+  background-color: rgba(220, 20, 60, 0.1) !important;
+}
+
+.sinterklaas-theme .hover\:bg-blue-500\/10:hover {
+  background-color: rgba(220, 20, 60, 0.15) !important;
+}
+
+.sinterklaas-theme .hover\:border-blue-500\/30:hover {
+  border-color: rgba(220, 20, 60, 0.3) !important;
+}
+
+.sinterklaas-theme .shadow-blue-600\/20 {
+  box-shadow: 0 10px 15px -3px rgba(220, 20, 60, 0.2), 0 4px 6px -2px rgba(220, 20, 60, 0.1) !important;
+}
+
+.sinterklaas-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(220, 20, 60, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.sinterklaas-theme button.bg-blue-600 {
+  background: linear-gradient(135deg, #dc143c 0%, #b80e2f 100%) !important;
+}
+
+.sinterklaas-theme button.bg-blue-600:hover {
+  background: linear-gradient(135deg, #b80e2f 0%, #9b0a26 100%) !important;
+}
+

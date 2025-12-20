@@ -1,0 +1,93 @@
+/* Old Year Theme Styles */
+
+/* Subtle transition effect */
+@keyframes oldyear-fade {
+  0% {
+    transform: translateY(-100vh) translateX(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(100vh) translateX(var(--oldyear-drift));
+    opacity: 0.1;
+  }
+}
+
+.oldyear-particles-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.oldyear-particle {
+  position: absolute;
+  top: -10px;
+  color: rgba(169, 169, 169, 0.6);
+  font-size: 1em;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  user-select: none;
+  animation: oldyear-fade linear infinite;
+  pointer-events: none;
+}
+
+body.oldyear-theme {
+  --oldyear-gray: #a9a9a9;
+  --oldyear-dark: #2c2c2c;
+}
+
+.oldyear-theme .bg-blue-600 {
+  background: linear-gradient(135deg, #696969 0%, #808080 100%) !important;
+}
+
+.oldyear-theme .border-blue-500,
+.oldyear-theme .border-blue-500\/50 {
+  border-color: rgba(169, 169, 169, 0.5) !important;
+}
+
+.oldyear-theme .text-blue-500 {
+  color: #a9a9a9 !important;
+}
+
+.oldyear-theme .bg-blue-500\/10,
+.oldyear-theme .bg-blue-500\/20 {
+  background-color: rgba(169, 169, 169, 0.1) !important;
+}
+
+.oldyear-theme .hover\:bg-blue-500\/10:hover {
+  background-color: rgba(169, 169, 169, 0.15) !important;
+}
+
+.oldyear-theme .hover\:border-blue-500\/30:hover {
+  border-color: rgba(169, 169, 169, 0.3) !important;
+}
+
+.oldyear-theme .shadow-blue-600\/20 {
+  box-shadow: 0 10px 15px -3px rgba(169, 169, 169, 0.2), 0 4px 6px -2px rgba(169, 169, 169, 0.1) !important;
+}
+
+.oldyear-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(169, 169, 169, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(105, 105, 105, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.oldyear-theme button.bg-blue-600 {
+  background: linear-gradient(135deg, #696969 0%, #808080 100%) !important;
+}
+
+.oldyear-theme button.bg-blue-600:hover {
+  background: linear-gradient(135deg, #5a5a5a 0%, #696969 100%) !important;
+}
+

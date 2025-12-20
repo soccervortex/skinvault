@@ -1,0 +1,96 @@
+/* Halloween Theme Styles */
+
+/* Spooky particles/falling effect */
+@keyframes spooky-float {
+  0% {
+    transform: translateY(-100vh) translateX(0) rotate(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(100vh) translateX(var(--particle-drift)) rotate(360deg);
+    opacity: 0.2;
+  }
+}
+
+.halloween-particles-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.halloween-particle {
+  position: absolute;
+  top: -10px;
+  color: rgba(255, 165, 0, 0.7);
+  font-size: 1em;
+  text-shadow: 0 0 10px rgba(255, 165, 0, 0.8), 0 0 20px rgba(255, 69, 0, 0.6);
+  user-select: none;
+  animation: spooky-float linear infinite;
+  pointer-events: none;
+}
+
+/* Halloween color scheme - orange/purple accents */
+body.halloween-theme {
+  --halloween-orange: #ff8c00;
+  --halloween-purple: #8b00ff;
+  --halloween-dark: #1a0a1a;
+}
+
+.halloween-theme .bg-blue-600 {
+  background: linear-gradient(135deg, #ff8c00 0%, #8b00ff 100%) !important;
+}
+
+.halloween-theme .border-blue-500,
+.halloween-theme .border-blue-500\/50 {
+  border-color: rgba(255, 140, 0, 0.5) !important;
+}
+
+.halloween-theme .text-blue-500 {
+  color: #ff8c00 !important;
+}
+
+.halloween-theme .bg-blue-500\/10,
+.halloween-theme .bg-blue-500\/20 {
+  background-color: rgba(255, 140, 0, 0.1) !important;
+}
+
+.halloween-theme .hover\:bg-blue-500\/10:hover {
+  background-color: rgba(255, 140, 0, 0.15) !important;
+}
+
+.halloween-theme .hover\:border-blue-500\/30:hover {
+  border-color: rgba(255, 140, 0, 0.3) !important;
+}
+
+.halloween-theme .shadow-blue-600\/20 {
+  box-shadow: 0 10px 15px -3px rgba(255, 140, 0, 0.3), 0 4px 6px -2px rgba(139, 0, 255, 0.2) !important;
+}
+
+/* Subtle dark background overlay */
+.halloween-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(255, 140, 0, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(139, 0, 255, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.halloween-theme button.bg-blue-600 {
+  background: linear-gradient(135deg, #ff8c00 0%, #ff6347 100%) !important;
+}
+
+.halloween-theme button.bg-blue-600:hover {
+  background: linear-gradient(135deg, #ff7f00 0%, #ff4500 100%) !important;
+}
+

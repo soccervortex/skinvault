@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./christmas-theme.css";
+import "./halloween-theme.css";
+import "./easter-theme.css";
+import "./sinterklaas-theme.css";
+import "./newyear-theme.css";
+import "./oldyear-theme.css";
 import InstallPrompt from "./components/InstallPrompt";
-import ChristmasThemeProvider from "./components/ChristmasThemeProvider";
+import ThemeProviderWrapper from "./components/ThemeProviderWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -72,7 +77,7 @@ export default function RootLayout({
       >
         {children}
         <InstallPrompt />
-        <ChristmasThemeProvider />
+        <ThemeProviderWrapper />
       </body>
     </html>
   );
