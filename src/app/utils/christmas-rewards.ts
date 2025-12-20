@@ -24,7 +24,7 @@ export const REWARDS_FREE: Reward[] = [
     name: 'Kerst Korting!',
     description: '20% korting op alle abonnementen',
     icon: '🎁',
-    value: 'CHRISTMAS2025',
+    value: 'CHRISTMAS2024',
   },
   {
     type: 'wishlist_boost',
@@ -113,7 +113,7 @@ export function getRandomReward(isPro: boolean = false): Reward {
 // Keep for backward compatibility
 export const REWARDS = REWARDS_FREE;
 
-const REWARD_STORAGE_KEY = 'sv_christmas_rewards_2025';
+const REWARD_STORAGE_KEY = 'sv_christmas_rewards_2024';
 
 export interface StoredReward {
   reward: Reward;
