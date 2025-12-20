@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import { getProUntil } from '@/app/utils/pro-storage';
+import { getUserGiftReward } from '@/app/utils/gift-storage';
+import type { ThemeType } from '@/app/utils/theme-storage';
 
 interface PriceAlert {
   id: string;
