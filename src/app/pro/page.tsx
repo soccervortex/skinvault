@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
 
-export default function ProInfoPage() {
+function ProInfoContent() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
@@ -365,5 +365,23 @@ export default function ProInfoPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProInfoPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+          <div className="text-center space-y-3">
+            <Loader2 className="mx-auto animate-spin text-blue-500" size={32} />
+            <p className="text-sm text-gray-400">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ProInfoContent />
+    </Suspense>
   );
 }
