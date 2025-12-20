@@ -23,8 +23,13 @@ export async function GET(request: Request) {
       timestamp: Date.now(),
     })).toString('base64');
 
-    // Discord OAuth2 scopes
-    const scopes = ['identify', 'guilds'];
+    // Discord OAuth2 scopes for user installs
+    // Note: For user installs, we only need 'identify' to get user info
+    // The bot itself is installed separately via user install flow
+    // 'guilds' is not needed for user installs (only for server installs)
+    const scopes = ['identify'];
+    
+    console.log('[Discord Auth] Generating OAuth URL for user install with scopes:', scopes.join(' '));
     
     // Build authorization URL
     const authUrl = `https://discord.com/api/oauth2/authorize?` +
@@ -33,6 +38,8 @@ export async function GET(request: Request) {
       `response_type=code&` +
       `scope=${encodeURIComponent(scopes.join(' '))}&` +
       `state=${encodeURIComponent(state)}`;
+    
+    console.log('[Discord Auth] Generated auth URL (redirect_uri hidden for security)');
 
     return NextResponse.json({ authUrl });
   } catch (error) {
