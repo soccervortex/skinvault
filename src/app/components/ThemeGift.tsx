@@ -63,7 +63,9 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
       if (!steamId) {
         // For non-logged-in users, check localStorage as fallback
         if (typeof window !== 'undefined') {
-          setHasClaimed(localStorage.getItem(`sv_${theme}_gift_claimed_2024`) === 'true');
+          // Use 2025 for current year (Christmas, Old Year), 2026 for next year events
+          const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+          setHasClaimed(localStorage.getItem(`sv_${theme}_gift_claimed_${year}`) === 'true');
         }
         setChecking(false);
         return;
@@ -89,7 +91,7 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
     if (hasClaimed || isOpening || checking || !steamId) {
       // For non-logged-in users, show message
       if (!steamId) {
-        alert('Log in met Steam om je cadeautje te openen!');
+        alert('Log in with Steam to open your gift!');
       }
       return;
     }
@@ -121,17 +123,17 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
         } else {
           const data = await response.json();
           if (data.alreadyClaimed) {
-            alert('Je hebt dit cadeautje al geopend!');
+            alert('You have already opened this gift!');
             setHasClaimed(true);
           } else {
-            alert('Er ging iets mis. Probeer het opnieuw.');
+            alert('Something went wrong. Please try again.');
             setIsOpening(false);
             setIsOpen(false);
           }
         }
       } catch (error) {
         console.error('Failed to claim gift:', error);
-        alert('Er ging iets mis. Probeer het opnieuw.');
+        alert('Something went wrong. Please try again.');
         setIsOpening(false);
         setIsOpen(false);
       }
@@ -259,7 +261,7 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
               {reward.type === 'pro_extension' && (
                 <div className="bg-emerald-500/20 backdrop-blur-sm rounded-2xl p-6 border-2 border-emerald-500/30">
                   <p className="text-white/90 text-base font-semibold">
-                    ✅ Je Pro abonnement is automatisch verlengd!
+                    ✅ Your Pro subscription has been automatically extended!
                   </p>
                 </div>
               )}
@@ -269,7 +271,7 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
                 onClick={handleCloseModal}
                 className="w-full bg-white text-red-600 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-white/90 transition-all shadow-xl text-lg"
               >
-                Geweldig!
+                Awesome!
               </button>
             </div>
           </div>

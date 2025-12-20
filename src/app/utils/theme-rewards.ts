@@ -23,37 +23,37 @@ export interface Reward {
 const REWARDS_FREE: Reward[] = [
   {
     type: 'promo_code',
-    name: 'Holiday Korting!',
-    description: '20% korting op alle abonnementen',
+    name: 'Holiday Discount!',
+    description: '20% off all subscriptions',
     icon: '🎁',
     value: 'HOLIDAY2025',
   },
   {
     type: 'wishlist_boost',
     name: 'Wishlist Boost',
-    description: '+10 extra wishlist slots voor 7 dagen',
+    description: '+10 extra wishlist slots for 7 days',
     icon: '⭐',
     duration: 7,
     value: 10,
   },
   {
     type: 'price_tracker_free',
-    name: 'Gratis Price Tracker',
-    description: '1 gratis price tracker toevoegen',
+    name: 'Free Price Tracker',
+    description: 'Add 1 free price tracker',
     icon: '🔔',
     value: 1,
   },
   {
     type: 'speed_boost',
     name: 'Speed Boost',
-    description: 'Pro scanning snelheid voor 24 uur',
+    description: 'Pro scanning speed for 24 hours',
     icon: '⚡',
     duration: 1,
   },
   {
     type: 'wishlist_extra_slots',
     name: 'Extra Slots',
-    description: '+5 permanente wishlist slots',
+    description: '+5 permanent wishlist slots',
     icon: '💎',
     value: 5,
   },
@@ -63,29 +63,29 @@ const REWARDS_FREE: Reward[] = [
 const REWARDS_PRO: Reward[] = [
   {
     type: 'pro_extension',
-    name: '1 Maand Gratis!',
-    description: 'Je Pro abonnement wordt met 1 maand verlengd',
+    name: '1 Month Free!',
+    description: 'Your Pro subscription extended by 1 month',
     icon: '👑',
     value: 1, // 1 month
   },
   {
     type: 'pro_extension',
-    name: '1 Week Gratis!',
-    description: 'Je Pro abonnement wordt met 1 week verlengd',
+    name: '1 Week Free!',
+    description: 'Your Pro subscription extended by 1 week',
     icon: '🎄',
     value: 0.25, // 0.25 months = 1 week
   },
   {
     type: 'pro_extension',
-    name: '3 Dagen Gratis!',
-    description: 'Je Pro abonnement wordt met 3 dagen verlengd',
+    name: '3 Days Free!',
+    description: 'Your Pro subscription extended by 3 days',
     icon: '🎅',
     value: 0.1, // ~0.1 months = 3 days
   },
   {
     type: 'pro_extension',
-    name: '6 Maanden Gratis!',
-    description: 'Je Pro abonnement wordt met 6 maanden verlengd! (Zeldzaam)',
+    name: '6 Months Free!',
+    description: 'Your Pro subscription extended by 6 months! (Rare)',
     icon: '🌟',
     value: 6, // 6 months (rare)
   },
@@ -100,7 +100,7 @@ const THEME_CONFIGS: Record<ThemeType, {
   christmas: {
     promoCode: 'CHRISTMAS2025',
     freeRewards: REWARDS_FREE.map(r => r.type === 'promo_code' 
-      ? { ...r, name: 'Kerst Korting!', value: 'CHRISTMAS2025', icon: '🎄' }
+      ? { ...r, name: 'Christmas Discount!', value: 'CHRISTMAS2025', icon: '🎄' }
       : r
     ),
     proRewards: REWARDS_PRO.map(r => ({
@@ -109,9 +109,9 @@ const THEME_CONFIGS: Record<ThemeType, {
     })),
   },
   halloween: {
-    promoCode: 'HALLOWEEN2025',
+    promoCode: 'HALLOWEEN2026',
     freeRewards: REWARDS_FREE.map(r => r.type === 'promo_code'
-      ? { ...r, name: 'Halloween Korting!', value: 'HALLOWEEN2025', icon: '🎃' }
+      ? { ...r, name: 'Halloween Discount!', value: 'HALLOWEEN2026', icon: '🎃' }
       : r.type === 'speed_boost'
       ? { ...r, icon: '👻' }
       : r.type === 'wishlist_boost'
@@ -124,9 +124,9 @@ const THEME_CONFIGS: Record<ThemeType, {
     })),
   },
   easter: {
-    promoCode: 'EASTER2024',
+    promoCode: 'EASTER2026',
     freeRewards: REWARDS_FREE.map(r => r.type === 'promo_code'
-      ? { ...r, name: 'Pasen Korting!', value: 'EASTER2024', icon: '🐰' }
+      ? { ...r, name: 'Easter Discount!', value: 'EASTER2026', icon: '🐰' }
       : r.type === 'speed_boost'
       ? { ...r, icon: '🥚' }
       : r.type === 'wishlist_boost'
@@ -139,9 +139,9 @@ const THEME_CONFIGS: Record<ThemeType, {
     })),
   },
   sinterklaas: {
-    promoCode: 'SINTERKLAAS2024',
+    promoCode: 'SINTERKLAAS2026',
     freeRewards: REWARDS_FREE.map(r => r.type === 'promo_code'
-      ? { ...r, name: 'Sinterklaas Korting!', value: 'SINTERKLAAS2024', icon: '🎅' }
+      ? { ...r, name: 'Sinterklaas Discount!', value: 'SINTERKLAAS2026', icon: '🎅' }
       : r.type === 'speed_boost'
       ? { ...r, icon: '🦌' }
       : r.type === 'wishlist_boost'
@@ -154,9 +154,9 @@ const THEME_CONFIGS: Record<ThemeType, {
     })),
   },
   newyear: {
-    promoCode: 'NEWYEAR2025',
+    promoCode: 'NEWYEAR2026',
     freeRewards: REWARDS_FREE.map(r => r.type === 'promo_code'
-      ? { ...r, name: 'Nieuwjaar Korting!', value: 'NEWYEAR2025', icon: '🎆' }
+      ? { ...r, name: 'New Year Discount!', value: 'NEWYEAR2026', icon: '🎆' }
       : r.type === 'speed_boost'
       ? { ...r, icon: '✨' }
       : r.type === 'wishlist_boost'
@@ -169,9 +169,9 @@ const THEME_CONFIGS: Record<ThemeType, {
     })),
   },
   oldyear: {
-    promoCode: 'OLDYEAR2024',
+    promoCode: 'OLDYEAR2025',
     freeRewards: REWARDS_FREE.map(r => r.type === 'promo_code'
-      ? { ...r, name: 'Oudjaar Korting!', value: 'OLDYEAR2024', icon: '🕐' }
+      ? { ...r, name: 'Old Year Discount!', value: 'OLDYEAR2025', icon: '🕐' }
       : r.type === 'speed_boost'
       ? { ...r, icon: '⏰' }
       : r.type === 'wishlist_boost'
@@ -260,11 +260,11 @@ export function getStoredRewards(): StoredReward[] {
 
 export function hasClaimedGift(theme: ThemeType): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem(`sv_${theme}_gift_claimed_2024`) === 'true';
+  return localStorage.getItem(`sv_${theme}_gift_claimed_2025`) === 'true';
 }
 
 export function markGiftClaimed(theme: ThemeType): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(`sv_${theme}_gift_claimed_2024`, 'true');
+  localStorage.setItem(`sv_${theme}_gift_claimed_2025`, 'true');
 }
 
