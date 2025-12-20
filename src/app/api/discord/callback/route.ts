@@ -7,8 +7,12 @@ const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.
 
 // Discord OAuth callback - exchange code for token and link to Steam account
 export async function GET(request: Request) {
+  // Log immediately - this should ALWAYS appear if route is hit
   console.log('[Discord Callback] ===== CALLBACK ROUTE CALLED =====');
+  console.log('[Discord Callback] Timestamp:', new Date().toISOString());
   console.log('[Discord Callback] Request URL:', request.url);
+  console.log('[Discord Callback] Request method:', request.method);
+  console.log('[Discord Callback] Headers:', JSON.stringify(Object.fromEntries(request.headers.entries())));
   
   try {
     const url = new URL(request.url);
