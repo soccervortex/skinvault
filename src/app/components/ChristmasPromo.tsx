@@ -16,132 +16,42 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
   const [santaVisible, setSantaVisible] = useState(false);
   const [throwAttempt, setThrowAttempt] = useState(0);
   const [claiming, setClaiming] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
-  const videoCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Enhanced Northern Lights Effect
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    let time = 0;
-    const layers: Array<{ speed: number; offset: number; colors: string[] }> = [
-      { speed: 0.0005, offset: 0, colors: ['rgba(34, 197, 94, 0)', 'rgba(34, 197, 94, 0.4)', 'rgba(34, 197, 94, 0.2)', 'rgba(34, 197, 94, 0)'] },
-      { speed: 0.0007, offset: Math.PI / 3, colors: ['rgba(16, 185, 129, 0)', 'rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0)'] },
-      { speed: 0.0006, offset: Math.PI / 2, colors: ['rgba(59, 130, 246, 0)', 'rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0)'] },
-    ];
-
-    const drawNorthernLights = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      layers.forEach((layer) => {
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        layer.colors.forEach((color, i) => {
-          gradient.addColorStop(i / (layer.colors.length - 1), color);
-        });
-
-        ctx.fillStyle = gradient;
-        ctx.globalAlpha = 0.8;
-        
-        for (let band = 0; band < 3; band++) {
-          const bandOffset = band * (canvas.width / 3);
-          const wavePhase = time * layer.speed + layer.offset + (band * Math.PI / 3);
-          
-          ctx.beginPath();
-          ctx.moveTo(bandOffset, canvas.height);
-          
-          for (let x = bandOffset; x < bandOffset + canvas.width / 3; x += 2) {
-            const normalizedX = (x - bandOffset) / (canvas.width / 3);
-            const wave1 = Math.sin(normalizedX * Math.PI * 2 + wavePhase) * 40;
-            const wave2 = Math.sin(normalizedX * Math.PI * 4 + wavePhase * 1.5) * 20;
-            const wave3 = Math.sin(normalizedX * Math.PI * 6 + wavePhase * 2) * 10;
-            const y = canvas.height * 0.3 + wave1 + wave2 + wave3;
-            ctx.lineTo(x, y);
-          }
-          
-          ctx.lineTo(bandOffset + canvas.width / 3, canvas.height);
-          ctx.lineTo(bandOffset, canvas.height);
-          ctx.fill();
-          
-          ctx.shadowBlur = 30;
-          ctx.shadowColor = layer.colors[1];
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
-      });
-
-      ctx.globalAlpha = 1.0;
-      time += 1;
-      animationFrameRef.current = requestAnimationFrame(drawNorthernLights);
-    };
-
-    drawNorthernLights();
-
-    const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  // Green screen removal and video processing
+  // Green screen removal with canvas
   useEffect(() => {
     const video = videoRef.current;
-    const videoCanvas = videoCanvasRef.current;
-    if (!video || !videoCanvas) return;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
 
-    const ctx = videoCanvas.getContext('2d', { willReadFrequently: true });
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     const processFrame = () => {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        if (videoCanvas.width !== video.videoWidth || videoCanvas.height !== video.videoHeight) {
-          videoCanvas.width = video.videoWidth;
-          videoCanvas.height = video.videoHeight;
-        }
+      if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
         
-        ctx.drawImage(video, 0, 0, videoCanvas.width, videoCanvas.height);
+        ctx.drawImage(video, 0, 0);
         
-        const imageData = ctx.getImageData(0, 0, videoCanvas.width, videoCanvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         
-        // Green screen removal (chroma key) - improved algorithm
+        // Remove green screen (chroma key)
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
           
-          // Enhanced green screen detection
-          // Check if pixel is primarily green
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const delta = max - min;
+          // Detect green screen pixels
           const greenRatio = g / (r + g + b + 1);
-          
-          // Green screen is typically bright green: high green, low red/blue
-          if (g > 120 && r < 100 && b < 100 && greenRatio > 0.4) {
-            // Calculate how "green" the pixel is (0-1)
+          if (g > 100 && r < 100 && b < 100 && greenRatio > 0.4) {
             const greenness = (g - Math.max(r, b)) / 255;
-            
-            if (greenness > 0.3) {
-              // Make transparent based on greenness for smooth edges
-              data[i + 3] = Math.floor(data[i + 3] * (1 - Math.min(greenness * 2, 1)));
+            if (greenness > 0.2) {
+              data[i + 3] = Math.floor(data[i + 3] * (1 - Math.min(greenness * 2.5, 1)));
             }
           }
         }
@@ -150,31 +60,50 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
       }
       
       if (!video.paused && !video.ended) {
-        requestAnimationFrame(processFrame);
+        animationFrameRef.current = requestAnimationFrame(processFrame);
       }
     };
 
-    video.addEventListener('play', () => {
+    const handlePlay = () => {
       processFrame();
-    });
+    };
 
+    video.addEventListener('play', handlePlay);
     video.addEventListener('loadeddata', () => {
-      videoCanvas.width = video.videoWidth;
-      videoCanvas.height = video.videoHeight;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
     });
 
     return () => {
-      video.removeEventListener('play', processFrame);
+      video.removeEventListener('play', handlePlay);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, []);
 
-  // 3D Animation for video
+  // Start video when component mounts
   useEffect(() => {
-    if (!videoRef.current || !santaVisible) return;
+    const timer = setTimeout(() => {
+      setSantaVisible(true);
+      setThrowAttempt(1);
+      
+      // Start video
+      if (videoRef.current) {
+        videoRef.current.play().catch((err) => {
+          console.error('Video play error:', err);
+        });
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
-    const videoContainer = videoRef.current.parentElement;
-    if (!videoContainer) return;
+  // 3D Animation for video container
+  useEffect(() => {
+    if (!containerRef.current || !santaVisible) return;
 
+    const container = containerRef.current;
     let frame: number;
     const startTime = Date.now();
 
@@ -185,22 +114,22 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
       }
 
       const elapsed = (Date.now() - startTime) / 1000;
-      const progress = (throwAttempt - 1) * 0.33 + (elapsed % 3) / 15; // Smooth progression
+      const progress = Math.min((throwAttempt - 1) * 0.33 + (elapsed % 3) / 10, 1);
       
       // 3D flight path
-      const x = -progress * 75;
-      const y = progress * 50;
-      const z = Math.sin(progress * Math.PI) * 80;
+      const x = -progress * 70;
+      const y = progress * 45;
+      const z = Math.sin(progress * Math.PI) * 60;
       
       // 3D rotation
-      const rotateX = Math.sin(progress * Math.PI * 2) * 12;
-      const rotateY = progress * 20;
-      const rotateZ = Math.sin(progress * Math.PI * 3) * 8;
+      const rotateX = Math.sin(progress * Math.PI * 2) * 10;
+      const rotateY = progress * 18;
+      const rotateZ = Math.sin(progress * Math.PI * 3) * 6;
       
       // Scale
-      const scale = 1 - progress * 0.25;
+      const scale = 1 - progress * 0.2;
 
-      videoContainer.style.transform = `
+      container.style.transform = `
         translate3d(${x}vw, ${y}vh, ${z}px)
         rotateX(${rotateX}deg)
         rotateY(${rotateY}deg)
@@ -217,19 +146,6 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
       if (frame) cancelAnimationFrame(frame);
     };
   }, [santaVisible, throwAttempt]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSantaVisible(true);
-      setThrowAttempt(1);
-      
-      // Start video when visible
-      if (videoRef.current) {
-        videoRef.current.play().catch(console.error);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (throwAttempt === 1) {
@@ -258,21 +174,15 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
 
   if (!giftOpened) {
     return (
-      <div className="fixed inset-0 z-[10000] pointer-events-none overflow-hidden" style={{ perspective: '2000px' }}>
-        {/* Northern Lights Canvas */}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: 'none' }}
-        />
-
+      <div className="fixed inset-0 z-[10000] pointer-events-none overflow-hidden" style={{ perspective: '2000px', background: 'transparent' }}>
         {/* Video with Green Screen Removal */}
         {santaVisible && (
           <div 
-            className="absolute top-[5%] right-[5%] origin-center"
+            ref={containerRef}
+            className="absolute top-[10%] right-[5%] origin-center"
             style={{ 
-              width: '50vw',
-              maxWidth: '800px',
+              width: '60vw',
+              maxWidth: '900px',
               aspectRatio: '16/9',
               zIndex: 10001,
               transformStyle: 'preserve-3d',
@@ -287,15 +197,15 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
               muted
               playsInline
               className="hidden"
+              style={{ display: 'none' }}
             />
             
-            {/* Canvas for chroma key output */}
+            {/* Canvas showing video with green screen removed */}
             <canvas
-              ref={videoCanvasRef}
-              className="w-full h-full"
+              ref={canvasRef}
+              className="w-full h-full object-contain"
               style={{
-                objectFit: 'contain',
-                filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.3))',
+                filter: 'drop-shadow(0 10px 40px rgba(0,0,0,0.8))',
                 imageRendering: 'auto'
               }}
             />
