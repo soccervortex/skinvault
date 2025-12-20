@@ -52,6 +52,7 @@ export default function ChristmasGift() {
         style={{
           animation: isOpen ? 'none' : 'bounce-gift 2s ease-in-out infinite',
         }}
+        id="christmas-gift-box"
       >
         <div
           className="relative w-20 h-20"
@@ -153,37 +154,6 @@ export default function ChristmasGift() {
         </div>
       )}
 
-      <style jsx>{`
-        @keyframes bounce-gift {
-          0%, 100% {
-            transform: translateX(0) translateY(0) rotate(0deg);
-          }
-          25% {
-            transform: translateX(-10px) translateY(-5px) rotate(-5deg);
-          }
-          50% {
-            transform: translateX(0) translateY(-10px) rotate(0deg);
-          }
-          75% {
-            transform: translateX(10px) translateY(-5px) rotate(5deg);
-          }
-        }
-
-        @keyframes scale-in {
-          from {
-            transform: scale(0.8);
-            opacity: 0;
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out;
-        }
-      `}</style>
     </>
   );
 }
