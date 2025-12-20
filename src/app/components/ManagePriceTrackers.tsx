@@ -151,13 +151,16 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
           </div>
         )}
 
-        {!isPro && alerts.length >= 5 && (
-          <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-            <p className="text-xs text-blue-400">
-              <strong>Free tier limit:</strong> You've reached the maximum of 5 price trackers. Upgrade to Pro for unlimited trackers!
-            </p>
-          </div>
-        )}
+        {(() => {
+          const maxTrackers = getPriceTrackerLimit(isPro);
+          return !isPro && alerts.length >= maxTrackers && (
+            <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+              <p className="text-xs text-blue-400">
+                <strong>Free tier limit:</strong> You've reached the maximum of {maxTrackers} price trackers. Upgrade to Pro for unlimited trackers!
+              </p>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
