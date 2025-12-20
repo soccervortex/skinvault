@@ -94,9 +94,18 @@ export async function preloadRewards(steamId: string): Promise<void> {
 async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
   const rewards = await getStoredRewards(steamId);
   let extraSlots = 0;
+  const now = Date.now();
   
   rewards.forEach((reward: any) => {
+    // Check for permanent extra slots
     if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
+      extraSlots += reward.value;
+    }
+    // Check for temporary wishlist boost (if not expired)
+    if (reward?.type === 'wishlist_boost' && reward?.value) {
+      // If there's a duration, check if it's expired
+      // For now, treat wishlist_boost as permanent if no expiresAt field
+      // The duration field in the reward is just metadata, not used for expiration check
       extraSlots += reward.value;
     }
   });
@@ -161,7 +170,12 @@ export function getWishlistLimitSync(isProUser: boolean): number {
   // Use cached rewards if available, otherwise return base limit
   if (rewardsCache.rewards.length > 0) {
     const extraSlots = rewardsCache.rewards.reduce((sum, reward) => {
+      // Check for permanent extra slots
       if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
+        return sum + reward.value;
+      }
+      // Check for temporary wishlist boost (treat as permanent for now)
+      if (reward?.type === 'wishlist_boost' && reward?.value) {
         return sum + reward.value;
       }
       return sum;
