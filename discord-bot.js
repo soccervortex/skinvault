@@ -1738,8 +1738,8 @@ client.on('interactionCreate', async (interaction) => {
 // Poll for queued messages every 5 seconds
 setInterval(processQueuedMessages, 5000);
 
-// Bot ready event
-client.once('ready', async () => {
+// Bot ready event (using clientReady to avoid deprecation warning)
+client.once('clientReady', async () => {
   log(`✅ Discord bot logged in as ${client.user.tag}!`);
   log(`Bot is in ${client.guilds.cache.size} guild(s)`);
   
