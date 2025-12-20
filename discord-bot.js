@@ -1,15 +1,23 @@
 const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 require('dotenv').config();
 
+// Helper function for timestamped logging
+function log(message) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+}
+
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const API_BASE_URL = process.env.API_BASE_URL || 'https://skinvaults.vercel.app';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 
 if (!DISCORD_TOKEN || !DISCORD_CLIENT_ID) {
-  console.error('Missing DISCORD_BOT_TOKEN or DISCORD_CLIENT_ID in environment variables');
+  log('❌ ERROR: Missing DISCORD_BOT_TOKEN or DISCORD_CLIENT_ID in environment variables');
   process.exit(1);
 }
+
+log('🚀 Starting Discord bot...');
 
 const client = new Client({
   intents: [
@@ -101,8 +109,8 @@ const commands = [
 async function registerCommands() {
   try {
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
-    console.log('Started refreshing application (/) commands.');
-    console.log(`Registering ${commands.length} commands:`, commands.map(c => c.name).join(', '));
+    log('Started refreshing application (/) commands.');
+    log(`Registering ${commands.length} commands: ${commands.map(c => c.name).join(', ')}`);
 
     // Register commands globally (works for both server and user installs)
     // Global commands can take up to 1 hour to propagate, but work everywhere
@@ -111,10 +119,10 @@ async function registerCommands() {
       { body: commands }
     );
 
-    console.log('✅ Successfully registered application commands globally.');
-    console.log('📋 Commands registered:', commands.map(c => `/${c.name}`).join(', '));
-    console.log('⏳ Global commands may take up to 1 hour to appear in Discord.');
-    console.log('💡 Tip: Commands will appear in DMs and servers where the bot is present.');
+    log('✅ Successfully registered application commands globally.');
+    log(`📋 Commands registered: ${commands.map(c => `/${c.name}`).join(', ')}`);
+    log('⏳ Global commands may take up to 1 hour to appear in Discord.');
+    log('💡 Tip: Commands will appear in DMs and servers where the bot is present.');
   } catch (error) {
     console.error('❌ Error registering commands:', error);
     if (error.code === 50001) {
@@ -130,25 +138,42 @@ async function registerCommands() {
 // Fetch messages from gateway API
 async function fetchQueuedMessages() {
   try {
-    const headers = API_TOKEN ? { 'Authorization': `Bearer ${API_TOKEN}` } : {};
+    const headers = {};
+    if (API_TOKEN) {
+      headers['Authorization'] = `Bearer ${API_TOKEN}`;
+    }
+    headers['Content-Type'] = 'application/json';
+    
+    log(`🔍 Fetching queued messages from ${API_BASE_URL}/api/discord/bot-gateway...`);
+    log(`🔑 API Token present: ${API_TOKEN ? 'Yes' : 'No'}`);
+    
     const response = await fetch(`${API_BASE_URL}/api/discord/bot-gateway`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(API_TOKEN ? { 'Authorization': `Bearer ${API_TOKEN}` } : {}),
-      },
+      headers: headers,
       body: JSON.stringify({ action: 'check_alerts' }),
     });
 
     if (!response.ok) {
-      console.error('Failed to fetch queued messages:', response.statusText);
+      const errorText = await response.text();
+      log(`❌ Failed to fetch queued messages: ${response.status} ${response.statusText}`);
+      log(`❌ Error details: ${errorText}`);
       return [];
     }
 
     const data = await response.json();
-    return data.queue || [];
+    const queue = data.queue || [];
+    if (queue.length > 0) {
+      log(`📬 Found ${queue.length} message(s) in queue`);
+      queue.forEach((msg, idx) => {
+        log(`   Message ${idx + 1}: Discord ID ${msg.discordId}, timestamp: ${new Date(msg.timestamp).toISOString()}`);
+      });
+    } else {
+      log(`📭 No messages in queue`);
+    }
+    return queue;
   } catch (error) {
-    console.error('Error fetching queued messages:', error);
+    log(`❌ Error fetching queued messages: ${error.message}`);
+    console.error(error);
     return [];
   }
 }
@@ -158,36 +183,40 @@ async function sendDM(discordId, message) {
   try {
     // Check if client is ready
     if (!client.isReady()) {
-      console.error('Bot is not ready yet, cannot send DM');
+      log('❌ Bot is not ready yet, cannot send DM');
       return false;
     }
 
+    log(`🔍 Fetching Discord user ${discordId}...`);
     const user = await client.users.fetch(discordId);
     if (!user) {
-      console.error(`User ${discordId} not found`);
+      log(`❌ User ${discordId} not found`);
       return false;
     }
 
+    log(`👤 Found user: ${user.username} (${user.id})`);
+    
     // Try to send DM
     try {
+      log(`📤 Attempting to send DM to ${user.username} (${discordId})...`);
       await user.send(message);
-      console.log(`✅ Sent DM to ${user.username} (${discordId})`);
+      log(`✅ Successfully sent DM to ${user.username} (${discordId})`);
       return true;
     } catch (dmError) {
       // Common errors:
       // - 50007: Cannot send messages to this user (DMs disabled or bot blocked)
       // - 50013: Missing permissions
       if (dmError.code === 50007) {
-        console.warn(`⚠️ Cannot send DM to ${user.username} (${discordId}): User has DMs disabled or bot is blocked`);
+        log(`⚠️ Cannot send DM to ${user.username} (${discordId}): User has DMs disabled or bot is blocked`);
       } else if (dmError.code === 50013) {
-        console.warn(`⚠️ Missing permissions to send DM to ${user.username} (${discordId})`);
+        log(`⚠️ Missing permissions to send DM to ${user.username} (${discordId})`);
       } else {
-        console.error(`❌ Failed to send DM to ${user.username} (${discordId}):`, dmError.message);
+        log(`❌ Failed to send DM to ${user.username} (${discordId}): ${dmError.message}`);
       }
       return false;
     }
   } catch (error) {
-    console.error(`❌ Error fetching user ${discordId} or sending DM:`, error.message);
+    log(`❌ Error fetching user ${discordId} or sending DM: ${error.message}`);
     return false;
   }
 }
@@ -196,22 +225,25 @@ async function sendDM(discordId, message) {
 async function processQueuedMessages() {
   // Only process if bot is ready
   if (!client.isReady()) {
+    log('⏸️ Bot not ready yet, skipping queue check');
     return;
   }
 
   try {
+    log('🔄 Checking for queued messages...');
     const messages = await fetchQueuedMessages();
     
     if (messages.length === 0) {
       return; // No messages to process
     }
 
-    console.log(`📬 Processing ${messages.length} queued message(s)...`);
+    log(`📬 Processing ${messages.length} queued message(s)...`);
     
     let successCount = 0;
     let failCount = 0;
-    
+  
     for (const msg of messages) {
+      log(`📤 Processing message for Discord ID: ${msg.discordId}`);
       const success = await sendDM(msg.discordId, msg.message);
       if (success) {
         successCount++;
@@ -223,10 +255,11 @@ async function processQueuedMessages() {
     }
     
     if (successCount > 0 || failCount > 0) {
-      console.log(`📬 Processed ${messages.length} message(s): ${successCount} sent, ${failCount} failed`);
+      log(`✅ Processed ${messages.length} message(s): ${successCount} sent, ${failCount} failed`);
     }
   } catch (error) {
-    console.error('❌ Error processing queued messages:', error);
+    log(`❌ Error processing queued messages: ${error.message}`);
+    console.error(error);
   }
 }
 
@@ -1634,6 +1667,11 @@ client.on('interactionCreate', async (interaction) => {
             inline: false,
           },
           {
+            name: '👤 `/player <query>`',
+            value: 'Search for a player by Steam ID, Discord username, or Steam username',
+            inline: false,
+          },
+          {
             name: '🔔 `/alerts`',
             value: 'View your active price alerts',
             inline: false,
@@ -1656,11 +1694,6 @@ client.on('interactionCreate', async (interaction) => {
           {
             name: '📊 `/stats`',
             value: 'View your CS2 player statistics',
-            inline: false,
-          },
-          {
-            name: '👤 `/player <query>`',
-            value: 'Search for a player by Steam ID, Discord username, or Steam username',
             inline: false,
           },
           {
@@ -1707,30 +1740,36 @@ setInterval(processQueuedMessages, 5000);
 
 // Bot ready event
 client.once('ready', async () => {
-  console.log(`✅ Discord bot logged in as ${client.user.tag}!`);
-  console.log(`Bot is in ${client.guilds.cache.size} guild(s)`);
+  log(`✅ Discord bot logged in as ${client.user.tag}!`);
+  log(`Bot is in ${client.guilds.cache.size} guild(s)`);
   
   // Register commands
   await registerCommands();
   
   // Process any queued messages immediately
+  log('🔄 Checking for queued messages...');
   processQueuedMessages();
   
-  console.log('🤖 Bot is ready and processing messages!');
+  log('🤖 Bot is ready and processing messages!');
+  log('⏰ Bot will check for queued messages every 5 seconds...');
 });
 
 // Error handling
 client.on('error', (error) => {
-  console.error('Discord client error:', error);
+  log(`❌ Discord client error: ${error.message}`);
+  console.error(error);
 });
 
 process.on('unhandledRejection', (error) => {
-  console.error('Unhandled promise rejection:', error);
+  log(`❌ Unhandled promise rejection: ${error.message}`);
+  console.error(error);
 });
 
 // Start bot
+log('🔐 Attempting to login to Discord...');
 client.login(DISCORD_TOKEN).catch((error) => {
-  console.error('Failed to login:', error);
+  log(`❌ Failed to login: ${error.message}`);
+  console.error(error);
   process.exit(1);
 });
 

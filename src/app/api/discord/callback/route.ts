@@ -64,6 +64,7 @@ export async function GET(request: Request) {
     }
 
     const discordUser = await userResponse.json();
+    console.log(`[Discord Callback] Received Discord user: ${discordUser.id} (${discordUser.username}) for Steam ID: ${steamId}`);
 
     // Store Discord connection in KV
     try {
@@ -81,65 +82,95 @@ export async function GET(request: Request) {
       };
       
       await kv.set(discordConnectionsKey, connections);
+      console.log(`[Discord Callback] ✅ Stored Discord connection for Steam ID ${steamId} -> Discord ID ${discordUser.id} (${discordUser.username})`);
       
-      // Send welcome message via bot gateway (try direct send first, then queue as fallback)
-      try {
-        const welcomeMessage = `🎉 **Bedankt voor het koppelen met SkinVault Bot!**
+      // Queue welcome message for bot to process
+      const welcomeMessage = `🎉 **Thanks for connecting to SkinVault Bot!**
 
-Je kunt nu:
-• **Price alerts** instellen voor CS2 skins
-• Meldingen ontvangen wanneer prijzen je doel bereiken
-• **/wishlist** gebruiken om je tracked items te bekijken
-• Alerts beheren vanuit je profiel op skinvaults.vercel.app
+You can now:
+• Set **price alerts** for CS2 skins
+• Receive notifications when prices hit your target
+• Use **/wishlist** to view your tracked items
+• Manage alerts from your profile on skinvaults.vercel.app
 
 **Commands:**
-\`/wishlist\` - Bekijk je wishlist met prijzen
-\`/price\` - Check de prijs van een skin
-\`/vault\` - Bekijk je totale vault waarde
-\`/stats\` - Bekijk je CS2 statistieken
-\`/help\` - Krijg hulp met commands
+\`/wishlist\` - View your wishlist with prices
+\`/price\` - Check the price of a skin
+\`/vault\` - View your total vault value
+\`/stats\` - View your CS2 statistics
+\`/help\` - Get help with commands
 
-Veel succes met trading! 🚀`;
+Happy trading! 🚀`;
+      
+      // Queue the message directly for bot to process
+      const welcomeQueueKey = 'discord_dm_queue';
+      console.log(`[Discord Callback] 📬 Attempting to queue welcome message for Discord user ${discordUser.id}...`);
+      
+      try {
+        const existingQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
+        console.log(`[Discord Callback] 📬 Current queue size before add: ${existingQueue.length}`);
         
-        // Try to send via bot gateway API (direct send)
-        try {
-          const botGatewayUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/discord/bot-gateway`;
-          const apiToken = process.env.DISCORD_BOT_API_TOKEN;
-          
-          const response = await fetch(botGatewayUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(apiToken ? { 'Authorization': `Bearer ${apiToken}` } : {}),
-            },
-            body: JSON.stringify({
-              action: 'send_dm',
-              discordId: discordUser.id,
-              message: welcomeMessage,
-            }),
-          });
-
-          if (!response.ok) {
-            // Fallback: queue the message
-            throw new Error('Direct send failed, queueing instead');
-          }
-          
-          console.log(`✅ Welcome message queued for Discord user ${discordUser.id}`);
-        } catch (directSendError) {
-          // Fallback: queue the message for bot to process
-          const welcomeQueueKey = 'discord_dm_queue';
-          const welcomeQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
-          
-          welcomeQueue.push({
+        // Check if message already exists for this user (avoid duplicates)
+        const existingIndex = existingQueue.findIndex(msg => msg.discordId === discordUser.id);
+        if (existingIndex >= 0) {
+          // Update existing message
+          console.log(`[Discord Callback] 📬 Updating existing message for user ${discordUser.id}`);
+          existingQueue[existingIndex] = {
+            discordId: discordUser.id,
+            message: welcomeMessage,
+            timestamp: Date.now(),
+          };
+        } else {
+          // Add new message
+          console.log(`[Discord Callback] 📬 Adding new message for user ${discordUser.id}`);
+          existingQueue.push({
             discordId: discordUser.id,
             message: welcomeMessage,
             timestamp: Date.now(),
           });
-          await kv.set(welcomeQueueKey, welcomeQueue);
-          console.log(`📬 Welcome message queued for Discord user ${discordUser.id}`);
+        }
+        
+        console.log(`[Discord Callback] 📬 Queue size before write: ${existingQueue.length}`);
+        
+        // Write to KV with retry logic
+        let writeSuccess = false;
+        let retries = 3;
+        while (retries > 0 && !writeSuccess) {
+          try {
+            await kv.set(welcomeQueueKey, existingQueue);
+            writeSuccess = true;
+            console.log(`[Discord Callback] ✅ KV write successful`);
+          } catch (writeError) {
+            retries--;
+            console.error(`[Discord Callback] ⚠️ KV write failed, retries left: ${retries}`, writeError);
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+            }
+          }
+        }
+        
+        if (!writeSuccess) {
+          console.error(`[Discord Callback] ❌ ERROR: Failed to write to KV after 3 retries!`);
+        } else {
+          // Verify the write worked (with a small delay to ensure consistency)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          const verifyQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
+          console.log(`[Discord Callback] ✅ Welcome message queued. Queue size after write: ${verifyQueue.length}`);
+          
+          if (verifyQueue.length === 0) {
+            console.error(`[Discord Callback] ❌ ERROR: Queue is empty after write! KV write may have failed.`);
+          } else {
+            const userInQueue = verifyQueue.find(msg => msg.discordId === discordUser.id);
+            if (!userInQueue) {
+              console.error(`[Discord Callback] ❌ ERROR: User ${discordUser.id} not found in queue after write!`);
+            } else {
+              console.log(`[Discord Callback] ✅ Verified: User ${discordUser.id} is in queue`);
+            }
+          }
         }
       } catch (welcomeError) {
-        console.error('Failed to send/queue welcome message:', welcomeError);
+        console.error('[Discord Callback] ❌ Failed to queue welcome message:', welcomeError);
+        console.error('[Discord Callback] Error details:', welcomeError instanceof Error ? welcomeError.stack : String(welcomeError));
         // Don't fail the connection if welcome message fails
       }
     } catch (error) {

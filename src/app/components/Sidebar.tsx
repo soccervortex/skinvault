@@ -95,6 +95,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
                 <Heart size={16}/> Wishlist
               </Link>
+              <button 
+                onClick={() => {
+                  setIsSearchOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+              >
+                <Search size={16}/> Search Player
+              </button>
               <Link href="/pro" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`}>
                 <Shield size={16}/> Pro
               </Link>
@@ -106,15 +115,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   <Shield size={16}/> Admin Panel
                 </Link>
               )}
-              <button 
-                onClick={() => {
-                  setIsSearchOpen(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
-              >
-                <Search size={16}/> Search Player
-              </button>
 
               {pathname === '/' && categories && (
                 <div className="mt-8 pt-8 border-t border-white/5">
@@ -212,6 +212,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
             <Heart size={16}/> Wishlist
           </Link>
+          <button 
+            onClick={() => setIsSearchOpen(true)}
+            className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+          >
+            <Search size={16}/> Search Player
+          </button>
           <Link href="/pro" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`}>
             <Shield size={16}/> Pro
           </Link>
@@ -223,12 +229,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Shield size={16}/> Admin Panel
             </Link>
           )}
-          <button 
-            onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
-          >
-            <Search size={16}/> Search Player
-          </button>
 
           {pathname === '/' && categories && (
             <div className="mt-8 pt-8 border-t border-white/5">

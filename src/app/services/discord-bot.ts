@@ -191,8 +191,8 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
           });
 
           if (response.ok) {
-            // Mark alert as triggered
-            await markAlertTriggered(alert.id);
+          // Mark alert as triggered
+          await markAlertTriggered(alert.id);
             console.log(`✅ Queued price alert for ${marketHashName} to Discord user ${alert.discordId}`);
           } else {
             console.error(`❌ Failed to queue price alert: ${response.statusText}`);

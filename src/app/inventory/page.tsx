@@ -1146,10 +1146,10 @@ function InventoryContent() {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setCompareModalItem({
-                                  id: itemKey,
-                                  name: getItemDisplayName(item),
-                                  image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
-                                  market_hash_name: itemKey,
+                                    id: itemKey,
+                                    name: getItemDisplayName(item),
+                                    image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
+                                    market_hash_name: itemKey,
                                 });
                                 setShowCompareModal(true);
                               }}

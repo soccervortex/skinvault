@@ -19,8 +19,14 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get('authorization');
     const expectedToken = process.env.DISCORD_BOT_API_TOKEN;
     
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Log auth attempt for debugging
+    if (expectedToken) {
+      if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
+        console.error('[Bot Gateway] Unauthorized request - token mismatch or missing');
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    } else {
+      console.warn('[Bot Gateway] No DISCORD_BOT_API_TOKEN set - allowing unauthenticated requests');
     }
 
     const body: BotGatewayRequest = await request.json();
@@ -115,8 +121,19 @@ View on SkinVault: https://skinvaults.vercel.app/item/${encodeURIComponent(alert
         const queueKey = 'discord_dm_queue';
         const queue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(queueKey) || [];
         
-        // Clear queue after reading (bot will process these)
-        await kv.set(queueKey, []);
+        console.log(`[Bot Gateway] check_alerts: Found ${queue.length} message(s) in queue`);
+        if (queue.length > 0) {
+          queue.forEach((msg, idx) => {
+            console.log(`[Bot Gateway] Queue item ${idx + 1}: Discord ID ${msg.discordId}, timestamp: ${new Date(msg.timestamp).toISOString()}`);
+          });
+          
+          // Only clear queue if we have messages (avoid race conditions)
+          // Clear queue after reading (bot will process these)
+          await kv.set(queueKey, []);
+          console.log(`[Bot Gateway] Queue cleared after returning ${queue.length} message(s)`);
+        } else {
+          console.log(`[Bot Gateway] No messages in queue, nothing to clear`);
+        }
         
         return NextResponse.json({ success: true, queue });
 
