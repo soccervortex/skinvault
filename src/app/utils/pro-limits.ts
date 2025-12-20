@@ -3,6 +3,8 @@
 export const PRO_LIMITS = {
   WISHLIST_FREE: 10, // Free users can have max 10 wishlist items
   WISHLIST_PRO: Infinity, // Pro users have unlimited
+  PRICE_TRACKER_FREE: 5, // Free users can have max 5 price trackers
+  PRICE_TRACKER_PRO: Infinity, // Pro users have unlimited
 } as const;
 
 // Helper to get rewards from localStorage (checks all theme-specific keys)
