@@ -163,18 +163,6 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
           currency: currency === '1' ? 'USD' : 'EUR',
         }).format(price);
 
-        // Try to get item image
-        let itemImage = null;
-        try {
-          const itemResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/item/info?market_hash_name=${encodeURIComponent(marketHashName)}`);
-          if (itemResponse.ok) {
-            const itemData = await itemResponse.json();
-            itemImage = itemData.image;
-          }
-        } catch (error) {
-          // Ignore errors getting image
-        }
-
         const message = `🔔 **Price Alert Triggered!**\n\n` +
           `**Item:** ${marketHashName}\n` +
           `**Current Price:** ${priceStr}\n` +
@@ -184,27 +172,47 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
           }).format(alert.targetPrice)}\n\n` +
           `View on SkinVault: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`;
 
-        // Send as embed if we have image, otherwise as plain message
-        let sent = false;
-        if (itemImage) {
-          const embed = {
-            title: '🔔 Price Alert Triggered!',
-            description: `**Item:** ${marketHashName}\n**Current Price:** ${priceStr}\n**Target Price:** ${alert.condition === 'below' ? '≤' : '≥'} ${new Intl.NumberFormat('en-US', {
-              style: 'currency',
-              currency: currency === '1' ? 'USD' : 'EUR',
-            }).format(alert.targetPrice)}`,
-            thumbnail: { url: itemImage },
-            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`,
-            color: 0x5865F2,
-          };
-          sent = await sendDiscordDMEmbed(alert.discordId, embed);
-        } else {
-          sent = await sendDiscordDM(alert.discordId, message);
-        }
-        
-        if (sent) {
-          // Mark alert as triggered
-          await markAlertTriggered(alert.id);
+        // Queue message via bot gateway (preferred method - uses Discord bot)
+        try {
+          const botGatewayUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/discord/bot-gateway`;
+          const apiToken = process.env.DISCORD_BOT_API_TOKEN;
+          
+          const response = await fetch(botGatewayUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(apiToken ? { 'Authorization': `Bearer ${apiToken}` } : {}),
+            },
+            body: JSON.stringify({
+              action: 'send_dm',
+              discordId: alert.discordId,
+              message: message,
+            }),
+          });
+
+          if (response.ok) {
+            // Mark alert as triggered
+            await markAlertTriggered(alert.id);
+            console.log(`✅ Queued price alert for ${marketHashName} to Discord user ${alert.discordId}`);
+          } else {
+            console.error(`❌ Failed to queue price alert: ${response.statusText}`);
+            // Fallback: Try direct Discord API (only if bot token is configured)
+            if (DISCORD_BOT_TOKEN) {
+              const sent = await sendDiscordDM(alert.discordId, message);
+              if (sent) {
+                await markAlertTriggered(alert.id);
+              }
+            }
+          }
+        } catch (queueError) {
+          console.error('Failed to queue price alert via bot gateway:', queueError);
+          // Fallback: Try direct Discord API (only if bot token is configured)
+          if (DISCORD_BOT_TOKEN) {
+            const sent = await sendDiscordDM(alert.discordId, message);
+            if (sent) {
+              await markAlertTriggered(alert.id);
+            }
+          }
         }
       }
     }

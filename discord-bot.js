@@ -156,29 +156,77 @@ async function fetchQueuedMessages() {
 // Send DM to user
 async function sendDM(discordId, message) {
   try {
+    // Check if client is ready
+    if (!client.isReady()) {
+      console.error('Bot is not ready yet, cannot send DM');
+      return false;
+    }
+
     const user = await client.users.fetch(discordId);
     if (!user) {
       console.error(`User ${discordId} not found`);
       return false;
     }
 
-    await user.send(message);
-    console.log(`Sent DM to ${user.username}#${user.discriminator} (${discordId})`);
-    return true;
+    // Try to send DM
+    try {
+      await user.send(message);
+      console.log(`✅ Sent DM to ${user.username} (${discordId})`);
+      return true;
+    } catch (dmError) {
+      // Common errors:
+      // - 50007: Cannot send messages to this user (DMs disabled or bot blocked)
+      // - 50013: Missing permissions
+      if (dmError.code === 50007) {
+        console.warn(`⚠️ Cannot send DM to ${user.username} (${discordId}): User has DMs disabled or bot is blocked`);
+      } else if (dmError.code === 50013) {
+        console.warn(`⚠️ Missing permissions to send DM to ${user.username} (${discordId})`);
+      } else {
+        console.error(`❌ Failed to send DM to ${user.username} (${discordId}):`, dmError.message);
+      }
+      return false;
+    }
   } catch (error) {
-    console.error(`Failed to send DM to ${discordId}:`, error.message);
+    console.error(`❌ Error fetching user ${discordId} or sending DM:`, error.message);
     return false;
   }
 }
 
 // Process queued messages
 async function processQueuedMessages() {
-  const messages = await fetchQueuedMessages();
-  
-  for (const msg of messages) {
-    await sendDM(msg.discordId, msg.message);
-    // Small delay to avoid rate limits
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  // Only process if bot is ready
+  if (!client.isReady()) {
+    return;
+  }
+
+  try {
+    const messages = await fetchQueuedMessages();
+    
+    if (messages.length === 0) {
+      return; // No messages to process
+    }
+
+    console.log(`📬 Processing ${messages.length} queued message(s)...`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const msg of messages) {
+      const success = await sendDM(msg.discordId, msg.message);
+      if (success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+      // Small delay to avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    if (successCount > 0 || failCount > 0) {
+      console.log(`📬 Processed ${messages.length} message(s): ${successCount} sent, ${failCount} failed`);
+    }
+  } catch (error) {
+    console.error('❌ Error processing queued messages:', error);
   }
 }
 
