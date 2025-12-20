@@ -1,151 +1,180 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Gift, X } from 'lucide-react';
-
-const PROMO_CODE = 'CHRISTMAS2024';
-const DISCOUNT_AMOUNT = 2;
-const PROMO_STORAGE_KEY = 'sv_christmas_promo_claimed_2024';
+import { Gift, X, Sparkles } from 'lucide-react';
+import { getRandomReward, saveReward, hasClaimedGift, markGiftClaimed, type Reward } from '@/app/utils/christmas-rewards';
 
 export default function ChristmasGift() {
+  const [isOpening, setIsOpening] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [reward, setReward] = useState<Reward | null>(null);
 
   useEffect(() => {
-    // Check if promo has been claimed this year
     if (typeof window === 'undefined') return;
-    
-    const claimed = localStorage.getItem(PROMO_STORAGE_KEY);
-    if (claimed === 'true') {
-      setHasClaimed(true);
-    }
+    setHasClaimed(hasClaimedGift());
   }, []);
 
   const handleGiftClick = () => {
-    if (hasClaimed) return;
+    if (hasClaimed || isOpening) return;
     
-    setShowModal(true);
-    setIsOpen(true);
+    setIsOpening(true);
     
-    // Mark as claimed
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(PROMO_STORAGE_KEY, 'true');
+    // Get random reward
+    const randomReward = getRandomReward();
+    setReward(randomReward);
+    
+    // Animate box opening
+    setTimeout(() => {
+      setIsOpening(false);
+      setIsOpen(true);
+      setShowModal(true);
+      
+      // Save reward
+      saveReward(randomReward);
+      markGiftClaimed();
       setHasClaimed(true);
-    }
+    }, 1500); // Opening animation duration
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
   };
 
-  if (hasClaimed) return null;
+  if (hasClaimed && !showModal) return null;
 
   return (
     <>
       {/* 3D Gift Box */}
-      <div
-        onClick={handleGiftClick}
-        className={`fixed bottom-6 right-6 z-[10000] cursor-pointer transition-all duration-500 ${
-          isOpen ? 'scale-0 rotate-180' : 'hover:scale-110'
-        }`}
-        style={{
-          animation: isOpen ? 'none' : 'bounce-gift 2s ease-in-out infinite',
-        }}
-        id="christmas-gift-box"
-      >
+      {!isOpen && (
         <div
-          className="relative w-20 h-20"
+          onClick={handleGiftClick}
+          className={`fixed bottom-6 right-6 z-[10000] cursor-pointer transition-all duration-300 ${
+            isOpening ? 'scale-125' : 'hover:scale-110'
+          }`}
           style={{
-            transformStyle: 'preserve-3d',
-            perspective: '1000px',
+            animation: isOpening ? 'open-gift 1.5s ease-in-out' : 'bounce-gift 2s ease-in-out infinite',
           }}
         >
-          {/* Gift Box - 3D effect */}
           <div
-            className="absolute inset-0 bg-gradient-to-br from-red-600 via-red-500 to-green-600 rounded-lg shadow-2xl"
+            className="relative w-20 h-20"
             style={{
-              transform: 'rotateX(15deg) rotateY(15deg)',
-              boxShadow: '0 10px 30px rgba(220, 38, 38, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.2)',
+              transformStyle: 'preserve-3d',
+              perspective: '1000px',
             }}
           >
-            {/* Gift Ribbon */}
-            <div className="absolute top-1/2 left-0 right-0 h-4 bg-yellow-400 transform -translate-y-1/2 shadow-lg"></div>
-            <div className="absolute left-1/2 top-0 bottom-0 w-4 bg-yellow-400 transform -translate-x-1/2 shadow-lg"></div>
-            {/* Bow */}
-            <div className="absolute top-1 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-6 h-6 bg-yellow-300 rounded-full shadow-md"></div>
+            {/* Gift Box - 3D effect */}
+            <div
+              className={`absolute inset-0 bg-gradient-to-br from-red-600 via-red-500 to-green-600 rounded-lg shadow-2xl transition-all duration-300 ${
+                isOpening ? 'gift-opening' : ''
+              }`}
+              style={{
+                transform: isOpening ? 'rotateX(90deg) translateZ(20px)' : 'rotateX(15deg) rotateY(15deg)',
+                boxShadow: '0 10px 30px rgba(220, 38, 38, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.2)',
+              }}
+            >
+              {/* Gift Ribbon */}
+              <div className="absolute top-1/2 left-0 right-0 h-4 bg-yellow-400 transform -translate-y-1/2 shadow-lg"></div>
+              <div className="absolute left-1/2 top-0 bottom-0 w-4 bg-yellow-400 transform -translate-x-1/2 shadow-lg"></div>
+              {/* Bow */}
+              <div className="absolute top-1 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="w-6 h-6 bg-yellow-300 rounded-full shadow-md"></div>
+              </div>
+              
+              {/* Opening effect - light coming out */}
+              {isOpening && (
+                <div className="absolute inset-0 bg-gradient-to-t from-yellow-200/80 via-white/60 to-transparent rounded-lg animate-pulse"></div>
+              )}
             </div>
           </div>
+          
+          {/* Sparkle effects */}
+          <div className="absolute -top-2 -right-2 text-yellow-300 text-2xl animate-pulse">✨</div>
+          <div className="absolute -bottom-1 -left-1 text-yellow-200 text-xl animate-pulse delay-300">⭐</div>
         </div>
-        
-        {/* Sparkle effect */}
-        <div className="absolute -top-2 -right-2 text-yellow-300 text-2xl animate-pulse">✨</div>
-      </div>
+      )}
 
-      {/* Promo Modal */}
-      {showModal && (
+      {/* Reward Modal */}
+      {showModal && reward && (
         <div 
-          className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in"
           onClick={handleCloseModal}
         >
           <div 
-            className="bg-gradient-to-br from-red-600 via-red-500 to-green-600 rounded-3xl p-8 md:p-12 max-w-md w-full shadow-2xl relative animate-scale-in"
+            className="bg-gradient-to-br from-red-600 via-red-500 to-green-600 rounded-3xl p-8 md:p-12 max-w-md w-full shadow-2xl relative animate-reward-pop"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Confetti effect */}
+            <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+              {[...Array(20)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-2 h-2 bg-yellow-300 rounded-full animate-confetti"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 1}s`,
+                    animationDuration: `${1 + Math.random() * 1}s`,
+                  }}
+                />
+              ))}
+            </div>
+
             <button
               onClick={handleCloseModal}
-              className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors z-10"
             >
               <X size={24} />
             </button>
 
-            <div className="text-center space-y-6">
-              {/* Gift Icon */}
+            <div className="text-center space-y-6 relative z-10">
+              {/* Reward Icon - Large */}
               <div className="flex justify-center">
-                <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm">
-                  <Gift size={48} className="text-white" />
+                <div className="p-8 bg-white/20 rounded-full backdrop-blur-sm animate-bounce-subtle">
+                  <span className="text-6xl">{reward.icon}</span>
                 </div>
               </div>
 
               {/* Title */}
               <div>
-                <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter mb-2">
-                  Kerst Special!
+                <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-2">
+                  {reward.name}
                 </h2>
-                <p className="text-white/90 text-lg">
-                  €{DISCOUNT_AMOUNT} korting op je volgende aankoop
+                <p className="text-white/90 text-lg md:text-xl">
+                  {reward.description}
                 </p>
+                {reward.duration && (
+                  <p className="text-white/70 text-sm mt-2">
+                    Geldig voor {reward.duration} {reward.duration === 1 ? 'dag' : 'dagen'}
+                  </p>
+                )}
               </div>
 
-              {/* Promo Code */}
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/30">
-                <p className="text-white/80 text-sm uppercase tracking-wider mb-2">Promo Code</p>
-                <div className="flex items-center justify-center gap-3">
-                  <code className="text-3xl font-black text-white tracking-wider bg-white/10 px-6 py-3 rounded-xl">
-                    {PROMO_CODE}
-                  </code>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(PROMO_CODE);
-                      // Visual feedback could be added here
-                    }}
-                    className="text-white/80 hover:text-white transition-colors"
-                    title="Kopieer code"
-                  >
-                    📋
-                  </button>
+              {/* Reward Details */}
+              {reward.type === 'promo_code' && reward.value && (
+                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/30">
+                  <p className="text-white/80 text-sm uppercase tracking-wider mb-2">Promo Code</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <code className="text-3xl font-black text-white tracking-wider bg-white/10 px-6 py-3 rounded-xl">
+                      {reward.value}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(reward.value as string);
+                      }}
+                      className="text-white/80 hover:text-white transition-colors"
+                      title="Kopieer code"
+                    >
+                      📋
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Info */}
-              <p className="text-white/70 text-sm">
-                Gebruik deze code bij checkout om €{DISCOUNT_AMOUNT} korting te krijgen!
-              </p>
-
+              {/* Action Button */}
               <button
                 onClick={handleCloseModal}
-                className="w-full bg-white text-red-600 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-white/90 transition-all shadow-xl"
+                className="w-full bg-white text-red-600 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-white/90 transition-all shadow-xl text-lg"
               >
                 Geweldig!
               </button>
@@ -154,7 +183,97 @@ export default function ChristmasGift() {
         </div>
       )}
 
+      <style jsx global>{`
+        @keyframes bounce-gift {
+          0%, 100% {
+            transform: translateX(0) translateY(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(-10px) translateY(-5px) rotate(-5deg);
+          }
+          50% {
+            transform: translateX(0) translateY(-10px) rotate(0deg);
+          }
+          75% {
+            transform: translateX(10px) translateY(-5px) rotate(5deg);
+          }
+        }
+
+        @keyframes open-gift {
+          0% {
+            transform: scale(1) rotate(0deg);
+          }
+          50% {
+            transform: scale(1.3) rotate(5deg);
+          }
+          100% {
+            transform: scale(1.5) rotate(0deg);
+          }
+        }
+
+        @keyframes reward-pop {
+          0% {
+            transform: scale(0.5);
+            opacity: 0;
+          }
+          60% {
+            transform: scale(1.05);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes bounce-subtle {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes confetti {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(200px) rotate(360deg);
+            opacity: 0;
+          }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+
+        .animate-reward-pop {
+          animation: reward-pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .animate-bounce-subtle {
+          animation: bounce-subtle 2s ease-in-out infinite;
+        }
+
+        .animate-confetti {
+          animation: confetti 2s ease-out forwards;
+        }
+
+        .gift-opening {
+          transition: transform 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+      `}</style>
     </>
   );
 }
-

@@ -26,9 +26,13 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
     if (theme) {
       document.body.classList.add(`${theme}-theme`);
     } else {
-      // When theme is disabled, clear Christmas promo data so it can be used next year
+      // When theme is disabled, clear Christmas promo and gift data so it can be used next year
       if (typeof window !== 'undefined') {
-        const promoKeys = Object.keys(localStorage).filter(key => key.startsWith('sv_christmas_promo_claimed_'));
+        const promoKeys = Object.keys(localStorage).filter(key => 
+          key.startsWith('sv_christmas_promo_claimed_') || 
+          key.startsWith('sv_christmas_gift_claimed_') ||
+          key.startsWith('sv_christmas_rewards_')
+        );
         promoKeys.forEach(key => localStorage.removeItem(key));
       }
     }
