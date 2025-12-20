@@ -47,15 +47,33 @@ export default function InstallPrompt() {
   const handleDismiss = () => {
     setShowPrompt(false);
     // Don't show again for this session
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('installPromptDismissed', 'true');
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        // Test sessionStorage accessibility first
+        const testKey = '__sessionStorage_test__';
+        window.sessionStorage.setItem(testKey, 'test');
+        window.sessionStorage.removeItem(testKey);
+        window.sessionStorage.setItem('installPromptDismissed', 'true');
+      }
+    } catch {
+      // Ignore sessionStorage errors
     }
   };
 
   // Don't show if dismissed in this session
   useEffect(() => {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('installPromptDismissed')) {
-      setShowPrompt(false);
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        // Test sessionStorage accessibility first
+        const testKey = '__sessionStorage_test__';
+        window.sessionStorage.setItem(testKey, 'test');
+        window.sessionStorage.removeItem(testKey);
+        if (window.sessionStorage.getItem('installPromptDismissed')) {
+          setShowPrompt(false);
+        }
+      }
+    } catch {
+      // Ignore sessionStorage errors
     }
   }, []);
 
