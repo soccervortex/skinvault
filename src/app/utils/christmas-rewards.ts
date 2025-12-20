@@ -20,7 +20,7 @@ export const REWARDS: Reward[] = [
   {
     type: 'promo_code',
     name: 'Kerst Korting!',
-    description: '€2 korting bij checkout',
+    description: '20% korting op alle abonnementen',
     icon: '🎁',
     value: 'CHRISTMAS2024',
   },

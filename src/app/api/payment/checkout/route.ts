@@ -38,9 +38,9 @@ export async function POST(request: Request) {
     let finalAmount = priceInfo.amount;
     let discountAmount = 0;
 
-    // Apply promo code discount (€2 off = 200 cents)
+    // Apply promo code discount (20% off - same as €2 on €10 = 20%)
     if (promoCode === 'CHRISTMAS2024') {
-      discountAmount = 200; // €2 in cents
+      discountAmount = Math.round(priceInfo.amount * 0.2); // 20% discount
       finalAmount = Math.max(0, priceInfo.amount - discountAmount);
     }
 
