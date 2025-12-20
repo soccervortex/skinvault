@@ -11,6 +11,15 @@ const PRICES: Record<string, { amount: number; months: number }> = {
   '6months': { amount: 4499, months: 6 }, // €44.99 in cents
 };
 
+// Promo discounts (in cents)
+const PROMO_DISCOUNTS: Record<string, number> = {
+  'christmas2024': 200, // €2 discount
+  'halloween2024': 200,
+  'easter2024': 200,
+  'sinterklaas2024': 200,
+  'newyear2024': 200,
+};
+
 export async function POST(request: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json(
@@ -20,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { plan, steamId } = await request.json();
+    const { plan, steamId, promoCode } = await request.json();
 
     if (!plan || !PRICES[plan]) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
@@ -35,6 +44,8 @@ export async function POST(request: Request) {
     }
 
     const priceInfo = PRICES[plan];
+    const discount = promoCode ? (PROMO_DISCOUNTS[promoCode] || 0) : 0;
+    const finalAmount = Math.max(0, priceInfo.amount - discount);
     const origin = request.headers.get('origin') || 'https://skinvaults.vercel.app';
 
     const session = await stripe.checkout.sessions.create({
@@ -45,9 +56,9 @@ export async function POST(request: Request) {
             currency: 'eur',
             product_data: {
               name: `SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`,
-              description: `Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`,
+              description: `Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}${discount > 0 ? ` (Promo: -€${(discount / 100).toFixed(2)})` : ''}`,
             },
-            unit_amount: priceInfo.amount,
+            unit_amount: finalAmount,
           },
           quantity: 1,
         },
@@ -59,6 +70,8 @@ export async function POST(request: Request) {
         steamId,
         months: priceInfo.months.toString(),
         plan,
+        promoCode: promoCode || '',
+        discount: discount.toString(),
       },
     });
 

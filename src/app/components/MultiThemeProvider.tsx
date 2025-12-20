@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ThemeType } from '@/app/utils/theme-storage';
 import ThemeParticles from './ThemeParticles';
+import PromoManager from './PromoManager';
 
 export default function MultiThemeProvider({ steamId }: { steamId?: string | null }) {
   const [activeTheme, setActiveTheme] = useState<ThemeType | null>(null);
@@ -101,6 +102,11 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
   // Don't render particles until mounted to avoid hydration issues
   if (!mounted || !activeTheme) return null;
 
-  return <ThemeParticles theme={activeTheme} />;
+  return (
+    <>
+      <ThemeParticles theme={activeTheme} />
+      <PromoManager theme={activeTheme} steamId={steamId} />
+    </>
+  );
 }
 
