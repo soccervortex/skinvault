@@ -653,15 +653,25 @@ function InventoryContent() {
   }, [viewedUser?.steamId]);
 
   const totalVaultValue = useMemo(() => {
+    // Always return a valid number, never Infinity
+    if (!inventory || inventory.length === 0) {
+      return '0,00';
+    }
     let total = 0;
     inventory.forEach(item => {
       const key = getMarketKey(item);
       const priceStr = key ? itemPrices[key] : undefined;
       if (priceStr) {
         const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
-        if (!isNaN(num)) total += num * Number(item.amount ?? 1);
+        if (!isNaN(num) && isFinite(num)) {
+          total += num * Number(item.amount ?? 1);
+        }
       }
     });
+    // Ensure total is always a finite number (not Infinity)
+    if (!isFinite(total) || isNaN(total)) {
+      total = 0;
+    }
     return total.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }, [inventory, itemPrices]);
 
