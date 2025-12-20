@@ -24,7 +24,7 @@ export const REWARDS_FREE: Reward[] = [
     name: 'Kerst Korting!',
     description: '20% korting op alle abonnementen',
     icon: '🎁',
-    value: 'CHRISTMAS2024',
+    value: 'CHRISTMAS2025',
   },
   {
     type: 'wishlist_boost',

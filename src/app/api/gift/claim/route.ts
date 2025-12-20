@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     // Check if user is Pro to determine reward pool
     const proUntil = await getProUntil(steamId);
-    const isPro = proUntil && new Date(proUntil) > new Date();
+    const isPro = !!(proUntil && new Date(proUntil) > new Date());
     
     // Get random reward based on Pro status and theme
     const reward = getRandomReward(theme, isPro);
