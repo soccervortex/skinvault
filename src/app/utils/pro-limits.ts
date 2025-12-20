@@ -101,11 +101,8 @@ async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
     if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
       extraSlots += reward.value;
     }
-    // Check for temporary wishlist boost (if not expired)
+    // Check for temporary wishlist boost (treat as permanent for now)
     if (reward?.type === 'wishlist_boost' && reward?.value) {
-      // If there's a duration, check if it's expired
-      // For now, treat wishlist_boost as permanent if no expiresAt field
-      // The duration field in the reward is just metadata, not used for expiration check
       extraSlots += reward.value;
     }
   });
