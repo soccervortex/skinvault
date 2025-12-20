@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, SlashCommandBuilder, ActivityType, PresenceUpdateStatus } = require('discord.js');
 require('dotenv').config();
 
 // Helper function for timestamped logging
@@ -1742,6 +1742,20 @@ setInterval(processQueuedMessages, 5000);
 client.once('clientReady', async () => {
   log(`✅ Discord bot logged in as ${client.user.tag}!`);
   log(`Bot is in ${client.guilds.cache.size} guild(s)`);
+  
+  // Set bot presence/status to show as online
+  try {
+    client.user.setPresence({
+      activities: [{
+        name: 'CS2 Skin Analytics',
+        type: ActivityType.Watching,
+      }],
+      status: PresenceUpdateStatus.Online,
+    });
+    log('✅ Bot presence set to online');
+  } catch (error) {
+    log(`⚠️ Failed to set bot presence: ${error.message}`);
+  }
   
   // Register commands
   await registerCommands();
