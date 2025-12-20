@@ -199,14 +199,28 @@ export function getRandomReward(theme: ThemeType, isPro: boolean = false): Rewar
     if (rand < 0.95) return proRewards[2]; // 3 days
     return proRewards[3]; // 6 months (rare)
   } else {
-    // Non-Pro users get regular rewards
-    // Weighted random - promo code is more common (40%), others 15% each
+    // Non-Pro users get regular rewards with small chance for Pro extension
     const rand = Math.random();
-    if (rand < 0.4) return rewards[0]; // promo_code
-    if (rand < 0.55) return rewards[1]; // wishlist_boost
-    if (rand < 0.70) return rewards[2]; // price_tracker_free
-    if (rand < 0.85) return rewards[3]; // speed_boost
-    return rewards[4]; // wishlist_extra_slots
+    
+    // 5% chance for Pro extension (1 week) - rare reward for free users
+    if (rand < 0.05) {
+      return {
+        type: 'pro_extension',
+        name: '1 Week Free Pro!',
+        description: 'Your Pro subscription extended by 1 week',
+        icon: config.proRewards[1].icon,
+        value: 0.25, // 0.25 months = 1 week
+      };
+    }
+    
+    // Regular rewards with adjusted weights (remaining 95%)
+    const adjustedRand = (rand - 0.05) / 0.95; // Rescale remaining probability
+    
+    if (adjustedRand < 0.421) return rewards[0]; // promo_code (40% of 95% ≈ 38%)
+    if (adjustedRand < 0.579) return rewards[1]; // wishlist_boost (15.8% of 95% ≈ 15%)
+    if (adjustedRand < 0.737) return rewards[2]; // price_tracker_free (15.8% of 95% ≈ 15%)
+    if (adjustedRand < 0.895) return rewards[3]; // speed_boost (15.8% of 95% ≈ 15%)
+    return rewards[4]; // wishlist_extra_slots (10.5% of 95% ≈ 10%)
   }
 }
 
