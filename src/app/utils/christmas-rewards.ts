@@ -24,7 +24,7 @@ export const REWARDS_FREE: Reward[] = [
     name: 'Kerst Korting!',
     description: '20% korting op alle abonnementen',
     icon: '🎁',
-    value: 'CHRISTMAS2024',
+    value: 'CHRISTMAS2025',
   },
   {
     type: 'wishlist_boost',
@@ -113,7 +113,7 @@ export function getRandomReward(isPro: boolean = false): Reward {
 // Keep for backward compatibility
 export const REWARDS = REWARDS_FREE;
 
-const REWARD_STORAGE_KEY = 'sv_christmas_rewards_2024';
+const REWARD_STORAGE_KEY = 'sv_christmas_rewards_2025';
 
 export interface StoredReward {
   reward: Reward;
@@ -161,11 +161,11 @@ export function getStoredRewards(): StoredReward[] {
 
 export function hasClaimedGift(): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem('sv_christmas_gift_claimed_2025') === 'true';
+  return localStorage.getItem('sv_christmas_gift_claimed_2024') === 'true';
 }
 
 export function markGiftClaimed(): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('sv_christmas_gift_claimed_2025', 'true');
+  localStorage.setItem('sv_christmas_gift_claimed_2024', 'true');
 }
 

@@ -21,7 +21,7 @@ export default function ChristmasGift({ steamId }: ChristmasGiftProps) {
       if (!steamId) {
         // For non-logged-in users, check localStorage as fallback
         if (typeof window !== 'undefined') {
-          setHasClaimed(localStorage.getItem('sv_christmas_gift_claimed_2024') === 'true');
+          setHasClaimed(localStorage.getItem('sv_christmas_gift_claimed_2025') === 'true');
         }
         setChecking(false);
         return;
@@ -227,6 +227,15 @@ export default function ChristmasGift({ steamId }: ChristmasGiftProps) {
                       📋
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Pro Extension Applied Message */}
+              {reward.type === 'pro_extension' && (
+                <div className="bg-emerald-500/20 backdrop-blur-sm rounded-2xl p-6 border-2 border-emerald-500/30">
+                  <p className="text-white/90 text-base font-semibold">
+                    ✅ Je Pro abonnement is automatisch verlengd!
+                  </p>
                 </div>
               )}
 
