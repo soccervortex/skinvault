@@ -107,7 +107,9 @@ export async function GET(request: Request) {
       await kv.set(discordConnectionsKey, connections);
       console.log(`[Discord Callback] ✅ Stored Discord connection for Steam ID ${steamId} -> Discord ID ${discordUser.id} (${discordUser.username})`);
       
-      // Queue welcome message for bot to process
+      // Queue welcome message for bot to process - THIS MUST RUN
+      console.log(`[Discord Callback] 🚀 Starting welcome message queue process...`);
+      
       const welcomeMessage = `🎉 **Thanks for connecting to SkinVault Bot!**
 
 You can now:
@@ -127,17 +129,19 @@ Happy trading! 🚀`;
       
       // Queue the message directly for bot to process
       const welcomeQueueKey = 'discord_dm_queue';
-      console.log(`[Discord Callback] 📬 Attempting to queue welcome message for Discord user ${discordUser.id}...`);
+      console.log(`[Discord Callback] 📬 STEP 1: Attempting to queue welcome message for Discord user ${discordUser.id}...`);
       
       try {
+        console.log(`[Discord Callback] 📬 STEP 2: About to read queue from KV...`);
         const existingQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
-        console.log(`[Discord Callback] 📬 Current queue size before add: ${existingQueue.length}`);
+        console.log(`[Discord Callback] 📬 STEP 3: Read queue from KV. Current queue size: ${existingQueue.length}`);
         
         // Check if message already exists for this user (avoid duplicates)
+        console.log(`[Discord Callback] 📬 STEP 4: Checking for existing message for user ${discordUser.id}...`);
         const existingIndex = existingQueue.findIndex(msg => msg.discordId === discordUser.id);
         if (existingIndex >= 0) {
           // Update existing message
-          console.log(`[Discord Callback] 📬 Updating existing message for user ${discordUser.id}`);
+          console.log(`[Discord Callback] 📬 STEP 5: Updating existing message at index ${existingIndex}`);
           existingQueue[existingIndex] = {
             discordId: discordUser.id,
             message: welcomeMessage,
@@ -145,7 +149,7 @@ Happy trading! 🚀`;
           };
         } else {
           // Add new message
-          console.log(`[Discord Callback] 📬 Adding new message for user ${discordUser.id}`);
+          console.log(`[Discord Callback] 📬 STEP 5: Adding NEW message to queue`);
           existingQueue.push({
             discordId: discordUser.id,
             message: welcomeMessage,
@@ -153,41 +157,47 @@ Happy trading! 🚀`;
           });
         }
         
-        console.log(`[Discord Callback] 📬 Queue size before write: ${existingQueue.length}`);
+        console.log(`[Discord Callback] 📬 STEP 6: Queue size after modification: ${existingQueue.length}`);
         
         // Write to KV with retry logic
+        console.log(`[Discord Callback] 📬 STEP 7: Starting KV write with retry logic...`);
         let writeSuccess = false;
         let retries = 3;
         while (retries > 0 && !writeSuccess) {
           try {
+            console.log(`[Discord Callback] 📬 STEP 7.${4 - retries}: Attempting KV write (retry ${4 - retries}/3)...`);
             await kv.set(welcomeQueueKey, existingQueue);
             writeSuccess = true;
-            console.log(`[Discord Callback] ✅ KV write successful`);
+            console.log(`[Discord Callback] ✅ STEP 7: KV write successful!`);
           } catch (writeError) {
             retries--;
             console.error(`[Discord Callback] ⚠️ KV write failed, retries left: ${retries}`, writeError);
             if (retries > 0) {
+              console.log(`[Discord Callback] ⏳ Waiting 500ms before retry...`);
               await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
             }
           }
         }
         
         if (!writeSuccess) {
-          console.error(`[Discord Callback] ❌ ERROR: Failed to write to KV after 3 retries!`);
+          console.error(`[Discord Callback] ❌ STEP 8: ERROR - Failed to write to KV after 3 retries!`);
         } else {
           // Verify the write worked (with a small delay to ensure consistency)
+          console.log(`[Discord Callback] 📬 STEP 8: Verifying KV write (waiting 100ms for consistency)...`);
           await new Promise(resolve => setTimeout(resolve, 100));
           const verifyQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
-          console.log(`[Discord Callback] ✅ Welcome message queued. Queue size after write: ${verifyQueue.length}`);
+          console.log(`[Discord Callback] 📬 STEP 9: Verification read complete. Queue size: ${verifyQueue.length}`);
           
           if (verifyQueue.length === 0) {
-            console.error(`[Discord Callback] ❌ ERROR: Queue is empty after write! KV write may have failed.`);
+            console.error(`[Discord Callback] ❌ STEP 9: ERROR - Queue is empty after write! KV write may have failed.`);
           } else {
             const userInQueue = verifyQueue.find(msg => msg.discordId === discordUser.id);
             if (!userInQueue) {
-              console.error(`[Discord Callback] ❌ ERROR: User ${discordUser.id} not found in queue after write!`);
+              console.error(`[Discord Callback] ❌ STEP 9: ERROR - User ${discordUser.id} not found in queue after write!`);
+              console.error(`[Discord Callback] Queue contents:`, JSON.stringify(verifyQueue.map(m => ({ id: m.discordId, ts: m.timestamp }))));
             } else {
-              console.log(`[Discord Callback] ✅ Verified: User ${discordUser.id} is in queue`);
+              console.log(`[Discord Callback] ✅ STEP 9: SUCCESS - Verified user ${discordUser.id} is in queue!`);
+              console.log(`[Discord Callback] ✅ Welcome message successfully queued and verified!`);
             }
           }
         }
