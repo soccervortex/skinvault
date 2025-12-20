@@ -48,12 +48,12 @@ export async function POST(request: Request) {
     await setThemeEnabled(theme, enabled);
     const updatedSettings = await getThemeSettings();
 
-    // If Christmas theme is being disabled, clear gift claims so users can claim again next year
-    if (theme === 'christmas' && !enabled) {
+    // If theme is being disabled, clear gift claims for that theme so users can claim again next year
+    if (!enabled) {
       try {
         const { kv } = await import('@vercel/kv');
         if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-          await kv.del('christmas_gift_claims_2024');
+          await kv.del(`theme_gift_claims_2024_${theme}`);
         }
       } catch (error) {
         console.error('Failed to clear gift claims:', error);

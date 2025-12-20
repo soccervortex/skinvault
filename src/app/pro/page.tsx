@@ -88,14 +88,19 @@ export default function ProInfoPage() {
 
     setLoading(plan);
     try {
-      // Check if user has claimed Christmas gift with promo code reward
+      // Check if user has claimed any theme gift with promo code reward
       let promoCode: string | undefined = undefined;
       try {
-        const giftResponse = await fetch(`/api/gift/claim?steamId=${user.steamId}`);
-        if (giftResponse.ok) {
-          const giftData = await giftResponse.json();
-          if (giftData.claimed && giftData.reward?.type === 'promo_code' && giftData.reward?.value) {
-            promoCode = giftData.reward.value;
+        // Check all possible themes for promo codes
+        const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+        for (const theme of themes) {
+          const giftResponse = await fetch(`/api/gift/claim?steamId=${user.steamId}&theme=${theme}`);
+          if (giftResponse.ok) {
+            const giftData = await giftResponse.json();
+            if (giftData.claimed && giftData.reward?.type === 'promo_code' && giftData.reward?.value) {
+              promoCode = giftData.reward.value;
+              break; // Use first found promo code
+            }
           }
         }
       } catch (error) {

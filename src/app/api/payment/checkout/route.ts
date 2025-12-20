@@ -38,8 +38,9 @@ export async function POST(request: Request) {
     let finalAmount = priceInfo.amount;
     let discountAmount = 0;
 
-    // Apply promo code discount (20% off - same as €2 on €10 = 20%)
-    if (promoCode === 'CHRISTMAS2024') {
+    // Apply promo code discount (20% off) - supports all theme promo codes
+    const validPromoCodes = ['CHRISTMAS2024', 'HALLOWEEN2024', 'EASTER2024', 'SINTERKLAAS2024', 'NEWYEAR2025', 'OLDYEAR2024'];
+    if (promoCode && validPromoCodes.includes(promoCode)) {
       discountAmount = Math.round(priceInfo.amount * 0.2); // 20% discount
       finalAmount = Math.max(0, priceInfo.amount - discountAmount);
     }
