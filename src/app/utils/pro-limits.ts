@@ -256,17 +256,46 @@ export async function canAddPriceTracker(currentCount: number, isProUser: boolea
 export function getPriceTrackerLimitSync(isProUser: boolean): number {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
   const baseLimit = PRO_LIMITS.PRICE_TRACKER_FREE;
-  // Use cached rewards if available
+  let extraTrackers = 0;
+  
+  // First try cached rewards
   if (rewardsCache.rewards.length > 0) {
-    const extraTrackers = rewardsCache.rewards.reduce((sum, reward) => {
+    extraTrackers = rewardsCache.rewards.reduce((sum, reward) => {
       if (reward?.type === 'price_tracker_free' && reward?.value) {
         return sum + reward.value;
       }
       return sum;
     }, 0);
-    return baseLimit + extraTrackers;
+  } else if (typeof window !== 'undefined') {
+    // Fallback to localStorage if cache is empty (for immediate use before API loads)
+    try {
+      const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+      themes.forEach(theme => {
+        const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+        const key = `sv_${theme}_rewards_${year}`;
+        const rewardsStr = localStorage.getItem(key);
+        if (rewardsStr) {
+          try {
+            const rewards = JSON.parse(rewardsStr);
+            if (Array.isArray(rewards)) {
+              rewards.forEach((stored: any) => {
+                const reward = stored.reward || stored;
+                if (reward?.type === 'price_tracker_free' && reward?.value) {
+                  extraTrackers += reward.value;
+                }
+              });
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      });
+    } catch {
+      // Ignore errors
+    }
   }
-  return baseLimit;
+  
+  return baseLimit + extraTrackers;
 }
 
 

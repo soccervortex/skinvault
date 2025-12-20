@@ -224,6 +224,8 @@ export function getRandomReward(theme: ThemeType, isPro: boolean = false): Rewar
   }
 }
 
+// REWARD_STORAGE_KEY is deprecated - use theme-specific keys instead
+// Kept for backwards compatibility but not used in new code
 const REWARD_STORAGE_KEY = 'sv_theme_rewards_2024';
 
 export interface StoredReward {
@@ -238,35 +240,77 @@ export function saveReward(reward: Reward, theme: ThemeType): void {
   if (typeof window === 'undefined') return;
   
   try {
-    const existing = localStorage.getItem(REWARD_STORAGE_KEY);
+    // Use theme-specific key for consistency with getStoredRewards fallback
+    const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+    const storageKey = `sv_${theme}_rewards_${year}`;
+    
+    const existing = localStorage.getItem(storageKey);
     const rewards: StoredReward[] = existing ? JSON.parse(existing) : [];
+    
+    // Permanent rewards (wishlist_extra_slots, price_tracker_free) should never expire
+    const isPermanent = reward.type === 'wishlist_extra_slots' || reward.type === 'price_tracker_free';
     
     const stored: StoredReward = {
       reward,
       theme,
       claimedAt: Date.now(),
-      expiresAt: reward.duration ? Date.now() + (reward.duration * 24 * 60 * 60 * 1000) : undefined,
+      expiresAt: isPermanent ? undefined : (reward.duration ? Date.now() + (reward.duration * 24 * 60 * 60 * 1000) : undefined),
       used: false,
     };
     
     rewards.push(stored);
-    localStorage.setItem(REWARD_STORAGE_KEY, JSON.stringify(rewards));
+    localStorage.setItem(storageKey, JSON.stringify(rewards));
   } catch (e) {
     console.error('Failed to save reward:', e);
   }
 }
 
-export function getStoredRewards(): StoredReward[] {
+export function getStoredRewards(theme?: ThemeType): StoredReward[] {
   if (typeof window === 'undefined') return [];
   
   try {
-    const existing = localStorage.getItem(REWARD_STORAGE_KEY);
-    if (!existing) return [];
+    // If theme is specified, only get rewards for that theme
+    if (theme) {
+      const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+      const storageKey = `sv_${theme}_rewards_${year}`;
+      const existing = localStorage.getItem(storageKey);
+      if (!existing) return [];
+      
+      const rewards: StoredReward[] = JSON.parse(existing);
+      const now = Date.now();
+      // Permanent rewards (wishlist_extra_slots, price_tracker_free) should never be filtered out
+      return rewards.filter(r => {
+        const isPermanent = r.reward?.type === 'wishlist_extra_slots' || r.reward?.type === 'price_tracker_free';
+        return isPermanent || !r.expiresAt || r.expiresAt > now;
+      });
+    }
     
-    const rewards: StoredReward[] = JSON.parse(existing);
-    // Filter out expired rewards
-    const now = Date.now();
-    return rewards.filter(r => !r.expiresAt || r.expiresAt > now);
+    // Get rewards from all themes
+    const themes: ThemeType[] = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+    const allRewards: StoredReward[] = [];
+    
+    themes.forEach(t => {
+      const year = t === 'christmas' || t === 'oldyear' ? '2025' : '2026';
+      const storageKey = `sv_${t}_rewards_${year}`;
+      const existing = localStorage.getItem(storageKey);
+      if (existing) {
+        try {
+          const rewards: StoredReward[] = JSON.parse(existing);
+          const now = Date.now();
+          // Permanent rewards should never be filtered out
+          rewards.forEach(r => {
+            const isPermanent = r.reward?.type === 'wishlist_extra_slots' || r.reward?.type === 'price_tracker_free';
+            if (isPermanent || !r.expiresAt || r.expiresAt > now) {
+              allRewards.push(r);
+            }
+          });
+        } catch {
+          // Skip invalid JSON
+        }
+      }
+    });
+    
+    return allRewards;
   } catch (e) {
     return [];
   }
