@@ -48,23 +48,6 @@
   pointer-events: none;
 }
 
-.christmas-snowflake:nth-child(odd) {
-  animation-name: snowfall-delayed;
-  animation-duration: calc(var(--snow-duration) * 1.3);
-}
-
-.christmas-snowflake:nth-child(3n) {
-  animation-duration: calc(var(--snow-duration) * 0.8);
-}
-
-.christmas-snowflake:nth-child(4n) {
-  animation-duration: calc(var(--snow-duration) * 1.5);
-}
-
-.christmas-snowflake:nth-child(5n) {
-  animation-duration: calc(var(--snow-duration) * 0.7);
-}
-
 /* Christmas color scheme */
 body.christmas-theme {
   /* Subtle Christmas accent colors */

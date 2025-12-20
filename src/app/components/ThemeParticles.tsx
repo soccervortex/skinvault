@@ -64,6 +64,8 @@ export default function ThemeParticles({ theme }: ThemeParticlesProps) {
       
       // Random animation duration (8-15 seconds)
       const duration = 8 + Math.random() * 7;
+      particle.style.setProperty('--snow-duration', `${duration}s`);
+      particle.style.animationDuration = `${duration}s`;
       
       // Random drift (-50px to 50px)
       const drift = -50 + Math.random() * 100;
