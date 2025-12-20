@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ThemeType } from '@/app/utils/theme-storage';
 import ThemeParticles from './ThemeParticles';
-import PromoManager from './PromoManager';
+import ChristmasGift from './ChristmasGift';
 
 export default function MultiThemeProvider({ steamId }: { steamId?: string | null }) {
   const [activeTheme, setActiveTheme] = useState<ThemeType | null>(null);
@@ -25,6 +25,12 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
     // Add active theme class
     if (theme) {
       document.body.classList.add(`${theme}-theme`);
+    } else {
+      // When theme is disabled, clear Christmas promo data so it can be used next year
+      if (typeof window !== 'undefined') {
+        const promoKeys = Object.keys(localStorage).filter(key => key.startsWith('sv_christmas_promo_claimed_'));
+        promoKeys.forEach(key => localStorage.removeItem(key));
+      }
     }
   }, []);
 
@@ -105,7 +111,7 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
   return (
     <>
       <ThemeParticles theme={activeTheme} />
-      <PromoManager theme={activeTheme} steamId={steamId} />
+      {activeTheme === 'christmas' && <ChristmasGift />}
     </>
   );
 }

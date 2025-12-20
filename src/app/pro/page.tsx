@@ -1,19 +1,15 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
 
-function ProInfoContent() {
-  const searchParams = useSearchParams();
+export default function ProInfoPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [freeMonthEligible, setFreeMonthEligible] = useState(false);
   const [claimingFreeMonth, setClaimingFreeMonth] = useState(false);
-  const [promoCode, setPromoCode] = useState<string | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -21,14 +17,6 @@ function ProInfoContent() {
       const stored = window.localStorage.getItem('steam_user');
       const parsedUser = stored ? JSON.parse(stored) : null;
       setUser(parsedUser);
-      
-      // Check for promo code in URL
-      const promo = searchParams.get('promo');
-      const discount = searchParams.get('discount');
-      if (promo) {
-        setPromoCode(promo);
-        setPromoDiscount(discount ? parseInt(discount) : 0);
-      }
       
       // Check if eligible for free month (only if not Pro)
       const userIsPro = parsedUser?.proUntil && new Date(parsedUser.proUntil) > new Date();
@@ -47,7 +35,7 @@ function ProInfoContent() {
     } catch {
       setUser(null);
     }
-  }, [searchParams]);
+  }, []);
 
   const isPro = user?.proUntil && new Date(user.proUntil) > new Date();
 
@@ -100,14 +88,19 @@ function ProInfoContent() {
 
     setLoading(plan);
     try {
+      // Check if user has claimed Christmas promo (if they opened the gift)
+      let promoCode: string | undefined = undefined;
+      if (typeof window !== 'undefined') {
+        const hasClaimed = localStorage.getItem('sv_christmas_promo_claimed_2024') === 'true';
+        if (hasClaimed) {
+          promoCode = 'CHRISTMAS2024';
+        }
+      }
+      
       const res = await fetch('/api/payment/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          plan, 
-          steamId: user.steamId,
-          promoCode: promoCode || undefined,
-        }),
+        body: JSON.stringify({ plan, steamId: user.steamId, promoCode }),
       });
 
       const data = await res.json();
@@ -249,15 +242,7 @@ function ProInfoContent() {
               <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
                 <div>
                   <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-1">1 Month</p>
-                  {promoCode && promoDiscount > 0 ? (
-                    <>
-                      <p className="text-xl md:text-2xl font-black text-white line-through opacity-50">€9.99</p>
-                      <p className="text-xl md:text-2xl font-black text-green-400">€{((999 - promoDiscount) / 100).toFixed(2)}</p>
-                      <p className="text-[8px] md:text-[9px] text-green-400 mt-1">Promo korting!</p>
-                    </>
-                  ) : (
-                    <p className="text-xl md:text-2xl font-black text-white">€9.99</p>
-                  )}
+                  <p className="text-xl md:text-2xl font-black text-white">€9.99</p>
                 </div>
                 <button
                   onClick={() => handleCheckout('1month')}
@@ -365,23 +350,5 @@ function ProInfoContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function ProInfoPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
-        <Sidebar />
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <Loader2 className="mx-auto animate-spin text-blue-500" size={32} />
-            <p className="text-sm text-gray-400">Loading...</p>
-          </div>
-        </div>
-      </div>
-    }>
-      <ProInfoContent />
-    </Suspense>
   );
 }
