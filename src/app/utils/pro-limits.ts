@@ -94,7 +94,6 @@ export async function preloadRewards(steamId: string): Promise<void> {
 async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
   const rewards = await getStoredRewards(steamId);
   let extraSlots = 0;
-  const now = Date.now();
   
   rewards.forEach((reward: any) => {
     // Check for permanent extra slots
