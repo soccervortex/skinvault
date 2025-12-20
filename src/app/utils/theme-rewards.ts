@@ -202,12 +202,12 @@ export function getRandomReward(theme: ThemeType, isPro: boolean = false): Rewar
     // Non-Pro users get regular rewards with small chance for Pro extension
     const rand = Math.random();
     
-    // 5% chance for Pro extension (1 week) - rare reward for free users
+    // 5% chance for Pro trial (1 week) - rare reward for free users
     if (rand < 0.05) {
       return {
         type: 'pro_extension',
         name: '1 Week Free Pro!',
-        description: 'Your Pro subscription extended by 1 week',
+        description: 'Get Pro subscription for 1 week',
         icon: config.proRewards[1].icon,
         value: 0.25, // 0.25 months = 1 week
       };
