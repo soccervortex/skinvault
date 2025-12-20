@@ -69,6 +69,11 @@ function CompareContent() {
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
+      // Test localStorage accessibility first
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
       const storedUser = window.localStorage.getItem("steam_user");
       const parsedUser = storedUser ? JSON.parse(storedUser) : null;
       setUser(parsedUser);
@@ -81,25 +86,19 @@ function CompareContent() {
         } else {
           setIsPro(false);
         }
+        
+        // Load currency
+        const stored = window.localStorage.getItem("sv_currency");
+        if (stored === "1") {
+          setCurrency({ code: "1", symbol: "$" });
+        } else if (stored === "3") {
+          setCurrency({ code: "3", symbol: "€" });
+        }
     } catch {
+      // Ignore localStorage errors
       setUser(null);
       setWishlist([]);
       setIsPro(false);
-    }
-  }, []);
-
-  // Hydrate currency preference once
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const stored = window.localStorage.getItem("sv_currency");
-      if (stored === "1") {
-        setCurrency({ code: "1", symbol: "$" });
-      } else if (stored === "3") {
-        setCurrency({ code: "3", symbol: "€" });
-      }
-    } catch {
-      // ignore
     }
   }, []);
 

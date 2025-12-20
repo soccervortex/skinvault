@@ -14,6 +14,11 @@ export default function ProInfoPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
+      // Test localStorage accessibility first
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
       const stored = window.localStorage.getItem('steam_user');
       const parsedUser = stored ? JSON.parse(stored) : null;
       setUser(parsedUser);

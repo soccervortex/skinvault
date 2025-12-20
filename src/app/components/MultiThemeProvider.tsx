@@ -26,14 +26,31 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
     if (theme) {
       document.body.classList.add(`${theme}-theme`);
     } else {
-      // When theme is disabled, clear Christmas promo and gift data so it can be used next year
+      // When theme is disabled, clear theme promo and gift data so it can be used next year
       if (typeof window !== 'undefined') {
-        const promoKeys = Object.keys(localStorage).filter(key => 
-          key.startsWith('sv_christmas_promo_claimed_') || 
-          key.startsWith('sv_christmas_gift_claimed_') ||
-          key.startsWith('sv_christmas_rewards_')
-        );
-        promoKeys.forEach(key => localStorage.removeItem(key));
+        try {
+          // Test localStorage accessibility first
+          const testKey = '__localStorage_test__';
+          window.localStorage.setItem(testKey, 'test');
+          window.localStorage.removeItem(testKey);
+          
+          const promoKeys = Object.keys(window.localStorage).filter(key => 
+            key.startsWith('sv_christmas_promo_claimed_') || 
+            key.startsWith('sv_christmas_gift_claimed_') ||
+            key.startsWith('sv_christmas_rewards_') ||
+            key.startsWith('sv_theme_rewards_') ||
+            key.match(/sv_(christmas|halloween|easter|sinterklaas|newyear|oldyear)_(gift_claimed|rewards)_\d{4}/)
+          );
+          promoKeys.forEach(key => {
+            try {
+              window.localStorage.removeItem(key);
+            } catch {
+              // Skip if removal fails
+            }
+          });
+        } catch {
+          // Ignore localStorage errors
+        }
       }
     }
   }, []);
@@ -59,9 +76,18 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
         
         // For non-logged-in users, check localStorage
         if (theme && !steamId && typeof window !== 'undefined') {
-          const userDisabled = localStorage.getItem('sv_theme_disabled') === 'true';
-          if (userDisabled) {
-            theme = null;
+          try {
+            // Test localStorage accessibility first
+            const testKey = '__localStorage_test__';
+            window.localStorage.setItem(testKey, 'test');
+            window.localStorage.removeItem(testKey);
+            
+            const userDisabled = window.localStorage.getItem('sv_theme_disabled') === 'true';
+            if (userDisabled) {
+              theme = null;
+            }
+          } catch {
+            // Ignore localStorage errors - assume theme is enabled
           }
         }
         

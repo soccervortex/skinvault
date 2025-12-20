@@ -44,6 +44,11 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
+        // Test localStorage accessibility first
+        const testKey = '__localStorage_test__';
+        window.localStorage.setItem(testKey, 'test');
+        window.localStorage.removeItem(testKey);
+        
         const ds = window.localStorage.getItem(DATASET_CACHE_KEY);
         if (ds) datasetCacheRef.current = JSON.parse(ds);
         const pc = window.localStorage.getItem(PRICE_CACHE_KEY);

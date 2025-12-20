@@ -19,8 +19,19 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   // 1. Sync User state met LocalStorage & andere tabbladen
   useEffect(() => {
     const checkUser = () => {
-      const savedUser = localStorage.getItem('steam_user');
-      setUser(savedUser ? JSON.parse(savedUser) : null);
+      try {
+        if (typeof window === 'undefined') return;
+        // Test localStorage accessibility first
+        const testKey = '__localStorage_test__';
+        window.localStorage.setItem(testKey, 'test');
+        window.localStorage.removeItem(testKey);
+        
+        const savedUser = window.localStorage.getItem('steam_user');
+        setUser(savedUser ? JSON.parse(savedUser) : null);
+      } catch {
+        // Ignore localStorage errors
+        setUser(null);
+      }
     };
 
     checkUser();
@@ -53,7 +64,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               }
             } else {
               // For non-logged-in users, check localStorage
-              userDisabled = localStorage.getItem('sv_theme_disabled') === 'true';
+              try {
+                if (typeof window !== 'undefined') {
+                  // Test localStorage accessibility first
+                  const testKey = '__localStorage_test__';
+                  window.localStorage.setItem(testKey, 'test');
+                  window.localStorage.removeItem(testKey);
+                  userDisabled = window.localStorage.getItem('sv_theme_disabled') === 'true';
+                }
+              } catch {
+                // Ignore localStorage errors - assume theme is enabled
+                userDisabled = false;
+              }
             }
             
             setThemesDisabled(userDisabled);

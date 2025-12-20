@@ -111,6 +111,11 @@ function InventoryContent() {
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return;
+      // Test localStorage accessibility first
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
       const stored = window.localStorage.getItem('sv_currency');
       if (stored === '1') {
         setCurrency({ code: '1', symbol: '$' });
@@ -118,7 +123,7 @@ function InventoryContent() {
         setCurrency({ code: '3', symbol: '€' });
       }
     } catch {
-      // ignore
+      // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
     }
   }, []);
 
@@ -237,9 +242,15 @@ function InventoryContent() {
     priceCacheRef.current = merged;
     setItemPrices(merged);
     try {
-      localStorage.setItem(cacheKey, JSON.stringify(merged));
+      if (typeof window === 'undefined') return;
+      // Test localStorage accessibility first
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
+      window.localStorage.setItem(cacheKey, JSON.stringify(merged));
     } catch {
-      // ignore quota errors
+      // Ignore quota errors and localStorage access errors
     }
   };
 

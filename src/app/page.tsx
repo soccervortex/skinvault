@@ -74,6 +74,11 @@ export default function GlobalSkinSearch() {
       if (typeof window === 'undefined') return;
       
       try {
+        // Test localStorage accessibility first
+        const testKey = '__localStorage_test__';
+        window.localStorage.setItem(testKey, 'test');
+        window.localStorage.removeItem(testKey);
+        
         const savedInv = window.localStorage.getItem('user_inventory');
         if (savedInv) {
           const parsed = JSON.parse(savedInv);
@@ -97,8 +102,9 @@ export default function GlobalSkinSearch() {
         } else if (storedCurrency === '3') {
           setCurrency({ code: '3', symbol: '€' });
         }
-      } catch (e) {
-        console.warn("LocalStorage access denied by browser:", e);
+      } catch (e: any) {
+        // Silently ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
+        // Don't log SecurityError to avoid console noise in production
       }
     };
 

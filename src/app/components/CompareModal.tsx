@@ -32,7 +32,13 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
     
     // Load compare list from localStorage
     try {
-      const stored = localStorage.getItem('sv_compare_list');
+      if (typeof window === 'undefined') return;
+      // Test localStorage accessibility first
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
+      const stored = window.localStorage.getItem('sv_compare_list');
       let list: CompareItem[] = stored ? JSON.parse(stored) : [];
       
       // Remove any duplicates first (by ID)
@@ -61,19 +67,25 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
             list = list.slice(-2); // Keep last 2 items
           }
           // Save updated list
-          localStorage.setItem('sv_compare_list', JSON.stringify(list));
+          window.localStorage.setItem('sv_compare_list', JSON.stringify(list));
         }
       }
       
       setCompareList(list);
     } catch (error) {
-      console.error('Failed to load compare list:', error);
+      // Ignore localStorage errors
       setCompareList([]);
     }
 
     // Load dataset cache
     try {
-      const cached = localStorage.getItem(DATASET_CACHE_KEY);
+      if (typeof window === 'undefined') return;
+      // Test localStorage accessibility first
+      const testKey = '__localStorage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      
+      const cached = window.localStorage.getItem(DATASET_CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
         const cache: Record<string, any[]> = {};

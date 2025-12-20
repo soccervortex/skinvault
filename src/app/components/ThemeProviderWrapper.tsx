@@ -11,10 +11,17 @@ export default function ThemeProviderWrapper() {
     
     const checkUser = () => {
       try {
-        const storedUser = localStorage.getItem('steam_user');
+        if (typeof window === 'undefined') return;
+        // Test localStorage accessibility first
+        const testKey = '__localStorage_test__';
+        window.localStorage.setItem(testKey, 'test');
+        window.localStorage.removeItem(testKey);
+        
+        const storedUser = window.localStorage.getItem('steam_user');
         const user = storedUser ? JSON.parse(storedUser) : null;
         setSteamId(user?.steamId || null);
       } catch {
+        // Ignore localStorage errors
         setSteamId(null);
       }
     };

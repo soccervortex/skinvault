@@ -64,9 +64,19 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
       if (!steamId) {
         // For non-logged-in users, check localStorage as fallback
         if (typeof window !== 'undefined') {
-          // Use 2025 for current year (Christmas, Old Year), 2026 for next year events
-          const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
-          setHasClaimed(localStorage.getItem(`sv_${theme}_gift_claimed_${year}`) === 'true');
+          try {
+            // Test localStorage accessibility first
+            const testKey = '__localStorage_test__';
+            window.localStorage.setItem(testKey, 'test');
+            window.localStorage.removeItem(testKey);
+            
+            // Use 2025 for current year (Christmas, Old Year), 2026 for next year events
+            const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+            setHasClaimed(window.localStorage.getItem(`sv_${theme}_gift_claimed_${year}`) === 'true');
+          } catch {
+            // Ignore localStorage errors
+            setHasClaimed(false);
+          }
         }
         setChecking(false);
         return;
