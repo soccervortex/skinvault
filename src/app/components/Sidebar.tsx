@@ -28,35 +28,45 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     return () => window.removeEventListener('storage', checkUser);
   }, []);
 
-  // Sync theme state
+  // Sync theme state (works for logged in and not logged in users)
   useEffect(() => {
     const loadThemeState = async () => {
-      if (!user?.steamId) return;
-      
       try {
-        // Check if user has disabled themes
-        const prefResponse = await fetch(`/api/themes/user-preference?steamId=${user.steamId}`);
-        let userDisabled = false;
-        if (prefResponse.ok) {
-          const prefData = await prefResponse.json();
-          userDisabled = prefData.disabled || false;
-          setThemesDisabled(userDisabled);
-        }
+        const steamId = user?.steamId || null;
         
-        // Check if there's an active theme
-        const activeResponse = await fetch(`/api/themes/active?steamId=${user.steamId}`);
-        if (activeResponse.ok) {
-          const activeData = await activeResponse.json();
-          setHasActiveTheme(!!activeData.theme && !userDisabled);
+        // Check if there's an active theme from admin (works without login)
+        // We check without user preference to see if admin has enabled a theme
+        const adminThemeResponse = await fetch('/api/themes/active');
+        if (adminThemeResponse.ok) {
+          const adminThemeData = await adminThemeResponse.json();
+          const themeExists = !!adminThemeData.theme;
+          setHasActiveTheme(themeExists);
+          
+          if (themeExists) {
+            // Check if user has disabled themes
+            let userDisabled = false;
+            if (steamId) {
+              const prefResponse = await fetch(`/api/themes/user-preference?steamId=${steamId}`);
+              if (prefResponse.ok) {
+                const prefData = await prefResponse.json();
+                userDisabled = prefData.disabled || false;
+              }
+            } else {
+              // For non-logged-in users, check localStorage
+              userDisabled = localStorage.getItem('sv_theme_disabled') === 'true';
+            }
+            
+            setThemesDisabled(userDisabled);
+          } else {
+            setThemesDisabled(false);
+          }
         }
       } catch (error) {
         console.error('Failed to load theme state:', error);
       }
     };
 
-    if (user?.steamId) {
-      loadThemeState();
-    }
+    loadThemeState();
 
     const handleThemeChange = () => {
       loadThemeState();
@@ -64,25 +74,47 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
     window.addEventListener('themeChanged', handleThemeChange);
     
+    // Poll periodically to catch admin changes
+    const interval = setInterval(loadThemeState, 3000);
+    
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
+      clearInterval(interval);
     };
   }, [user?.steamId]);
 
   const handleToggleTheme = async () => {
-    if (!user?.steamId) return;
-    
     const newValue = !themesDisabled;
+    const steamId = user?.steamId;
     
     try {
-      const response = await fetch('/api/themes/user-preference', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steamId: user.steamId, disabled: newValue }),
-      });
-      
-      if (response.ok) {
+      if (steamId) {
+        // Logged in user - save to backend
+        const response = await fetch('/api/themes/user-preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ steamId, disabled: newValue }),
+        });
+        
+        if (response.ok) {
+          setThemesDisabled(newValue);
+          // Trigger theme update
+          window.dispatchEvent(new CustomEvent('themeChanged'));
+        }
+      } else {
+        // Not logged in - save to localStorage
+        if (newValue) {
+          localStorage.setItem('sv_theme_disabled', 'true');
+        } else {
+          localStorage.removeItem('sv_theme_disabled');
+        }
         setThemesDisabled(newValue);
+        // Trigger storage event for other tabs/components
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'sv_theme_disabled',
+          newValue: newValue ? 'true' : null,
+          storageArea: localStorage,
+        }));
         // Trigger theme update
         window.dispatchEvent(new CustomEvent('themeChanged'));
       }
@@ -235,15 +267,31 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   </div>
                 </div>
               ) : (
-                <button 
-                  onClick={handleSteamLogin}
-                  className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
-                >
-                  <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                    <User size={18} />
-                  </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
-                </button>
+                <div className="space-y-3">
+                  {hasActiveTheme && (
+                    <button 
+                      onClick={handleToggleTheme}
+                      className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${
+                        !themesDisabled
+                          ? 'bg-purple-600/20 border border-purple-500/40 text-purple-400 hover:bg-purple-600/30'
+                          : 'bg-[#11141d] border border-white/5 text-gray-500 hover:text-white'
+                      }`}
+                      title={!themesDisabled ? 'Disable Theme' : 'Enable Theme'}
+                    >
+                      <Sparkles size={16} className={!themesDisabled ? 'fill-purple-400' : ''} />
+                      {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleSteamLogin}
+                    className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
+                  >
+                    <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                      <User size={18} />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
+                  </button>
+                </div>
               )}
               
               {/* Footer Links */}
@@ -365,15 +413,31 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </div>
             </div>
           ) : (
-            <button 
-              onClick={handleSteamLogin}
-              className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
-            >
-              <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                <User size={18} />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
-            </button>
+            <div className="space-y-3">
+              {hasActiveTheme && (
+                <button 
+                  onClick={handleToggleTheme}
+                  className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${
+                    !themesDisabled
+                      ? 'bg-purple-600/20 border border-purple-500/40 text-purple-400 hover:bg-purple-600/30'
+                      : 'bg-[#11141d] border border-white/5 text-gray-500 hover:text-white'
+                  }`}
+                  title={!themesDisabled ? 'Disable Theme' : 'Enable Theme'}
+                >
+                  <Sparkles size={16} className={!themesDisabled ? 'fill-purple-400' : ''} />
+                  {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
+                </button>
+              )}
+              <button 
+                onClick={handleSteamLogin}
+                className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
+              >
+                <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                  <User size={18} />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
+              </button>
+            </div>
           )}
           
           {/* Footer Links */}

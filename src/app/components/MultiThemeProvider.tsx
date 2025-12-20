@@ -44,7 +44,16 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
         }
         
         const data = await response.json();
-        const theme = data.theme || null;
+        let theme = data.theme || null;
+        
+        // For non-logged-in users, check localStorage
+        if (theme && !steamId && typeof window !== 'undefined') {
+          const userDisabled = localStorage.getItem('sv_theme_disabled') === 'true';
+          if (userDisabled) {
+            theme = null;
+          }
+        }
+        
         setActiveTheme(theme);
         updateBodyClass(theme);
       } catch (error) {
@@ -64,11 +73,21 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
 
     window.addEventListener('themeChanged', handleThemeChange);
     
+    // Listen for storage changes (for localStorage updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'sv_theme_disabled') {
+        loadActiveTheme();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
     // Also poll periodically to catch admin changes (every 3 seconds)
     const interval = setInterval(loadActiveTheme, 3000);
     
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
+      window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, [steamId, updateBodyClass]);
