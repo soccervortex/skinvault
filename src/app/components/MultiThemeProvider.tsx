@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ThemeType } from '@/app/utils/theme-storage';
 import ThemeParticles from './ThemeParticles';
-import ChristmasGift from './ChristmasGift';
+import ThemeGift from './ThemeGift';
 
 export default function MultiThemeProvider({ steamId }: { steamId?: string | null }) {
   const [activeTheme, setActiveTheme] = useState<ThemeType | null>(null);
