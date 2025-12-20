@@ -5,6 +5,29 @@ export const PRO_LIMITS = {
   WISHLIST_PRO: Infinity, // Pro users have unlimited
 } as const;
 
+// Helper to get extra slots from rewards
+function getExtraWishlistSlots(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const rewardsStr = localStorage.getItem('sv_theme_rewards_2024');
+    if (!rewardsStr) return 0;
+    
+    const rewards = JSON.parse(rewardsStr);
+    let extraSlots = 0;
+    
+    // Check for wishlist_extra_slots rewards
+    rewards.forEach((stored: any) => {
+      if (stored.reward?.type === 'wishlist_extra_slots' && stored.reward?.value) {
+        extraSlots += stored.reward.value;
+      }
+    });
+    
+    return extraSlots;
+  } catch {
+    return 0;
+  }
+}
+
 // Performance settings
 export const PRO_PERFORMANCE = {
   // Price scanning concurrency
@@ -30,7 +53,10 @@ export function isPro(proUntil: string | null | undefined): boolean {
 }
 
 export function getWishlistLimit(isProUser: boolean): number {
-  return isProUser ? PRO_LIMITS.WISHLIST_PRO : PRO_LIMITS.WISHLIST_FREE;
+  if (isProUser) return PRO_LIMITS.WISHLIST_PRO;
+  const baseLimit = PRO_LIMITS.WISHLIST_FREE;
+  const extraSlots = getExtraWishlistSlots();
+  return baseLimit + extraSlots;
 }
 
 export function canAddToWishlist(currentCount: number, isProUser: boolean): boolean {
