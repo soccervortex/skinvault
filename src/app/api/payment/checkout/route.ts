@@ -13,11 +13,11 @@ const PRICES: Record<string, { amount: number; months: number }> = {
 
 // Promo discounts (in cents)
 const PROMO_DISCOUNTS: Record<string, number> = {
-  'christmas2024': 200, // €2 discount
-  'halloween2024': 200,
-  'easter2024': 200,
-  'sinterklaas2024': 200,
-  'newyear2024': 200,
+  'christmas2025': 200, // €2 discount
+  'halloween2025': 200,
+  'easter2025': 200,
+  'sinterklaas2025': 200,
+  'newyear2025': 200,
 };
 
 export async function POST(request: Request) {

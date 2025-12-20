@@ -57,7 +57,7 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
     setClaiming(true);
     try {
       // Navigate to pro page with discount code
-      router.push('/pro?promo=christmas2024&discount=200');
+      router.push('/pro?promo=christmas2025&discount=200');
       onClaim();
     } catch (error) {
       console.error('Failed to claim promo:', error);
