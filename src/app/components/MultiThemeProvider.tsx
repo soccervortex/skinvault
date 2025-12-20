@@ -115,7 +115,7 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
   return (
     <>
       <ThemeParticles theme={activeTheme} />
-      {activeTheme === 'christmas' && <ChristmasGift />}
+      {activeTheme === 'christmas' && <ChristmasGift steamId={steamId} />}
     </>
   );
 }

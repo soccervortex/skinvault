@@ -2,22 +2,55 @@
 
 import { useState, useEffect } from 'react';
 import { Gift, X, Sparkles } from 'lucide-react';
-import { getRandomReward, saveReward, hasClaimedGift, markGiftClaimed, type Reward } from '@/app/utils/christmas-rewards';
+import { getRandomReward, saveReward, type Reward } from '@/app/utils/christmas-rewards';
 
-export default function ChristmasGift() {
+interface ChristmasGiftProps {
+  steamId?: string | null;
+}
+
+export default function ChristmasGift({ steamId }: ChristmasGiftProps) {
   const [isOpening, setIsOpening] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [reward, setReward] = useState<Reward | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setHasClaimed(hasClaimedGift());
-  }, []);
+    const checkClaimStatus = async () => {
+      if (!steamId) {
+        // For non-logged-in users, check localStorage as fallback
+        if (typeof window !== 'undefined') {
+          setHasClaimed(localStorage.getItem('sv_christmas_gift_claimed_2024') === 'true');
+        }
+        setChecking(false);
+        return;
+      }
 
-  const handleGiftClick = () => {
-    if (hasClaimed || isOpening) return;
+      try {
+        const response = await fetch(`/api/gift/claim?steamId=${steamId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setHasClaimed(data.claimed || false);
+        }
+      } catch (error) {
+        console.error('Failed to check gift claim status:', error);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkClaimStatus();
+  }, [steamId]);
+
+  const handleGiftClick = async () => {
+    if (hasClaimed || isOpening || checking || !steamId) {
+      // For non-logged-in users, show message
+      if (!steamId) {
+        alert('Log in met Steam om je cadeautje te openen!');
+      }
+      return;
+    }
     
     setIsOpening(true);
     
@@ -26,15 +59,40 @@ export default function ChristmasGift() {
     setReward(randomReward);
     
     // Animate box opening
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsOpening(false);
       setIsOpen(true);
-      setShowModal(true);
       
-      // Save reward
-      saveReward(randomReward);
-      markGiftClaimed();
-      setHasClaimed(true);
+      // Save to database
+      try {
+        const response = await fetch('/api/gift/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ steamId, reward: randomReward }),
+        });
+
+        if (response.ok) {
+          // Also save to localStorage as backup
+          saveReward(randomReward);
+          setShowModal(true);
+          setHasClaimed(true);
+        } else {
+          const data = await response.json();
+          if (data.alreadyClaimed) {
+            alert('Je hebt dit cadeautje al geopend!');
+            setHasClaimed(true);
+          } else {
+            alert('Er ging iets mis. Probeer het opnieuw.');
+            setIsOpening(false);
+            setIsOpen(false);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to claim gift:', error);
+        alert('Er ging iets mis. Probeer het opnieuw.');
+        setIsOpening(false);
+        setIsOpen(false);
+      }
     }, 1500); // Opening animation duration
   };
 
@@ -42,6 +100,7 @@ export default function ChristmasGift() {
     setShowModal(false);
   };
 
+  if (checking) return null; // Don't show while checking
   if (hasClaimed && !showModal) return null;
 
   return (

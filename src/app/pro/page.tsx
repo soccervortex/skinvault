@@ -88,13 +88,18 @@ export default function ProInfoPage() {
 
     setLoading(plan);
     try {
-      // Check if user has claimed Christmas promo (if they opened the gift)
+      // Check if user has claimed Christmas gift with promo code reward
       let promoCode: string | undefined = undefined;
-      if (typeof window !== 'undefined') {
-        const hasClaimed = localStorage.getItem('sv_christmas_promo_claimed_2024') === 'true';
-        if (hasClaimed) {
-          promoCode = 'CHRISTMAS2024';
+      try {
+        const giftResponse = await fetch(`/api/gift/claim?steamId=${user.steamId}`);
+        if (giftResponse.ok) {
+          const giftData = await giftResponse.json();
+          if (giftData.claimed && giftData.reward?.type === 'promo_code' && giftData.reward?.value) {
+            promoCode = giftData.reward.value;
+          }
         }
+      } catch (error) {
+        console.error('Failed to check gift reward:', error);
       }
       
       const res = await fetch('/api/payment/checkout', {
