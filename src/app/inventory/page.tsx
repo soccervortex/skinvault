@@ -12,7 +12,7 @@ import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import CompareModal from '@/app/components/CompareModal';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
-import { getWishlistLimit } from '@/app/utils/pro-limits';
+import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -1253,7 +1253,7 @@ function InventoryContent() {
         title="Wishlist Limit Reached"
         message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
         feature="Wishlist"
-        limit={getWishlistLimit(false)}
+        limit={getWishlistLimitSync(false)}
         currentCount={wishlist.length}
       />
       
