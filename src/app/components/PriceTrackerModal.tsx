@@ -26,6 +26,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
   const [loadingDiscord, setLoadingDiscord] = useState(true);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(true);
+  const [maxAlerts, setMaxAlerts] = useState(5);
 
   const marketHashName = item.market_hash_name || item.name;
 
