@@ -17,8 +17,9 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
   const [throwAttempt, setThrowAttempt] = useState(0);
   const [claiming, setClaiming] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
-  const sleighRef = useRef<HTMLDivElement>(null);
+  const videoCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Enhanced Northern Lights Effect
   useEffect(() => {
@@ -99,12 +100,83 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
     };
   }, []);
 
-  // 3D Animation for sleigh
+  // Green screen removal and video processing
   useEffect(() => {
-    if (!sleighRef.current || !santaVisible) return;
+    const video = videoRef.current;
+    const videoCanvas = videoCanvasRef.current;
+    if (!video || !videoCanvas) return;
 
-    const sleigh = sleighRef.current;
-    let frame = 0;
+    const ctx = videoCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const processFrame = () => {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (videoCanvas.width !== video.videoWidth || videoCanvas.height !== video.videoHeight) {
+          videoCanvas.width = video.videoWidth;
+          videoCanvas.height = video.videoHeight;
+        }
+        
+        ctx.drawImage(video, 0, 0, videoCanvas.width, videoCanvas.height);
+        
+        const imageData = ctx.getImageData(0, 0, videoCanvas.width, videoCanvas.height);
+        const data = imageData.data;
+        
+        // Green screen removal (chroma key) - improved algorithm
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          
+          // Enhanced green screen detection
+          // Check if pixel is primarily green
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const delta = max - min;
+          const greenRatio = g / (r + g + b + 1);
+          
+          // Green screen is typically bright green: high green, low red/blue
+          if (g > 120 && r < 100 && b < 100 && greenRatio > 0.4) {
+            // Calculate how "green" the pixel is (0-1)
+            const greenness = (g - Math.max(r, b)) / 255;
+            
+            if (greenness > 0.3) {
+              // Make transparent based on greenness for smooth edges
+              data[i + 3] = Math.floor(data[i + 3] * (1 - Math.min(greenness * 2, 1)));
+            }
+          }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+      }
+      
+      if (!video.paused && !video.ended) {
+        requestAnimationFrame(processFrame);
+      }
+    };
+
+    video.addEventListener('play', () => {
+      processFrame();
+    });
+
+    video.addEventListener('loadeddata', () => {
+      videoCanvas.width = video.videoWidth;
+      videoCanvas.height = video.videoHeight;
+    });
+
+    return () => {
+      video.removeEventListener('play', processFrame);
+    };
+  }, []);
+
+  // 3D Animation for video
+  useEffect(() => {
+    if (!videoRef.current || !santaVisible) return;
+
+    const videoContainer = videoRef.current.parentElement;
+    if (!videoContainer) return;
+
+    let frame: number;
+    const startTime = Date.now();
 
     const animate = () => {
       if (throwAttempt === 0) {
@@ -112,29 +184,28 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
         return;
       }
 
-      const progress = (throwAttempt - 1) * 0.33; // 0 to 1 across 3 attempts
-      const t = progress + (Date.now() % 2000) / 2000 * 0.1; // Continuous subtle movement
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progress = (throwAttempt - 1) * 0.33 + (elapsed % 3) / 15; // Smooth progression
       
-      // 3D flight path - curves through space
-      const x = -progress * 80; // Moves left
-      const y = progress * 60; // Moves down
-      const z = Math.sin(progress * Math.PI) * 100; // Moves in and out of screen
+      // 3D flight path
+      const x = -progress * 75;
+      const y = progress * 50;
+      const z = Math.sin(progress * Math.PI) * 80;
       
-      // 3D rotation - tilts and banks like flying
-      const rotateX = Math.sin(progress * Math.PI * 2) * 15; // Banking
-      const rotateY = progress * 25; // Turning
-      const rotateZ = Math.sin(progress * Math.PI * 3) * 10; // Rolling
+      // 3D rotation
+      const rotateX = Math.sin(progress * Math.PI * 2) * 12;
+      const rotateY = progress * 20;
+      const rotateZ = Math.sin(progress * Math.PI * 3) * 8;
       
-      // Scale - gets smaller as it moves away
-      const scale = 1 - progress * 0.3;
+      // Scale
+      const scale = 1 - progress * 0.25;
 
-      sleigh.style.transform = `
+      videoContainer.style.transform = `
         translate3d(${x}vw, ${y}vh, ${z}px)
         rotateX(${rotateX}deg)
         rotateY(${rotateY}deg)
         rotateZ(${rotateZ}deg)
         scale(${scale})
-        perspective(1000px)
       `;
 
       frame = requestAnimationFrame(animate);
@@ -151,7 +222,12 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
     const timer = setTimeout(() => {
       setSantaVisible(true);
       setThrowAttempt(1);
-    }, 1000);
+      
+      // Start video when visible
+      if (videoRef.current) {
+        videoRef.current.play().catch(console.error);
+      }
+    }, 500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -190,138 +266,39 @@ export default function ChristmasPromo({ steamId, onDismiss, onClaim }: Christma
           style={{ pointerEvents: 'none' }}
         />
 
-        {/* 3D Sleigh Container */}
+        {/* Video with Green Screen Removal */}
         {santaVisible && (
           <div 
-            ref={sleighRef}
-            className="absolute top-[10%] right-[10%] origin-center transition-all duration-[2500ms] ease-in-out"
+            className="absolute top-[5%] right-[5%] origin-center"
             style={{ 
-              width: '400px',
-              height: '200px',
+              width: '50vw',
+              maxWidth: '800px',
+              aspectRatio: '16/9',
               zIndex: 10001,
               transformStyle: 'preserve-3d',
               willChange: 'transform'
             }}
           >
-            <div style={{ transformStyle: 'preserve-3d', width: '100%', height: '100%' }}>
-              <svg viewBox="0 0 400 200" className="w-full h-full" style={{ filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(255,255,255,0.3))' }}>
-                {/* Reindeer - 3D effect with depth */}
-                <g transform="translate(50, 100)">
-                  {/* Body with 3D shadow */}
-                  <ellipse cx="0" cy="2" rx="28" ry="18" fill="#654321" opacity="0.5" />
-                  <ellipse cx="0" cy="0" rx="28" ry="18" fill="#8B4513" />
-                  {/* Head */}
-                  <circle cx="0" cy="-18" r="14" fill="#8B4513" />
-                  {/* Antlers */}
-                  <path d="M-6 -25 L-12 -42 L-10 -36 L-14 -48 M6 -25 L12 -42 L10 -36 L14 -48" stroke="#654321" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                  {/* Eyes */}
-                  <circle cx="-5" cy="-20" r="2.5" fill="#FFD700" />
-                  <circle cx="-5" cy="-20" r="1.5" fill="#000" />
-                  <circle cx="5" cy="-20" r="2.5" fill="#FFD700" />
-                  <circle cx="5" cy="-20" r="1.5" fill="#000" />
-                  {/* Nose */}
-                  <circle cx="0" cy="-15" r="2.5" fill="#FF6347" />
-                  {/* Legs with depth */}
-                  <line x1="-20" y1="12" x2="-20" y2="30" stroke="#654321" strokeWidth="5" strokeLinecap="round" />
-                  <line x1="20" y1="12" x2="20" y2="30" stroke="#654321" strokeWidth="5" strokeLinecap="round" />
-                  {/* Harness */}
-                  <path d="M-28 0 Q0 -15 28 0" stroke="#2A2A2A" strokeWidth="3" fill="none" />
-                  <path d="M-28 0 Q0 -12 28 0" stroke="#4A4A4A" strokeWidth="2" fill="none" />
-                </g>
-                
-                {/* Sleigh - 3D with depth */}
-                <g transform="translate(180, 135)">
-                  {/* Sleigh shadow */}
-                  <ellipse cx="0" cy="35" rx="55" ry="8" fill="#000" opacity="0.3" />
-                  {/* Sleigh body with 3D effect */}
-                  <path d="M-50 0 Q-50 -25 0 -25 Q50 -25 50 0 L50 12 L-50 12 Z" fill="#C41E3A" />
-                  <path d="M-50 0 Q-50 -25 0 -25 Q50 -25 50 0" stroke="#8B0000" strokeWidth="2" fill="none" />
-                  <rect x="-50" y="0" width="100" height="18" fill="#8B0000" rx="6" />
-                  {/* Decorative lines with depth */}
-                  <line x1="-40" y1="-15" x2="40" y2="-15" stroke="#FFD700" strokeWidth="2" />
-                  <line x1="-30" y1="-20" x2="30" y2="-20" stroke="#FFD700" strokeWidth="1.5" />
-                  {/* Runners with 3D curve */}
-                  <path d="M-40 30 Q-40 35 -30 36 Q-15 37 0 36 Q15 37 30 36 Q40 35 40 30" fill="#2A2A2A" stroke="#1A1A1A" strokeWidth="1" />
-                  <line x1="-40" y1="18" x2="-40" y2="30" stroke="#4A4A4A" strokeWidth="4" />
-                  <line x1="40" y1="18" x2="40" y2="30" stroke="#4A4A4A" strokeWidth="4" />
-                </g>
-
-                {/* Santa - Enhanced 3D */}
-                <g transform="translate(280, 70)">
-                  {/* Body shadow */}
-                  <ellipse cx="2" cy="78" rx="38" ry="45" fill="#000" opacity="0.3" />
-                  {/* Body */}
-                  <ellipse cx="0" cy="35" rx="38" ry="45" fill="#C41E3A" />
-                  {/* Belt with 3D buckle */}
-                  <rect x="-38" y="35" width="76" height="12" fill="#000000" />
-                  <circle cx="0" cy="41" r="7" fill="#FFD700" />
-                  <circle cx="0" cy="41" r="5" fill="#FFA500" />
-                  {/* Head with 3D effect */}
-                  <circle cx="1" cy="2" r="28" fill="#E8A598" opacity="0.5" />
-                  <circle cx="0" cy="0" r="28" fill="#FDBCB4" />
-                  {/* Hat */}
-                  <path d="M-28 -18 L-28 -40 L0 -58 L28 -40 L28 -18 Z" fill="#C41E3A" />
-                  <circle cx="0" cy="-40" r="10" fill="white" />
-                  <ellipse cx="0" cy="-40" rx="8" ry="4" fill="#FFD700" />
-                  {/* Beard with layers */}
-                  <path d="M-25 12 Q0 45 25 12" stroke="white" strokeWidth="16" fill="white" strokeLinecap="round" />
-                  <path d="M-20 8 Q0 38 20 8" stroke="white" strokeWidth="12" fill="white" strokeLinecap="round" />
-                  {/* Eyes */}
-                  <circle cx="-10" cy="-8" r="4.5" fill="#FFF" />
-                  <circle cx="-10" cy="-8" r="3" fill="#000" />
-                  <circle cx="10" cy="-8" r="4.5" fill="#FFF" />
-                  <circle cx="10" cy="-8" r="3" fill="#000" />
-                  {/* Nose */}
-                  <ellipse cx="0" cy="2" rx="5" ry="6" fill="#FF8C69" />
-                  {/* Cheeks */}
-                  <circle cx="-18" cy="2" r="7" fill="#FFB6C1" opacity="0.6" />
-                  <circle cx="18" cy="2" r="7" fill="#FFB6C1" opacity="0.6" />
-                  {/* Arms with throwing motion */}
-                  <g transform={`rotate(${throwAttempt === 3 ? 50 : throwAttempt === 2 ? 30 : 0}, -40, 25)`}>
-                    <ellipse cx="-40" cy="25" rx="10" ry="32" fill="#C41E3A" />
-                    <circle cx="-40" cy="8" r="13" fill="#FDBCB4" />
-                    {/* Glove */}
-                    <circle cx="-40" cy="45" r="8" fill="#8B0000" />
-                  </g>
-                  <g transform={`rotate(${throwAttempt === 3 ? -50 : throwAttempt === 2 ? -30 : 0}, 40, 25)`}>
-                    <ellipse cx="40" cy="25" rx="10" ry="32" fill="#C41E3A" />
-                    <circle cx="40" cy="8" r="13" fill="#FDBCB4" />
-                    {/* Glove */}
-                    <circle cx="40" cy="45" r="8" fill="#8B0000" />
-                  </g>
-                </g>
-
-                {/* Gift being thrown - 3D rotation */}
-                {throwAttempt > 0 && throwAttempt <= 3 && (
-                  <g 
-                    transform={`translate(${
-                      throwAttempt === 1 ? 320 : 
-                      throwAttempt === 2 ? 360 : 
-                      450
-                    }, ${
-                      throwAttempt === 1 ? 110 : 
-                      throwAttempt === 2 ? 140 : 
-                      200
-                    })`}
-                    opacity={throwAttempt === 3 ? 1 : 0.5}
-                  >
-                    {/* Shadow */}
-                    <ellipse cx="0" cy="25" rx="15" ry="5" fill="#000" opacity="0.4" />
-                    {/* Gift with 3D effect */}
-                    <g transform={`rotate(${throwAttempt * 60}) scale(${throwAttempt === 3 ? 1.3 : 0.7})`}>
-                      <rect x="-20" y="-20" width="40" height="40" fill="#C41E3A" rx="5" />
-                      <rect x="-17" y="-17" width="34" height="34" fill="#16A34A" rx="4" />
-                      <line x1="0" y1="-20" x2="0" y2="20" stroke="#DC2626" strokeWidth="3" />
-                      <line x1="-20" y1="0" x2="20" y2="0" stroke="#DC2626" strokeWidth="3" />
-                      {/* Ribbon bow */}
-                      <circle cx="0" cy="0" r="8" fill="#FFD700" opacity="0.9" />
-                      <ellipse cx="-8" cy="0" rx="7" ry="5" fill="#FFD700" />
-                      <ellipse cx="8" cy="0" rx="7" ry="5" fill="#FFD700" />
-                    </g>
-                  </g>
-                )}
-              </svg>
-            </div>
+            {/* Hidden video for processing */}
+            <video
+              ref={videoRef}
+              src="/santa-sleigh-green.mp4"
+              loop
+              muted
+              playsInline
+              className="hidden"
+            />
+            
+            {/* Canvas for chroma key output */}
+            <canvas
+              ref={videoCanvasRef}
+              className="w-full h-full"
+              style={{
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.3))',
+                imageRendering: 'auto'
+              }}
+            />
           </div>
         )}
       </div>
