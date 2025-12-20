@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Bell, TrendingUp, TrendingDown, Loader2, User, MessageSquare, CheckCircle2 } from 'lucide-react';
-import { getPriceTrackerLimit } from '@/app/utils/pro-limits';
+import { getPriceTrackerLimitSync, preloadRewards } from '@/app/utils/pro-limits';
 
 interface PriceTrackerModalProps {
   isOpen: boolean;
@@ -31,6 +31,13 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
   useEffect(() => {
     if (!isOpen || !user?.steamId) return;
+
+    // Load rewards to refresh cache and update limit
+    preloadRewards(user.steamId).then(() => {
+      setMaxAlerts(getPriceTrackerLimitSync(isPro));
+    }).catch(() => {
+      setMaxAlerts(getPriceTrackerLimitSync(isPro));
+    });
 
     // Check Discord status
     fetch(`/api/discord/status?steamId=${user.steamId}`)
@@ -119,7 +126,6 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
   if (!isOpen) return null;
 
-  const maxAlerts = getPriceTrackerLimit(isPro);
   const canCreateMore = alerts.length < maxAlerts;
 
   return (

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, AlertCircle, Bell } from 'lucide-react';
-import { getPriceTrackerLimit } from '@/app/utils/pro-limits';
+import { getPriceTrackerLimitSync, preloadRewards } from '@/app/utils/pro-limits';
 
 interface PriceAlert {
   id: string;
@@ -25,12 +25,19 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [maxTrackers, setMaxTrackers] = useState(5);
 
   useEffect(() => {
     if (isOpen && steamId) {
       loadAlerts();
+      // Load rewards to update limit
+      preloadRewards(steamId).then(() => {
+        setMaxTrackers(getPriceTrackerLimitSync(isPro));
+      }).catch(() => {
+        setMaxTrackers(getPriceTrackerLimitSync(isPro));
+      });
     }
-  }, [isOpen, steamId]);
+  }, [isOpen, steamId, isPro]);
 
   const loadAlerts = async () => {
     try {
@@ -151,16 +158,13 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
           </div>
         )}
 
-        {(() => {
-          const maxTrackers = getPriceTrackerLimit(isPro);
-          return !isPro && alerts.length >= maxTrackers && (
+        {!isPro && alerts.length >= maxTrackers && (
             <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
               <p className="text-xs text-blue-400">
                 <strong>Free tier limit:</strong> You've reached the maximum of {maxTrackers} price trackers. Upgrade to Pro for unlimited trackers!
               </p>
             </div>
-          );
-        })()}
+        )}
       </div>
     </div>
   );

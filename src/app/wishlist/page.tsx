@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
-import { getWishlistLimit, getWishlistBatchSize } from '@/app/utils/pro-limits';
+import { getWishlistLimitSync, getWishlistBatchSize, preloadRewards } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 const PROXY_LIST = [
@@ -84,6 +84,7 @@ export default function WishlistPage() {
   const [user, setUser] = useState<any>(null);
   const [isPro, setIsPro] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [wishlistLimit, setWishlistLimit] = useState(10);
 
   // hydrate wishlist + currency + Pro status
   useEffect(() => {
@@ -94,6 +95,17 @@ export default function WishlistPage() {
         setUser(parsedUser);
         const steamId = parsedUser?.steamId || null;
         setItems(loadWishlist(steamId));
+        
+        // Load rewards to update limit
+        if (steamId) {
+          preloadRewards(steamId).then(() => {
+            setWishlistLimit(getWishlistLimitSync(false));
+          }).catch(() => {
+            setWishlistLimit(getWishlistLimitSync(false));
+          });
+        } else {
+          setWishlistLimit(getWishlistLimitSync(false));
+        }
         
         // Check Pro status from API to ensure accuracy
         if (steamId) {
@@ -213,8 +225,8 @@ export default function WishlistPage() {
                 <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">My Wishlist</h2>
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">
-                    {items.length} / {isPro ? '∞' : getWishlistLimit(false)} {items.length === 1 ? 'item' : 'items'} saved
-                    {!isPro && items.length >= getWishlistLimit(false) && (
+                    {items.length} / {isPro ? '∞' : wishlistLimit} {items.length === 1 ? 'item' : 'items'} saved
+                    {!isPro && items.length >= wishlistLimit && (
                       <span className="ml-2 text-amber-500">• Limit reached</span>
                     )}
                   </p>
@@ -356,7 +368,7 @@ export default function WishlistPage() {
         title="Wishlist Limit Reached"
         message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
         feature="Wishlist"
-        limit={getWishlistLimit(false)}
+        limit={wishlistLimit}
         currentCount={items.length}
       />
     </div>

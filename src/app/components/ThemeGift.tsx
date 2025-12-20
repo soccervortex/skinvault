@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Gift, X, Sparkles } from 'lucide-react';
 import { saveReward, type Reward } from '@/app/utils/theme-rewards';
 import { ThemeType } from '@/app/utils/theme-storage';
+import { preloadRewards } from '@/app/utils/pro-limits';
 
 interface ThemeGiftProps {
   theme: ThemeType;
@@ -118,6 +119,10 @@ export default function ThemeGift({ theme, steamId }: ThemeGiftProps) {
           
           // Also save to localStorage as backup
           saveReward(randomReward, theme);
+          // Reload rewards cache so limits refresh immediately
+          if (steamId) {
+            preloadRewards(steamId).catch(() => {});
+          }
           setShowModal(true);
           setHasClaimed(true);
         } else {

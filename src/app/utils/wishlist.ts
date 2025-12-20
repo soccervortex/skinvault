@@ -1,4 +1,4 @@
-import { canAddToWishlist, getWishlistLimit } from './pro-limits';
+import { canAddToWishlist, getWishlistLimitSync } from './pro-limits';
 
 export type WishlistEntry = {
   key: string; // stable identifier, usually market_hash_name
@@ -75,12 +75,14 @@ export function toggleWishlistEntry(
     return { success: true, newList: next };
   }
   
-  // If adding, check limits
+  // If adding, check limits (use sync version for now, async requires refactor)
   const currentCount = current.length;
-  const canAdd = canAddToWishlist(currentCount, isProUser);
+  // For sync function, we can't check rewards from API easily, so use base limit
+  // This will be updated when the page refreshes and loads rewards
+  const limit = isProUser ? Infinity : getWishlistLimitSync(isProUser);
+  const canAdd = currentCount < limit;
   
   if (!canAdd) {
-    const limit = getWishlistLimit(isProUser);
     return {
       success: false,
       newList: current,
