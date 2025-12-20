@@ -7,30 +7,44 @@ const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.
 
 // Discord OAuth callback - exchange code for token and link to Steam account
 export async function GET(request: Request) {
+  console.log('[Discord Callback] ===== CALLBACK ROUTE CALLED =====');
+  console.log('[Discord Callback] Request URL:', request.url);
+  
   try {
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     
+    console.log('[Discord Callback] Code present:', !!code);
+    console.log('[Discord Callback] State present:', !!state);
+    
     if (!code || !state) {
+      console.error('[Discord Callback] ❌ Missing code or state parameter');
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_auth_failed`);
     }
 
     // Decode state to get steamId
     let steamId: string;
     try {
+      console.log('[Discord Callback] Decoding state parameter...');
       const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
       steamId = stateData.steamId;
+      console.log('[Discord Callback] Decoded Steam ID:', steamId);
       
       // Verify state is recent (within 10 minutes)
-      if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
+      const stateAge = Date.now() - stateData.timestamp;
+      console.log('[Discord Callback] State age:', stateAge, 'ms');
+      if (stateAge > 10 * 60 * 1000) {
+        console.error('[Discord Callback] ❌ State expired');
         return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_auth_expired`);
       }
-    } catch {
+    } catch (error) {
+      console.error('[Discord Callback] ❌ Failed to decode state:', error);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_auth_invalid`);
     }
 
     // Exchange code for access token
+    console.log('[Discord Callback] Exchanging code for access token...');
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: {
@@ -46,13 +60,18 @@ export async function GET(request: Request) {
     });
 
     if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('[Discord Callback] ❌ Token exchange failed:', tokenResponse.status, errorText);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_token_failed`);
     }
+    
+    console.log('[Discord Callback] ✅ Token exchange successful');
 
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
     // Get Discord user info
+    console.log('[Discord Callback] Fetching Discord user info...');
     const userResponse = await fetch('https://discord.com/api/users/@me', {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -60,8 +79,12 @@ export async function GET(request: Request) {
     });
 
     if (!userResponse.ok) {
+      const errorText = await userResponse.text();
+      console.error('[Discord Callback] ❌ Failed to fetch user info:', userResponse.status, errorText);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_user_failed`);
     }
+    
+    console.log('[Discord Callback] ✅ User info fetched successfully');
 
     const discordUser = await userResponse.json();
     console.log(`[Discord Callback] Received Discord user: ${discordUser.id} (${discordUser.username}) for Steam ID: ${steamId}`);
@@ -174,13 +197,17 @@ Happy trading! 🚀`;
         // Don't fail the connection if welcome message fails
       }
     } catch (error) {
-      console.error('Failed to store Discord connection:', error);
+      console.error('[Discord Callback] ❌ Failed to store Discord connection:', error);
+      console.error('[Discord Callback] Error details:', error instanceof Error ? error.stack : String(error));
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_storage_failed`);
     }
 
+    console.log('[Discord Callback] ===== SUCCESS - Redirecting to /pro =====');
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?discord=connected`);
   } catch (error) {
-    console.error('Discord callback error:', error);
+    console.error('[Discord Callback] ===== FATAL ERROR =====');
+    console.error('[Discord Callback] Error:', error);
+    console.error('[Discord Callback] Error details:', error instanceof Error ? error.stack : String(error));
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/pro?error=discord_callback_failed`);
   }
 }
