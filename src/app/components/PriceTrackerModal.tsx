@@ -119,7 +119,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
   if (!isOpen) return null;
 
-  const maxAlerts = isPro ? Infinity : 5;
+  const maxAlerts = getPriceTrackerLimit(isPro);
   const canCreateMore = alerts.length < maxAlerts;
 
   return (

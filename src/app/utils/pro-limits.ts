@@ -5,13 +5,31 @@ export const PRO_LIMITS = {
   WISHLIST_PRO: Infinity, // Pro users have unlimited
 } as const;
 
-// Helper to get rewards from localStorage
+// Helper to get rewards from localStorage (checks all theme-specific keys)
 function getStoredRewards(): any[] {
   if (typeof window === 'undefined') return [];
   try {
-    const rewardsStr = localStorage.getItem('sv_theme_rewards_2024');
-    if (!rewardsStr) return [];
-    return JSON.parse(rewardsStr);
+    // Check all theme-specific reward keys
+    const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+    const allRewards: any[] = [];
+    
+    themes.forEach(theme => {
+      const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+      const key = `sv_${theme}_rewards_${year}`;
+      const rewardsStr = localStorage.getItem(key);
+      if (rewardsStr) {
+        try {
+          const rewards = JSON.parse(rewardsStr);
+          if (Array.isArray(rewards)) {
+            allRewards.push(...rewards);
+          }
+        } catch {
+          // Skip invalid JSON
+        }
+      }
+    });
+    
+    return allRewards;
   } catch {
     return [];
   }

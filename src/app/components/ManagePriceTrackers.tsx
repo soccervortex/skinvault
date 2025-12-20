@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, AlertCircle, Bell } from 'lucide-react';
+import { getPriceTrackerLimit } from '@/app/utils/pro-limits';
 
 interface PriceAlert {
   id: string;
