@@ -10,6 +10,11 @@ import "./newyear-theme.css";
 import "./oldyear-theme.css";
 import InstallPrompt from "./components/InstallPrompt";
 import ThemeProviderWrapper from "./components/ThemeProviderWrapper";
+import ErrorBoundary from "./components/ErrorBoundary";
+import { ToastProvider } from "./components/Toast";
+import ProExpirationWarning from "./components/ProExpirationWarning";
+import NetworkStatus from "./components/NetworkStatus";
+import KeyboardShortcuts from "./components/KeyboardShortcuts";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -80,9 +85,16 @@ export default function RootLayout({
           src="/safe-storage-init.js"
           strategy="beforeInteractive"
         />
-        {children}
-        <InstallPrompt />
-        <ThemeProviderWrapper />
+        <ErrorBoundary>
+          <ToastProvider>
+            <KeyboardShortcuts />
+            {children}
+            <ProExpirationWarning />
+            <NetworkStatus />
+            <InstallPrompt />
+            <ThemeProviderWrapper />
+          </ToastProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

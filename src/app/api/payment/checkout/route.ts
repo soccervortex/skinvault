@@ -47,6 +47,9 @@ export async function POST(request: Request) {
 
     const origin = request.headers.get('origin') || 'https://skinvaults.vercel.app';
 
+    // Set expiration to 30 minutes from now (minimum allowed by Stripe is 30 minutes)
+    const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60); // 30 minutes in seconds
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
       mode: 'payment',
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&months=${priceInfo.months}`,
       cancel_url: `${origin}/payment/cancel`,
+      expires_at: expiresAt,
       metadata: {
         steamId,
         months: priceInfo.months.toString(),

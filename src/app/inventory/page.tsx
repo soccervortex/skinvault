@@ -11,8 +11,11 @@ import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import CompareModal from '@/app/components/CompareModal';
+import { InventoryItemSkeleton, ProfileHeaderSkeleton, StatCardSkeleton } from '@/app/components/LoadingSkeleton';
+import ShareButton from '@/app/components/ShareButton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
+import { useToast } from '@/app/components/Toast';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -100,6 +103,7 @@ function InventoryContent() {
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
+  const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
   const isPro = useMemo(
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
@@ -767,21 +771,36 @@ function InventoryContent() {
         document.body.removeChild(textArea);
       }
       setCopied(true);
+      toast.success('Link copied to clipboard!');
       setTimeout(() => setCopied(false), 1500);
     } catch {
       setCopied(false);
-      if (typeof window !== 'undefined') {
-        window.alert('Could not copy link. Please copy it manually.');
-      }
+      toast.error('Could not copy link. Please copy it manually.');
     }
   };
 
-  if (!viewedUser && loading) return (
-    <div className="h-screen bg-[#08090d] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-blue-500" size={40} />
-      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Syncing with Steam...</p>
-    </div>
-  );
+  if (!viewedUser && loading) {
+    return (
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+          <div className="max-w-6xl mx-auto space-y-12 pb-32">
+            <ProfileHeaderSkeleton />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <StatCardSkeleton key={i} />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <InventoryItemSkeleton key={i} />
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -901,13 +920,14 @@ function InventoryContent() {
                     </button>
                   </div>
                   {shareUrl && (
-                    <div className="mt-3 space-y-1 max-w-full md:max-w-xs">
-                      <button
-                        onClick={handleCopyShareLink}
-                        className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 hover:text-white transition-colors"
-                      >
-                        {copied ? 'Link copied' : 'Copy share link'}
-                      </button>
+                    <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
+                      <ShareButton
+                        url={shareUrl}
+                        title={`${viewedUser?.name || 'User'}'s Vault - SkinVault`}
+                        text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVault`}
+                        variant="button"
+                        className="text-[8px] md:text-[9px]"
+                      />
                       <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
                         {shareUrl}
                       </p>

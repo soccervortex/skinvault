@@ -205,13 +205,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             </div>
             
             <div className="space-y-2 mb-10 flex-1">
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Market">
                 <Tag size={16}/> Market
               </Link>
-              <Link href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+              <Link href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="My Vault">
                 <Wallet size={16}/> My Vault
               </Link>
-              <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+              <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16}/> Wishlist
               </Link>
               <button 
@@ -219,14 +219,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   setIsSearchOpen(true);
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+                className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+                aria-label="Search Player"
               >
                 <Search size={16}/> Search Player
               </button>
-              <Link href="/pro" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`}>
+              <Link href="/pro" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`} aria-label="Pro Subscription">
                 <Shield size={16}/> Pro
               </Link>
-              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16}/> Contact
               </Link>
               {user?.steamId === OWNER_STEAM_ID && (
@@ -240,7 +241,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-4">Weapon Categories</h3>
                   <nav className="space-y-1">
                     {categories.map((cat: any) => (
-                      <button key={cat.name} onClick={() => { setActiveCat(cat); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}>
+                      <button 
+                        key={cat.name} 
+                        onClick={() => { setActiveCat(cat); setIsMobileMenuOpen(false); }} 
+                        className={`w-full flex items-center gap-4 px-5 py-3 min-h-[44px] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}
+                        aria-label={`Filter by ${cat.name}`}
+                      >
                         {cat.icon} {cat.name}
                       </button>
                     ))}
@@ -351,28 +357,30 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         </div>
         
         <div className="space-y-2 mb-10 flex-1">
-          <Link href="/" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+          <Link href="/" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Market">
             <Tag size={16}/> Market
           </Link>
           <Link 
             href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} 
-            className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}
+            className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}
+            aria-label="My Vault"
           >
             <Wallet size={16}/> My Vault
           </Link>
-          <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+          <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16}/> Wishlist
           </Link>
           <button 
             onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+            className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+            aria-label="Search Player"
           >
             <Search size={16}/> Search Player
           </button>
-          <Link href="/pro" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`}>
+          <Link href="/pro" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`} aria-label="Pro Subscription">
             <Shield size={16}/> Pro
           </Link>
-          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}>
+          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
             <Mail size={16}/> Contact
           </Link>
           {user?.steamId === OWNER_STEAM_ID && (
@@ -386,7 +394,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-4">Weapon Categories</h3>
               <nav className="space-y-1">
                 {categories.map((cat: any) => (
-                  <button key={cat.name} onClick={() => setActiveCat(cat)} className={`w-full flex items-center gap-4 px-5 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}>
+                  <button 
+                    key={cat.name} 
+                    onClick={() => setActiveCat(cat)} 
+                    className={`w-full flex items-center gap-4 px-5 py-3 min-h-[44px] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}
+                    aria-label={`Filter by ${cat.name}`}
+                  >
                     {cat.icon} {cat.name}
                   </button>
                 ))}

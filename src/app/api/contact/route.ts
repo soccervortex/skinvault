@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { sanitizeString, sanitizeEmail, escapeHtml } from '@/app/utils/sanitize';
 import nodemailer from 'nodemailer';
 
 const RECIPIENT_EMAIL = 'drmizayt2@gmail.com';
@@ -40,14 +41,20 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     
-    const reason = formData.get('reason') as string;
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const description = formData.get('description') as string;
+    let reason = formData.get('reason') as string;
+    let name = formData.get('name') as string;
+    let email = formData.get('email') as string;
+    let description = formData.get('description') as string;
+
+    // Sanitize inputs
+    reason = sanitizeString(reason || '');
+    name = sanitizeString(name || '');
+    email = sanitizeEmail(email || '');
+    description = sanitizeString(description || '');
 
     if (!reason || !name || !email || !description) {
       return NextResponse.json(
-        { error: 'All fields are required' },
+        { error: 'All fields are required and must be valid' },
         { status: 400 }
       );
     }
@@ -117,19 +124,19 @@ export async function POST(request: Request) {
             <div class="content">
               <div class="field">
                 <div class="label">Reason:</div>
-                <div class="value">${reasonLabels[reason] || reason}</div>
+                <div class="value">${escapeHtml(reasonLabels[reason] || reason)}</div>
               </div>
               <div class="field">
                 <div class="label">Name:</div>
-                <div class="value">${name}</div>
+                <div class="value">${escapeHtml(name)}</div>
               </div>
               <div class="field">
                 <div class="label">Email:</div>
-                <div class="value">${email}</div>
+                <div class="value">${escapeHtml(email)}</div>
               </div>
               <div class="field">
                 <div class="label">Description:</div>
-                <div class="value">${description.replace(/\n/g, '<br>')}</div>
+                <div class="value">${escapeHtml(description).replace(/\n/g, '<br>')}</div>
               </div>
               ${images.length > 0 ? `
               <div class="field">
@@ -141,7 +148,7 @@ export async function POST(request: Request) {
           </div>
         </body>
       </html>
-    `;
+`;
 
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@skinvault.app',

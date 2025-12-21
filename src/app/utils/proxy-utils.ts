@@ -1,6 +1,8 @@
 // Proxy utilities with Pro-based proxy selection
 // Free users: 3 proxies, Pro users: 10 proxies
 
+import { parseRateLimitHeaders, getRateLimitMessage } from './rate-limit-handler';
+
 // Get scraping service proxies (server-side only, uses env vars)
 function getScrapingProxies(): Array<(url: string) => string> {
   const proxies: Array<(url: string) => string> = [];

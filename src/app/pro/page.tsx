@@ -4,12 +4,14 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
+import { useToast } from '@/app/components/Toast';
 
 export default function ProInfoPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [freeMonthEligible, setFreeMonthEligible] = useState(false);
   const [claimingFreeMonth, setClaimingFreeMonth] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -46,8 +48,8 @@ export default function ProInfoPage() {
 
   const handleClaimFreeMonth = async () => {
     if (!user?.steamId) {
-      alert('You must be signed in with Steam to claim the free month.');
-      window.location.href = '/inventory';
+      toast.error('You must be signed in with Steam to claim the free month.');
+      setTimeout(() => window.location.href = '/inventory', 2000);
       return;
     }
 
@@ -62,7 +64,7 @@ export default function ProInfoPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Failed to claim free month');
+        toast.error(data.error || 'Failed to claim free month');
         setClaimingFreeMonth(false);
         return;
       }
@@ -74,11 +76,11 @@ export default function ProInfoPage() {
         setUser(updatedUser);
         window.dispatchEvent(new Event('storage'));
         setFreeMonthEligible(false);
-        alert(data.message || 'Free month claimed successfully!');
+        toast.success(data.message || 'Free month claimed successfully!');
       }
       setClaimingFreeMonth(false);
     } catch (error) {
-      alert('Failed to claim free month. Please try again.');
+      toast.error('Failed to claim free month. Please try again.');
       setClaimingFreeMonth(false);
     }
   };
@@ -86,8 +88,8 @@ export default function ProInfoPage() {
   const handleCheckout = async (plan: '1month' | '3months' | '6months') => {
     // Double-check user is signed in
     if (!user?.steamId) {
-      alert('You must be signed in with Steam to purchase Pro. Please sign in first.');
-      window.location.href = '/inventory';
+      toast.error('You must be signed in with Steam to purchase Pro. Please sign in first.');
+      setTimeout(() => window.location.href = '/inventory', 2000);
       return;
     }
 
@@ -123,25 +125,26 @@ export default function ProInfoPage() {
       if (!res.ok) {
         // Handle authentication errors
         if (res.status === 401) {
-          alert(data.error || 'You must be signed in with Steam to purchase Pro.');
+          toast.error(data.error || 'You must be signed in with Steam to purchase Pro.');
           // Clear potentially stale user data
           localStorage.removeItem('steam_user');
-          window.location.href = '/inventory';
+          setTimeout(() => window.location.href = '/inventory', 2000);
         } else {
-          alert(data.error || 'Failed to start checkout');
+          toast.error(data.error || 'Failed to start checkout');
         }
         setLoading(null);
         return;
       }
 
       if (data.url) {
+        toast.info('Redirecting to payment...');
         window.location.href = data.url;
       } else {
-        alert(data.error || 'Failed to start checkout');
+        toast.error(data.error || 'Failed to start checkout');
         setLoading(null);
       }
     } catch (error) {
-      alert('Payment system error. Please try again.');
+      toast.error('Payment system error. Please try again.');
       setLoading(null);
     }
   };

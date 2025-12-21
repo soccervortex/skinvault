@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { checkProStatus } from '@/app/utils/proxy-utils';
@@ -304,7 +305,11 @@ export default function GlobalSkinSearch() {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
           {loading ? (
-            <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={32} /></div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
+              {Array.from({ length: 20 }).map((_, i) => (
+                <ItemCardSkeleton key={i} />
+              ))}
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
               {processedItems.slice(0, visibleCount).map((item) => {
@@ -321,7 +326,14 @@ export default function GlobalSkinSearch() {
                     )}
                     <div className="absolute top-2 md:top-3 lg:top-4 right-2 md:right-3 lg:right-4 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       {/* Compare Button */}
-                      <button onClick={() => toggleCompare(item)} className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} title="Add to Compare"><Scale size={12} /></button>
+                      <button 
+                        onClick={() => toggleCompare(item)} 
+                        className={`p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} 
+                        title="Add to Compare"
+                        aria-label={compareList.find(i => i.id === item.id) ? 'Remove from compare' : 'Add to compare'}
+                      >
+                        <Scale size={12} />
+                      </button>
                       
                       {/* Price Tracker Button - Only show if logged in */}
                       {user?.steamId && (
@@ -338,8 +350,9 @@ export default function GlobalSkinSearch() {
                               });
                               setShowTrackerModal(true);
                             }}
-                            className="p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all text-white border-white/10 hover:text-purple-500 hover:border-purple-500"
+                            className="p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all text-white border-white/10 hover:text-purple-500 hover:border-purple-500"
                             title="Price Tracker"
+                            aria-label="Set price tracker"
                           >
                             <Bell size={12} />
                           </button>
@@ -369,12 +382,13 @@ export default function GlobalSkinSearch() {
                                 setShowUpgradeModal(true);
                               }
                             }}
-                            className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${
+                            className={`p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${
                               wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id)
                                 ? 'text-rose-500 border-rose-500'
                                 : 'text-white border-white/10 hover:text-rose-500 hover:border-rose-500'
                             }`}
                             title={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                            aria-label={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                           >
                             <Heart 
                               size={12} 

@@ -6,6 +6,8 @@ import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import CompareModal from '@/app/components/CompareModal';
+import ShareButton from '@/app/components/ShareButton';
+import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
@@ -217,7 +219,31 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
     };
   }, [viewMode]);
 
-  if (loading) return <div className="min-h-screen bg-[#08090d] flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={40} /></div>;
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-12 custom-scrollbar">
+            <div className="w-full max-w-6xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 items-start">
+                <div className="lg:col-span-5">
+                  <ItemCardSkeleton />
+                </div>
+                <div className="lg:col-span-7 space-y-6">
+                  <div className="h-12 bg-gray-700/30 rounded animate-pulse" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="h-32 bg-gray-700/30 rounded animate-pulse" />
+                    <div className="h-32 bg-gray-700/30 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!item) {
     return (
@@ -332,10 +358,19 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 </button>
               </div>
               <div className="absolute bottom-4 right-4 md:hidden flex items-center gap-2 z-20">
+                {/* Share Button (Mobile) */}
+                {typeof window !== 'undefined' && (
+                  <ShareButton
+                    url={window.location.href}
+                    title={`${item?.name} - SkinVault`}
+                    text={`Check out ${item?.name} on SkinVault`}
+                    variant="icon"
+                  />
+                )}
                 {/* Compare Button (Mobile) */}
                 <button
                   onClick={() => setShowCompareModal(true)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
                   aria-label="Compare items"
                 >
                   <Scale size={14} className="text-blue-400" />
@@ -344,7 +379,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 {user && (
                   <button
                     onClick={() => setShowTrackerModal(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
                     aria-label="Set price tracker"
                   >
                     <Bell size={14} className="text-blue-400" />
@@ -372,7 +407,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                       setShowUpgradeModal(true);
                     }
                   }}
-                  className="inline-flex items-center justify-center p-2.5 rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all"
+                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <Heart
@@ -388,13 +423,23 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
               <div className="flex items-center gap-2">
+                {/* Share Button */}
+                {typeof window !== 'undefined' && (
+                  <ShareButton
+                    url={window.location.href}
+                    title={`${item?.name} - SkinVault`}
+                    text={`Check out ${item?.name} on SkinVault`}
+                    variant="icon"
+                    className="hidden md:flex"
+                  />
+                )}
                 {/* Compare Button */}
                 <button
                   onClick={() => {
                     // Just show modal - it will handle adding the current item automatically
                     setShowCompareModal(true);
                   }}
-                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0"
+                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0 min-h-[44px]"
                   aria-label="Compare items"
                 >
                   <Scale size={18} className="text-blue-400" />
@@ -404,7 +449,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 {user && (
                   <button
                     onClick={() => setShowTrackerModal(true)}
-                    className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0"
+                    className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0 min-h-[44px]"
                     aria-label="Set price tracker"
                   >
                     <Bell size={18} className="text-blue-400" />
@@ -433,7 +478,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                       setShowUpgradeModal(true);
                     }
                   }}
-                  className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0"
+                  className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0 min-h-[44px]"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <Heart

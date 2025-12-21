@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchWithProxyRotation } from '@/app/utils/proxy-utils';
+import { parseRateLimitHeaders, getRateLimitMessage } from '@/app/utils/rate-limit-handler';
 
 // Proxy endpoint for fetching Steam market prices
 // Supports both direct URL and market_hash_name parameters
@@ -73,6 +74,23 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
+      // Handle rate limiting with user-friendly message
+      if (response.status === 429) {
+        const rateLimitInfo = parseRateLimitHeaders(response.headers);
+        return NextResponse.json(
+          { 
+            error: getRateLimitMessage(rateLimitInfo),
+            rateLimit: rateLimitInfo,
+          },
+          { 
+            status: 429,
+            headers: {
+              'Retry-After': rateLimitInfo.retryAfter?.toString() || '60',
+            },
+          }
+        );
+      }
+      
       return NextResponse.json(
         { error: `Steam API returned ${response.status}` },
         { status: response.status }
