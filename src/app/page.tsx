@@ -105,32 +105,7 @@ export default function GlobalSkinSearch() {
         const storedUser = window.localStorage.getItem('steam_user');
         const parsedUser = storedUser ? JSON.parse(storedUser) : null;
         
-        // TEMPORARY TEST: Add test item for user 00000000001 (will be removed after testing)
-        const testSteamId = '00000000001';
-        const isTestUser = parsedUser?.steamId === testSteamId;
-        
-        if (isTestUser) {
-          // Add Snakebite Case for testing - try multiple possible names
-          const testItems = ['Snakebite Case', 'snakebite case', 'SNAKEBITE CASE', 'crate-4747'];
-          let added = false;
-          testItems.forEach(testItem => {
-            if (!marketHashNames.some(name => name.toLowerCase() === testItem.toLowerCase())) {
-              marketHashNames.push(testItem);
-              added = true;
-            }
-          });
-          if (added) {
-            // Save back to localStorage
-            window.localStorage.setItem('user_inventory', JSON.stringify(marketHashNames));
-          }
-        }
-        
         setOwnedItems(marketHashNames);
-        
-        // DEBUG: Log owned items (remove after testing)
-        if (marketHashNames.length > 0 && typeof window !== 'undefined') {
-          console.log('[Owned Badge Debug] Owned items loaded:', marketHashNames.slice(0, 10));
-        }
         
         setUser(parsedUser);
         
