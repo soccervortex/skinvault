@@ -83,29 +83,49 @@ export default function GlobalSkinSearch() {
         window.localStorage.removeItem(testKey);
         
         const savedInv = window.localStorage.getItem('user_inventory');
+        let marketHashNames: string[] = [];
+        
         if (savedInv) {
           const parsed = JSON.parse(savedInv);
           if (Array.isArray(parsed)) {
             // If it's an array of strings (market_hash_names), use as is
             // If it's an array of objects, extract market_hash_name
-            const marketHashNames = parsed.map((item: any) => 
+            marketHashNames = parsed.map((item: any) => 
               typeof item === 'string' ? item : (item.market_hash_name || item.market_name || item.name || '')
             ).filter(Boolean);
-            setOwnedItems(marketHashNames);
           } else if (parsed && typeof parsed === 'object') {
             // If it's an object, try to extract market_hash_names
-            const marketHashNames = Object.values(parsed).map((item: any) => 
+            marketHashNames = Object.values(parsed).map((item: any) => 
               typeof item === 'string' ? item : (item?.market_hash_name || item?.market_name || item?.name || '')
             ).filter(Boolean);
-            setOwnedItems(marketHashNames);
-          } else {
-            setOwnedItems([]);
           }
         }
         
         // Load user and wishlist
         const storedUser = window.localStorage.getItem('steam_user');
         const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+        
+        // TEMPORARY TEST: Add test item for user 00000000001 (will be removed after testing)
+        const testSteamId = '00000000001';
+        const isTestUser = parsedUser?.steamId === testSteamId;
+        
+        if (isTestUser) {
+          // Add Snakebite Case for testing - try multiple possible names
+          const testItems = ['Snakebite Case', 'snakebite case', 'SNAKEBITE CASE', 'crate-4747'];
+          let added = false;
+          testItems.forEach(testItem => {
+            if (!marketHashNames.some(name => name.toLowerCase() === testItem.toLowerCase())) {
+              marketHashNames.push(testItem);
+              added = true;
+            }
+          });
+          if (added) {
+            // Save back to localStorage
+            window.localStorage.setItem('user_inventory', JSON.stringify(marketHashNames));
+          }
+        }
+        
+        setOwnedItems(marketHashNames);
         setUser(parsedUser);
         
         if (parsedUser?.steamId) {

@@ -626,6 +626,29 @@ function InventoryContent() {
     loadAll();
   }, [searchParams]);
 
+  // Save inventory to localStorage for owned badge on market page (only for own profile)
+  useEffect(() => {
+    if (!inventory.length || !loggedInUser?.steamId || !viewedUser?.steamId) return;
+    if (loggedInUser.steamId !== viewedUser.steamId) return; // Only save for own profile
+    
+    try {
+      // Extract market_hash_names from inventory
+      const marketHashNames = inventory
+        .map((item) => getMarketKey(item))
+        .filter(Boolean) as string[];
+      
+      // Save to localStorage for market page to use
+      if (typeof window !== 'undefined' && marketHashNames.length > 0) {
+        window.localStorage.setItem('user_inventory', JSON.stringify(marketHashNames));
+        // Trigger storage event so market page updates
+        window.dispatchEvent(new Event('storage'));
+      }
+    } catch (error) {
+      // Silently ignore localStorage errors
+      console.error('Failed to save inventory to localStorage:', error);
+    }
+  }, [inventory, loggedInUser?.steamId, viewedUser?.steamId]);
+
   useEffect(() => {
     if (!inventory.length) return;
 
