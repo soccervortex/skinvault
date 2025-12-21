@@ -324,84 +324,88 @@ export default function GlobalSkinSearch() {
                         <span className="text-[7px] md:text-[8px] font-black uppercase tracking-widest text-white">Owned</span>
                       </div>
                     )}
-                    <div className="absolute top-2 md:top-3 lg:top-4 right-2 md:right-3 lg:right-4 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {/* Compare Button */}
-                      <button 
-                        onClick={() => toggleCompare(item)} 
-                        className={`p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} 
-                        title="Add to Compare"
-                        aria-label={compareList.find(i => i.id === item.id) ? 'Remove from compare' : 'Add to compare'}
-                      >
-                        <Scale size={12} />
-                      </button>
-                      
-                      {/* Price Tracker Button - Only show if logged in */}
-                      {user?.steamId && (
-                        <>
-                          <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setTrackerModalItem({
-                                id: item.id,
-                                name: item.name,
-                                image: item.image,
-                                market_hash_name: item.market_hash_name,
-                              });
-                              setShowTrackerModal(true);
-                            }}
-                            className="p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all text-white border-white/10 hover:text-purple-500 hover:border-purple-500"
-                            title="Price Tracker"
-                            aria-label="Set price tracker"
-                          >
-                            <Bell size={12} />
-                          </button>
-                          
-                          {/* Wishlist Button */}
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const isWishlisted = wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id);
-                              const result = toggleWishlistEntry(
-                                {
-                                  key: item.id,
-                                  name: item.name,
-                                  image: item.image,
-                                  market_hash_name: item.market_hash_name,
-                                  rarityName: item.rarity?.name,
-                                  rarityColor: item.rarity?.color,
-                                  weaponName: item.weapon?.name,
-                                },
-                                user.steamId,
-                                isPro,
-                              );
-                              if (result.success) {
-                                setWishlist(result.newList);
-                              } else if (result.reason === 'limit_reached') {
-                                setShowUpgradeModal(true);
-                              }
-                            }}
-                            className={`p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all ${
-                              wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id)
-                                ? 'text-rose-500 border-rose-500'
-                                : 'text-white border-white/10 hover:text-rose-500 hover:border-rose-500'
-                            }`}
-                            title={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
-                            aria-label={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                          >
-                            <Heart 
-                              size={12} 
-                              className={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'fill-current' : ''} 
-                            />
-                          </button>
-                        </>
-                      )}
-                    </div>
                     <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                         <img loading="lazy" src={item.image} className="w-full h-full object-contain relative z-10 transition-transform group-hover:scale-110 duration-500" alt={item.name} />
+                        <div className="absolute top-2 md:top-3 right-2 md:right-3 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Compare Button */}
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleCompare(item);
+                            }}
+                            className={`p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/80 backdrop-blur-md transition-all ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} 
+                            title="Add to Compare"
+                            aria-label={compareList.find(i => i.id === item.id) ? 'Remove from compare' : 'Add to compare'}
+                          >
+                            <Scale size={12} />
+                          </button>
+                          
+                          {/* Price Tracker Button - Only show if logged in */}
+                          {user?.steamId && (
+                            <>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setTrackerModalItem({
+                                    id: item.id,
+                                    name: item.name,
+                                    image: item.image,
+                                    market_hash_name: item.market_hash_name,
+                                  });
+                                  setShowTrackerModal(true);
+                                }}
+                                className="p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/80 backdrop-blur-md transition-all text-white border-white/10 hover:text-purple-500 hover:border-purple-500"
+                                title="Price Tracker"
+                                aria-label="Set price tracker"
+                              >
+                                <Bell size={12} />
+                              </button>
+                              
+                              {/* Wishlist Button */}
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const isWishlisted = wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id);
+                                  const result = toggleWishlistEntry(
+                                    {
+                                      key: item.id,
+                                      name: item.name,
+                                      image: item.image,
+                                      market_hash_name: item.market_hash_name,
+                                      rarityName: item.rarity?.name,
+                                      rarityColor: item.rarity?.color,
+                                      weaponName: item.weapon?.name,
+                                    },
+                                    user.steamId,
+                                    isPro,
+                                  );
+                                  if (result.success) {
+                                    setWishlist(result.newList);
+                                  } else if (result.reason === 'limit_reached') {
+                                    setShowUpgradeModal(true);
+                                  }
+                                }}
+                                className={`p-2 md:p-2.5 min-h-[44px] min-w-[44px] rounded-lg md:rounded-xl border bg-black/80 backdrop-blur-md transition-all ${
+                                  wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id)
+                                    ? 'text-rose-500 border-rose-500'
+                                    : 'text-white border-white/10 hover:text-rose-500 hover:border-rose-500'
+                                }`}
+                                title={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                                aria-label={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                              >
+                                <Heart 
+                                  size={12} 
+                                  className={wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id) ? 'fill-current' : ''} 
+                                />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[9px] md:text-[10px] font-black uppercase truncate tracking-widest text-white/90">{item.name}</p>
                       <p className="text-[7px] md:text-[8px] font-black mt-1 md:mt-2 opacity-80 uppercase" style={{color: rarityColor}}>{item.rarity?.name || 'Standard'}</p>
