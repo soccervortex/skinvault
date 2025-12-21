@@ -319,7 +319,7 @@ export default function GlobalSkinSearch() {
                 return (
                   <div key={item.id} className={`bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-all duration-300 group relative flex flex-col border ${isOwned ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'border-white/5 hover:border-blue-500/40'}`}>
                     {isOwned && (
-                      <div className="absolute top-2 md:top-3 lg:top-4 left-2 md:left-3 lg:left-4 z-30 flex items-center gap-1 md:gap-1.5 bg-emerald-500 px-2 md:px-3 py-1 md:py-1.5 rounded-full">
+                      <div className="absolute top-2 md:top-3 lg:top-4 left-2 md:left-3 lg:left-4 z-50 flex items-center gap-1 md:gap-1.5 bg-emerald-500 px-2 md:px-3 py-1 md:py-1.5 rounded-full shadow-lg">
                         <CheckCircle2 size={8} className="text-white" />
                         <span className="text-[7px] md:text-[8px] font-black uppercase tracking-widest text-white">Owned</span>
                       </div>

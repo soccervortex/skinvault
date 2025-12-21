@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&months=${priceInfo.months}`,
-      cancel_url: `${origin}/payment/cancel`,
+      cancel_url: `${origin}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: expiresAt,
       metadata: {
         steamId,
