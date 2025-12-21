@@ -126,6 +126,12 @@ export default function GlobalSkinSearch() {
         }
         
         setOwnedItems(marketHashNames);
+        
+        // DEBUG: Log owned items (remove after testing)
+        if (marketHashNames.length > 0 && typeof window !== 'undefined') {
+          console.log('[Owned Badge Debug] Owned items loaded:', marketHashNames.slice(0, 10));
+        }
+        
         setUser(parsedUser);
         
         if (parsedUser?.steamId) {
@@ -363,14 +369,32 @@ export default function GlobalSkinSearch() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
               {processedItems.slice(0, visibleCount).map((item) => {
                 // Check if item is owned by comparing market_hash_name, id, or name
-                const isOwned = ownedItems.some(owned => 
-                  owned === item.market_hash_name || 
-                  owned === item.id || 
-                  owned === item.name ||
-                  item.market_hash_name?.toLowerCase() === owned?.toLowerCase() ||
-                  item.id?.toLowerCase() === owned?.toLowerCase() ||
-                  item.name?.toLowerCase() === owned?.toLowerCase()
-                );
+                const normalize = (str: string | undefined | null): string => {
+                  if (!str) return '';
+                  return str.toString().toLowerCase().trim();
+                };
+                
+                const itemMarketHash = normalize(item.market_hash_name);
+                const itemId = normalize(item.id);
+                const itemName = normalize(item.name);
+                
+                const isOwned = ownedItems.length > 0 && ownedItems.some(owned => {
+                  if (!owned) return false;
+                  const ownedLower = normalize(owned);
+                  if (!ownedLower) return false;
+                  
+                  // Check exact matches (case-insensitive, trimmed)
+                  if (itemMarketHash && ownedLower === itemMarketHash) return true;
+                  if (itemId && ownedLower === itemId) return true;
+                  if (itemName && ownedLower === itemName) return true;
+                  
+                  // Check if names match when normalized (remove special chars for comparison)
+                  const normalizeStrict = (s: string) => s.replace(/[^a-z0-9]/g, '');
+                  if (itemMarketHash && normalizeStrict(ownedLower) === normalizeStrict(itemMarketHash)) return true;
+                  if (itemName && normalizeStrict(ownedLower) === normalizeStrict(itemName)) return true;
+                  
+                  return false;
+                });
                 const rarityColor = item.rarity?.color || "#4b5563";
 
                 return (
