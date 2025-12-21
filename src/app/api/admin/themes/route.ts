@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getThemeSettings, setThemeEnabled, ThemeType } from '@/app/utils/theme-storage';
 
 const ADMIN_HEADER = 'x-admin-key';
-const OWNER_STEAM_ID = '76561199235618867';
 
 // Get all theme settings
 export async function GET(request: Request) {

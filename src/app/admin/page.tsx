@@ -12,8 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
-
-const OWNER_STEAM_ID = "76561199235618867";
+import { isOwner } from "@/app/utils/owner-ids";
 
 type ProEntry = {
   steamId: string;
@@ -60,10 +59,10 @@ export default function AdminPage() {
     }
   }, []);
 
-  const isOwner = user?.steamId === OWNER_STEAM_ID;
+  const userIsOwner = isOwner(user?.steamId);
 
   useEffect(() => {
-    if (!isOwner) return;
+    if (!userIsOwner) return;
     const loadStats = async () => {
       setLoadingStats(true);
       setStatsError(null);
@@ -107,7 +106,7 @@ export default function AdminPage() {
       }
     };
     loadThemes();
-  }, [isOwner]);
+  }, [userIsOwner]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,7 +211,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!isOwner) {
+  if (!userIsOwner) {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />

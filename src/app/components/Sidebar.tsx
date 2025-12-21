@@ -3,8 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-
-const OWNER_STEAM_ID = '76561199235618867';
+import { isOwner } from '@/app/utils/owner-ids';
 
 export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const pathname = usePathname();
@@ -230,7 +229,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16}/> Contact
               </Link>
-              {user?.steamId === OWNER_STEAM_ID && (
+              {isOwner(user?.steamId) && (
                 <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
                   <Shield size={16}/> Admin Panel
                 </Link>
@@ -383,7 +382,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
             <Mail size={16}/> Contact
           </Link>
-          {user?.steamId === OWNER_STEAM_ID && (
+          {isOwner(user?.steamId) && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
               <Shield size={16}/> Admin Panel
             </Link>

@@ -1,6 +1,5 @@
 import { kv } from '@vercel/kv';
-
-const OWNER_STEAM_ID = '76561199235618867';
+import { OWNER_STEAM_IDS } from './owner-ids';
 const PRO_USERS_KEY = 'pro_users';
 const FIRST_LOGINS_KEY = 'first_logins'; // Track first login dates
 const CLAIMED_FREE_MONTH_KEY = 'claimed_free_month'; // Track who claimed free month
@@ -44,8 +43,8 @@ export async function getProUntil(steamId: string): Promise<string | null> {
   const data = await readProData();
   let proUntil = data[steamId] || null;
 
-  // Owner account has Pro forever
-  if (steamId === OWNER_STEAM_ID && !proUntil) {
+  // Owner accounts have Pro forever
+  if (OWNER_STEAM_IDS.includes(steamId as any) && !proUntil) {
     proUntil = '2999-01-01T00:00:00.000Z';
   }
 
