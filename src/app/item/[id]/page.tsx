@@ -335,7 +335,7 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
               <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
               <img
                 src={item?.image}
-                className="w-[80%] h-auto object-contain z-10"
+                className="max-w-full max-h-full w-auto h-auto object-contain z-10"
                 alt={item?.name || ''}
                 style={{
                   transform: viewMode === '3D' ? `rotateY(${rotation}deg)` : 'rotateY(0deg)',
