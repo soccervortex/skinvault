@@ -5,7 +5,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // Vercel automatically provides VERCEL_URL in production
   // You can also set NEXT_PUBLIC_BASE_URL in your environment variables
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://skinvault.app');
+                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://skinvaults.online');
   
   const currentDate = new Date().toISOString();
 

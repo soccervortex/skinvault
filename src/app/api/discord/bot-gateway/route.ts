@@ -110,7 +110,7 @@ Happy trading! 🚀`;
         }).format(alert.targetPrice)}
 **Current Price:** ${priceData.lowest || 'N/A'}
 
-View on SkinVault: https://skinvaults.vercel.app/item/${encodeURIComponent(alert.marketHashName)}`;
+View on SkinVault: https://skinvaults.online/item/${encodeURIComponent(alert.marketHashName)}`;
 
         const notificationQueueKey = 'discord_dm_queue';
         const notificationQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(notificationQueueKey) || [];

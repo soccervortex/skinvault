@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     // Fetch inventory from Steam API
     const inventoryResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/steam/inventory?steamId=${steamId}`,
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/api/steam/inventory?steamId=${steamId}`,
       { cache: 'no-store' }
     );
 

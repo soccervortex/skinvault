@@ -692,7 +692,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.vercel.app/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -720,7 +720,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription(`Showing ${itemsToShow.length} of ${wishlist.length} items`)
         .setColor(0x5865F2)
         .setTimestamp()
-        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
       // Add thumbnail if first item has image
       if (firstItem?.image) {
@@ -730,7 +730,7 @@ client.on('interactionCreate', async (interaction) => {
       const fields = itemsToShow.map((item, index) => {
         const price = prices[index];
         const priceText = price?.lowest_price || price?.lowest || price?.median_price || 'No price data';
-        const itemUrl = `https://skinvaults.vercel.app/item/${encodeURIComponent(item.market_hash_name || item.key)}`;
+        const itemUrl = `https://skinvaults.online/item/${encodeURIComponent(item.market_hash_name || item.key)}`;
         
         return {
           name: `${index + 1}. ${item.name || item.key}`,
@@ -743,7 +743,7 @@ client.on('interactionCreate', async (interaction) => {
       embed.addFields(fields);
 
       if (wishlist.length > 10) {
-        embed.setDescription(`Showing first 10 of ${wishlist.length} items\n\nView all items: https://skinvaults.vercel.app/wishlist`);
+        embed.setDescription(`Showing first 10 of ${wishlist.length} items\n\nView all items: https://skinvaults.online/wishlist`);
       }
 
       await interaction.editReply({ embeds: [embed] });
@@ -755,7 +755,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
         });
         return;
       }
@@ -788,7 +788,7 @@ client.on('interactionCreate', async (interaction) => {
         const status = alert.triggered ? '✅ Triggered' : '⏳ Active';
         const price = prices[index];
         const currentPrice = price?.lowest_price || price?.lowest || price?.median_price || 'No price data';
-        const itemUrl = `https://skinvaults.vercel.app/item/${encodeURIComponent(alert.marketHashName)}`;
+        const itemUrl = `https://skinvaults.online/item/${encodeURIComponent(alert.marketHashName)}`;
         
         return {
           name: `${index + 1}. ${alert.marketHashName}`,
@@ -817,7 +817,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       if (alerts.length > 10) {
-        embed.setDescription(`Showing first 10 of ${alerts.length} alerts\n\nManage alerts: https://skinvaults.vercel.app/inventory`);
+        embed.setDescription(`Showing first 10 of ${alerts.length} alerts\n\nManage alerts: https://skinvaults.online/inventory`);
       }
 
       await interaction.editReply({ embeds: [embed] });
@@ -868,8 +868,8 @@ client.on('interactionCreate', async (interaction) => {
 
       const priceText = price ? (price.lowest_price || price.lowest || price.median_price || 'No price data') : 'No price data';
       const itemUrl = itemId 
-        ? `https://skinvaults.vercel.app/item/${encodeURIComponent(itemId)}`
-        : `https://skinvaults.vercel.app/item/${encodeURIComponent(itemName)}`;
+        ? `https://skinvaults.online/item/${encodeURIComponent(itemId)}`
+        : `https://skinvaults.online/item/${encodeURIComponent(itemName)}`;
 
       const embed = new EmbedBuilder()
         .setTitle(`💰 ${displayName}`)
@@ -877,7 +877,7 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0x5865F2)
         .setURL(itemUrl)
         .setTimestamp()
-        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
       // Set image if available
       if (itemImage) {
@@ -911,7 +911,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
         });
         return;
       }
@@ -960,14 +960,14 @@ client.on('interactionCreate', async (interaction) => {
 
         const totalItems = assets.length;
         const uniqueItems = sortedItems.length;
-        const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
+        const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
 
         const embed = new EmbedBuilder()
           .setTitle('📦 Your Inventory')
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Add summary
         embed.addFields(
@@ -1012,7 +1012,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
         });
         return;
       }
@@ -1121,7 +1121,7 @@ client.on('interactionCreate', async (interaction) => {
           // Stats are optional
         }
 
-        const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
+        const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
         const totalItems = assets.length;
         const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
 
@@ -1131,7 +1131,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Add summary fields
         const totalValueStr = totalValue > 0 ? `€${totalValue.toFixed(2).replace('.', ',')}` : '€0,00';
@@ -1162,7 +1162,7 @@ client.on('interactionCreate', async (interaction) => {
           
           itemsToShow.forEach((item, index) => {
             const itemUrl = item.marketHashName 
-              ? `https://skinvaults.vercel.app/item/${encodeURIComponent(item.marketHashName)}`
+              ? `https://skinvaults.online/item/${encodeURIComponent(item.marketHashName)}`
               : vaultUrl;
             const priceText = item.price || (item.isMarketable ? 'No price data' : 'NOT MARKETABLE');
             const tradableText = item.isTradable ? '✅' : '🔒';
@@ -1199,7 +1199,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.vercel.app/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
         });
         return;
       }
@@ -1255,9 +1255,9 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle(`📊 Your CS2 Stats${isPro ? ' ⚡ PRO' : ''}`)
           .setColor(0x5865F2)
-          .setURL(`https://skinvaults.vercel.app/inventory?steamId=${steamId}`)
+          .setURL(`https://skinvaults.online/inventory?steamId=${steamId}`)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Basic stats (always shown)
         if (kills > 0) {
@@ -1296,7 +1296,7 @@ client.on('interactionCreate', async (interaction) => {
         } else {
           embed.addFields({ 
             name: '🔒 Advanced Stats', 
-            value: 'Upgrade to **PRO** to see ADR, MVPs, Accuracy, Rounds Played, and Total Damage!\n\n[Get PRO](https://skinvaults.vercel.app/pro)',
+            value: 'Upgrade to **PRO** to see ADR, MVPs, Accuracy, Rounds Played, and Total Damage!\n\n[Get PRO](https://skinvaults.online/pro)',
             inline: false 
           });
         }
@@ -1404,7 +1404,7 @@ client.on('interactionCreate', async (interaction) => {
                 searchMethod = 'Discord ID';
               } else {
                 await interaction.editReply({
-                  content: `❌ **Discord Account Not Connected**\n\nThe Discord ID "${query}" is not connected to a Steam account.\n\nThey need to:\n1. Visit https://skinvaults.vercel.app/inventory\n2. Sign in with Steam\n3. Click "Connect Discord"`,
+                  content: `❌ **Discord Account Not Connected**\n\nThe Discord ID "${query}" is not connected to a Steam account.\n\nThey need to:\n1. Visit https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord"`,
                 });
                 return;
               }
@@ -1466,13 +1466,13 @@ client.on('interactionCreate', async (interaction) => {
         // Get top 3 weapons (returns immediately, doesn't wait)
         const topWeapons = await getTopWeapons(steamId, 3);
 
-        const vaultUrl = `https://skinvaults.vercel.app/inventory?steamId=${steamId}`;
+        const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
         const embed = new EmbedBuilder()
           .setTitle(`👤 ${profile.name}`)
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Set profile avatar
         if (profile.avatar) {
@@ -1526,7 +1526,7 @@ client.on('interactionCreate', async (interaction) => {
           } else if (!viewingOwnProfile) {
             embed.addFields({ 
               name: '🔒 Advanced Stats', 
-              value: 'Upgrade to **PRO** to see advanced stats for other players!\n\n[Get PRO](https://skinvaults.vercel.app/pro)',
+              value: 'Upgrade to **PRO** to see advanced stats for other players!\n\n[Get PRO](https://skinvaults.online/pro)',
               inline: false 
             });
           }
@@ -1610,13 +1610,13 @@ client.on('interactionCreate', async (interaction) => {
         const itemIds = items.filter(i => i.id).map(i => i.id);
         let compareUrl = '';
         if (itemIds.length === 2) {
-          compareUrl = `https://skinvaults.vercel.app/compare?id1=${encodeURIComponent(itemIds[0])}&id2=${encodeURIComponent(itemIds[1])}`;
+          compareUrl = `https://skinvaults.online/compare?id1=${encodeURIComponent(itemIds[0])}&id2=${encodeURIComponent(itemIds[1])}`;
         } else if (itemIds.length === 3) {
-          compareUrl = `https://skinvaults.vercel.app/compare?id1=${encodeURIComponent(itemIds[0])}&id2=${encodeURIComponent(itemIds[1])}&id3=${encodeURIComponent(itemIds[2])}`;
+          compareUrl = `https://skinvaults.online/compare?id1=${encodeURIComponent(itemIds[0])}&id2=${encodeURIComponent(itemIds[1])}&id3=${encodeURIComponent(itemIds[2])}`;
         } else {
           // Fallback to market hash names
           const names = items.map(i => i.marketHashName).filter(Boolean);
-          compareUrl = `https://skinvaults.vercel.app/compare?name1=${encodeURIComponent(names[0])}&name2=${encodeURIComponent(names[1])}`;
+          compareUrl = `https://skinvaults.online/compare?name1=${encodeURIComponent(names[0])}&name2=${encodeURIComponent(names[1])}`;
         }
 
         const embed = new EmbedBuilder()
@@ -1624,14 +1624,14 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(compareUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.vercel.app/icon.png' });
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Add items to embed
         items.forEach((item, index) => {
           const priceText = item.price || 'No price data';
           const itemUrl = item.id 
-            ? `https://skinvaults.vercel.app/item/${encodeURIComponent(item.id)}`
-            : `https://skinvaults.vercel.app/item/${encodeURIComponent(item.marketHashName)}`;
+            ? `https://skinvaults.online/item/${encodeURIComponent(item.id)}`
+            : `https://skinvaults.online/item/${encodeURIComponent(item.marketHashName)}`;
           
           embed.addFields({
             name: `${index + 1}. ${item.name}`,
@@ -1708,7 +1708,7 @@ client.on('interactionCreate', async (interaction) => {
           },
           {
             name: '🔗 Links',
-            value: '[Website](https://skinvaults.vercel.app) | [Inventory](https://skinvaults.vercel.app/inventory) | [Wishlist](https://skinvaults.vercel.app/wishlist)',
+            value: '[Website](https://skinvaults.vercel.app) | [Inventory](https://skinvaults.online/inventory) | [Wishlist](https://skinvaults.online/wishlist)',
             inline: false,
           }
         )

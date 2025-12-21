@@ -28,6 +28,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'),
   title: "SkinVault",
   description: "Premium CS2 skin analytics and inventory management",
   icons: {

@@ -170,11 +170,11 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
             style: 'currency',
             currency: currency === '1' ? 'USD' : 'EUR',
           }).format(alert.targetPrice)}\n\n` +
-          `View on SkinVault: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/item/${encodeURIComponent(marketHashName)}`;
+          `View on SkinVault: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/item/${encodeURIComponent(marketHashName)}`;
 
         // Queue message via bot gateway (preferred method - uses Discord bot)
         try {
-          const botGatewayUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.vercel.app'}/api/discord/bot-gateway`;
+          const botGatewayUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/api/discord/bot-gateway`;
           const apiToken = process.env.DISCORD_BOT_API_TOKEN;
           
           const response = await fetch(botGatewayUrl, {

@@ -171,7 +171,7 @@ Successfully registered application commands.
 
 ### Test 4: Discord Connection (Website)
 
-1. Go to https://skinvaults.vercel.app/inventory
+1. Go to https://skinvaults.online/inventory
 2. Sign in with Steam
 3. Click "Connect Discord" button
 4. Authorize the connection

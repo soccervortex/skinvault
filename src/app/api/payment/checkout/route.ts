@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       finalAmount = Math.max(0, priceInfo.amount - discountAmount);
     }
 
-    const origin = request.headers.get('origin') || 'https://skinvaults.vercel.app';
+    const origin = request.headers.get('origin') || 'https://skinvaults.online';
 
     // Set expiration to 30 minutes from now (minimum allowed by Stripe is 30 minutes)
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60); // 30 minutes in seconds
