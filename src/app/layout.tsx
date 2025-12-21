@@ -15,6 +15,7 @@ import { ToastProvider } from "./components/Toast";
 import ProExpirationWarning from "./components/ProExpirationWarning";
 import NetworkStatus from "./components/NetworkStatus";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
+import ChunkErrorHandler from "./components/ChunkErrorHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -87,6 +88,7 @@ export default function RootLayout({
         />
         <ErrorBoundary>
           <ToastProvider>
+            <ChunkErrorHandler />
             <KeyboardShortcuts />
             {children}
             <ProExpirationWarning />
