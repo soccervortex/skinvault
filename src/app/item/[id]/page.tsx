@@ -329,13 +329,13 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
             <div className="lg:col-span-5">
               <div
                 ref={cardRef}
-                className="bg-[#11141d] rounded-[2rem] md:rounded-[3.5rem] aspect-square border border-white/5 flex items-center justify-center relative overflow-hidden shadow-2xl"
+                className="bg-[#11141d] rounded-[2rem] md:rounded-[3.5rem] aspect-square border border-white/5 flex items-center justify-center relative overflow-hidden shadow-2xl p-6 md:p-8 lg:p-10"
                 style={{ perspective: '1200px' }}
               >
               <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
               <img
                 src={item?.image}
-                className="max-w-full max-h-full w-auto h-auto object-contain z-10"
+                className="w-full h-full object-contain z-10"
                 alt={item?.name || ''}
                 style={{
                   transform: viewMode === '3D' ? `rotateY(${rotation}deg)` : 'rotateY(0deg)',
