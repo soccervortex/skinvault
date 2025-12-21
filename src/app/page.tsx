@@ -33,7 +33,9 @@ const CATEGORIES = [
 
 const RARITY_ORDER: { [key: string]: number } = {
   'Covert': 1, 'Extraordinary': 1, 'Classified': 2, 'Restricted': 3, 
-  'Mil-Spec Grade': 4, 'Industrial Grade': 5, 'Consumer Grade': 6,
+  'Mil-Spec Grade': 4, 'Mil-Spec': 4, 'Industrial Grade': 5, 'Industrial': 5,
+  'Consumer Grade': 6, 'Consumer': 6, 'Base Grade': 7, 'Base': 7,
+  'High Grade': 3, 'High': 3,
 };
 
 const CACHE_KEY = 'sv_dataset_cache_v1';
@@ -83,7 +85,22 @@ export default function GlobalSkinSearch() {
         const savedInv = window.localStorage.getItem('user_inventory');
         if (savedInv) {
           const parsed = JSON.parse(savedInv);
-          setOwnedItems(Array.isArray(parsed) ? parsed : []);
+          if (Array.isArray(parsed)) {
+            // If it's an array of strings (market_hash_names), use as is
+            // If it's an array of objects, extract market_hash_name
+            const marketHashNames = parsed.map((item: any) => 
+              typeof item === 'string' ? item : (item.market_hash_name || item.market_name || item.name || '')
+            ).filter(Boolean);
+            setOwnedItems(marketHashNames);
+          } else if (parsed && typeof parsed === 'object') {
+            // If it's an object, try to extract market_hash_names
+            const marketHashNames = Object.values(parsed).map((item: any) => 
+              typeof item === 'string' ? item : (item?.market_hash_name || item?.market_name || item?.name || '')
+            ).filter(Boolean);
+            setOwnedItems(marketHashNames);
+          } else {
+            setOwnedItems([]);
+          }
         }
         
         // Load user and wishlist
@@ -200,10 +217,22 @@ export default function GlobalSkinSearch() {
 
     return result.sort((a, b) => {
       if (sortBy === 'rarity-desc') {
-        return (RARITY_ORDER[a.rarity?.name] || 99) - (RARITY_ORDER[b.rarity?.name] || 99);
+        const rarityA = (a.rarity?.name || '').trim();
+        const rarityB = (b.rarity?.name || '').trim();
+        const orderA = RARITY_ORDER[rarityA] || RARITY_ORDER[rarityA.toLowerCase()] || 99;
+        const orderB = RARITY_ORDER[rarityB] || RARITY_ORDER[rarityB.toLowerCase()] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        // If same rarity order, sort by name
+        return a.name.localeCompare(b.name);
       }
       if (sortBy === 'rarity-asc') {
-        return (RARITY_ORDER[b.rarity?.name] || 99) - (RARITY_ORDER[a.rarity?.name] || 99);
+        const rarityA = (a.rarity?.name || '').trim();
+        const rarityB = (b.rarity?.name || '').trim();
+        const orderA = RARITY_ORDER[rarityA] || RARITY_ORDER[rarityA.toLowerCase()] || 99;
+        const orderB = RARITY_ORDER[rarityB] || RARITY_ORDER[rarityB.toLowerCase()] || 99;
+        if (orderA !== orderB) return orderB - orderA;
+        // If same rarity order, sort by name
+        return a.name.localeCompare(b.name);
       }
       if (sortBy === 'alphabetical-asc') {
         return a.name.localeCompare(b.name);
@@ -313,7 +342,15 @@ export default function GlobalSkinSearch() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
               {processedItems.slice(0, visibleCount).map((item) => {
-                const isOwned = ownedItems.includes(item.market_hash_name);
+                // Check if item is owned by comparing market_hash_name, id, or name
+                const isOwned = ownedItems.some(owned => 
+                  owned === item.market_hash_name || 
+                  owned === item.id || 
+                  owned === item.name ||
+                  item.market_hash_name?.toLowerCase() === owned?.toLowerCase() ||
+                  item.id?.toLowerCase() === owned?.toLowerCase() ||
+                  item.name?.toLowerCase() === owned?.toLowerCase()
+                );
                 const rarityColor = item.rarity?.color || "#4b5563";
 
                 return (
