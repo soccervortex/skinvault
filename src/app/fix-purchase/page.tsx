@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 
-export default function FixPurchasePage() {
+function FixPurchaseContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId');
   const steamId = searchParams.get('steamId');
@@ -129,6 +129,26 @@ export default function FixPurchasePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function FixPurchasePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <Loader2 className="animate-spin text-blue-500 mx-auto" size={32} />
+            <p className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">
+              Loading...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <FixPurchaseContent />
+    </Suspense>
   );
 }
 
