@@ -19,6 +19,7 @@ import { MongoClient, Db, Collection } from 'mongodb';
 let dbStatus: 'kv' | 'mongodb' | 'fallback' = 'kv';
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
+let previousKVAvailable: boolean | null = null; // Track KV availability to detect recovery
 
 // Cache to reduce KV reads (simple in-memory cache)
 const readCache: Map<string, { value: any; timestamp: number }> = new Map();
@@ -52,6 +53,7 @@ async function initMongoDB(): Promise<Db | null> {
 // Check if KV is available and working
 async function isKVAvailable(): Promise<boolean> {
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    previousKVAvailable = false;
     return false;
   }
 
@@ -61,8 +63,24 @@ async function isKVAvailable(): Promise<boolean> {
       kv.get('__health_check__'),
       new Promise((_, reject) => setTimeout(() => reject(new Error('KV timeout')), 2000))
     ]);
+    
+    // Check if KV just recovered (was unavailable, now available)
+    const justRecovered = previousKVAvailable === false;
+    previousKVAvailable = true;
+    
+    if (justRecovered && dbStatus === 'mongodb') {
+      console.log('[Database] ✅ KV recovered! Triggering full sync from MongoDB to KV...');
+      // Trigger full sync in background (don't block)
+      syncAllDataToKV().catch((err) => {
+        console.error('[Database] Full sync failed:', err);
+      });
+      dbStatus = 'kv'; // Update status since KV is now available
+    }
+    
     return true;
   } catch (error: any) {
+    previousKVAvailable = false;
+    
     // Check for rate limit errors
     if (error?.message?.includes('rate limit') || 
         error?.message?.includes('429') ||
@@ -250,6 +268,13 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
     try {
       await kv.set(key, value);
       console.log(`[Database] Synced ${key} from MongoDB to KV (read recovery)`);
+      
+      // If we were using MongoDB and KV just became available, trigger full sync
+      if (dbStatus === 'mongodb') {
+        console.log('[Database] KV recovered during read, triggering full sync from MongoDB...');
+        syncAllDataToKV().catch(() => {});
+        dbStatus = 'kv'; // Update status since KV is now available
+      }
     } catch (error) {
       console.warn(`[Database] Failed to sync ${key} back to KV:`, error);
     }
@@ -308,10 +333,20 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   // Wait for both writes (don't fail if one fails)
   await Promise.allSettled(writePromises);
 
-  // If KV failed but MongoDB succeeded, try to sync back to KV later
-  if (!kvSuccess && mongoSuccess && await isKVAvailable()) {
-    // Try to sync immediately (don't wait, do in background)
-    syncFromMongoDBToKV(key).catch(() => {});
+  // If KV failed but MongoDB succeeded, try to sync back to KV when it recovers
+  if (!kvSuccess && mongoSuccess) {
+    // Check if KV just became available (recovered from rate limit/outage)
+    const kvNowAvailable = await isKVAvailable();
+    if (kvNowAvailable) {
+      // KV recovered! Sync this key immediately, then trigger full sync
+      syncFromMongoDBToKV(key).catch(() => {});
+      // Also trigger full sync in background (to catch any other keys that were written while KV was down)
+      if (dbStatus === 'mongodb') {
+        console.log('[Database] KV recovered during write, triggering full sync from MongoDB...');
+        syncAllDataToKV().catch(() => {});
+        dbStatus = 'kv'; // Update status since KV is now available
+      }
+    }
   }
 
   return kvSuccess || mongoSuccess;
