@@ -47,6 +47,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   // Check for persisted banned notification on mount and page navigation
   useEffect(() => {
+    let hasShownNotification = false; // Track if we've already shown the notification on this page load
+
     const checkBannedNotification = async () => {
       try {
         if (typeof window === 'undefined') return;
@@ -83,15 +85,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // User is still banned, show the notification for the remaining time
-        showToast(notification.message, 'error', remaining);
-        
-        // Clear the localStorage after the remaining time
-        setTimeout(() => {
-          try {
-            window.localStorage.removeItem('sv_banned_notification');
-          } catch {}
-        }, remaining);
+        // Only show notification once per page load
+        if (!hasShownNotification && !notification.shown) {
+          hasShownNotification = true;
+          // Mark as shown in localStorage
+          notification.shown = true;
+          window.localStorage.setItem('sv_banned_notification', JSON.stringify(notification));
+          
+          // User is still banned, show the notification for the remaining time
+          showToast(notification.message, 'error', remaining);
+          
+          // Clear the localStorage after the remaining time
+          setTimeout(() => {
+            try {
+              window.localStorage.removeItem('sv_banned_notification');
+            } catch {}
+          }, remaining);
+        }
       } catch (error) {
         // Ignore errors (invalid JSON, localStorage issues, etc.)
         try {
@@ -102,24 +112,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Check immediately on mount
+    // Check immediately on mount (only once)
     checkBannedNotification();
 
     // Also check on storage events (when localStorage changes from other tabs/pages)
+    // But only if we haven't shown it yet on this page
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sv_banned_notification') {
+      if (e.key === 'sv_banned_notification' && !hasShownNotification) {
         checkBannedNotification();
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
 
-    // Check periodically in case the notification was set in the same tab
-    const interval = setInterval(checkBannedNotification, 1000);
-
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
     };
   }, [showToast]);
 

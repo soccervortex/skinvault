@@ -522,16 +522,13 @@ function InventoryContent() {
                 timestamp: Date.now(),
                 duration: 30000, // 30 seconds
                 steamId: viewedSteamId, // Store steamId to check ban status later
+                shown: false, // Flag to prevent duplicate notifications
               };
               window.localStorage.setItem('sv_banned_notification', JSON.stringify(bannedNotification));
-              // Show banned notification immediately
-              toast.error(bannedNotification.message, 30000);
-              // Clean up URL (remove OpenID params) and redirect to contact page
-              setTimeout(() => {
-                // Remove all query parameters to clean the URL
-                window.history.replaceState({}, '', '/contact');
-                window.location.href = '/contact';
-              }, 2000);
+              // Don't show notification here - let the ToastProvider handle it on the contact page
+              // Clean up URL (remove OpenID params) and redirect to contact page immediately
+              window.history.replaceState({}, '', '/contact');
+              window.location.href = '/contact';
             }
           } catch {}
           return;
