@@ -14,12 +14,6 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const targetSteamId = url.searchParams.get('steamId'); // Target user's Steam ID to filter by
-    const requesterSteamId = url.searchParams.get('requesterSteamId'); // Admin's Steam ID for auth
-    
-    // If requesterSteamId is provided, check if they're owner
-    if (requesterSteamId && !isOwner(requesterSteamId as any)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     try {
       const { kv } = await import('@vercel/kv');

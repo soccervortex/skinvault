@@ -94,6 +94,7 @@ function InventoryContent() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [discordStatus, setDiscordStatus] = useState<any>(null);
+  const [hasDiscordAccess, setHasDiscordAccess] = useState(false);
   const [showManageTrackers, setShowManageTrackers] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [wishlist, setWishlist] = useState<any[]>([]);
@@ -698,19 +699,51 @@ function InventoryContent() {
       return;
     }
     
-    // Only check Discord status if user is Pro
-    if (!isPro) {
-      setDiscordStatus({ connected: false, requiresPro: true });
-      return;
-    }
+    // Check if user has Discord access (Pro or Discord access consumable)
+    const checkDiscordAccess = async () => {
+      if (isPro) {
+        // Pro users always have access
+        setHasDiscordAccess(true);
+        fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
+          })
+          .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
+      } else {
+        // Check if free user has Discord access consumable
+        try {
+          const rewardsRes = await fetch(`/api/user/rewards?steamId=${viewedUser.steamId}`);
+          if (rewardsRes.ok) {
+            const rewardsData = await rewardsRes.json();
+            const userHasAccess = (rewardsData.rewards || []).some((r: any) => 
+              r.reward?.type === 'discord_access'
+            );
+            setHasDiscordAccess(userHasAccess);
+            
+            if (userHasAccess) {
+              // Free user with Discord access - check connection status
+              fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                  setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
+                })
+                .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
+            } else {
+              setDiscordStatus({ connected: false, requiresPro: true });
+            }
+          } else {
+            setHasDiscordAccess(false);
+            setDiscordStatus({ connected: false, requiresPro: true });
+          }
+        } catch {
+          setHasDiscordAccess(false);
+          setDiscordStatus({ connected: false, requiresPro: true });
+        }
+      }
+    };
     
-    fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        // Ensure we set connected status correctly - only show if Pro and connected
-        setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: true });
-      })
-      .catch(() => setDiscordStatus({ connected: false, requiresPro: true }));
+    checkDiscordAccess();
   }, [viewedUser?.steamId, isPro]);
 
   const totalVaultValue = useMemo(() => {
@@ -862,8 +895,8 @@ function InventoryContent() {
                         Pro
                       </span>
                     )}
-                    {/* Discord Connection Status (Only show if Pro AND connected) */}
-                    {isPro && discordStatus?.connected && (
+                    {/* Discord Connection Status (Show if Pro or has Discord access AND connected) */}
+                    {(isPro || hasDiscordAccess) && discordStatus?.connected && (
                       <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 border border-indigo-500/40 shrink-0">
                         <MessageSquare size={10} className="text-indigo-400" />
                         <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
@@ -875,8 +908,8 @@ function InventoryContent() {
                   {/* Action Buttons (only for own profile) */}
                   {loggedInUser?.steamId === viewedUser?.steamId && (
                     <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
-                      {/* Connect/Disconnect Discord Button (Only show if Pro) */}
-                      {isPro && (
+                      {/* Connect/Disconnect Discord Button (Show if Pro or has Discord access) */}
+                      {(isPro || hasDiscordAccess) && (
                         !discordStatus?.connected ? (
                           <button
                             onClick={() => {
