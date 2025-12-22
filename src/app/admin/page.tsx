@@ -133,7 +133,8 @@ export default function AdminPage() {
       if (!userIsOwner) return;
       setLoadingPurchases(true);
       try {
-        const res = await fetch(`/api/admin/purchases?steamId=${user?.steamId}`, {
+        // Load ALL purchases (no steamId filter for admin view)
+        const res = await fetch(`/api/admin/purchases`, {
           headers: {
             "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
           },
@@ -175,7 +176,8 @@ export default function AdminPage() {
       if (!userIsOwner) return;
       setLoadingFailedPurchases(true);
       try {
-        const res = await fetch(`/api/admin/failed-purchases?steamId=${user?.steamId}`, {
+        // Load ALL failed purchases (no steamId filter for admin view)
+        const res = await fetch(`/api/admin/failed-purchases`, {
           headers: {
             "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
           },
@@ -801,7 +803,7 @@ export default function AdminPage() {
                               if (res.ok && data.fulfilled) {
                                 setMessage(`Purchase fulfilled: ${data.message}`);
                                 // Reload failed purchases
-                                const reloadRes = await fetch(`/api/admin/failed-purchases?steamId=${user?.steamId}`, {
+                                const reloadRes = await fetch(`/api/admin/failed-purchases`, {
                                   headers: { "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "" },
                                 });
                                 if (reloadRes.ok) {
