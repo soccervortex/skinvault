@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server';
-import { grantPro } from '@/app/utils/pro-storage';
+import { grantPro, getProUntil, getAllProUsers } from '@/app/utils/pro-storage';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
 
 const ADMIN_HEADER = 'x-admin-key';
 
+function checkAuth(request: Request): boolean {
+  const adminKey = request.headers.get(ADMIN_HEADER);
+  const expected = process.env.ADMIN_PRO_TOKEN;
+  if (expected && adminKey !== expected) {
+    return false;
+  }
+  return true;
+}
+
 export async function POST(request: Request) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    // If an ADMIN_PRO_TOKEN is configured, require it.
-    // If it's not set (e.g. local dev), allow the request.
-    if (expected && adminKey !== expected) {
+    if (!checkAuth(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -39,6 +43,100 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Failed to grant Pro:', error);
     return NextResponse.json({ error: 'Failed to grant Pro' }, { status: 500 });
+  }
+}
+
+// DELETE: Remove Pro status
+export async function DELETE(request: Request) {
+  try {
+    if (!checkAuth(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const rawSteamId = url.searchParams.get('steamId');
+
+    const steamId = rawSteamId ? sanitizeSteamId(rawSteamId) : null;
+    if (!steamId) {
+      return NextResponse.json({ error: 'Invalid SteamID format' }, { status: 400 });
+    }
+
+    // Remove Pro by setting expiry to past date
+    const { kv } = await import('@vercel/kv');
+    const PRO_USERS_KEY = 'pro_users';
+    
+    try {
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        const data = await kv.get<Record<string, string>>(PRO_USERS_KEY) || {};
+        // Set to past date to effectively remove Pro
+        data[steamId] = new Date('2000-01-01').toISOString();
+        await kv.set(PRO_USERS_KEY, data);
+      } else {
+        // Fallback for local dev
+        return NextResponse.json({ error: 'KV not configured' }, { status: 500 });
+      }
+    } catch (error) {
+      console.error('Failed to delete Pro:', error);
+      return NextResponse.json({ error: 'Failed to delete Pro' }, { status: 500 });
+    }
+
+    return NextResponse.json({ steamId, deleted: true });
+  } catch (error) {
+    console.error('Failed to delete Pro:', error);
+    return NextResponse.json({ error: 'Failed to delete Pro' }, { status: 500 });
+  }
+}
+
+// PATCH: Edit Pro status (set specific expiry date)
+export async function PATCH(request: Request) {
+  try {
+    if (!checkAuth(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    const rawSteamId = body?.steamId as string | undefined;
+    const proUntil = body?.proUntil as string | undefined;
+
+    const steamId = rawSteamId ? sanitizeSteamId(rawSteamId) : null;
+    if (!steamId) {
+      return NextResponse.json({ error: 'Invalid SteamID format' }, { status: 400 });
+    }
+
+    if (!proUntil) {
+      return NextResponse.json({ error: 'Missing proUntil date' }, { status: 400 });
+    }
+
+    // Validate date
+    const expiryDate = new Date(proUntil);
+    if (isNaN(expiryDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
+    }
+
+    const { kv } = await import('@vercel/kv');
+    const PRO_USERS_KEY = 'pro_users';
+    
+    try {
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        const data = await kv.get<Record<string, string>>(PRO_USERS_KEY) || {};
+        data[steamId] = expiryDate.toISOString();
+        await kv.set(PRO_USERS_KEY, data);
+      } else {
+        return NextResponse.json({ error: 'KV not configured' }, { status: 500 });
+      }
+    } catch (error) {
+      console.error('Failed to edit Pro:', error);
+      return NextResponse.json({ error: 'Failed to edit Pro' }, { status: 500 });
+    }
+
+    return NextResponse.json({ steamId, proUntil: expiryDate.toISOString() });
+  } catch (error) {
+    console.error('Failed to edit Pro:', error);
+    return NextResponse.json({ error: 'Failed to edit Pro' }, { status: 500 });
   }
 }
 

@@ -206,17 +206,53 @@ export function getWishlistLimitSync(isProUser: boolean): number {
   return baseLimit + extraSlots;
 }
 
-// Performance helpers
-export function getPriceScanConcurrency(isProUser: boolean): number {
-  return isProUser 
-    ? PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_PRO 
-    : PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_FREE;
+// Helper to check if user has price scan boost
+async function hasPriceScanBoost(steamId?: string | null): Promise<boolean> {
+  if (!steamId) return false;
+  const rewards = await getStoredRewards(steamId);
+  return rewards.some((reward: any) => reward?.type === 'price_scan_boost');
 }
 
-export function getPriceCacheTTL(isProUser: boolean): number {
-  return isProUser 
-    ? PRO_PERFORMANCE.PRICE_CACHE_TTL_PRO 
-    : PRO_PERFORMANCE.PRICE_CACHE_TTL_FREE;
+// Helper to check if user has cache boost
+async function hasCacheBoost(steamId?: string | null): Promise<boolean> {
+  if (!steamId) return false;
+  const rewards = await getStoredRewards(steamId);
+  return rewards.some((reward: any) => reward?.type === 'cache_boost');
+}
+
+// Performance helpers
+export async function getPriceScanConcurrency(isProUser: boolean, steamId?: string | null): Promise<number> {
+  if (isProUser) return PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_PRO;
+  const hasBoost = await hasPriceScanBoost(steamId);
+  return hasBoost ? 5 : PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_FREE; // Boost increases from 3 to 5
+}
+
+// Synchronous version (uses cached rewards or defaults)
+export function getPriceScanConcurrencySync(isProUser: boolean, steamId?: string | null): number {
+  if (isProUser) return PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_PRO;
+  // Check cached rewards for boost
+  if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
+    const hasBoost = rewardsCache.rewards.some((reward: any) => reward?.type === 'price_scan_boost');
+    if (hasBoost) return 5;
+  }
+  return PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_FREE;
+}
+
+export async function getPriceCacheTTL(isProUser: boolean, steamId?: string | null): Promise<number> {
+  if (isProUser) return PRO_PERFORMANCE.PRICE_CACHE_TTL_PRO;
+  const hasBoost = await hasCacheBoost(steamId);
+  return hasBoost ? (1000 * 60 * 60) : PRO_PERFORMANCE.PRICE_CACHE_TTL_FREE; // Boost: 30min to 1 hour
+}
+
+// Synchronous version (uses cached rewards or defaults)
+export function getPriceCacheTTLSync(isProUser: boolean, steamId?: string | null): number {
+  if (isProUser) return PRO_PERFORMANCE.PRICE_CACHE_TTL_PRO;
+  // Check cached rewards for boost
+  if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
+    const hasBoost = rewardsCache.rewards.some((reward: any) => reward?.type === 'cache_boost');
+    if (hasBoost) return 1000 * 60 * 60; // 1 hour
+  }
+  return PRO_PERFORMANCE.PRICE_CACHE_TTL_FREE;
 }
 
 export function getDatasetCacheTTL(isProUser: boolean): number {

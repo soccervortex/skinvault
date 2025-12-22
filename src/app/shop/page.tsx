@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ShoppingCart, Package, Loader2, Heart } from 'lucide-react';
+import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 export default function ShopPage() {
@@ -22,7 +22,7 @@ export default function ShopPage() {
     }
   }, []);
 
-  const handleCheckout = async (type: 'wishlist_slot', quantity: number = 1) => {
+  const handleCheckout = async (type: 'wishlist_slot' | 'inventory_export_boost' | 'price_scan_boost' | 'cache_boost', quantity: number = 1) => {
     if (!user?.steamId) {
       toast.error('You must be signed in with Steam to purchase. Please sign in first.');
       setTimeout(() => window.location.href = '/inventory', 2000);
@@ -78,10 +78,10 @@ export default function ShopPage() {
           </div>
 
           <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed">
-            Purchase extra slots for wishlist items. Perfect if you only need a few extra slots without a full Pro subscription.
+            Purchase consumables to enhance your free account. Perfect if you only need specific features without a full Pro subscription.
           </p>
 
-          <div className="grid grid-cols-1 gap-4 md:gap-6 max-w-md mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {/* Wishlist Slots */}
             <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
               <div className="flex items-center gap-3 mb-2">
@@ -116,16 +116,122 @@ export default function ShopPage() {
                 )}
               </button>
             </div>
+
+            {/* Inventory Export Boost */}
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-blue-600/20 border border-blue-500/40">
+                  <Download className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Export Boost</p>
+                  <p className="text-xl md:text-2xl font-black text-white">€1.49</p>
+                  <p className="text-[8px] md:text-[9px] text-gray-500">one-time</p>
+                </div>
+              </div>
+              <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+                Export your inventory data 10 more times. Perfect for backing up or analyzing your collection.
+              </p>
+              <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                ✓ 10 additional exports
+              </p>
+              <button
+                onClick={() => handleCheckout('inventory_export_boost', 1)}
+                disabled={loading === 'inventory_export_boost_1' || !user?.steamId}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-blue-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading === 'inventory_export_boost_1' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={12} /> Purchase Boost
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Price Scan Boost */}
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-purple-600/20 border border-purple-500/40">
+                  <Zap className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Scan Boost</p>
+                  <p className="text-xl md:text-2xl font-black text-white">€2.49</p>
+                  <p className="text-[8px] md:text-[9px] text-gray-500">one-time</p>
+                </div>
+              </div>
+              <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+                Increase concurrent price scans from 3 to 5. Scan prices faster for your inventory and wishlist.
+              </p>
+              <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                ✓ Permanent upgrade
+              </p>
+              <button
+                onClick={() => handleCheckout('price_scan_boost', 1)}
+                disabled={loading === 'price_scan_boost_1' || !user?.steamId}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-purple-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading === 'price_scan_boost_1' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={12} /> Purchase Boost
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Cache Boost */}
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-amber-600/20 border border-amber-500/40">
+                  <Clock className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Cache Boost</p>
+                  <p className="text-xl md:text-2xl font-black text-white">€1.99</p>
+                  <p className="text-[8px] md:text-[9px] text-gray-500">one-time</p>
+                </div>
+              </div>
+              <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+                Extend price cache duration from 30 minutes to 1 hour. Prices update less frequently, saving API requests.
+              </p>
+              <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                ✓ Permanent upgrade
+              </p>
+              <button
+                onClick={() => handleCheckout('cache_boost', 1)}
+                disabled={loading === 'cache_boost_1' || !user?.steamId}
+                className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-amber-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading === 'cache_boost_1' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={12} /> Purchase Boost
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Info Section */}
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5 space-y-2">
             <p className="font-black uppercase tracking-[0.3em] text-gray-500 text-[9px] md:text-[10px]">About Consumables</p>
             <ul className="space-y-1 text-gray-300 text-[10px] md:text-[11px]">
-              <li>– Consumables are one-time purchases that add permanent slots to your account</li>
-              <li>– Slots are permanent and never expire</li>
-              <li>– Perfect if you only need a few extra slots without a full Pro subscription</li>
-              <li>– Pro users get unlimited slots automatically - no need to purchase consumables</li>
+              <li>– Consumables are one-time purchases that enhance your free account</li>
+              <li>– All consumables are permanent and never expire</li>
+              <li>– Perfect if you only need specific features without a full Pro subscription</li>
+              <li>– Pro users get all features automatically - no need to purchase consumables</li>
+              <li>– Note: Price trackers are Pro-only features and not available as consumables</li>
             </ul>
           </div>
 

@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   ArrowLeft,
   Sparkles,
+  Trash2,
+  Edit,
+  Ban,
+  ShoppingBag,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -48,6 +52,12 @@ export default function AdminPage() {
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [themeMessage, setThemeMessage] = useState<string | null>(null);
   const [themeError, setThemeError] = useState<string | null>(null);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [loadingPurchases, setLoadingPurchases] = useState(true);
+  const [editingEntry, setEditingEntry] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [banSteamId, setBanSteamId] = useState("");
+  const [banning, setBanning] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -106,7 +116,28 @@ export default function AdminPage() {
       }
     };
     loadThemes();
-  }, [userIsOwner]);
+
+    const loadPurchases = async () => {
+      if (!userIsOwner) return;
+      setLoadingPurchases(true);
+      try {
+        const res = await fetch(`/api/admin/purchases?steamId=${user?.steamId}`, {
+          headers: {
+            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPurchases(data.purchases || []);
+        }
+      } catch (e: any) {
+        console.error("Failed to load purchases:", e);
+      } finally {
+        setLoadingPurchases(false);
+      }
+    };
+    loadPurchases();
+  }, [userIsOwner, user?.steamId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,6 +222,108 @@ export default function AdminPage() {
     sinterklaas: "Sinterklaas",
     newyear: "Nieuwjaar (New Year)",
     oldyear: "Oudjaar (Old Year)",
+  };
+
+  const handleDeletePro = async (steamIdToDelete: string) => {
+    if (!confirm(`Are you sure you want to remove Pro status for ${steamIdToDelete}?`)) return;
+    
+    try {
+      const res = await fetch(`/api/admin/pro?steamId=${steamIdToDelete}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+      });
+
+      if (res.ok) {
+        setMessage(`Pro status removed for ${steamIdToDelete}`);
+        // Refresh stats
+        const statsRes = await fetch("/api/admin/pro/stats");
+        const stats = await statsRes.json();
+        if (statsRes.ok) {
+          setEntries(stats.entries || []);
+          setTotals({
+            total: stats.total ?? 0,
+            active: stats.active ?? 0,
+            expired: stats.expired ?? 0,
+          });
+        }
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to delete Pro status");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleEditPro = async (steamIdToEdit: string, newDate: string) => {
+    try {
+      const res = await fetch("/api/admin/pro", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+        body: JSON.stringify({ steamId: steamIdToEdit, proUntil: newDate }),
+      });
+
+      if (res.ok) {
+        setEditingEntry(null);
+        setEditDate("");
+        setMessage(`Pro status updated for ${steamIdToEdit}`);
+        // Refresh stats
+        const statsRes = await fetch("/api/admin/pro/stats");
+        const stats = await statsRes.json();
+        if (statsRes.ok) {
+          setEntries(stats.entries || []);
+          setTotals({
+            total: stats.total ?? 0,
+            active: stats.active ?? 0,
+            expired: stats.expired ?? 0,
+          });
+        }
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to edit Pro status");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleBanSteamId = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!banSteamId || !/^\d{17}$/.test(banSteamId)) {
+      setError("Invalid SteamID64 format");
+      return;
+    }
+
+    setBanning(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/ban", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+        body: JSON.stringify({ steamId: banSteamId }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`Steam ID ${banSteamId} has been banned`);
+        setBanSteamId("");
+      } else {
+        setError(data.error || "Failed to ban Steam ID");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Request failed.");
+    } finally {
+      setBanning(false);
+    }
   };
 
   if (!user) {
@@ -361,6 +494,7 @@ export default function AdminPage() {
                         <th className="py-2 pr-2">SteamID</th>
                         <th className="py-2 pr-2">Expires</th>
                         <th className="py-2 pr-2">Status</th>
+                        <th className="py-2 pr-2">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -370,9 +504,19 @@ export default function AdminPage() {
                             {e.steamId}
                           </td>
                           <td className="py-2 pr-2 text-[9px]">
-                            {new Date(e.proUntil).toLocaleDateString()}{" "}
-                            {e.isActive &&
-                              `(${e.daysRemaining}d)`}
+                            {editingEntry === e.steamId ? (
+                              <input
+                                type="datetime-local"
+                                value={editDate}
+                                onChange={(ev) => setEditDate(ev.target.value)}
+                                className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[9px] text-blue-500"
+                              />
+                            ) : (
+                              <>
+                                {new Date(e.proUntil).toLocaleDateString()}{" "}
+                                {e.isActive && `(${e.daysRemaining}d)`}
+                              </>
+                            )}
                           </td>
                           <td className="py-2 pr-2">
                             {e.isActive ? (
@@ -380,6 +524,51 @@ export default function AdminPage() {
                             ) : (
                               <span className="text-gray-500 text-[9px]">Expired</span>
                             )}
+                          </td>
+                          <td className="py-2 pr-2">
+                            <div className="flex items-center gap-1">
+                              {editingEntry === e.steamId ? (
+                                <>
+                                  <button
+                                    onClick={() => handleEditPro(e.steamId, editDate || e.proUntil)}
+                                    className="p-1 text-emerald-400 hover:text-emerald-300"
+                                    title="Save"
+                                  >
+                                    <CheckCircle2 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingEntry(null);
+                                      setEditDate("");
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-gray-300"
+                                    title="Cancel"
+                                  >
+                                    <AlertTriangle size={12} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingEntry(e.steamId);
+                                      setEditDate(new Date(e.proUntil).toISOString().slice(0, 16));
+                                    }}
+                                    className="p-1 text-blue-400 hover:text-blue-300"
+                                    title="Edit"
+                                  >
+                                    <Edit size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePro(e.steamId)}
+                                    className="p-1 text-red-400 hover:text-red-300"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -389,6 +578,112 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Purchase History Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+              <ShoppingBag className="text-blue-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Purchase History
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Recent Purchases
+              </h2>
+            </div>
+          </div>
+
+          {loadingPurchases ? (
+            <div className="flex items-center justify-center gap-2 text-gray-400 text-[11px] py-8">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading purchases...
+            </div>
+          ) : purchases.length === 0 ? (
+            <div className="text-gray-500 text-[11px]">No purchases yet.</div>
+          ) : (
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4 max-h-96 overflow-y-auto">
+              <table className="w-full text-left text-[9px] md:text-[10px]">
+                <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
+                  <tr>
+                    <th className="py-2 pr-2">Date</th>
+                    <th className="py-2 pr-2">SteamID</th>
+                    <th className="py-2 pr-2">Type</th>
+                    <th className="py-2 pr-2">Amount</th>
+                    <th className="py-2 pr-2">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.slice(0, 50).map((purchase, idx) => (
+                    <tr key={idx} className="border-b border-white/5 last:border-b-0">
+                      <td className="py-2 pr-2 text-[9px]">
+                        {new Date(purchase.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-2 font-mono text-[9px] break-all">
+                        {purchase.steamId}
+                      </td>
+                      <td className="py-2 pr-2 text-[9px]">
+                        {purchase.type === "pro" ? "👑 Pro" : "🎁 Consumable"}
+                      </td>
+                      <td className="py-2 pr-2 text-[9px]">
+                        {purchase.currency === "eur" ? "€" : "$"}
+                        {purchase.amount?.toFixed(2) || "0.00"}
+                      </td>
+                      <td className="py-2 pr-2 text-[9px]">
+                        {purchase.type === "pro"
+                          ? `${purchase.months} month${purchase.months > 1 ? "s" : ""}`
+                          : `${purchase.quantity}x ${purchase.consumableType || "item"}`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Ban Steam ID Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-red-500/10 border border-red-500/40 shrink-0">
+              <Ban className="text-red-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                User Management
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Ban Steam ID
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
+            Ban a Steam ID from accessing the site. Banned users will not be able to log in.
+          </p>
+
+          <form onSubmit={handleBanSteamId} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px]">
+            <div>
+              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+                SteamID64 to Ban
+              </label>
+              <input
+                value={banSteamId}
+                onChange={(e) => setBanSteamId(e.target.value)}
+                placeholder="7656119..."
+                className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-red-500 outline-none focus:border-red-500 transition-all placeholder:text-gray-700"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={banning}
+              className="w-full bg-red-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-red-500 transition-all shadow-xl shadow-red-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {banning && <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" />}
+              {banning ? "Banning..." : "Ban Steam ID"}
+            </button>
+          </form>
         </div>
 
         {/* Theme Management Section */}

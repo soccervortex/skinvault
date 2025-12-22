@@ -34,6 +34,30 @@ export async function POST(request: Request) {
       try {
         const proUntil = await grantPro(steamId, months);
         console.log(`✅ Granted ${months} months Pro to ${steamId}, expires ${proUntil}`);
+        
+        // Record purchase history
+        try {
+          const { kv } = await import('@vercel/kv');
+          const purchasesKey = 'purchase_history';
+          const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+          
+          existingPurchases.push({
+            steamId,
+            type: 'pro',
+            months,
+            amount: session.amount_total ? (session.amount_total / 100) : 0,
+            currency: session.currency || 'eur',
+            sessionId: session.id,
+            timestamp: new Date().toISOString(),
+            proUntil,
+          });
+          
+          // Keep only last 1000 purchases
+          const recentPurchases = existingPurchases.slice(-1000);
+          await kv.set(purchasesKey, recentPurchases);
+        } catch (error) {
+          console.error('Failed to record purchase history:', error);
+        }
       } catch (error) {
         console.error('❌ Failed to update Pro status:', error);
         // Still return 200 to prevent Stripe from retrying
@@ -65,6 +89,29 @@ export async function POST(request: Request) {
 
           existingRewards[steamId] = userRewards;
           await kv.set(rewardsKey, existingRewards);
+
+          // Record purchase history
+          try {
+            const purchasesKey = 'purchase_history';
+            const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+            
+            existingPurchases.push({
+              steamId,
+              type: 'consumable',
+              consumableType,
+              quantity,
+              amount: session.amount_total ? (session.amount_total / 100) : 0,
+              currency: session.currency || 'eur',
+              sessionId: session.id,
+              timestamp: new Date().toISOString(),
+            });
+            
+            // Keep only last 1000 purchases
+            const recentPurchases = existingPurchases.slice(-1000);
+            await kv.set(purchasesKey, recentPurchases);
+          } catch (error) {
+            console.error('Failed to record purchase history:', error);
+          }
 
           console.log(`✅ Granted ${quantity} ${consumableType} to ${steamId}`);
         } catch (error) {

@@ -16,6 +16,7 @@ import ShareButton from '@/app/components/ShareButton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { useToast } from '@/app/components/Toast';
+import { isBanned } from '@/app/utils/ban-check';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -265,7 +266,7 @@ function InventoryContent() {
     const results: Record<string, string> = {};
     const active = new Set<Promise<void>>();
     // Pro users get faster scanning with higher concurrency
-    const CONCURRENCY = getPriceScanConcurrency(isPro);
+    const CONCURRENCY = getPriceScanConcurrencySync(isPro, viewedUser?.steamId);
 
     for (const name of missing) {
       let taskPromise: Promise<void>;
@@ -504,6 +505,22 @@ function InventoryContent() {
 
     const loadAll = async () => {
       setLoading(true);
+      
+      // Check if user is banned (only for login callbacks)
+      if (isLoginCallback) {
+        const banned = await isBanned(viewedSteamId);
+        if (banned) {
+          setLoading(false);
+          toast.error('Your account has been banned from this service. Please contact support if you believe this is an error.');
+          // Clear any stored user data
+          try {
+            if (typeof window !== 'undefined') {
+              window.localStorage.removeItem('steam_user');
+            }
+          } catch {}
+          return;
+        }
+      }
       
       // Fetch Pro status FIRST so we can use it for inventory fetch
       let proInfo: any = { proUntil: null };

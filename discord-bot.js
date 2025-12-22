@@ -1864,10 +1864,10 @@ client.on('interactionCreate', async (interaction) => {
           inline: false,
         });
 
-        // Consumables (coming soon)
+        // Consumables (available now)
         embed.addFields({
-          name: '🎁 Consumables (Coming Soon)',
-          value: '**Price Tracker Slots** - Add extra price alerts\n**Wishlist Slots** - Add extra wishlist items\n\n*These will be available soon!*',
+          name: '🎁 Consumables',
+          value: '**Wishlist Slots** - €1.99 per slot\n**Export Boost** - €1.49 (10 extra exports)\n**Scan Boost** - €2.49 (faster price scans)\n**Cache Boost** - €1.99 (longer cache duration)\n\n*Price Trackers are Pro-only features*',
           inline: false,
         });
 
@@ -1881,12 +1881,12 @@ client.on('interactionCreate', async (interaction) => {
 
         embed.addFields({
           name: '💳 How to Purchase',
-          value: `1. Click the button below to visit the shop\n2. Select your plan\n3. Complete checkout with Stripe\n4. Your Pro status will activate automatically`,
+          value: `1. Click the button below to visit the shop\n2. Select your plan or consumable\n3. Complete checkout with Stripe\n4. Your purchase will activate automatically`,
           inline: false,
         });
 
         // Create checkout URL with Steam ID
-        const checkoutUrl = `https://skinvaults.online/pro?steamId=${steamId}${promoCode ? `&promo=${promoCode}` : ''}`;
+        const checkoutUrl = `https://skinvaults.online/shop?steamId=${steamId}${promoCode ? `&promo=${promoCode}` : ''}`;
 
         await interaction.editReply({ 
           embeds: [embed],
@@ -1903,7 +1903,13 @@ client.on('interactionCreate', async (interaction) => {
                 {
                   type: 2, // BUTTON
                   style: 5, // LINK
-                  label: '👑 View Pro Page',
+                  label: '🛒 View Shop',
+                  url: 'https://skinvaults.online/shop',
+                },
+                {
+                  type: 2, // BUTTON
+                  style: 5, // LINK
+                  label: '👑 View Pro',
                   url: 'https://skinvaults.online/pro',
                 },
               ],
@@ -1926,7 +1932,7 @@ client.on('interactionCreate', async (interaction) => {
         .addFields(
           {
             name: '🔗 Quick Links',
-            value: '[🏠 Home](https://skinvaults.online)\n[📦 Inventory](https://skinvaults.online/inventory)\n[📋 Wishlist](https://skinvaults.online/wishlist)\n[👑 Pro](https://skinvaults.online/pro)\n[⚖️ Compare](https://skinvaults.online/compare)',
+            value: '[🏠 Home](https://skinvaults.online)\n[📦 Inventory](https://skinvaults.online/inventory)\n[📋 Wishlist](https://skinvaults.online/wishlist)\n[👑 Pro](https://skinvaults.online/pro)',
             inline: false,
           }
         )
