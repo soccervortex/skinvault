@@ -83,25 +83,32 @@ export default function PrivacyPage() {
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Wishlist items (stored locally in your browser and optionally synced to server)</li>
                 <li>Currency preferences (EUR/USD, stored in browser localStorage)</li>
-                <li>Price alert/tracker settings (target prices, conditions, stored in Vercel KV database)</li>
+                <li>Price alert/tracker settings (target prices, conditions, stored in Vercel KV and MongoDB databases)</li>
                 <li>Contact form submissions (name, email, message, images)</li>
                 <li>Payment information (processed securely through Stripe - we do not store credit card details)</li>
-                <li>Compare list items (stored locally in browser)</li>
+                <li>Compare list items (stored locally in browser, max 2 items)</li>
+                <li>Purchase history (Pro subscriptions and consumable purchases - stored in Vercel KV and MongoDB)</li>
+                <li>Consumable purchases (wishlist slots, Discord access, price scan boost, cache boost - stored in user_rewards database key)</li>
               </ul>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
                 2.4 Automatically Collected Information
               </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>First login timestamp (for free trial eligibility, stored in Vercel KV)</li>
-                <li>Pro subscription status and expiration dates (stored in Vercel KV)</li>
-                <li>Claimed free month status (stored in Vercel KV)</li>
-                <li>Price alert trigger history (stored in Vercel KV)</li>
+                <li>First login timestamp (for free trial eligibility, stored in Vercel KV and MongoDB)</li>
+                <li>Pro subscription status and expiration dates (stored in Vercel KV and MongoDB)</li>
+                <li>Claimed free month status (stored in Vercel KV and MongoDB)</li>
+                <li>Price alert trigger history (stored in Vercel KV and MongoDB)</li>
+                <li>Purchase history (all Pro and consumable purchases, including session IDs, amounts, timestamps, fulfillment status - stored in Vercel KV and MongoDB)</li>
+                <li>Failed purchase records (for admin review and manual fulfillment - stored in Vercel KV and MongoDB)</li>
+                <li>User rewards (consumable purchases like wishlist slots, Discord access, boosts - stored in Vercel KV and MongoDB)</li>
+                <li>Banned user list (Steam IDs that are banned from the Service - stored in Vercel KV and MongoDB)</li>
+                <li>Stripe test mode status (for payment testing - stored in Vercel KV and MongoDB)</li>
                 <li>Browser type and device information</li>
                 <li>IP address (for security and analytics)</li>
                 <li>Usage data (pages visited, features used, commands executed)</li>
-                <li>Price cache data (stored locally in browser for performance)</li>
-                <li>Dataset cache (item information, stored locally in browser)</li>
+                <li>Price cache data (stored locally in browser for performance - Free: 30 min, Pro: 2 hours, Cache Boost: 1 hour)</li>
+                <li>Dataset cache (item information from CS:GO API, stored locally in browser for 12-24 hours)</li>
               </ul>
             </section>
 
@@ -144,7 +151,7 @@ export default function PrivacyPage() {
                     <li>Compare list (key: <code>sv_compare_list</code>)</li>
                   </ul>
                 </li>
-                <li><strong>Vercel KV Database:</strong> 
+                <li><strong>Vercel KV Database (Primary) and MongoDB (Backup/Fallback):</strong> 
                   <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
                     <li>Pro subscription data (key: <code>pro_users</code>)</li>
                     <li>First login timestamps (key: <code>first_logins</code>)</li>
@@ -152,9 +159,17 @@ export default function PrivacyPage() {
                     <li>Discord connections (key: <code>discord_connections</code>) - includes Discord ID, username, avatar, OAuth tokens</li>
                     <li>Price alerts/trackers (key: <code>price_alerts</code>) - includes target prices, conditions, trigger status</li>
                     <li>Discord DM queue (key: <code>discord_dm_queue</code>) - temporary queue for bot messages</li>
+                    <li>Purchase history (key: <code>purchase_history</code>) - all Pro and consumable purchases with session IDs, amounts, timestamps, fulfillment status</li>
+                    <li>Failed purchases (key: <code>failed_purchases</code>) - purchases that failed to fulfill automatically, for admin review</li>
+                    <li>User rewards (key: <code>user_rewards</code>) - consumable purchases (wishlist slots, Discord access, boosts) with grant timestamps and session IDs</li>
+                    <li>Banned Steam IDs (key: <code>banned_steam_ids</code>) - list of banned users</li>
+                    <li>Stripe test mode status (key: <code>stripe_test_mode</code>) - toggle for payment testing</li>
                   </ul>
+                  <p className="text-gray-300 mt-2 ml-4">
+                    <strong>Database System:</strong> We use a dual-database system for reliability. Vercel KV is the primary database for fast access. MongoDB automatically backs up all data and serves as a fallback when KV is unavailable or hits rate limits. Both databases are kept in sync automatically. Data is written to both databases simultaneously, and if KV fails, the system seamlessly switches to MongoDB.
+                  </p>
                 </li>
-                <li><strong>Stripe:</strong> Payment information (we do not store credit card details on our servers)</li>
+                <li><strong>Stripe:</strong> Payment information (we do not store credit card details on our servers). Supports both production and test mode for payment testing.</li>
               </ul>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
@@ -184,6 +199,7 @@ export default function PrivacyPage() {
                 <li><strong>Discord:</strong> For sending price alert notifications via direct messages and enabling bot commands (subject to Discord's privacy policy)</li>
                 <li><strong>Stripe:</strong> For payment processing (subject to Stripe's privacy policy)</li>
                 <li><strong>Vercel:</strong> For hosting and data storage via Vercel KV (subject to Vercel's privacy policy)</li>
+                <li><strong>MongoDB:</strong> For database backup and fallback storage via MongoDB Atlas (subject to MongoDB's privacy policy)</li>
                 <li><strong>Email Service Providers:</strong> For sending contact form emails (Resend, SMTP providers)</li>
                 <li><strong>Proxy Services:</strong> ScraperAPI, ZenRows, ScrapingAnt for accessing Steam Community Market data</li>
                 <li><strong>steamid.io:</strong> For resolving Steam usernames to Steam64 IDs</li>
@@ -226,6 +242,7 @@ export default function PrivacyPage() {
                 <li><strong>Discord:</strong> <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Discord Privacy Policy</a></li>
                 <li><strong>Stripe:</strong> <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Stripe Privacy Policy</a></li>
                 <li><strong>Vercel:</strong> <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Vercel Privacy Policy</a></li>
+                <li><strong>MongoDB:</strong> <a href="https://www.mongodb.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">MongoDB Privacy Policy</a></li>
                 <li><strong>Proxy Services:</strong> ScraperAPI, ZenRows, ScrapingAnt (each has their own privacy policies)</li>
               </ul>
             </section>
@@ -259,11 +276,15 @@ export default function PrivacyPage() {
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Account Data:</strong> Retained while your account is active</li>
                 <li><strong>Pro Subscription Data:</strong> Retained for the duration of your subscription and for legal/accounting purposes</li>
+                <li><strong>Purchase History:</strong> Retained for legal/accounting purposes and customer support. Includes Pro subscriptions and consumable purchases.</li>
+                <li><strong>User Rewards (Consumables):</strong> Retained permanently as consumables never expire. Includes wishlist slots, Discord access, and boost purchases.</li>
                 <li><strong>Discord Connection Data:</strong> Retained until you disconnect your Discord account or tokens expire. Expired tokens are automatically removed.</li>
                 <li><strong>Price Alert Data:</strong> Retained until you delete the alert or disconnect your Discord account</li>
                 <li><strong>Contact Form Data:</strong> Retained for customer support purposes</li>
+                <li><strong>Banned User Data:</strong> Retained until the ban is lifted. If you are unbanned, your access is restored immediately.</li>
                 <li><strong>LocalStorage Data:</strong> Stored in your browser until you clear it. Wishlist data may be synced to server for cross-device access.</li>
                 <li><strong>Discord DM Queue:</strong> Temporary queue cleared after messages are sent by the bot</li>
+                <li><strong>Failed Purchase Records:</strong> Retained for admin review and manual fulfillment. May be cleared after successful fulfillment.</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 You can delete your local data at any time by clearing your browser's localStorage. You can disconnect your Discord account at any time, which will remove all Discord-related data and price trackers. To request deletion of server-stored data, contact us through our <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact Page</a>.

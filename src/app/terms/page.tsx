@@ -110,26 +110,30 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                5. Pro Subscription
+                5. Pro Subscription and Consumables
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault offers a Pro subscription service with the following terms:
+                SkinVault offers a Pro subscription service and consumable items with the following terms:
               </p>
+              
+              <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
+                5.1 Pro Subscription
+              </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Pricing:</strong> €9.99/month, €24.99/3 months (save €5), €44.99/6 months (save €15)</li>
                 <li><strong>Payment:</strong> Processed securely through Stripe. All payments are final unless otherwise stated. We do not store credit card details on our servers.</li>
-                <li><strong>Free Trial:</strong> New users may be eligible for a 1-month free trial within 7 days of first login. This offer is one-time only and must be claimed manually.</li>
+                <li><strong>Free Trial:</strong> New users may be eligible for a 1-month free trial within 7 days of first login. This offer is one-time only and must be claimed manually. The offer expires after 7 days if not claimed.</li>
                 <li><strong>Auto-Renewal:</strong> Subscriptions do not auto-renew. You must manually renew your subscription before expiration.</li>
                 <li><strong>Refunds:</strong> Refund requests are handled on a case-by-case basis. Contact support for assistance.</li>
                 <li><strong>Cancellation:</strong> You may cancel your subscription at any time. Access continues until the end of your paid period.</li>
                 <li><strong>Pro Features Include:</strong>
                   <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
-                    <li>Unlimited wishlist items (Free: 10 items max)</li>
-                    <li>Unlimited price trackers (Pro only)</li>
+                    <li>Unlimited wishlist items (Free: 10 items max, can purchase additional slots)</li>
+                    <li>Unlimited price trackers (Pro only - free users can purchase Discord Access for 3 trackers)</li>
                     <li>Advanced player statistics (ADR, MVPs, Accuracy, Rounds Played, Total Damage)</li>
-                    <li>Faster price scanning (10x speed with higher concurrency)</li>
+                    <li>Faster price scanning (10x speed with higher concurrency - Free: 3 concurrent, Pro: 10 concurrent)</li>
                     <li>Priority API requests</li>
-                    <li>Better caching (2x longer cache duration)</li>
+                    <li>Better caching (2x longer cache duration - Free: 30 min, Pro: 2 hours)</li>
                     <li>Fast wishlist updates (larger batch processing)</li>
                     <li>Advanced compare stats & value breakdown</li>
                     <li>Early access to new tools and features</li>
@@ -137,11 +141,27 @@ export default function TermsPage() {
                   </ul>
                 </li>
               </ul>
+
+              <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
+                5.2 Consumables (One-Time Purchases)
+              </h3>
+              <p className="text-gray-300 mb-4">
+                SkinVault offers consumable items that enhance your free account. These are one-time purchases that never expire:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li><strong>Wishlist Slots (€1.99 per slot):</strong> Add one additional item to your wishlist. Each purchase adds +1 to your wishlist limit. Pro users already have unlimited wishlist items.</li>
+                <li><strong>Discord Access (€4.99):</strong> Get Discord bot access and create up to 3 price trackers. Receive price alerts directly in Discord for your favorite items. This is for free users only - Pro users already have unlimited trackers. Permanent access that never expires.</li>
+                <li><strong>Price Scan Boost (€2.49):</strong> Increase concurrent price scans from 3 to 5. Scan prices faster for your inventory and wishlist. Permanent upgrade. Pro users already have 10 concurrent scans.</li>
+                <li><strong>Price Cache Boost (€1.99):</strong> Extend price cache duration from 30 minutes to 1 hour. Prices update less frequently, saving API requests. Permanent upgrade. Pro users already have 2-hour cache.</li>
+              </ul>
+              <p className="text-gray-300 mt-4">
+                <strong>Note:</strong> Consumables are permanent and never expire. Pro users already have access to all consumable benefits, so they do not need to purchase consumables. All consumable purchases are processed securely through Stripe. We do not store credit card details on our servers.
+              </p>
             </section>
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                5. User Responsibilities
+                6. User Responsibilities
               </h2>
               <p className="text-gray-300 mb-4">
                 You agree to:
@@ -158,7 +178,23 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                7. Data and Content
+                7. Account Termination and Bans
+              </h2>
+              <p className="text-gray-300 mb-4">
+                We reserve the right to ban or terminate accounts that violate our Terms of Service:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li>Banned users will be immediately logged out and redirected to the contact page</li>
+                <li>Banned users cannot access the Service or create new accounts using the same Steam ID</li>
+                <li>Ban decisions are final, but you may contact support to appeal</li>
+                <li>If you are unbanned, your account access will be restored immediately</li>
+                <li>We may ban accounts for: violation of terms, fraudulent activity, abuse of the Service, or any other reason we deem necessary</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
+                8. Data and Content
               </h2>
               <p className="text-gray-300 mb-4">
                 The Service displays data from:
@@ -170,19 +206,27 @@ export default function TermsPage() {
                 <li>steamid.io (for Steam username resolution)</li>
                 <li>CS:GO API dataset (item information, images, rarity data)</li>
                 <li>Your local browser storage (wishlist, preferences, price cache, compare list)</li>
-                <li>Vercel KV database (Pro subscriptions, Discord connections, price alerts)</li>
+                <li>Vercel KV database (primary) and MongoDB (backup/fallback) - Pro subscriptions, Discord connections, price alerts, purchase history, user rewards, banned users</li>
               </ul>
               <p className="text-gray-300 mt-4">
-                We do not guarantee the accuracy, completeness, or timeliness of price data. Market prices are subject to change and may not reflect real-time values. Price data is cached for performance optimization (Free: 30 minutes, Pro: 2 hours).
+                We do not guarantee the accuracy, completeness, or timeliness of price data. Market prices are subject to change and may not reflect real-time values. Price data is cached for performance optimization (Free: 30 minutes, Pro: 2 hours, or 1 hour with Cache Boost consumable).
               </p>
               <p className="text-gray-300 mt-4">
-                <strong>Proxy Services:</strong> We use multiple proxy services (ScraperAPI, ZenRows, ScrapingAnt, and fallback proxies) to access Steam Community Market data. These services help bypass rate limits and improve reliability.
+                <strong>Database System:</strong> We use a dual-database system for reliability:
+                <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                  <li><strong>Vercel KV (Primary):</strong> Fast, serverless Redis database for real-time data</li>
+                  <li><strong>MongoDB (Backup/Fallback):</strong> Persistent database that automatically backs up all data and serves as fallback when KV is unavailable or hits rate limits</li>
+                  <li>Both databases are kept in sync automatically. If KV fails, the system seamlessly switches to MongoDB. When KV recovers, data syncs back from MongoDB.</li>
+                </ul>
+              </p>
+              <p className="text-gray-300 mt-4">
+                <strong>Proxy Services:</strong> We use multiple proxy services (ScraperAPI, ZenRows, ScrapingAnt, and fallback proxies) to access Steam Community Market data. These services help bypass rate limits and improve reliability. Pro users get direct Steam API access with priority requests, falling back to proxies only if needed.
               </p>
             </section>
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                8. Intellectual Property
+                9. Intellectual Property
               </h2>
               <p className="text-gray-300 mb-4">
                 All content, features, and functionality of the Service are owned by SkinVault and are protected by international copyright, trademark, and other intellectual property laws. You may not:
@@ -197,7 +241,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                9. Limitation of Liability
+                10. Limitation of Liability
               </h2>
               <p className="text-gray-300 mb-4">
                 SkinVault is provided "as is" without warranties of any kind. We are not liable for:
@@ -213,7 +257,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                10. Third-Party Services
+                11. Third-Party Services
               </h2>
               <p className="text-gray-300 mb-4">
                 The Service integrates with third-party services that have their own privacy policies:
@@ -221,8 +265,9 @@ export default function TermsPage() {
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Steam:</strong> For authentication, inventory data, player statistics, and profile information</li>
                 <li><strong>Discord:</strong> For price alert notifications, bot commands, and OAuth authentication</li>
-                <li><strong>Stripe:</strong> For secure payment processing (we do not store credit card details)</li>
+                <li><strong>Stripe:</strong> For secure payment processing (we do not store credit card details). Supports both production and test mode for payment testing.</li>
                 <li><strong>Vercel:</strong> For hosting, data storage (Vercel KV), and infrastructure</li>
+                <li><strong>MongoDB:</strong> For database backup and fallback storage (MongoDB Atlas)</li>
                 <li><strong>Proxy Services:</strong> ScraperAPI, ZenRows, ScrapingAnt, and other proxy services for accessing Steam Community Market data</li>
                 <li><strong>steamid.io:</strong> For resolving Steam usernames to Steam64 IDs</li>
                 <li><strong>CORS Proxy Services:</strong> corsproxy.io, api.allorigins.win for accessing external APIs</li>
@@ -235,22 +280,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                11. Termination
-              </h2>
-              <p className="text-gray-300 mb-4">
-                We reserve the right to terminate or suspend your access to the Service at any time, without prior notice, for any reason, including:
-              </p>
-              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>Violation of these Terms of Service</li>
-                <li>Fraudulent or illegal activity</li>
-                <li>Abuse of the Service</li>
-                <li>Non-payment of subscription fees</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                11. Changes to Terms
+                12. Changes to Terms
               </h2>
               <p className="text-gray-300 mb-4">
                 We reserve the right to modify these terms at any time. Continued use of the Service after changes constitutes acceptance of the new terms. We will notify users of significant changes via email or through the Service.
@@ -259,7 +289,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                12. Contact Information
+                13. Contact Information
               </h2>
               <p className="text-gray-300 mb-4">
                 For questions about these Terms of Service, please contact us through our <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact Page</a>.
@@ -268,7 +298,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                13. Governing Law
+                14. Governing Law
               </h2>
               <p className="text-gray-300 mb-4">
                 These Terms shall be governed by and construed in accordance with applicable laws. Any disputes arising from these terms or use of the Service shall be resolved through appropriate legal channels.
