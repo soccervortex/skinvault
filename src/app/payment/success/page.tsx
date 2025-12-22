@@ -180,7 +180,7 @@ function PaymentSuccessContent() {
           {purchaseType === 'pro' 
             ? 'Your Pro subscription has been activated. You can now enjoy all premium features.'
             : purchaseDetails?.consumableType
-              ? `Your ${purchaseDetails.consumableType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}${purchaseDetails.quantity > 1 ? ` (x${purchaseDetails.quantity})` : ''} has been added to your account.`
+              ? `Your ${purchaseDetails.consumableType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}${purchaseDetails.quantity > 1 ? ` (x${purchaseDetails.quantity})` : ''} has been added to your account.`
               : 'Your purchase has been processed successfully. Your consumable has been added to your account.'}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
