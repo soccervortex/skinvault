@@ -94,7 +94,6 @@ export async function POST(request: Request) {
 
     // Fulfill the purchase
     const months = Number(session.metadata?.months || 0);
-    const type = session.metadata?.type;
 
     // Handle Pro subscription
     if (months > 0 && type !== 'consumable') {
