@@ -9,6 +9,7 @@ function log(message) {
 
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+// Use environment variable if set, otherwise default to skinvaults.online (without www)
 const API_BASE_URL = process.env.API_BASE_URL || 'https://skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 
