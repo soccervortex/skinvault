@@ -458,27 +458,32 @@ export async function syncAllDataToKV(): Promise<{
   synced: number;
   failed: number;
   total: number;
+  details?: Array<{ key: string; status: 'success' | 'failed' | 'skipped'; error?: string }>;
 }> {
   if (!await isKVAvailable()) {
-    return { synced: 0, failed: 0, total: 0 };
+    console.warn('[Database] ⚠️ KV not available, cannot sync');
+    return { synced: 0, failed: 0, total: 0, details: [] };
   }
 
   const db = await initMongoDB();
   if (!db) {
-    return { synced: 0, failed: 0, total: 0 };
+    console.warn('[Database] ⚠️ MongoDB not available, cannot sync');
+    return { synced: 0, failed: 0, total: 0, details: [] };
   }
 
   try {
+    console.log('[Database] 🔄 Starting full sync from MongoDB to KV...');
     // Get all collections (each collection = one KV key)
     const collections = await db.listCollections().toArray();
     let synced = 0;
     let failed = 0;
-    const total = collections.length;
+    const details: Array<{ key: string; status: 'success' | 'failed' | 'skipped'; error?: string }> = [];
 
     for (const collInfo of collections) {
       const collectionName = collInfo.name;
       // Skip system collections
-      if (collectionName.startsWith('system.')) {
+      if (collectionName.startsWith('system.') || collectionName.startsWith('__')) {
+        details.push({ key: collectionName, status: 'skipped' });
         continue;
       }
 
@@ -487,20 +492,35 @@ export async function syncAllDataToKV(): Promise<{
         const doc = await collection.findOne({ _id: collectionName } as any);
         
         if (doc && doc.value !== undefined) {
-          await kv.set(collectionName, doc.value);
-          synced++;
+          // Compare with KV to see if sync is needed
+          const kvValue = await kv.get(collectionName);
+          const kvString = JSON.stringify(kvValue);
+          const mongoString = JSON.stringify(doc.value);
+          
+          if (kvString !== mongoString) {
+            await kv.set(collectionName, doc.value);
+            synced++;
+            details.push({ key: collectionName, status: 'success' });
+            console.log(`[Database] ✅ Synced ${collectionName} from MongoDB to KV`);
+          } else {
+            details.push({ key: collectionName, status: 'skipped' });
+            console.log(`[Database] ⏭️  ${collectionName} already in sync`);
+          }
+        } else {
+          details.push({ key: collectionName, status: 'skipped' });
         }
-      } catch (error) {
-        console.error(`[Database] Failed to sync collection ${collectionName} to KV:`, error);
+      } catch (error: any) {
+        console.error(`[Database] ❌ Failed to sync collection ${collectionName} to KV:`, error);
         failed++;
+        details.push({ key: collectionName, status: 'failed', error: error?.message || 'Unknown error' });
       }
     }
 
-    console.log(`[Database] Full sync complete: ${synced} keys synced, ${failed} failed, ${total} total`);
-    return { synced, failed, total };
+    console.log(`[Database] ✅ Full sync complete: ${synced} keys synced, ${failed} failed, ${collections.length} total`);
+    return { synced, failed, total: collections.length, details };
   } catch (error) {
-    console.error('[Database] Failed to sync all data from MongoDB to KV:', error);
-    return { synced: 0, failed: 0, total: 0 };
+    console.error('[Database] ❌ Failed to sync all data from MongoDB to KV:', error);
+    return { synced: 0, failed: 0, total: 0, details: [] };
   }
 }
 
