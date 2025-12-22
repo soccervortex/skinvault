@@ -6,12 +6,10 @@ async function getStripeInstance(): Promise<Stripe> {
   // Check if test mode is enabled
   let testMode = false;
   try {
-    const { kv } = await import('@vercel/kv');
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-    }
+    const { dbGet } = await import('@/app/utils/database');
+    testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
   } catch (error) {
-    // If KV fails, use production keys
+    // If database fails, use production keys
   }
 
   // Use test keys if test mode is enabled

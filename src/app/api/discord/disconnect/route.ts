@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 // Disconnect Discord from Steam account
 export async function POST(request: Request) {
@@ -12,23 +12,23 @@ export async function POST(request: Request) {
 
     // Remove Discord connection
     const discordConnectionsKey = 'discord_connections';
-    const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
     
     if (connections[steamId]) {
       delete connections[steamId];
-      await kv.set(discordConnectionsKey, connections);
+      await dbSet(discordConnectionsKey, connections);
     }
 
     // Remove all price trackers for this user
     const alertsKey = 'price_alerts';
-    const alerts = await kv.get<Record<string, any>>(alertsKey) || {};
+    const alerts = await dbGet<Record<string, any>>(alertsKey) || {};
     const userAlertIds = Object.keys(alerts).filter(alertId => alerts[alertId].steamId === steamId);
     
     if (userAlertIds.length > 0) {
       userAlertIds.forEach(alertId => {
         delete alerts[alertId];
       });
-      await kv.set(alertsKey, alerts);
+      await dbSet(alertsKey, alerts);
     }
 
     return NextResponse.json({ success: true, removedAlerts: userAlertIds.length });

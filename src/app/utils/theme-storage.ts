@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from './database';
 
 export type ThemeType = 'christmas' | 'halloween' | 'easter' | 'sinterklaas' | 'newyear' | 'oldyear';
 
@@ -25,54 +25,46 @@ const DEFAULT_THEME_SETTINGS: ThemeSettingsMap = {
 let fallbackThemeSettings: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
 let fallbackUserDisabled: Record<string, boolean> = {};
 
-// Read theme settings from KV
+// Read theme settings (database abstraction)
 async function readThemeSettings(): Promise<ThemeSettingsMap> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<ThemeSettingsMap>(THEME_SETTINGS_KEY);
-      return data || { ...DEFAULT_THEME_SETTINGS };
-    }
+    const data = await dbGet<ThemeSettingsMap>(THEME_SETTINGS_KEY);
+    return data || { ...DEFAULT_THEME_SETTINGS };
   } catch (error) {
-    console.warn('KV read failed for theme settings, using fallback:', error);
+    console.warn('Database read failed for theme settings, using fallback:', error);
   }
   return fallbackThemeSettings;
 }
 
-// Write theme settings to KV
+// Write theme settings (database abstraction)
 async function writeThemeSettings(settings: ThemeSettingsMap): Promise<void> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(THEME_SETTINGS_KEY, settings);
-      return;
-    }
+    await dbSet(THEME_SETTINGS_KEY, settings);
+    return;
   } catch (error) {
-    console.warn('KV write failed for theme settings, using fallback:', error);
+    console.warn('Database write failed for theme settings, using fallback:', error);
   }
   fallbackThemeSettings = settings;
 }
 
-// Get user's disabled themes preference
+// Get user's disabled themes preference (database abstraction)
 async function readUserDisabledThemes(): Promise<Record<string, boolean>> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<Record<string, boolean>>(THEME_DISABLED_BY_USER_KEY);
-      return data || {};
-    }
+    const data = await dbGet<Record<string, boolean>>(THEME_DISABLED_BY_USER_KEY);
+    return data || {};
   } catch (error) {
-    console.warn('KV read failed for user disabled themes, using fallback:', error);
+    console.warn('Database read failed for user disabled themes, using fallback:', error);
   }
   return fallbackUserDisabled;
 }
 
-// Write user's disabled themes preference
+// Write user's disabled themes preference (database abstraction)
 async function writeUserDisabledThemes(data: Record<string, boolean>): Promise<void> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(THEME_DISABLED_BY_USER_KEY, data);
-      return;
-    }
+    await dbSet(THEME_DISABLED_BY_USER_KEY, data);
+    return;
   } catch (error) {
-    console.warn('KV write failed for user disabled themes, using fallback:', error);
+    console.warn('Database write failed for user disabled themes, using fallback:', error);
   }
   fallbackUserDisabled = data;
 }

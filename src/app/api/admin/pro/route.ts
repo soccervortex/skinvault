@@ -62,21 +62,16 @@ export async function DELETE(request: Request) {
     }
 
     // Remove Pro by setting expiry to yesterday (more reasonable than 2000)
-    const { kv } = await import('@vercel/kv');
+    const { dbGet, dbSet } = await import('@/app/utils/database');
     const PRO_USERS_KEY = 'pro_users';
     
     try {
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        const data = await kv.get<Record<string, string>>(PRO_USERS_KEY) || {};
-        // Set to yesterday to mark as expired (more reasonable than 2000-01-01)
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        data[steamId] = yesterday.toISOString();
-        await kv.set(PRO_USERS_KEY, data);
-      } else {
-        // Fallback for local dev
-        return NextResponse.json({ error: 'KV not configured' }, { status: 500 });
-      }
+      const data = await dbGet<Record<string, string>>(PRO_USERS_KEY) || {};
+      // Set to yesterday to mark as expired (more reasonable than 2000-01-01)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      data[steamId] = yesterday.toISOString();
+      await dbSet(PRO_USERS_KEY, data);
     } catch (error) {
       console.error('Failed to delete Pro:', error);
       return NextResponse.json({ error: 'Failed to delete Pro' }, { status: 500 });
@@ -119,17 +114,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
     }
 
-    const { kv } = await import('@vercel/kv');
+    const { dbGet, dbSet } = await import('@/app/utils/database');
     const PRO_USERS_KEY = 'pro_users';
     
     try {
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        const data = await kv.get<Record<string, string>>(PRO_USERS_KEY) || {};
-        data[steamId] = expiryDate.toISOString();
-        await kv.set(PRO_USERS_KEY, data);
-      } else {
-        return NextResponse.json({ error: 'KV not configured' }, { status: 500 });
-      }
+      const data = await dbGet<Record<string, string>>(PRO_USERS_KEY) || {};
+      data[steamId] = expiryDate.toISOString();
+      await dbSet(PRO_USERS_KEY, data);
     } catch (error) {
       console.error('Failed to edit Pro:', error);
       return NextResponse.json({ error: 'Failed to edit Pro' }, { status: 500 });

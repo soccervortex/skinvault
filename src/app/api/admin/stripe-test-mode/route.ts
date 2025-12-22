@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 const ADMIN_HEADER = 'x-admin-key';
 const TEST_MODE_KEY = 'stripe_test_mode';
@@ -28,13 +29,8 @@ export async function GET(request: Request) {
     }
 
     try {
-      const { kv } = await import('@vercel/kv');
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        const testMode = await kv.get<boolean>(TEST_MODE_KEY);
-        return NextResponse.json({ testMode: testMode === true });
-      } else {
-        return NextResponse.json({ testMode: false });
-      }
+      const testMode = await dbGet<boolean>(TEST_MODE_KEY);
+      return NextResponse.json({ testMode: testMode === true });
     } catch (error) {
       console.error('Failed to get test mode:', error);
       return NextResponse.json({ testMode: false });
@@ -60,13 +56,8 @@ export async function POST(request: Request) {
     const testMode = body.testMode === true;
 
     try {
-      const { kv } = await import('@vercel/kv');
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        await kv.set(TEST_MODE_KEY, testMode);
-        return NextResponse.json({ testMode, message: `Test mode ${testMode ? 'enabled' : 'disabled'}` });
-      } else {
-        return NextResponse.json({ error: 'KV not configured' }, { status: 500 });
-      }
+      await dbSet(TEST_MODE_KEY, testMode);
+      return NextResponse.json({ testMode, message: `Test mode ${testMode ? 'enabled' : 'disabled'}` });
     } catch (error) {
       console.error('Failed to set test mode:', error);
       return NextResponse.json({ error: 'Failed to set test mode' }, { status: 500 });

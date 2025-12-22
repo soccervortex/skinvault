@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserGiftReward } from '@/app/utils/gift-storage';
 import type { ThemeType } from '@/app/utils/theme-storage';
-import { kv } from '@vercel/kv';
+import { dbGet } from '@/app/utils/database';
 
 export async function GET(request: Request) {
   try {
@@ -23,10 +23,10 @@ export async function GET(request: Request) {
       }
     }
 
-    // Also get purchased consumables from user_rewards KV
+    // Also get purchased consumables from user_rewards (database abstraction)
     try {
       const rewardsKey = 'user_rewards';
-      const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+      const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
       const userRewards = existingRewards[steamId] || [];
       
       // Add consumable rewards as theme-less rewards
@@ -37,8 +37,8 @@ export async function GET(request: Request) {
         });
       });
     } catch (error) {
-      console.error('Failed to get consumable rewards from KV:', error);
-      // Continue without consumables if KV fails
+      console.error('Failed to get consumable rewards:', error);
+      // Continue without consumables if database fails
     }
 
     return NextResponse.json({ rewards });

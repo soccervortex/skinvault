@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
 import Stripe from 'stripe';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
   let testMode = false;
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-    }
+    testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
   } catch (error) { /* ignore */ }
 
   const secretKey = testMode
@@ -52,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     const purchasesKey = 'purchase_history';
-    const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+    const existingPurchases = await dbGet<Array<any>>(purchasesKey) || [];
     const purchase = existingPurchases.find(p => p.sessionId === sessionId);
 
     if (purchase && purchase.fulfilled) {
@@ -69,7 +67,7 @@ export async function POST(request: Request) {
     // Handle consumables
     if (type === 'consumable' && consumableType && quantity > 0) {
       const rewardsKey = 'user_rewards';
-      const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+      const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
       const userRewards = existingRewards[steamId] || [];
 
       // Check if already granted (check by type, not just sessionId)
@@ -90,7 +88,7 @@ export async function POST(request: Request) {
         }
 
         existingRewards[steamId] = userRewards;
-        await kv.set(rewardsKey, existingRewards);
+        await dbSet(rewardsKey, existingRewards);
         console.log(`✅ Granted ${toGrant} ${consumableType} to ${steamId} (${alreadyGrantedCount} already existed)`);
       } else {
         console.log(`ℹ️ User already has ${alreadyGrantedCount} ${consumableType}, no need to grant`);
@@ -115,7 +113,7 @@ export async function POST(request: Request) {
         });
       }
 
-      await kv.set(purchasesKey, existingPurchases.slice(-1000));
+      await dbSet(purchasesKey, existingPurchases.slice(-1000));
 
       const finalCount = existingRewards[steamId]?.filter((r: any) => r?.type === consumableType).length || 0;
 

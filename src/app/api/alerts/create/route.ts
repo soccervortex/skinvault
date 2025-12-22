@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
 import { getProUntil } from '@/app/utils/pro-storage';
+import { dbGet, dbSet, hasDiscordAccessServer } from '@/app/utils/database';
 
 // Server-side helper to check if user has Discord access
 async function hasDiscordAccess(steamId: string): Promise<boolean> {
-  try {
-    const rewardsKey = 'user_rewards';
-    const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
-    const userRewards = existingRewards[steamId] || [];
-    return userRewards.some((r: any) => r?.type === 'discord_access');
-  } catch {
-    return false;
-  }
+  return await hasDiscordAccessServer(steamId);
 }
 
 // Server-side helper to get price tracker limit
@@ -58,7 +51,7 @@ export async function POST(request: Request) {
     
     // Check current alert count
     const alertsKey = 'price_alerts';
-    const existingAlerts = await kv.get<Record<string, PriceAlert>>(alertsKey) || {};
+    const existingAlerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
     const userAlerts = Object.values(existingAlerts).filter(a => a.steamId === steamId);
     
     if (userAlerts.length >= maxAlerts) {
@@ -72,7 +65,7 @@ export async function POST(request: Request) {
 
     // Check Discord connection (Pro already verified above)
     const discordConnectionsKey = 'discord_connections';
-    const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
     const connection = connections[steamId];
 
     if (!connection || (connection.expiresAt && Date.now() > connection.expiresAt)) {
@@ -97,9 +90,9 @@ export async function POST(request: Request) {
     };
 
     // Store alert
-    const alerts = await kv.get<Record<string, PriceAlert>>(alertsKey) || {};
+    const alerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
     alerts[alertId] = alert;
-    await kv.set(alertsKey, alerts);
+    await dbSet(alertsKey, alerts);
 
     return NextResponse.json({ success: true, alertId });
   } catch (error) {

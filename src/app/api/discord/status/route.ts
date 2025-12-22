@@ -37,10 +37,10 @@ export async function GET(request: Request) {
     if (!hasAccess) {
       // User doesn't have access, disconnect them if they have a connection
       const discordConnectionsKey = 'discord_connections';
-      const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+      const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
       if (connections[steamId]) {
         delete connections[steamId];
-        await kv.set(discordConnectionsKey, connections);
+        await dbSet(discordConnectionsKey, connections);
       }
       return NextResponse.json({ 
         connected: false, 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     }
 
     const discordConnectionsKey = 'discord_connections';
-    const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
     const connection = connections[steamId];
 
     if (!connection) {
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     if (connection.expiresAt && Date.now() > connection.expiresAt) {
       // Remove expired connection
       delete connections[steamId];
-      await kv.set(discordConnectionsKey, connections);
+      await dbSet(discordConnectionsKey, connections);
       return NextResponse.json({ connected: false, expired: true, requiresPro: false });
     }
 

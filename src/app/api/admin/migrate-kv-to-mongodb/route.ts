@@ -1,0 +1,215 @@
+import { NextResponse } from 'next/server';
+import { kv } from '@vercel/kv';
+import { MongoClient } from 'mongodb';
+import { isOwner } from '@/app/utils/owner-ids';
+
+const ADMIN_HEADER = 'x-admin-key';
+
+// All KV keys used in the application
+const KV_KEYS = [
+  'pro_users',
+  'first_logins',
+  'claimed_free_month',
+  'purchase_history',
+  'failed_purchases',
+  'user_rewards',
+  'discord_connections',
+  'price_alerts',
+  'banned_steam_ids',
+  'stripe_test_mode',
+  'active_theme',
+  'user_theme_preferences',
+  // Theme gift claims (dynamic keys)
+  'theme_gift_claims_2024_christmas',
+  'theme_gift_claims_2024_halloween',
+  'theme_gift_claims_2024_easter',
+  'theme_gift_claims_2024_sinterklaas',
+  'theme_gift_claims_2024_newyear',
+  'theme_gift_claims_2024_oldyear',
+];
+
+/**
+ * POST /api/admin/migrate-kv-to-mongodb
+ * Migrate all KV data to MongoDB
+ */
+export async function POST(request: Request) {
+  const adminKey = request.headers.get(ADMIN_HEADER);
+  const expected = process.env.ADMIN_PRO_TOKEN;
+
+  if (expected && adminKey !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const MONGODB_URI = process.env.MONGODB_URI;
+  const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
+
+  if (!MONGODB_URI) {
+    return NextResponse.json({ error: 'MongoDB URI not configured' }, { status: 400 });
+  }
+
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    return NextResponse.json({ error: 'KV not configured' }, { status: 400 });
+  }
+
+  try {
+    // Connect to MongoDB
+    const mongoClient = new MongoClient(MONGODB_URI);
+    await mongoClient.connect();
+    const db = mongoClient.db(MONGODB_DB_NAME);
+    const collection = db.collection('kv_data');
+
+    const results: Array<{ key: string; status: 'success' | 'error' | 'not_found'; error?: string }> = [];
+    let totalMigrated = 0;
+    let totalErrors = 0;
+    let totalNotFound = 0;
+
+    // Migrate each key
+    for (const key of KV_KEYS) {
+      try {
+        // Get value from KV
+        const value = await kv.get(key);
+
+        if (value === null || value === undefined) {
+          results.push({ key, status: 'not_found' });
+          totalNotFound++;
+          continue;
+        }
+
+        // Save to MongoDB
+        await collection.updateOne(
+          { key },
+          {
+            $set: {
+              key,
+              value,
+              migratedAt: new Date(),
+              source: 'kv_migration',
+            },
+          },
+          { upsert: true }
+        );
+
+        results.push({ key, status: 'success' });
+        totalMigrated++;
+      } catch (error: any) {
+        console.error(`Failed to migrate key ${key}:`, error);
+        results.push({
+          key,
+          status: 'error',
+          error: error.message || 'Unknown error',
+        });
+        totalErrors++;
+      }
+    }
+
+    // Also try to find any other keys in KV (if possible)
+    // Note: KV doesn't support key listing via REST API, so we can't discover all keys
+    // But we can try common patterns
+
+    await mongoClient.close();
+
+    return NextResponse.json({
+      success: true,
+      message: `Migration complete: ${totalMigrated} keys migrated, ${totalErrors} errors, ${totalNotFound} not found`,
+      summary: {
+        total: KV_KEYS.length,
+        migrated: totalMigrated,
+        errors: totalErrors,
+        notFound: totalNotFound,
+      },
+      results,
+    });
+  } catch (error: any) {
+    console.error('Migration failed:', error);
+    return NextResponse.json(
+      {
+        error: error.message || 'Migration failed',
+        details: error,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/admin/migrate-kv-to-mongodb
+ * Check migration status (compare KV and MongoDB)
+ */
+export async function GET(request: Request) {
+  const adminKey = request.headers.get(ADMIN_HEADER);
+  const expected = process.env.ADMIN_PRO_TOKEN;
+
+  if (expected && adminKey !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const MONGODB_URI = process.env.MONGODB_URI;
+  const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
+
+  if (!MONGODB_URI) {
+    return NextResponse.json({ error: 'MongoDB URI not configured' }, { status: 400 });
+  }
+
+  try {
+    const mongoClient = new MongoClient(MONGODB_URI);
+    await mongoClient.connect();
+    const db = mongoClient.db(MONGODB_DB_NAME);
+    const collection = db.collection('kv_data');
+
+    const comparison: Array<{
+      key: string;
+      inKV: boolean;
+      inMongoDB: boolean;
+      match: boolean;
+    }> = [];
+
+    for (const key of KV_KEYS) {
+      try {
+        const kvValue = await kv.get(key);
+        const mongoDoc = await collection.findOne({ key });
+
+        comparison.push({
+          key,
+          inKV: kvValue !== null && kvValue !== undefined,
+          inMongoDB: mongoDoc !== null,
+          match: JSON.stringify(kvValue) === JSON.stringify(mongoDoc?.value),
+        });
+      } catch (error) {
+        comparison.push({
+          key,
+          inKV: false,
+          inMongoDB: false,
+          match: false,
+        });
+      }
+    }
+
+    await mongoClient.close();
+
+    const inBoth = comparison.filter((c) => c.inKV && c.inMongoDB).length;
+    const onlyKV = comparison.filter((c) => c.inKV && !c.inMongoDB).length;
+    const onlyMongoDB = comparison.filter((c) => !c.inKV && c.inMongoDB).length;
+    const matches = comparison.filter((c) => c.match).length;
+
+    return NextResponse.json({
+      summary: {
+        total: KV_KEYS.length,
+        inBoth,
+        onlyKV,
+        onlyMongoDB,
+        matches,
+        mismatches: inBoth - matches,
+      },
+      comparison,
+    });
+  } catch (error: any) {
+    console.error('Failed to check migration status:', error);
+    return NextResponse.json(
+      {
+        error: error.message || 'Failed to check migration status',
+      },
+      { status: 500 }
+    );
+  }
+}
+

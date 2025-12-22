@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 interface PriceAlert {
   id: string;
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const alertsKey = 'price_alerts';
-    const alerts = await kv.get<Record<string, PriceAlert>>(alertsKey) || {};
+    const alerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
     
     // Verify the alert exists and belongs to the user
     const alert = alerts[alertId];
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     // Delete the alert
     delete alerts[alertId];
-    await kv.set(alertsKey, alerts);
+    await dbSet(alertsKey, alerts);
 
     return NextResponse.json({ success: true });
   } catch (error) {

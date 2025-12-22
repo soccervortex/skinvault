@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
@@ -93,10 +93,10 @@ export async function GET(request: Request) {
     const discordUser = await userResponse.json();
     console.log(`[Discord Callback] Received Discord user: ${discordUser.id} (${discordUser.username}) for Steam ID: ${steamId}`);
 
-    // Store Discord connection in KV
+    // Store Discord connection (database abstraction)
     try {
       const discordConnectionsKey = 'discord_connections';
-      const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+      const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
       
       connections[steamId] = {
         discordId: discordUser.id,
@@ -108,7 +108,7 @@ export async function GET(request: Request) {
         connectedAt: new Date().toISOString(),
       };
       
-      await kv.set(discordConnectionsKey, connections);
+      await dbSet(discordConnectionsKey, connections);
       console.log(`[Discord Callback] ✅ Stored Discord connection for Steam ID ${steamId} -> Discord ID ${discordUser.id} (${discordUser.username})`);
       
       // Queue welcome message for bot to process - THIS MUST RUN
@@ -140,7 +140,7 @@ Happy trading! 🚀`;
       
       try {
         console.log(`[Discord Callback] 📬 STEP 2: About to read queue from KV...`);
-        const existingQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
+        const existingQueue = await dbGet<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
         console.log(`[Discord Callback] 📬 STEP 3: Read queue from KV. Current queue size: ${existingQueue.length}`);
         
         // Check if message already exists for this user (avoid duplicates)
@@ -173,7 +173,7 @@ Happy trading! 🚀`;
         while (retries > 0 && !writeSuccess) {
           try {
             console.log(`[Discord Callback] 📬 STEP 7.${4 - retries}: Attempting KV write (retry ${4 - retries}/3)...`);
-            await kv.set(welcomeQueueKey, existingQueue);
+            await dbSet(welcomeQueueKey, existingQueue);
             writeSuccess = true;
             console.log(`[Discord Callback] ✅ STEP 7: KV write successful!`);
           } catch (writeError) {
@@ -192,7 +192,7 @@ Happy trading! 🚀`;
           // Verify the write worked (with a small delay to ensure consistency)
           console.log(`[Discord Callback] 📬 STEP 8: Verifying KV write (waiting 100ms for consistency)...`);
           await new Promise(resolve => setTimeout(resolve, 100));
-          const verifyQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
+          const verifyQueue = await dbGet<Array<{ discordId: string; message: string; timestamp: number }>>(welcomeQueueKey) || [];
           console.log(`[Discord Callback] 📬 STEP 9: Verification read complete. Queue size: ${verifyQueue.length}`);
           
           if (verifyQueue.length === 0) {

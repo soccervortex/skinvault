@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from './database';
 import { ThemeType } from './theme-storage';
 
 const GIFT_CLAIMS_KEY_PREFIX = 'theme_gift_claims_2024';
@@ -19,24 +19,20 @@ function getGiftClaimsKey(theme: ThemeType): string {
 
 async function readGiftClaims(theme: ThemeType): Promise<Record<string, GiftClaim>> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<Record<string, GiftClaim>>(getGiftClaimsKey(theme));
-      return data || {};
-    }
+    const data = await dbGet<Record<string, GiftClaim>>(getGiftClaimsKey(theme));
+    return data || {};
   } catch (error) {
-    console.warn(`KV read failed for ${theme} gift claims, using fallback:`, error);
+    console.warn(`Database read failed for ${theme} gift claims, using fallback:`, error);
   }
   return fallbackGiftClaims[theme] || {};
 }
 
 async function writeGiftClaims(theme: ThemeType, data: Record<string, GiftClaim>): Promise<void> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(getGiftClaimsKey(theme), data);
-      return;
-    }
+    await dbSet(getGiftClaimsKey(theme), data);
+    return;
   } catch (error) {
-    console.warn(`KV write failed for ${theme} gift claims, using fallback:`, error);
+    console.warn(`Database write failed for ${theme} gift claims, using fallback:`, error);
   }
   if (!fallbackGiftClaims[theme]) {
     fallbackGiftClaims[theme] = {};

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { grantPro } from '@/app/utils/pro-storage';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -86,9 +87,8 @@ export async function POST(request: Request) {
     if (steamId && months > 0 && type !== 'consumable') {
       try {
         // Check if already fulfilled (idempotency check)
-        const { kv } = await import('@vercel/kv');
         const purchasesKey = 'purchase_history';
-        const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+        const existingPurchases = await dbGet<Array<any>>(purchasesKey) || [];
         const alreadyFulfilled = existingPurchases.some(p => p.sessionId === session.id);
         
         if (alreadyFulfilled) {
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
           
           // Keep only last 1000 purchases
           const recentPurchases = existingPurchases.slice(-1000);
-          await kv.set(purchasesKey, recentPurchases);
+          await dbSet(purchasesKey, recentPurchases);
           console.log(`✅ Purchase ${session.id} recorded in history`);
         } catch (error) {
           console.error('❌ Failed to record purchase history:', error);
@@ -128,9 +128,8 @@ export async function POST(request: Request) {
         console.error('❌ Failed to update Pro status:', error);
         // Record failed fulfillment for manual review
         try {
-          const { kv } = await import('@vercel/kv');
           const failedKey = 'failed_purchases';
-          const failed = await kv.get<Array<any>>(failedKey) || [];
+          const failed = await dbGet<Array<any>>(failedKey) || [];
           failed.push({
             sessionId: session.id,
             steamId,
@@ -140,7 +139,7 @@ export async function POST(request: Request) {
             timestamp: new Date().toISOString(),
             amount: session.amount_total ? (session.amount_total / 100) : 0,
           });
-          await kv.set(failedKey, failed.slice(-100)); // Keep last 100 failed
+          await dbSet(failedKey, failed.slice(-100)); // Keep last 100 failed
         } catch (err) {
           console.error('Failed to record failed purchase:', err);
         }
@@ -155,11 +154,9 @@ export async function POST(request: Request) {
 
       if (consumableType && quantity > 0) {
         try {
-          const { kv } = await import('@vercel/kv');
-          
           // Check if already fulfilled (idempotency check)
           const purchasesKey = 'purchase_history';
-          const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+          const existingPurchases = await dbGet<Array<any>>(purchasesKey) || [];
           const alreadyFulfilled = existingPurchases.some(p => p.sessionId === session.id);
           
           if (alreadyFulfilled) {
@@ -169,7 +166,7 @@ export async function POST(request: Request) {
 
           // Grant consumable rewards
           const rewardsKey = 'user_rewards';
-          const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+          const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
           const userRewards = existingRewards[steamId] || [];
 
           // Add consumable rewards
@@ -183,7 +180,7 @@ export async function POST(request: Request) {
           }
 
           existingRewards[steamId] = userRewards;
-          await kv.set(rewardsKey, existingRewards);
+          await dbSet(rewardsKey, existingRewards);
 
           // Record purchase history with fulfillment status
           try {
@@ -204,7 +201,7 @@ export async function POST(request: Request) {
             
             // Keep only last 1000 purchases
             const recentPurchases = existingPurchases.slice(-1000);
-            await kv.set(purchasesKey, recentPurchases);
+            await dbSet(purchasesKey, recentPurchases);
             console.log(`✅ Purchase ${session.id} recorded in history`);
           } catch (error) {
             console.error('Failed to record purchase history:', error);
@@ -216,9 +213,8 @@ export async function POST(request: Request) {
           console.error('❌ Failed to grant consumables:', error);
           // Record failed fulfillment for manual review
           try {
-            const { kv } = await import('@vercel/kv');
             const failedKey = 'failed_purchases';
-            const failed = await kv.get<Array<any>>(failedKey) || [];
+            const failed = await dbGet<Array<any>>(failedKey) || [];
             failed.push({
               sessionId: session.id,
               steamId,
@@ -229,7 +225,7 @@ export async function POST(request: Request) {
               timestamp: new Date().toISOString(),
               amount: session.amount_total ? (session.amount_total / 100) : 0,
             });
-            await kv.set(failedKey, failed.slice(-100)); // Keep last 100 failed
+            await dbSet(failedKey, failed.slice(-100)); // Keep last 100 failed
           } catch (err) {
             console.error('Failed to record failed purchase:', err);
           }

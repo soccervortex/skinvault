@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet } from '@/app/utils/database';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -21,12 +21,12 @@ export async function GET(request: Request) {
 
     // Check purchase history
     const purchasesKey = 'purchase_history';
-    const purchases = await kv.get<Array<any>>(purchasesKey) || [];
+    const purchases = await dbGet<Array<any>>(purchasesKey) || [];
     const userPurchases = purchases.filter(p => p.steamId === steamId);
 
     // Check user_rewards
     const rewardsKey = 'user_rewards';
-    const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+    const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
     const userRewards = existingRewards[steamId] || [];
 
     // Check for discord_access specifically

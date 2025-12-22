@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
+import { dbGet } from '@/app/utils/database';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -20,9 +21,8 @@ export async function GET(request: Request) {
     }
 
     try {
-      const { kv } = await import('@vercel/kv');
       const failedKey = 'failed_purchases';
-      const failed = await kv.get<Array<any>>(failedKey) || [];
+      const failed = await dbGet<Array<any>>(failedKey) || [];
       
       // Sort by timestamp (newest first)
       const sorted = failed.sort((a, b) => 

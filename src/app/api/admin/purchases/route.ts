@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
+import { dbGet } from '@/app/utils/database';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -16,9 +17,8 @@ export async function GET(request: Request) {
     const targetSteamId = url.searchParams.get('steamId'); // Target user's Steam ID to filter by
 
     try {
-      const { kv } = await import('@vercel/kv');
       const purchasesKey = 'purchase_history';
-      let purchases = await kv.get<Array<any>>(purchasesKey) || [];
+      let purchases = await dbGet<Array<any>>(purchasesKey) || [];
       
       // Filter by target Steam ID if provided
       if (targetSteamId) {

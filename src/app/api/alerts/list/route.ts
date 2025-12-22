@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet } from '@/app/utils/database';
 
 interface PriceAlert {
   id: string;
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     }
 
     const alertsKey = 'price_alerts';
-    const allAlerts = await kv.get<Record<string, PriceAlert>>(alertsKey) || {};
+    const allAlerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
     
     // Filter alerts for this user
     const userAlerts = Object.values(allAlerts).filter(alert => alert.steamId === steamId);

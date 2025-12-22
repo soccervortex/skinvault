@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
   let testMode = false;
   try {
-    const { kv } = await import('@vercel/kv');
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-    }
+    testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
   } catch (error) {
-    // If KV fails, use production keys
+    // If database fails, use production keys
   }
 
   const secretKey = testMode 
@@ -57,9 +55,8 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    const { kv } = await import('@vercel/kv');
     const purchasesKey = 'purchase_history';
-    const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+    const existingPurchases = await dbGet<Array<any>>(purchasesKey) || [];
     const purchase = existingPurchases.find(p => p.sessionId === sessionId);
     
     // Check if reward was actually granted (not just if purchase exists)
@@ -68,7 +65,7 @@ export async function POST(request: Request) {
     
     if (type === 'consumable' && consumableType) {
       const rewardsKey = 'user_rewards';
-      const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+      const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
       const userRewards = existingRewards[steamId] || [];
       const rewardGranted = userRewards.some((r: any) => 
         r?.type === consumableType && r?.sessionId === sessionId
@@ -114,7 +111,7 @@ export async function POST(request: Request) {
         verifiedBy: 'manual_verification',
       });
       
-      await kv.set(purchasesKey, existingPurchases.slice(-1000));
+      await dbSet(purchasesKey, existingPurchases.slice(-1000));
       
       return NextResponse.json({ 
         fulfilled: true,
@@ -132,7 +129,7 @@ export async function POST(request: Request) {
 
       if (consumableType && quantity > 0) {
         const rewardsKey = 'user_rewards';
-        const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+        const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
         const userRewards = existingRewards[steamId] || [];
 
         // Check if already granted for this session
@@ -153,7 +150,7 @@ export async function POST(request: Request) {
           }
 
           existingRewards[steamId] = userRewards;
-          await kv.set(rewardsKey, existingRewards);
+          await dbSet(rewardsKey, existingRewards);
           console.log(`✅ Granted ${toGrant} ${consumableType} to ${steamId} (${alreadyGranted} already existed)`);
         } else {
           console.log(`ℹ️ Rewards already granted for session ${sessionId}`);
@@ -173,7 +170,7 @@ export async function POST(request: Request) {
           verifiedBy: 'manual_verification',
         });
         
-        await kv.set(purchasesKey, existingPurchases.slice(-1000));
+        await dbSet(purchasesKey, existingPurchases.slice(-1000));
 
         return NextResponse.json({ 
           fulfilled: true,
@@ -209,9 +206,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing session_id or sessionId' }, { status: 400 });
     }
 
-    const { kv } = await import('@vercel/kv');
     const purchasesKey = 'purchase_history';
-    const purchases = await kv.get<Array<any>>(purchasesKey) || [];
+    const purchases = await dbGet<Array<any>>(purchasesKey) || [];
     
     const purchase = purchases.find(p => p.sessionId === sessionId);
     

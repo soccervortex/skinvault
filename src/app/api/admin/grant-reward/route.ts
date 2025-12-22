@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }
 
     const rewardsKey = 'user_rewards';
-    const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+    const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
     const userRewards = existingRewards[steamId] || [];
 
     // Check if already has this reward
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       }
 
       existingRewards[steamId] = userRewards;
-      await kv.set(rewardsKey, existingRewards);
+      await dbSet(rewardsKey, existingRewards);
 
       return NextResponse.json({ 
         success: true, 
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     }
 
     const rewardsKey = 'user_rewards';
-    const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+    const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey) || {};
     const userRewards = existingRewards[steamId] || [];
 
     const hasReward = userRewards.some((r: any) => r?.type === rewardType);
