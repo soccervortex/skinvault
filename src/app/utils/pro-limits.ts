@@ -36,7 +36,12 @@ async function getStoredRewards(steamId?: string | null): Promise<any[]> {
       if (response.ok) {
         const data = await response.json();
         // Get rewards from both theme gifts and consumables
-        const rewards = (data.rewards || []).map((r: any) => r.reward);
+        const rewards = (data.rewards || []).map((r: any) => r.reward).filter((r: any) => r != null);
+        // Debug: Log wishlist slot count
+        const wishlistSlotCount = rewards.filter((r: any) => r?.type === 'wishlist_slot').length;
+        if (wishlistSlotCount > 0) {
+          console.log(`[Wishlist] Found ${wishlistSlotCount} wishlist_slot rewards for ${steamId}`);
+        }
         // Update cache
         rewardsCache = {
           steamId,
@@ -96,6 +101,10 @@ async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
   const rewards = await getStoredRewards(steamId);
   let extraSlots = 0;
   
+  // Count all wishlist_slot rewards (each purchase = +1 slot)
+  const wishlistSlotCount = rewards.filter((reward: any) => reward?.type === 'wishlist_slot').length;
+  extraSlots += wishlistSlotCount;
+  
   rewards.forEach((reward: any) => {
     // Check for permanent extra slots (from theme rewards)
     if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
@@ -105,10 +114,7 @@ async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
     if (reward?.type === 'wishlist_boost' && reward?.value) {
       extraSlots += reward.value;
     }
-    // Check for purchased wishlist slots (each purchase = +1 slot)
-    if (reward?.type === 'wishlist_slot') {
-      extraSlots += 1;
-    }
+    // Note: wishlist_slot is now counted above using filter().length for accuracy
   });
   
   return extraSlots;
@@ -165,21 +171,21 @@ export function getWishlistLimitSync(isProUser: boolean, steamId?: string | null
   
   // First try cached rewards (only if cache matches the requested steamId)
   if (rewardsCache.rewards.length > 0 && (!steamId || rewardsCache.steamId === steamId)) {
-    extraSlots = rewardsCache.rewards.reduce((sum, reward) => {
+    // Count all wishlist_slot rewards (each purchase = +1 slot) - use filter for accuracy
+    const wishlistSlotCount = rewardsCache.rewards.filter((reward: any) => reward?.type === 'wishlist_slot').length;
+    extraSlots += wishlistSlotCount;
+    
+    rewardsCache.rewards.forEach((reward: any) => {
       // Check for permanent extra slots (from theme rewards)
       if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
-        return sum + reward.value;
+        extraSlots += reward.value;
       }
       // Check for temporary wishlist boost (treat as permanent for now)
       if (reward?.type === 'wishlist_boost' && reward?.value) {
-        return sum + reward.value;
+        extraSlots += reward.value;
       }
-      // Check for purchased wishlist slots (each purchase = +1 slot)
-      if (reward?.type === 'wishlist_slot') {
-        return sum + 1;
-      }
-      return sum;
-    }, 0);
+      // Note: wishlist_slot is now counted above using filter().length for accuracy
+    });
   } else if (typeof window !== 'undefined') {
     // Fallback to localStorage if cache is empty (for immediate use before API loads)
     try {
@@ -192,6 +198,13 @@ export function getWishlistLimitSync(isProUser: boolean, steamId?: string | null
           try {
             const rewards = JSON.parse(rewardsStr);
             if (Array.isArray(rewards)) {
+              // Count all wishlist_slot rewards first (each purchase = +1 slot)
+              const wishlistSlotCount = rewards.filter((stored: any) => {
+                const reward = stored.reward || stored;
+                return reward?.type === 'wishlist_slot';
+              }).length;
+              extraSlots += wishlistSlotCount;
+              
               rewards.forEach((stored: any) => {
                 const reward = stored.reward || stored;
                 if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
@@ -200,10 +213,7 @@ export function getWishlistLimitSync(isProUser: boolean, steamId?: string | null
                 if (reward?.type === 'wishlist_boost' && reward?.value) {
                   extraSlots += reward.value;
                 }
-                // Check for purchased wishlist slots (each purchase = +1 slot)
-                if (reward?.type === 'wishlist_slot') {
-                  extraSlots += 1;
-                }
+                // Note: wishlist_slot is now counted above using filter().length for accuracy
               });
             }
           } catch {

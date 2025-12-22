@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
-import { getWishlistLimitSync, getWishlistBatchSize, getWishlistBatchSizeSync, preloadRewards } from '@/app/utils/pro-limits';
+import { getWishlistLimitSync, getWishlistBatchSize, getWishlistBatchSizeSync, preloadRewards, clearRewardsCache } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 const PROXY_LIST = [
@@ -101,12 +101,17 @@ export default function WishlistPage() {
         const steamId = parsedUser?.steamId || null;
         setItems(loadWishlist(steamId));
         
-        // Load rewards to update limit
+        // Load rewards to update limit (force refresh cache)
         if (steamId) {
+          // Clear cache first to ensure fresh data
+          clearRewardsCache();
           preloadRewards(steamId).then(() => {
-            setWishlistLimit(getWishlistLimitSync(false, steamId));
+            const limit = getWishlistLimitSync(false, steamId);
+            setWishlistLimit(limit);
+            console.log(`[Wishlist] Loaded limit: ${limit} for ${steamId}`);
           }).catch(() => {
-            setWishlistLimit(getWishlistLimitSync(false, steamId));
+            const limit = getWishlistLimitSync(false, steamId);
+            setWishlistLimit(limit);
           });
         } else {
           setWishlistLimit(getWishlistLimitSync(false));
