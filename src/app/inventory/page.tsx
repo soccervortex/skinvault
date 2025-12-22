@@ -723,9 +723,9 @@ function InventoryContent() {
             
             if (userHasAccess) {
               // Free user with Discord access - check connection status
-    fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
+              fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
                   setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
                 })
                 .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
@@ -745,6 +745,35 @@ function InventoryContent() {
     
     checkDiscordAccess();
   }, [viewedUser?.steamId, isPro]);
+
+  // Handle discord=connected URL parameter (refresh status after OAuth callback)
+  useEffect(() => {
+    const discordParam = searchParams.get('discord');
+    if (discordParam === 'connected' && viewedUser?.steamId) {
+      // Force refresh Discord status when coming back from OAuth
+      const refreshDiscordStatus = async () => {
+        try {
+          const res = await fetch(`/api/discord/status?steamId=${viewedUser.steamId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
+            
+            // Remove the parameter from URL without reload
+            if (typeof window !== 'undefined') {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('discord');
+              window.history.replaceState({}, '', url.toString());
+            }
+          }
+        } catch (error) {
+          console.error('Failed to refresh Discord status:', error);
+        }
+      };
+      
+      // Small delay to ensure connection is saved
+      setTimeout(refreshDiscordStatus, 500);
+    }
+  }, [searchParams, viewedUser?.steamId]);
 
   const totalVaultValue = useMemo(() => {
     // Always return a valid number, never Infinity
