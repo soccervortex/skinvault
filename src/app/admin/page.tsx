@@ -420,7 +420,7 @@ export default function AdminPage() {
     setUserPurchases([]);
 
     try {
-      const res = await fetch(`/api/admin/purchases?steamId=${fixSteamId}`, {
+      const res = await fetch(`/api/admin/purchases?steamId=${fixSteamId}&requesterSteamId=${user?.steamId}`, {
         headers: {
           "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
