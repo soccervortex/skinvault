@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles } from 'lucide-react';
+import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 export default function ProInfoPage() {
@@ -154,14 +154,23 @@ export default function ProInfoPage() {
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
         <div className="w-full max-w-4xl bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
-              <Crown className="text-blue-400" size={20} />
+          <div className="flex items-center justify-between gap-3 md:gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
+                <Crown className="text-blue-400" size={20} />
+              </div>
+              <div>
+                <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Premium tier</p>
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">SkinVault Pro</h1>
+              </div>
             </div>
-            <div>
-              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Premium tier</p>
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">SkinVault Pro</h1>
-            </div>
+            <Link
+              href="/shop"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white py-2 md:py-3 px-4 md:px-6 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] tracking-widest transition-all shadow-xl shadow-blue-600/20"
+            >
+              <ShoppingCart size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Shop</span>
+            </Link>
           </div>
 
         {user && (
