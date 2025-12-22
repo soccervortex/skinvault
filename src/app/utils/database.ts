@@ -20,6 +20,11 @@ let dbStatus: 'kv' | 'mongodb' | 'fallback' = 'kv';
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
 
+// Cache to reduce KV reads (simple in-memory cache)
+const readCache: Map<string, { value: any; timestamp: number }> = new Map();
+const CACHE_TTL = 1000 * 60 * 5; // 5 minutes cache
+const MAX_CACHE_SIZE = 1000; // Max cached items
+
 // MongoDB connection string
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
@@ -160,24 +165,77 @@ async function syncFromMongoDBToKV(key: string): Promise<void> {
   }
 }
 
+// Sync all MongoDB data back to KV (when KV recovers)
+async function syncAllFromMongoDBToKV(): Promise<void> {
+  if (!await isKVAvailable()) {
+    return; // KV not available yet
+  }
+
+  try {
+    const collection = await getMongoCollection('__all_keys__');
+    if (!collection) return;
+
+    // Get all keys from MongoDB
+    const allDocs = await collection.find({}).toArray();
+    let synced = 0;
+    let failed = 0;
+
+    for (const doc of allDocs) {
+      try {
+        // Skip backup markers
+        if (doc.source === 'kv_backup') continue;
+        
+        await kv.set(doc.key, doc.value);
+        synced++;
+      } catch (error) {
+        console.error(`[Database] Failed to sync key ${doc.key} to KV:`, error);
+        failed++;
+      }
+    }
+
+    console.log(`[Database] Sync complete: ${synced} keys synced, ${failed} failed`);
+  } catch (error) {
+    console.error('[Database] Failed to sync all data from MongoDB to KV:', error);
+  }
+}
+
 /**
- * Get value from database (KV primary, MongoDB fallback)
+ * Get value from database (with caching to reduce KV reads)
  */
-export async function dbGet<T>(key: string): Promise<T | null> {
+export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T | null> {
+  // Check cache first (reduces KV reads)
+  if (useCache) {
+    const cached = readCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.value as T;
+    }
+  }
+
   // Try KV first
   if (await isKVAvailable()) {
     try {
       const value = await kv.get<T>(key);
       
-      // Backup to MongoDB in background (don't wait)
+      // Update cache
+      if (useCache && value !== null) {
+        // Clean cache if too large
+        if (readCache.size >= MAX_CACHE_SIZE) {
+          const firstKey = readCache.keys().next().value;
+          readCache.delete(firstKey);
+        }
+        readCache.set(key, { value, timestamp: Date.now() });
+      }
+      
+      // If found in KV, ensure MongoDB also has it (sync in background)
       if (value && MONGODB_URI) {
-        backupToMongoDB(key, value).catch(() => {});
+        mongoSet(key, value).catch(() => {}); // Sync to MongoDB
       }
       
       dbStatus = 'kv';
       return value;
     } catch (error) {
       console.warn(`[Database] KV get failed for ${key}, trying MongoDB:`, error);
+      readCache.delete(key); // Remove from cache on error
     }
   }
 
@@ -185,38 +243,83 @@ export async function dbGet<T>(key: string): Promise<T | null> {
   dbStatus = 'mongodb';
   const value = await mongoGet<T>(key);
   
-  // If found in MongoDB and KV is available, try to sync back
+  // Update cache
+  if (useCache && value !== null) {
+    if (readCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = readCache.keys().next().value;
+      readCache.delete(firstKey);
+    }
+    readCache.set(key, { value, timestamp: Date.now() });
+  }
+  
+  // If found in MongoDB and KV is available, sync back to KV immediately
   if (value && await isKVAvailable()) {
-    syncFromMongoDBToKV(key).catch(() => {});
+    // Sync back to KV so both databases have the data
+    try {
+      await kv.set(key, value);
+      console.log(`[Database] Synced ${key} from MongoDB to KV (read recovery)`);
+    } catch (error) {
+      console.warn(`[Database] Failed to sync ${key} back to KV:`, error);
+    }
   }
   
   return value;
 }
 
 /**
- * Set value in database (write to both KV and MongoDB)
+ * Set value in database (ALWAYS write to both KV and MongoDB for sync)
  */
 export async function dbSet<T>(key: string, value: T): Promise<boolean> {
+  // Update cache immediately (reduces future KV reads)
+  readCache.set(key, { value, timestamp: Date.now() });
+  if (readCache.size > MAX_CACHE_SIZE) {
+    const firstKey = readCache.keys().next().value;
+    readCache.delete(firstKey);
+  }
+
   let kvSuccess = false;
   let mongoSuccess = false;
 
-  // Try KV first
+  // Always try to write to both databases for sync
+  const writePromises: Promise<void>[] = [];
+
+  // Write to KV (if available)
   if (await isKVAvailable()) {
-    try {
-      await kv.set(key, value);
-      kvSuccess = true;
-      dbStatus = 'kv';
-    } catch (error) {
-      console.warn(`[Database] KV set failed for ${key}, will use MongoDB:`, error);
-    }
+    writePromises.push(
+      kv.set(key, value)
+        .then(() => {
+          kvSuccess = true;
+          dbStatus = 'kv';
+        })
+        .catch((error) => {
+          console.warn(`[Database] KV set failed for ${key}:`, error);
+        })
+    );
   }
 
-  // Always write to MongoDB as backup
+  // ALWAYS write to MongoDB (even if KV fails)
   if (MONGODB_URI) {
-    mongoSuccess = await mongoSet(key, value);
-    if (mongoSuccess && !kvSuccess) {
-      dbStatus = 'mongodb';
-    }
+    writePromises.push(
+      mongoSet(key, value)
+        .then(() => {
+          mongoSuccess = true;
+          if (!kvSuccess) {
+            dbStatus = 'mongodb';
+          }
+        })
+        .catch((error) => {
+          console.error(`[Database] MongoDB set failed for ${key}:`, error);
+        })
+    );
+  }
+
+  // Wait for both writes (don't fail if one fails)
+  await Promise.allSettled(writePromises);
+
+  // If KV failed but MongoDB succeeded, try to sync back to KV later
+  if (!kvSuccess && mongoSuccess && await isKVAvailable()) {
+    // Try to sync immediately (don't wait, do in background)
+    syncFromMongoDBToKV(key).catch(() => {});
   }
 
   return kvSuccess || mongoSuccess;
@@ -226,6 +329,9 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
  * Delete value from database
  */
 export async function dbDelete(key: string): Promise<boolean> {
+  // Remove from cache
+  readCache.delete(key);
+
   let kvSuccess = false;
   let mongoSuccess = false;
 
@@ -255,6 +361,50 @@ export function getDbStatus(): 'kv' | 'mongodb' | 'fallback' {
 }
 
 /**
+ * Sync all data from MongoDB to KV (call this when KV recovers)
+ */
+export async function syncAllDataToKV(): Promise<{
+  synced: number;
+  failed: number;
+  total: number;
+}> {
+  if (!await isKVAvailable()) {
+    return { synced: 0, failed: 0, total: 0 };
+  }
+
+  try {
+    const collection = await getMongoCollection('__all_keys__');
+    if (!collection) {
+      return { synced: 0, failed: 0, total: 0 };
+    }
+
+    // Get all keys from MongoDB
+    const allDocs = await collection.find({}).toArray();
+    let synced = 0;
+    let failed = 0;
+
+    for (const doc of allDocs) {
+      try {
+        // Skip backup markers and internal keys
+        if (doc.source === 'kv_backup' || doc.key?.startsWith('__')) continue;
+        
+        await kv.set(doc.key, doc.value);
+        synced++;
+      } catch (error) {
+        console.error(`[Database] Failed to sync key ${doc.key} to KV:`, error);
+        failed++;
+      }
+    }
+
+    console.log(`[Database] Full sync complete: ${synced} keys synced, ${failed} failed, ${allDocs.length} total`);
+    return { synced, failed, total: allDocs.length };
+  } catch (error) {
+    console.error('[Database] Failed to sync all data from MongoDB to KV:', error);
+    return { synced: 0, failed: 0, total: 0 };
+  }
+}
+
+/**
  * Check database health
  */
 export async function checkDbHealth(): Promise<{
@@ -264,6 +414,12 @@ export async function checkDbHealth(): Promise<{
 }> {
   const kvAvailable = await isKVAvailable();
   const mongoAvailable = MONGODB_URI ? (await initMongoDB()) !== null : false;
+
+  // If KV just became available and we were using MongoDB, trigger sync
+  if (kvAvailable && dbStatus === 'mongodb' && mongoAvailable) {
+    console.log('[Database] KV recovered, syncing data from MongoDB...');
+    syncAllDataToKV().catch(() => {});
+  }
 
   return {
     kv: kvAvailable,
