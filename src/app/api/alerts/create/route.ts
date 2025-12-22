@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     // Check if user is Pro or has Discord access
     const proUntil = await getProUntil(steamId);
-    const isPro = proUntil && new Date(proUntil) > new Date();
+    const isPro = !!(proUntil && new Date(proUntil) > new Date());
     
     // Get price tracker limit (unlimited for Pro, 3 for Discord access, 0 for free)
     const maxAlerts = await getPriceTrackerLimit(isPro, steamId);
