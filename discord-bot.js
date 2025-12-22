@@ -9,7 +9,7 @@ function log(message) {
 
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const API_BASE_URL = process.env.API_BASE_URL || 'https://www.skinvaults.online';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 
 if (!DISCORD_TOKEN || !DISCORD_CLIENT_ID) {
@@ -718,7 +718,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!wishlist || wishlist.length === 0) {
         await interaction.editReply({
-          content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVault to track their prices!\n\nVisit: https://www.skinvaults.online',
+          content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVault to track their prices!\n\nVisit: https://skinvaults.online',
         });
         return;
       }
@@ -781,7 +781,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!alerts || alerts.length === 0) {
         await interaction.editReply({
-          content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVault to get notified when prices hit your target!\n\nVisit: https://www.skinvaults.online',
+          content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVault to get notified when prices hit your target!\n\nVisit: https://skinvaults.online',
         });
         return;
       }
@@ -877,7 +877,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (!itemInfo && !searchResult) {
           await interaction.editReply({
-            content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemQuery}"\n\n💡 **Tip:** Try a partial name like "snakebite" or "ak redline"\n\nSearch for items on: https://www.skinvaults.online`,
+            content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemQuery}"\n\n💡 **Tip:** Try a partial name like "snakebite" or "ak redline"\n\nSearch for items on: https://skinvaults.online`,
           });
           return;
         }
