@@ -113,7 +113,14 @@ function PaymentSuccessContent() {
             if (user.steamId === steamId) {
               // Clear rewards cache to force refresh
               localStorage.removeItem('user_rewards_cache');
+              // Also clear the in-memory cache by triggering a storage event
               window.dispatchEvent(new Event('storage'));
+              // Force reload rewards by fetching from API
+              try {
+                await fetch(`/api/user/rewards?steamId=${steamId}`);
+              } catch (e) {
+                // Ignore errors
+              }
             }
           }
         }

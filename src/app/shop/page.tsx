@@ -67,17 +67,17 @@ export default function ShopPage() {
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
         <div className="w-full max-w-4xl bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
-          <div className="flex items-center gap-3 md:gap-4">
+          <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
             <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
               <ShoppingCart className="text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Consumables</p>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black mb-1">Consumables</p>
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">Shop</h1>
             </div>
           </div>
 
-          <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed">
+          <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed mb-6 md:mb-8">
             Purchase consumables to enhance your free account. Perfect if you only need specific features without a full Pro subscription.
           </p>
 

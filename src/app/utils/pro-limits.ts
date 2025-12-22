@@ -32,18 +32,19 @@ async function getStoredRewards(steamId?: string | null): Promise<any[]> {
   }
 
   try {
-    const response = await fetch(`/api/user/rewards?steamId=${steamId}`);
-    if (response.ok) {
-      const data = await response.json();
-      const rewards = (data.rewards || []).map((r: any) => r.reward);
-      // Update cache
-      rewardsCache = {
-        steamId,
-        rewards,
-        timestamp: now,
-      };
-      return rewards;
-    }
+      const response = await fetch(`/api/user/rewards?steamId=${steamId}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Get rewards from both theme gifts and consumables
+        const rewards = (data.rewards || []).map((r: any) => r.reward);
+        // Update cache
+        rewardsCache = {
+          steamId,
+          rewards,
+          timestamp: now,
+        };
+        return rewards;
+      }
   } catch (error) {
     console.error('Failed to fetch rewards from API:', error);
   }
