@@ -1,23 +1,22 @@
-import { kv } from '@vercel/kv';
 import { OWNER_STEAM_IDS } from './owner-ids';
+import { dbGet, dbSet } from './database';
+
 const PRO_USERS_KEY = 'pro_users';
 const FIRST_LOGINS_KEY = 'first_logins'; // Track first login dates
 const CLAIMED_FREE_MONTH_KEY = 'claimed_free_month'; // Track who claimed free month
 
-// Fallback to in-memory storage if KV is not available (local dev)
+// Fallback to in-memory storage if both KV and MongoDB are not available (local dev)
 let fallbackStorage: Record<string, string> = {};
 let fallbackFirstLogins: Record<string, string> = {};
 let fallbackClaimedFree: Record<string, boolean> = {};
 
 async function readProData(): Promise<Record<string, string>> {
   try {
-    // Try Vercel KV first (only if credentials are set)
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<Record<string, string>>(PRO_USERS_KEY);
-      return data || {};
-    }
+    // Use database abstraction (KV primary, MongoDB fallback)
+    const data = await dbGet<Record<string, string>>(PRO_USERS_KEY);
+    if (data) return data;
   } catch (error) {
-    console.warn('KV read failed, using fallback:', error);
+    console.warn('Database read failed, using fallback:', error);
   }
   
   // Fallback to in-memory storage for local dev
@@ -26,13 +25,11 @@ async function readProData(): Promise<Record<string, string>> {
 
 async function writeProData(data: Record<string, string>): Promise<void> {
   try {
-    // Try Vercel KV first (only if credentials are set)
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(PRO_USERS_KEY, data);
-      return;
-    }
+    // Use database abstraction (writes to both KV and MongoDB)
+    const success = await dbSet(PRO_USERS_KEY, data);
+    if (success) return;
   } catch (error) {
-    console.warn('KV write failed, using fallback:', error);
+    console.warn('Database write failed, using fallback:', error);
   }
   
   // Fallback to in-memory storage for local dev
@@ -74,24 +71,20 @@ export async function getAllProUsers(): Promise<Record<string, string>> {
 // Track first login date
 async function readFirstLogins(): Promise<Record<string, string>> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<Record<string, string>>(FIRST_LOGINS_KEY);
-      return data || {};
-    }
+    const data = await dbGet<Record<string, string>>(FIRST_LOGINS_KEY);
+    if (data) return data;
   } catch (error) {
-    console.warn('KV read failed for first logins, using fallback:', error);
+    console.warn('Database read failed for first logins, using fallback:', error);
   }
   return fallbackFirstLogins;
 }
 
 async function writeFirstLogins(data: Record<string, string>): Promise<void> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(FIRST_LOGINS_KEY, data);
-      return;
-    }
+    const success = await dbSet(FIRST_LOGINS_KEY, data);
+    if (success) return;
   } catch (error) {
-    console.warn('KV write failed for first logins, using fallback:', error);
+    console.warn('Database write failed for first logins, using fallback:', error);
   }
   fallbackFirstLogins = data;
 }
@@ -99,24 +92,20 @@ async function writeFirstLogins(data: Record<string, string>): Promise<void> {
 // Track if user has claimed free month (one-time only)
 async function readClaimedFreeMonth(): Promise<Record<string, boolean>> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<Record<string, boolean>>(CLAIMED_FREE_MONTH_KEY);
-      return data || {};
-    }
+    const data = await dbGet<Record<string, boolean>>(CLAIMED_FREE_MONTH_KEY);
+    if (data) return data;
   } catch (error) {
-    console.warn('KV read failed for claimed free month, using fallback:', error);
+    console.warn('Database read failed for claimed free month, using fallback:', error);
   }
   return fallbackClaimedFree;
 }
 
 async function writeClaimedFreeMonth(data: Record<string, boolean>): Promise<void> {
   try {
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(CLAIMED_FREE_MONTH_KEY, data);
-      return;
-    }
+    const success = await dbSet(CLAIMED_FREE_MONTH_KEY, data);
+    if (success) return;
   } catch (error) {
-    console.warn('KV write failed for claimed free month, using fallback:', error);
+    console.warn('Database write failed for claimed free month, using fallback:', error);
   }
   fallbackClaimedFree = data;
 }
