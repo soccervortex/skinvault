@@ -221,7 +221,7 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
         // Clean cache if too large
         if (readCache.size >= MAX_CACHE_SIZE) {
           const firstKey = readCache.keys().next().value;
-          readCache.delete(firstKey);
+          if (firstKey) readCache.delete(firstKey);
         }
         readCache.set(key, { value, timestamp: Date.now() });
       }
@@ -247,7 +247,7 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
   if (useCache && value !== null) {
     if (readCache.size >= MAX_CACHE_SIZE) {
       const firstKey = readCache.keys().next().value;
-      readCache.delete(firstKey);
+      if (firstKey) readCache.delete(firstKey);
     }
     readCache.set(key, { value, timestamp: Date.now() });
   }
@@ -274,7 +274,7 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   readCache.set(key, { value, timestamp: Date.now() });
   if (readCache.size > MAX_CACHE_SIZE) {
     const firstKey = readCache.keys().next().value;
-    readCache.delete(firstKey);
+    if (firstKey) readCache.delete(firstKey);
   }
 
   let kvSuccess = false;
