@@ -77,21 +77,29 @@ async function isKVAvailable(): Promise<boolean> {
 }
 
 // Get MongoDB collection for a key
+// Each KV key becomes its own MongoDB collection for easier browsing
 async function getMongoCollection(key: string): Promise<Collection | null> {
   const db = await initMongoDB();
   if (!db) return null;
+
+  // Sanitize key name for MongoDB collection name (must be valid collection name)
+  // Replace invalid characters with underscores
+  const collectionName = key.replace(/[^a-zA-Z0-9_]/g, '_');
   
-  // Use a single collection for all KV-like data
-  return db.collection('kv_data');
+  // Use the key name as the collection name (makes it identical to KV structure)
+  return db.collection(collectionName);
 }
 
 // MongoDB operations
+// Each collection stores a single document with the value
+// Structure: { _id: key, value: <actual data>, updatedAt: Date }
 async function mongoGet<T>(key: string): Promise<T | null> {
   try {
     const collection = await getMongoCollection(key);
     if (!collection) return null;
 
-    const doc = await collection.findOne({ key });
+    // Each collection has a single document with _id = key
+    const doc = await collection.findOne({ _id: key } as any);
     return doc ? (doc.value as T) : null;
   } catch (error) {
     console.error(`[Database] MongoDB get failed for key ${key}:`, error);
@@ -104,9 +112,10 @@ async function mongoSet<T>(key: string, value: T): Promise<boolean> {
     const collection = await getMongoCollection(key);
     if (!collection) return false;
 
+    // Store as single document with _id = key, value = actual data
     await collection.updateOne(
-      { key },
-      { $set: { key, value, updatedAt: new Date() } },
+      { _id: key } as any,
+      { $set: { _id: key, value, updatedAt: new Date() } },
       { upsert: true }
     );
     return true;
@@ -121,7 +130,7 @@ async function mongoDelete(key: string): Promise<boolean> {
     const collection = await getMongoCollection(key);
     if (!collection) return false;
 
-    await collection.deleteOne({ key });
+    await collection.deleteOne({ _id: key } as any);
     return true;
   } catch (error) {
     console.error(`[Database] MongoDB delete failed for key ${key}:`, error);
@@ -129,27 +138,10 @@ async function mongoDelete(key: string): Promise<boolean> {
   }
 }
 
-// Backup KV data to MongoDB
+// Backup KV data to MongoDB (no longer needed - dbSet handles this)
 async function backupToMongoDB(key: string, value: any): Promise<void> {
-  try {
-    const collection = await getMongoCollection(key);
-    if (!collection) return;
-
-    await collection.updateOne(
-      { key, source: 'kv_backup' },
-      { 
-        $set: { 
-          key, 
-          value, 
-          source: 'kv_backup',
-          backedUpAt: new Date() 
-        } 
-      },
-      { upsert: true }
-    );
-  } catch (error) {
-    console.error(`[Database] Backup to MongoDB failed for key ${key}:`, error);
-  }
+  // This function is kept for backwards compatibility but dbSet already handles backups
+  // No-op since dbSet always writes to both KV and MongoDB
 }
 
 // Sync from MongoDB to KV (when KV becomes available again)
@@ -372,32 +364,41 @@ export async function syncAllDataToKV(): Promise<{
     return { synced: 0, failed: 0, total: 0 };
   }
 
-  try {
-    const collection = await getMongoCollection('__all_keys__');
-    if (!collection) {
-      return { synced: 0, failed: 0, total: 0 };
-    }
+  const db = await initMongoDB();
+  if (!db) {
+    return { synced: 0, failed: 0, total: 0 };
+  }
 
-    // Get all keys from MongoDB
-    const allDocs = await collection.find({}).toArray();
+  try {
+    // Get all collections (each collection = one KV key)
+    const collections = await db.listCollections().toArray();
     let synced = 0;
     let failed = 0;
+    const total = collections.length;
 
-    for (const doc of allDocs) {
+    for (const collInfo of collections) {
+      const collectionName = collInfo.name;
+      // Skip system collections
+      if (collectionName.startsWith('system.')) {
+        continue;
+      }
+
       try {
-        // Skip backup markers and internal keys
-        if (doc.source === 'kv_backup' || doc.key?.startsWith('__')) continue;
+        const collection = db.collection(collectionName);
+        const doc = await collection.findOne({ _id: collectionName } as any);
         
-        await kv.set(doc.key, doc.value);
-        synced++;
+        if (doc && doc.value !== undefined) {
+          await kv.set(collectionName, doc.value);
+          synced++;
+        }
       } catch (error) {
-        console.error(`[Database] Failed to sync key ${doc.key} to KV:`, error);
+        console.error(`[Database] Failed to sync collection ${collectionName} to KV:`, error);
         failed++;
       }
     }
 
-    console.log(`[Database] Full sync complete: ${synced} keys synced, ${failed} failed, ${allDocs.length} total`);
-    return { synced, failed, total: allDocs.length };
+    console.log(`[Database] Full sync complete: ${synced} keys synced, ${failed} failed, ${total} total`);
+    return { synced, failed, total };
   } catch (error) {
     console.error('[Database] Failed to sync all data from MongoDB to KV:', error);
     return { synced: 0, failed: 0, total: 0 };

@@ -56,14 +56,13 @@ export async function POST(request: Request) {
     const mongoClient = new MongoClient(MONGODB_URI);
     await mongoClient.connect();
     const db = mongoClient.db(MONGODB_DB_NAME);
-    const collection = db.collection('kv_data');
 
     const results: Array<{ key: string; status: 'success' | 'error' | 'not_found'; error?: string }> = [];
     let totalMigrated = 0;
     let totalErrors = 0;
     let totalNotFound = 0;
 
-    // Migrate each key
+    // Migrate each key (each key becomes its own collection)
     for (const key of KV_KEYS) {
       try {
         // Get value from KV
@@ -75,13 +74,18 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Save to MongoDB
+        // Sanitize key name for MongoDB collection name
+        const collectionName = key.replace(/[^a-zA-Z0-9_]/g, '_');
+        const collection = db.collection(collectionName);
+
+        // Save to MongoDB (each key = its own collection)
         await collection.updateOne(
-          { key },
+          { _id: key } as any,
           {
             $set: {
-              key,
+              _id: key,
               value,
+              updatedAt: new Date(),
               migratedAt: new Date(),
               source: 'kv_migration',
             },
@@ -154,7 +158,6 @@ export async function GET(request: Request) {
     const mongoClient = new MongoClient(MONGODB_URI);
     await mongoClient.connect();
     const db = mongoClient.db(MONGODB_DB_NAME);
-    const collection = db.collection('kv_data');
 
     const comparison: Array<{
       key: string;
@@ -166,7 +169,10 @@ export async function GET(request: Request) {
     for (const key of KV_KEYS) {
       try {
         const kvValue = await kv.get(key);
-        const mongoDoc = await collection.findOne({ key });
+        // Each key is its own collection
+        const collectionName = key.replace(/[^a-zA-Z0-9_]/g, '_');
+        const collection = db.collection(collectionName);
+        const mongoDoc = await collection.findOne({ _id: key } as any);
 
         comparison.push({
           key,
