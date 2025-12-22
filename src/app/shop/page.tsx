@@ -3,12 +3,17 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock, MessageSquare } from 'lucide-react';
+import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
+import { checkProStatus } from '@/app/utils/proxy-utils';
+import { preloadRewards } from '@/app/utils/pro-limits';
 
 export default function ShopPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [userRewards, setUserRewards] = useState<any[]>([]);
+  const [loadingRewards, setLoadingRewards] = useState(true);
   const toast = useToast();
 
   useEffect(() => {
@@ -17,10 +22,42 @@ export default function ShopPage() {
       const stored = window.localStorage.getItem('steam_user');
       const parsedUser = stored ? JSON.parse(stored) : null;
       setUser(parsedUser);
+      
+      // Check Pro status
+      if (parsedUser?.steamId) {
+        checkProStatus(parsedUser.steamId).then(setIsPro);
+        
+        // Load user rewards to check what they already have
+        setLoadingRewards(true);
+        preloadRewards(parsedUser.steamId).then(async () => {
+          try {
+            const res = await fetch(`/api/user/rewards?steamId=${parsedUser.steamId}`);
+            if (res.ok) {
+              const data = await res.json();
+              const rewards = (data.rewards || []).map((r: any) => r.reward).filter((r: any) => r != null);
+              setUserRewards(rewards);
+            }
+          } catch (error) {
+            console.error('Failed to load rewards:', error);
+          } finally {
+            setLoadingRewards(false);
+          }
+        }).catch(() => {
+          setLoadingRewards(false);
+        });
+      } else {
+        setLoadingRewards(false);
+      }
     } catch {
       setUser(null);
+      setLoadingRewards(false);
     }
   }, []);
+
+  // Helper to check if user already has a consumable
+  const hasConsumable = (type: string): boolean => {
+    return userRewards.some((reward: any) => reward?.type === type);
+  };
 
   const handleCheckout = async (type: 'wishlist_slot' | 'discord_access' | 'price_scan_boost' | 'cache_boost', quantity: number = 1) => {
     if (!user?.steamId) {
@@ -100,14 +137,23 @@ export default function ShopPage() {
               <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
                 ✓ Permanent slot - never expires
               </p>
+              {isPro && (
+                <p className="text-[8px] md:text-[9px] text-blue-400 font-bold">
+                  ⚠ Pro users have unlimited wishlist slots
+                </p>
+              )}
               <button
                 onClick={() => handleCheckout('wishlist_slot', 1)}
-                disabled={loading === 'wishlist_slot_1' || !user?.steamId}
+                disabled={loading === 'wishlist_slot_1' || !user?.steamId || isPro}
                 className="w-full bg-pink-600 hover:bg-pink-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-pink-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {loading === 'wishlist_slot_1' ? (
                   <>
                     <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : isPro ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Have (Pro)
                   </>
                 ) : (
                   <>
@@ -135,17 +181,35 @@ export default function ShopPage() {
               <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
                 ✓ Permanent access - never expires
               </p>
-              <p className="text-[8px] md:text-[9px] text-orange-400 font-bold">
-                ⚠ Free users only - Pro users already have unlimited trackers
-              </p>
+              {isPro ? (
+                <p className="text-[8px] md:text-[9px] text-blue-400 font-bold">
+                  ⚠ Pro users already have unlimited trackers
+                </p>
+              ) : hasConsumable('discord_access') ? (
+                <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                  ✓ You already have Discord access
+                </p>
+              ) : (
+                <p className="text-[8px] md:text-[9px] text-orange-400 font-bold">
+                  ⚠ Free users only - Pro users already have unlimited trackers
+                </p>
+              )}
               <button
                 onClick={() => handleCheckout('discord_access', 1)}
-                disabled={loading === 'discord_access_1' || !user?.steamId}
+                disabled={loading === 'discord_access_1' || !user?.steamId || isPro || hasConsumable('discord_access')}
                 className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {loading === 'discord_access_1' ? (
                   <>
                     <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : isPro ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Have (Pro)
+                  </>
+                ) : hasConsumable('discord_access') ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Purchased
                   </>
                 ) : (
                   <>
@@ -173,14 +237,31 @@ export default function ShopPage() {
               <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
                 ✓ Permanent upgrade
               </p>
+              {isPro ? (
+                <p className="text-[8px] md:text-[9px] text-blue-400 font-bold">
+                  ⚠ Pro users already have faster scanning (10 concurrent)
+                </p>
+              ) : hasConsumable('price_scan_boost') ? (
+                <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                  ✓ You already have this boost
+                </p>
+              ) : null}
               <button
                 onClick={() => handleCheckout('price_scan_boost', 1)}
-                disabled={loading === 'price_scan_boost_1' || !user?.steamId}
+                disabled={loading === 'price_scan_boost_1' || !user?.steamId || isPro || hasConsumable('price_scan_boost')}
                 className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-purple-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {loading === 'price_scan_boost_1' ? (
                   <>
                     <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : isPro ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Have (Pro)
+                  </>
+                ) : hasConsumable('price_scan_boost') ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Purchased
                   </>
                 ) : (
                   <>
@@ -208,14 +289,31 @@ export default function ShopPage() {
               <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
                 ✓ Permanent upgrade
               </p>
+              {isPro ? (
+                <p className="text-[8px] md:text-[9px] text-blue-400 font-bold">
+                  ⚠ Pro users already have better cache (2 hours)
+                </p>
+              ) : hasConsumable('cache_boost') ? (
+                <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                  ✓ You already have this boost
+                </p>
+              ) : null}
               <button
                 onClick={() => handleCheckout('cache_boost', 1)}
-                disabled={loading === 'cache_boost_1' || !user?.steamId}
+                disabled={loading === 'cache_boost_1' || !user?.steamId || isPro || hasConsumable('cache_boost')}
                 className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-amber-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {loading === 'cache_boost_1' ? (
                   <>
                     <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : isPro ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Have (Pro)
+                  </>
+                ) : hasConsumable('cache_boost') ? (
+                  <>
+                    <CheckCircle2 size={12} /> Already Purchased
                   </>
                 ) : (
                   <>
