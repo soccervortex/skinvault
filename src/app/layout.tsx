@@ -91,11 +91,11 @@ export default function RootLayout({
           <ToastProvider>
             <ChunkErrorHandler />
             <KeyboardShortcuts />
-            {children}
+        {children}
             <ProExpirationWarning />
             <NetworkStatus />
-            <InstallPrompt />
-            <ThemeProviderWrapper />
+        <InstallPrompt />
+        <ThemeProviderWrapper />
           </ToastProvider>
         </ErrorBoundary>
       </body>

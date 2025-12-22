@@ -244,10 +244,15 @@ export default function ProInfoPage() {
           </div>
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5 space-y-2">
             <p className="font-black uppercase tracking-[0.3em] text-gray-500">How to get Pro</p>
-            <p className="text-gray-300 text-[10px]">
-              Pro is currently granted manually by the site owner. Contact the owner with your SteamID64
-              and payment proof; your account will be upgraded for the agreed number of months.
+            <p className="text-gray-300 text-[10px] mb-3">
+              Purchase Pro directly through our secure Stripe checkout. Choose from 1, 3, or 6 month plans.
             </p>
+            <Link
+              href="/shop"
+              className="inline-block bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all"
+            >
+              Visit Shop
+            </Link>
           </div>
         </div>
 

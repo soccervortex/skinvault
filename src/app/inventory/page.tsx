@@ -821,8 +821,8 @@ function InventoryContent() {
             </div>
           </div>
         </main>
-      </div>
-    );
+    </div>
+  );
   }
 
   return (

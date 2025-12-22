@@ -148,7 +148,7 @@ export async function POST(request: Request) {
           </div>
         </body>
       </html>
-`;
+    `;
 
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@skinvaults.online',

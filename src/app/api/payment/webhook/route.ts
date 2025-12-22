@@ -27,14 +27,50 @@ export async function POST(request: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     const steamId = session.metadata?.steamId;
     const months = Number(session.metadata?.months || 0);
+    const type = session.metadata?.type;
 
-    if (steamId && months > 0) {
+    // Handle Pro subscription
+    if (steamId && months > 0 && type !== 'consumable') {
       try {
         const proUntil = await grantPro(steamId, months);
         console.log(`✅ Granted ${months} months Pro to ${steamId}, expires ${proUntil}`);
       } catch (error) {
         console.error('❌ Failed to update Pro status:', error);
         // Still return 200 to prevent Stripe from retrying
+      }
+    }
+
+    // Handle consumables (price tracker slots, wishlist slots)
+    if (steamId && type === 'consumable') {
+      const consumableType = session.metadata?.consumableType;
+      const quantity = Number(session.metadata?.quantity || 0);
+
+      if (consumableType && quantity > 0) {
+        try {
+          // Grant consumable rewards
+          const { kv } = await import('@vercel/kv');
+          const rewardsKey = 'user_rewards';
+          
+          const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+          const userRewards = existingRewards[steamId] || [];
+
+          // Add consumable rewards
+          for (let i = 0; i < quantity; i++) {
+            userRewards.push({
+              type: consumableType,
+              grantedAt: new Date().toISOString(),
+              source: 'purchase',
+            });
+          }
+
+          existingRewards[steamId] = userRewards;
+          await kv.set(rewardsKey, existingRewards);
+
+          console.log(`✅ Granted ${quantity} ${consumableType} to ${steamId}`);
+        } catch (error) {
+          console.error('❌ Failed to grant consumables:', error);
+          // Still return 200 to prevent Stripe from retrying
+        }
       }
     }
   }

@@ -9,7 +9,7 @@ function log(message) {
 
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const API_BASE_URL = process.env.API_BASE_URL || 'https://skinvaults.vercel.app';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://www.skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 
 if (!DISCORD_TOKEN || !DISCORD_CLIENT_ID) {
@@ -103,6 +103,18 @@ const commands = [
         .setDescription('Third item name (optional)')
         .setRequired(false)
     )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('pro')
+    .setDescription('Check your Pro subscription status')
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('shop')
+    .setDescription('View and purchase Pro subscriptions and consumables')
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('website')
+    .setDescription('Get a link to the SkinVault website')
     .toJSON(),
 ];
 
@@ -701,7 +713,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!wishlist || wishlist.length === 0) {
         await interaction.editReply({
-          content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVault to track their prices!\n\nVisit: https://skinvaults.vercel.app',
+          content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVault to track their prices!\n\nVisit: https://www.skinvaults.online',
         });
         return;
       }
@@ -764,7 +776,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!alerts || alerts.length === 0) {
         await interaction.editReply({
-          content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVault to get notified when prices hit your target!\n\nVisit: https://skinvaults.vercel.app',
+          content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVault to get notified when prices hit your target!\n\nVisit: https://www.skinvaults.online',
         });
         return;
       }
@@ -860,7 +872,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (!itemInfo && !searchResult) {
           await interaction.editReply({
-            content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemQuery}"\n\n💡 **Tip:** Try a partial name like "snakebite" or "ak redline"\n\nSearch for items on: https://skinvaults.vercel.app`,
+            content: `❌ **Item Not Found**\n\nCould not find price data for: "${itemQuery}"\n\n💡 **Tip:** Try a partial name like "snakebite" or "ak redline"\n\nSearch for items on: https://www.skinvaults.online`,
           });
           return;
         }
@@ -1707,8 +1719,202 @@ client.on('interactionCreate', async (interaction) => {
             inline: false,
           },
           {
+            name: '👑 `/pro`',
+            value: 'Check your Pro subscription status',
+            inline: false,
+          },
+          {
+            name: '🛒 `/shop`',
+            value: 'View and purchase Pro subscriptions and consumables',
+            inline: false,
+          },
+          {
+            name: '🌐 `/website`',
+            value: 'Get a link to the SkinVault website',
+            inline: false,
+          },
+          {
             name: '🔗 Links',
-            value: '[Website](https://skinvaults.vercel.app) | [Inventory](https://skinvaults.online/inventory) | [Wishlist](https://skinvaults.online/wishlist)',
+            value: '[Website](https://skinvaults.online) | [Inventory](https://skinvaults.online/inventory) | [Wishlist](https://skinvaults.online/wishlist) | [Pro](https://skinvaults.online/pro)',
+            inline: false,
+          }
+        )
+        .setFooter({ text: 'SkinVault - Premium CS2 Analytics' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+
+    } else if (commandName === 'pro') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const steamId = await getSteamIdFromDiscord(user.id);
+      
+      if (!steamId) {
+        await interaction.editReply({
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+        });
+        return;
+      }
+
+      try {
+        const proResponse = await fetch(`${API_BASE_URL}/api/user/pro?id=${steamId}`);
+        if (!proResponse.ok) {
+          await interaction.editReply({
+            content: '❌ **Error**\n\nFailed to check Pro status. Please try again later.',
+          });
+          return;
+        }
+
+        const proData = await proResponse.json();
+        const isPro = proData?.proUntil && new Date(proData.proUntil) > new Date();
+        const proUntil = proData?.proUntil ? new Date(proData.proUntil) : null;
+
+        const embed = new EmbedBuilder()
+          .setTitle('👑 Your Pro Status')
+          .setColor(isPro ? 0x5865F2 : 0x808080)
+          .setURL('https://skinvaults.online/pro')
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+
+        if (isPro && proUntil) {
+          const daysRemaining = Math.ceil((proUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          const formattedDate = proUntil.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          
+          embed.setDescription(`✅ **You have an active Pro subscription!**`);
+          embed.addFields(
+            { name: '📅 Expires', value: formattedDate, inline: true },
+            { name: '⏰ Days Remaining', value: `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`, inline: true },
+            { name: '🎁 Benefits', value: '• Unlimited wishlist items\n• Unlimited price alerts\n• Advanced stats\n• Discord bot features', inline: false }
+          );
+        } else {
+          embed.setDescription(`❌ **You don't have an active Pro subscription.**`);
+          embed.addFields(
+            { name: '💡 Upgrade to Pro', value: 'Get unlimited features and support SkinVault!\n\nUse `/shop` to view available plans.', inline: false },
+            { name: '🎁 Benefits', value: '• Unlimited wishlist items\n• Unlimited price alerts\n• Advanced stats\n• Discord bot features', inline: false }
+          );
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Error checking Pro status:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to check Pro status. Please try again later.',
+        });
+      }
+
+    } else if (commandName === 'shop') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const steamId = await getSteamIdFromDiscord(user.id);
+      
+      if (!steamId) {
+        await interaction.editReply({
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can purchase items!',
+        });
+        return;
+      }
+
+      try {
+        // Check for promo codes
+        let promoCode = null;
+        try {
+          const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+          for (const theme of themes) {
+            const giftResponse = await fetch(`${API_BASE_URL}/api/gift/claim?steamId=${steamId}&theme=${theme}`);
+            if (giftResponse.ok) {
+              const giftData = await giftResponse.json();
+              if (giftData.claimed && giftData.reward?.type === 'promo_code' && giftData.reward?.value) {
+                promoCode = giftData.reward.value;
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          // Ignore errors checking promo codes
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('🛒 SkinVault Shop')
+          .setDescription('Purchase Pro subscriptions and consumables')
+          .setColor(0x5865F2)
+          .setURL('https://skinvaults.online/pro')
+          .setTimestamp()
+          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+
+        // Pro Subscription Plans
+        embed.addFields({
+          name: '👑 Pro Subscriptions',
+          value: '**1 Month** - €9.99\n**3 Months** - €24.99 (Save €4.98)\n**6 Months** - €44.99 (Save €14.95)',
+          inline: false,
+        });
+
+        // Consumables (coming soon)
+        embed.addFields({
+          name: '🎁 Consumables (Coming Soon)',
+          value: '**Price Tracker Slots** - Add extra price alerts\n**Wishlist Slots** - Add extra wishlist items\n\n*These will be available soon!*',
+          inline: false,
+        });
+
+        if (promoCode) {
+          embed.addFields({
+            name: '🎟️ Active Promo Code',
+            value: `You have an active promo code: **${promoCode}**\n\nThis will automatically apply a 20% discount when purchasing!`,
+            inline: false,
+          });
+        }
+
+        embed.addFields({
+          name: '💳 How to Purchase',
+          value: `1. Click the button below to visit the shop\n2. Select your plan\n3. Complete checkout with Stripe\n4. Your Pro status will activate automatically`,
+          inline: false,
+        });
+
+        // Create checkout URL with Steam ID
+        const checkoutUrl = `https://skinvaults.online/pro?steamId=${steamId}${promoCode ? `&promo=${promoCode}` : ''}`;
+
+        await interaction.editReply({ 
+          embeds: [embed],
+          components: [
+            {
+              type: 1, // ACTION_ROW
+              components: [
+                {
+                  type: 2, // BUTTON
+                  style: 5, // LINK
+                  label: '🛒 Visit Shop',
+                  url: checkoutUrl,
+                },
+                {
+                  type: 2, // BUTTON
+                  style: 5, // LINK
+                  label: '👑 View Pro Page',
+                  url: 'https://skinvaults.online/pro',
+                },
+              ],
+            },
+          ],
+        });
+      } catch (error) {
+        console.error('Error showing shop:', error);
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to load shop. Please try again later.',
+        });
+      }
+
+    } else if (commandName === 'website') {
+      const embed = new EmbedBuilder()
+        .setTitle('🌐 SkinVault Website')
+        .setDescription('Visit the SkinVault website to manage your inventory, wishlist, and more!')
+        .setColor(0x5865F2)
+        .setURL('https://skinvaults.online')
+        .addFields(
+          {
+            name: '🔗 Quick Links',
+            value: '[🏠 Home](https://skinvaults.online)\n[📦 Inventory](https://skinvaults.online/inventory)\n[📋 Wishlist](https://skinvaults.online/wishlist)\n[👑 Pro](https://skinvaults.online/pro)\n[⚖️ Compare](https://skinvaults.online/compare)',
             inline: false,
           }
         )
