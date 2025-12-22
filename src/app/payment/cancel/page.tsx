@@ -70,12 +70,20 @@ function PaymentCancelContent() {
         <p className="text-[10px] md:text-[11px] text-gray-400">
           Your payment was cancelled. No charges were made. You can try again anytime.
         </p>
-        <Link
-          href="/pro"
-          className="inline-block bg-blue-600 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all"
-        >
-          Back to Pro
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/shop"
+            className="inline-block bg-blue-600 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all"
+          >
+            Back to Shop
+          </Link>
+          <Link
+            href="/pro"
+            className="inline-block bg-gray-700 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-gray-600 transition-all"
+          >
+            View Pro Plans
+          </Link>
+        </div>
       </div>
     </div>
   );

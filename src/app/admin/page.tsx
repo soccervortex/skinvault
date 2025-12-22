@@ -58,6 +58,10 @@ export default function AdminPage() {
   const [editDate, setEditDate] = useState("");
   const [banSteamId, setBanSteamId] = useState("");
   const [banning, setBanning] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [loadingTestMode, setLoadingTestMode] = useState(true);
+  const [testModeMessage, setTestModeMessage] = useState<string | null>(null);
+  const [testModeError, setTestModeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -137,6 +141,27 @@ export default function AdminPage() {
       }
     };
     loadPurchases();
+
+    const loadTestMode = async () => {
+      if (!userIsOwner) return;
+      setLoadingTestMode(true);
+      try {
+        const res = await fetch(`/api/admin/stripe-test-mode?steamId=${user?.steamId}`, {
+          headers: {
+            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTestMode(data.testMode === true);
+        }
+      } catch (e: any) {
+        console.error("Failed to load test mode:", e);
+      } finally {
+        setLoadingTestMode(false);
+      }
+    };
+    loadTestMode();
   }, [userIsOwner, user?.steamId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -290,6 +315,33 @@ export default function AdminPage() {
       }
     } catch (e: any) {
       setError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleTestModeToggle = async (enabled: boolean) => {
+    setTestModeMessage(null);
+    setTestModeError(null);
+    
+    try {
+      const res = await fetch("/api/admin/stripe-test-mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+        body: JSON.stringify({ testMode: enabled }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setTestMode(enabled);
+        setTestModeMessage(data.message || `Test mode ${enabled ? 'enabled' : 'disabled'}`);
+        setTimeout(() => setTestModeMessage(null), 3000);
+      } else {
+        setTestModeError(data.error || "Failed to update test mode");
+      }
+    } catch (e: any) {
+      setTestModeError(e?.message || "Request failed.");
     }
   };
 
@@ -684,6 +736,87 @@ export default function AdminPage() {
               {banning ? "Banning..." : "Ban Steam ID"}
             </button>
           </form>
+        </div>
+
+        {/* Stripe Test Mode Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-yellow-500/10 border border-yellow-500/40 shrink-0">
+              <Sparkles className="text-yellow-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Payment Settings
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Stripe Test Mode
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-6">
+            Enable test mode to use Stripe test keys (<code className="text-yellow-400">STRIPE_TEST_SECRET_KEY</code>) instead of production keys. 
+            All payments will be marked as <span className="text-yellow-400 font-bold">[TEST]</span> and won't charge real money.
+          </p>
+
+          {testModeMessage && (
+            <div className="mb-4 flex items-center gap-2 text-emerald-400 text-[10px] md:text-[11px]">
+              <CheckCircle2 size={12} /> <span>{testModeMessage}</span>
+            </div>
+          )}
+          {testModeError && (
+            <div className="mb-4 flex items-center gap-2 text-red-400 text-[10px] md:text-[11px]">
+              <AlertTriangle size={12} /> <span>{testModeError}</span>
+            </div>
+          )}
+
+          {loadingTestMode ? (
+            <div className="flex items-center justify-center gap-2 text-gray-400 text-[11px] py-8">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading test mode status...
+            </div>
+          ) : (
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-gray-300">
+                  Test Mode
+                </span>
+                <p className="text-[9px] md:text-[10px] text-gray-500 mt-1">
+                  {testMode 
+                    ? 'Using test keys (STRIPE_TEST_SECRET_KEY)' 
+                    : 'Using production keys (STRIPE_SECRET_KEY)'}
+                </p>
+              </div>
+              <button
+                onClick={() => handleTestModeToggle(!testMode)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  testMode
+                    ? "bg-yellow-600"
+                    : "bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    testMode ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {testMode && (
+            <div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4">
+              <p className="text-[9px] md:text-[10px] text-yellow-400 font-bold mb-2">
+                ⚠️ Test Mode Active
+              </p>
+              <ul className="text-[9px] md:text-[10px] text-gray-300 space-y-1">
+                <li>• All payments will use test keys</li>
+                <li>• Products will be marked with [TEST] prefix</li>
+                <li>• Use test card: <code className="text-yellow-400">4242 4242 4242 4242</code></li>
+                <li>• No real charges will be made</li>
+                <li>• Make sure <code className="text-yellow-400">STRIPE_TEST_SECRET_KEY</code> is set in environment variables</li>
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Theme Management Section */}

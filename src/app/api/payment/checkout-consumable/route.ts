@@ -1,9 +1,32 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-12-15.clover',
-});
+// Helper to get Stripe instance (checks for test mode)
+async function getStripeInstance(): Promise<Stripe> {
+  // Check if test mode is enabled
+  let testMode = false;
+  try {
+    const { kv } = await import('@vercel/kv');
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
+    }
+  } catch (error) {
+    // If KV fails, use production keys
+  }
+
+  // Use test keys if test mode is enabled
+  const secretKey = testMode 
+    ? (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY)
+    : process.env.STRIPE_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new Error('Stripe secret key not configured');
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: '2025-12-15.clover',
+  });
+}
 
 // Consumable prices (in cents)
 const CONSUMABLE_PRICES: Record<string, number> = {
@@ -15,14 +38,8 @@ const CONSUMABLE_PRICES: Record<string, number> = {
 };
 
 export async function POST(request: Request) {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json(
-      { error: 'Stripe not configured. Please set STRIPE_SECRET_KEY in environment variables.' },
-      { status: 500 }
-    );
-  }
-
   try {
+    const stripe = await getStripeInstance();
     const { type, quantity, steamId } = await request.json();
 
     if (!type || !CONSUMABLE_PRICES[type]) {
@@ -62,8 +79,27 @@ export async function POST(request: Request) {
 
     const origin = request.headers.get('origin') || 'https://skinvaults.online';
 
+    // Check if test mode is enabled
+    let testMode = false;
+    try {
+      const { kv } = await import('@vercel/kv');
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
+      }
+    } catch (error) {
+      // Ignore
+    }
+
     // Set expiration to 30 minutes from now
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
+
+    const productName = testMode
+      ? `[TEST] ${consumableNames[type]}${quantity > 1 ? ` (x${quantity})` : ''}`
+      : `${consumableNames[type]}${quantity > 1 ? ` (x${quantity})` : ''}`;
+    
+    const productDescription = testMode
+      ? `[TEST MODE] ${consumableDescriptions[type] || `Add ${quantity} ${consumableNames[type]}${quantity > 1 ? 's' : ''} to your account`}. Permanent and never expires.`
+      : `${consumableDescriptions[type] || `Add ${quantity} ${consumableNames[type]}${quantity > 1 ? 's' : ''} to your account`}. Permanent and never expires.`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -72,8 +108,8 @@ export async function POST(request: Request) {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `${consumableNames[type]}${quantity > 1 ? ` (x${quantity})` : ''}`,
-              description: `${consumableDescriptions[type] || `Add ${quantity} ${consumableNames[type]}${quantity > 1 ? 's' : ''} to your account`}. Permanent and never expires.`,
+              name: productName,
+              description: productDescription,
             },
             unit_amount: unitPrice,
           },
@@ -91,6 +127,7 @@ export async function POST(request: Request) {
         quantity: quantity.toString(),
         unitPrice: unitPrice.toString(),
         totalAmount: totalAmount.toString(),
+        testMode: testMode ? 'true' : 'false',
       },
     });
 

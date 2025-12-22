@@ -1,9 +1,32 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-12-15.clover',
-});
+// Helper to get Stripe instance (checks for test mode)
+async function getStripeInstance(): Promise<Stripe> {
+  // Check if test mode is enabled
+  let testMode = false;
+  try {
+    const { kv } = await import('@vercel/kv');
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
+    }
+  } catch (error) {
+    // If KV fails, use production keys
+  }
+
+  // Use test keys if test mode is enabled
+  const secretKey = testMode 
+    ? (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY)
+    : process.env.STRIPE_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new Error('Stripe secret key not configured');
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: '2025-12-15.clover',
+  });
+}
 
 const PRICES: Record<string, { amount: number; months: number }> = {
   '1month': { amount: 999, months: 1 }, // €9.99 in cents
@@ -12,14 +35,8 @@ const PRICES: Record<string, { amount: number; months: number }> = {
 };
 
 export async function POST(request: Request) {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json(
-      { error: 'Stripe not configured. Please set STRIPE_SECRET_KEY in environment variables.' },
-      { status: 500 }
-    );
-  }
-
   try {
+    const stripe = await getStripeInstance();
     const { plan, steamId, promoCode } = await request.json();
 
     if (!plan || !PRICES[plan]) {
@@ -47,8 +64,27 @@ export async function POST(request: Request) {
 
     const origin = request.headers.get('origin') || 'https://skinvaults.online';
 
+    // Check if test mode is enabled
+    let testMode = false;
+    try {
+      const { kv } = await import('@vercel/kv');
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
+      }
+    } catch (error) {
+      // Ignore
+    }
+
     // Set expiration to 30 minutes from now (minimum allowed by Stripe is 30 minutes)
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60); // 30 minutes in seconds
+
+    const productName = testMode 
+      ? `[TEST] SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`
+      : `SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`;
+    
+    const productDescription = testMode
+      ? `[TEST MODE] Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`
+      : `Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -57,8 +93,8 @@ export async function POST(request: Request) {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`,
-              description: `Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`,
+              name: productName,
+              description: productDescription,
             },
             unit_amount: finalAmount,
           },
@@ -76,6 +112,7 @@ export async function POST(request: Request) {
         promoCode: promoCode || '',
         originalAmount: priceInfo.amount.toString(),
         discountAmount: discountAmount.toString(),
+        testMode: testMode ? 'true' : 'false',
       },
     });
 

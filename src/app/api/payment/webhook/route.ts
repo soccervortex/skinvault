@@ -2,25 +2,78 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { grantPro } from '@/app/utils/pro-storage';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-12-15.clover',
-});
+// Helper to get Stripe instance (checks for test mode)
+async function getStripeInstance(): Promise<Stripe> {
+  // Check if test mode is enabled
+  let testMode = false;
+  try {
+    const { kv } = await import('@vercel/kv');
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
+    }
+  } catch (error) {
+    // If KV fails, use production keys
+  }
+
+  // Use test keys if test mode is enabled
+  const secretKey = testMode 
+    ? (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY)
+    : process.env.STRIPE_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new Error('Stripe secret key not configured');
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: '2025-12-15.clover',
+  });
+}
+
+// Helper to get webhook secrets (returns both test and production)
+function getWebhookSecrets(): { test?: string; production?: string } {
+  return {
+    test: process.env.STRIPE_TEST_WEBHOOK_SECRET,
+    production: process.env.STRIPE_WEBHOOK_SECRET,
+  };
+}
 
 export async function POST(request: Request) {
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
-  if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return NextResponse.json({ error: 'Missing signature or webhook secret' }, { status: 400 });
+  if (!signature) {
+    return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
   }
 
   let event: Stripe.Event;
+  let stripe: Stripe;
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+    stripe = await getStripeInstance();
+  } catch (error: any) {
+    console.error('Failed to get Stripe instance:', error.message);
+    return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+  }
+
+  // Try both test and production webhook secrets
+  const secrets = getWebhookSecrets();
+  let lastError: Error | null = null;
+
+  // Try production secret first, then test secret
+  for (const secret of [secrets.production, secrets.test].filter(Boolean)) {
+    if (!secret) continue;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, secret);
+      break; // Success, exit loop
+    } catch (err: any) {
+      lastError = err;
+      // Continue to try next secret
+    }
+  }
+
+  if (!event) {
+    console.error('Webhook signature verification failed with all secrets:', lastError?.message);
+    return NextResponse.json({ error: `Webhook Error: ${lastError?.message || 'Invalid signature'}` }, { status: 400 });
   }
 
   if (event.type === 'checkout.session.completed') {
