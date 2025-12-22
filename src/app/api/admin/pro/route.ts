@@ -61,15 +61,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Invalid SteamID format' }, { status: 400 });
     }
 
-    // Remove Pro by setting expiry to past date
+    // Remove Pro by setting expiry to yesterday (more reasonable than 2000)
     const { kv } = await import('@vercel/kv');
     const PRO_USERS_KEY = 'pro_users';
     
     try {
       if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
         const data = await kv.get<Record<string, string>>(PRO_USERS_KEY) || {};
-        // Set to past date to effectively remove Pro
-        data[steamId] = new Date('2000-01-01').toISOString();
+        // Set to yesterday to mark as expired (more reasonable than 2000-01-01)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        data[steamId] = yesterday.toISOString();
         await kv.set(PRO_USERS_KEY, data);
       } else {
         // Fallback for local dev
