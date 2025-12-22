@@ -60,11 +60,31 @@ export async function POST(request: Request) {
     const { kv } = await import('@vercel/kv');
     const purchasesKey = 'purchase_history';
     const existingPurchases = await kv.get<Array<any>>(purchasesKey) || [];
+    const purchase = existingPurchases.find(p => p.sessionId === sessionId);
     
-    // Check if this purchase was already fulfilled
-    const alreadyFulfilled = existingPurchases.some(p => p.sessionId === sessionId);
+    // Check if reward was actually granted (not just if purchase exists)
+    const type = session.metadata?.type;
+    const consumableType = session.metadata?.consumableType;
     
-    if (alreadyFulfilled) {
+    if (type === 'consumable' && consumableType) {
+      const rewardsKey = 'user_rewards';
+      const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
+      const userRewards = existingRewards[steamId] || [];
+      const rewardGranted = userRewards.some((r: any) => 
+        r?.type === consumableType && r?.sessionId === sessionId
+      );
+      
+      if (rewardGranted) {
+        return NextResponse.json({ 
+          fulfilled: true,
+          message: 'Reward already granted',
+          sessionId,
+          purchase: purchase || null,
+        });
+      }
+      // Continue to grant reward even if purchase exists in history
+    } else if (purchase) {
+      // For Pro subscriptions, if purchase exists, it's fulfilled
       return NextResponse.json({ 
         fulfilled: true,
         message: 'Purchase already fulfilled',
