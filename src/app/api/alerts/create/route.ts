@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import { getProUntil } from '@/app/utils/pro-storage';
+import { getPriceTrackerLimit } from '@/app/utils/pro-limits';
 
 interface PriceAlert {
   id: string;
@@ -23,19 +24,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if user is Pro - Discord alerts require Pro subscription
+    // Check if user is Pro or has Discord access
     const proUntil = await getProUntil(steamId);
     const isPro = proUntil && new Date(proUntil) > new Date();
     
-    if (!isPro) {
+    // Get price tracker limit (unlimited for Pro, 3 for Discord access, 0 for free)
+    const maxAlerts = await getPriceTrackerLimit(isPro, steamId);
+    
+    if (maxAlerts === 0) {
       return NextResponse.json({ 
-        error: 'Pro subscription required. Discord price alerts are a Pro feature. Please upgrade to Pro to use this feature.',
+        error: 'Pro subscription or Discord access required. Discord price alerts require Pro subscription or Discord access consumable. Please upgrade to Pro or purchase Discord access to use this feature.',
         requiresPro: true
       }, { status: 403 });
     }
-    
-    // Pro users have unlimited alerts
-    const maxAlerts = Infinity;
     
     // Check current alert count
     const alertsKey = 'price_alerts';
@@ -58,8 +59,8 @@ export async function POST(request: Request) {
 
     if (!connection || (connection.expiresAt && Date.now() > connection.expiresAt)) {
       return NextResponse.json({ 
-        error: 'Discord not connected or expired. Pro subscription is required and Discord must be connected to receive price alerts.',
-        requiresPro: true
+        error: 'Discord not connected or expired. Discord must be connected to receive price alerts.',
+        requiresPro: false
       }, { status: 400 });
     }
 
