@@ -153,7 +153,7 @@ export default function ProInfoPage() {
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
-        <div className="w-full max-w-4xl mx-auto mt-8 md:mt-12 bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
+        <div className="w-full max-w-4xl mx-auto bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
           <div className="flex items-center justify-between gap-3 md:gap-4">
           <div className="flex items-center gap-3 md:gap-4">
             <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
@@ -186,49 +186,47 @@ export default function ProInfoPage() {
           </div>
         )}
 
-        {/* First Week Free Promotion Banner - Reserve space when not shown */}
-        <div className={user && !isPro && freeMonthEligible ? '' : 'min-h-[180px] md:min-h-[200px]'}>
-          {user && !isPro && freeMonthEligible && (
-            <div className="bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-purple-500/20 border-2 border-emerald-500/40 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-blue-500/5 to-purple-500/5 animate-pulse" />
-              <div className="relative z-10">
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 shrink-0">
-                    <Gift className="text-emerald-400" size={24} />
+        {/* First Week Free Promotion Banner */}
+        {user && !isPro && freeMonthEligible && (
+          <div className="bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-purple-500/20 border-2 border-emerald-500/40 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-blue-500/5 to-purple-500/5 animate-pulse" />
+            <div className="relative z-10">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 shrink-0">
+                  <Gift className="text-emerald-400" size={24} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="text-amber-400" size={16} />
+                    <h3 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white">
+                      Limited Time Offer
+                    </h3>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="text-amber-400" size={16} />
-                      <h3 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white">
-                        Limited Time Offer
-                      </h3>
-                    </div>
-                    <p className="text-[11px] md:text-[12px] text-gray-300 mb-4 leading-relaxed">
-                      Claim <span className="font-black text-emerald-400">1 month FREE</span> of Pro! 
-                      This special offer is available for new users in their first week. 
-                      Unlock unlimited wishlist, advanced stats, and all Pro features.
-                    </p>
-                    <button
-                      onClick={handleClaimFreeMonth}
-                      disabled={claimingFreeMonth}
-                      className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white py-3 md:py-4 px-6 md:px-8 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {claimingFreeMonth ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Claiming...
-                        </>
-                      ) : (
-                        <>
-                          <Gift size={16} /> Claim Free Month Now
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <p className="text-[11px] md:text-[12px] text-gray-300 mb-4 leading-relaxed">
+                    Claim <span className="font-black text-emerald-400">1 month FREE</span> of Pro! 
+                    This special offer is available for new users in their first week. 
+                    Unlock unlimited wishlist, advanced stats, and all Pro features.
+                  </p>
+                  <button
+                    onClick={handleClaimFreeMonth}
+                    disabled={claimingFreeMonth}
+                    className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white py-3 md:py-4 px-6 md:px-8 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {claimingFreeMonth ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Claiming...
+                      </>
+                    ) : (
+                      <>
+                        <Gift size={16} /> Claim Free Month Now
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-[10px] md:text-[11px]">
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5 space-y-2">
