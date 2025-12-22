@@ -219,8 +219,8 @@ Happy trading! 🚀`;
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_storage_failed`);
     }
 
-    console.log('[Discord Callback] ===== SUCCESS - Redirecting to /pro =====');
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?discord=connected`);
+    console.log('[Discord Callback] ===== SUCCESS - Redirecting to /inventory =====');
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/inventory?discord=connected`);
   } catch (error) {
     console.error('[Discord Callback] ===== FATAL ERROR =====');
     console.error('[Discord Callback] Error:', error);

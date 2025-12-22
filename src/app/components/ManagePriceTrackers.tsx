@@ -26,15 +26,33 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [maxTrackers, setMaxTrackers] = useState(5);
+  const [hasDiscordAccess, setHasDiscordAccess] = useState(false);
 
   useEffect(() => {
     if (isOpen && steamId) {
       loadAlerts();
       // Load rewards to update limit
       preloadRewards(steamId).then(() => {
-        setMaxTrackers(getPriceTrackerLimitSync(isPro, steamId));
+        const limit = getPriceTrackerLimitSync(isPro, steamId);
+        setMaxTrackers(limit);
+        // Check if user has Discord access (Pro or consumable)
+        if (!isPro && limit > 0) {
+          setHasDiscordAccess(true);
+        } else if (isPro) {
+          setHasDiscordAccess(true);
+        } else {
+          setHasDiscordAccess(false);
+        }
       }).catch(() => {
-        setMaxTrackers(getPriceTrackerLimitSync(isPro, steamId));
+        const limit = getPriceTrackerLimitSync(isPro, steamId);
+        setMaxTrackers(limit);
+        if (!isPro && limit > 0) {
+          setHasDiscordAccess(true);
+        } else if (isPro) {
+          setHasDiscordAccess(true);
+        } else {
+          setHasDiscordAccess(false);
+        }
       });
     }
   }, [isOpen, steamId, isPro]);
@@ -158,10 +176,17 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
           </div>
         )}
 
-        {!isPro && (
+        {!isPro && !hasDiscordAccess && (
             <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
               <p className="text-xs text-blue-400">
                 <strong>Pro feature:</strong> Price trackers require a Pro subscription. Upgrade to Pro to create unlimited price trackers!
+              </p>
+            </div>
+        )}
+        {!isPro && hasDiscordAccess && (
+            <div className="mt-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+              <p className="text-xs text-indigo-400">
+                <strong>Discord Access:</strong> You have {maxTrackers} free price trackers available. Upgrade to Pro for unlimited trackers!
               </p>
             </div>
         )}

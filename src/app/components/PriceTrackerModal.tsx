@@ -27,6 +27,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(true);
   const [maxAlerts, setMaxAlerts] = useState(5);
+  const [hasDiscordAccess, setHasDiscordAccess] = useState(false);
 
   const marketHashName = item.market_hash_name || item.name;
 
@@ -35,9 +36,26 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
     // Load rewards to refresh cache and update limit
     preloadRewards(user.steamId).then(() => {
-      setMaxAlerts(getPriceTrackerLimitSync(isPro, user.steamId));
+      const limit = getPriceTrackerLimitSync(isPro, user.steamId);
+      setMaxAlerts(limit);
+      // Check if user has Discord access (Pro or consumable)
+      if (!isPro && limit > 0) {
+        setHasDiscordAccess(true);
+      } else if (isPro) {
+        setHasDiscordAccess(true);
+      } else {
+        setHasDiscordAccess(false);
+      }
     }).catch(() => {
-      setMaxAlerts(getPriceTrackerLimitSync(isPro, user.steamId));
+      const limit = getPriceTrackerLimitSync(isPro, user.steamId);
+      setMaxAlerts(limit);
+      if (!isPro && limit > 0) {
+        setHasDiscordAccess(true);
+      } else if (isPro) {
+        setHasDiscordAccess(true);
+      } else {
+        setHasDiscordAccess(false);
+      }
     });
 
     // Check Discord status
@@ -127,7 +145,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
   if (!isOpen) return null;
 
-  const canCreateMore = isPro && alerts.length < maxAlerts;
+  const canCreateMore = (isPro || hasDiscordAccess) && alerts.length < maxAlerts;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -221,9 +239,12 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
               {/* Alert Limit Info */}
               <div className="bg-black/40 border border-white/5 rounded-xl p-3">
                 <p className="text-[9px] text-gray-400 text-center">
-                  {isPro ? 'Unlimited' : 'Pro required'} price trackers
-                  {!isPro && (
+                  {isPro ? 'Unlimited' : hasDiscordAccess ? `${maxAlerts} free` : 'Pro required'} price trackers
+                  {!isPro && !hasDiscordAccess && (
                     <span className="block mt-1 text-yellow-400">Upgrade to Pro to create price trackers</span>
+                  )}
+                  {!isPro && hasDiscordAccess && (
+                    <span className="block mt-1 text-blue-400">You have {maxAlerts} free trackers available</span>
                   )}
                 </p>
               </div>
