@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale } from 'lucide-react';
-import { getPriceScanConcurrency } from '@/app/utils/pro-limits';
+import { getPriceScanConcurrencySync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
