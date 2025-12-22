@@ -440,3 +440,14 @@ export async function closeDbConnections(): Promise<void> {
   }
 }
 
+/**
+ * Server-side helper to check for discord_access reward directly from KV/MongoDB.
+ * Used in API routes to avoid client-side API calls.
+ */
+export async function hasDiscordAccessServer(steamId: string): Promise<boolean> {
+  const rewardsKey = 'user_rewards';
+  const existingRewards = await dbGet<Record<string, any[]>>(rewardsKey, false) || {}; // No cache for this specific check
+  const userRewards = existingRewards[steamId] || [];
+  return userRewards.some((reward: any) => reward?.type === 'discord_access');
+}
+
