@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ShoppingCart, Package, Loader2, Bell, Heart } from 'lucide-react';
+import { ShoppingCart, Package, Loader2, Heart } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 export default function ShopPage() {
@@ -22,7 +22,7 @@ export default function ShopPage() {
     }
   }, []);
 
-  const handleCheckout = async (type: 'price_tracker_slot' | 'wishlist_slot', quantity: number = 1) => {
+  const handleCheckout = async (type: 'wishlist_slot', quantity: number = 1) => {
     if (!user?.steamId) {
       toast.error('You must be signed in with Steam to purchase. Please sign in first.');
       setTimeout(() => window.location.href = '/inventory', 2000);
@@ -78,45 +78,10 @@ export default function ShopPage() {
           </div>
 
           <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed">
-            Purchase extra slots for price trackers and wishlist items. Perfect if you only need a few extra slots without a full Pro subscription.
+            Purchase extra slots for wishlist items. Perfect if you only need a few extra slots without a full Pro subscription.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            {/* Price Tracker Slots */}
-            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-xl bg-purple-600/20 border border-purple-500/40">
-                  <Bell className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Price Tracker Slots</p>
-                  <p className="text-xl md:text-2xl font-black text-white">€2.99</p>
-                  <p className="text-[8px] md:text-[9px] text-gray-500">per slot</p>
-                </div>
-              </div>
-              <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
-                Add extra price alerts to track more items. Each slot allows you to set one additional price alert.
-              </p>
-              <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
-                ✓ Permanent slot - never expires
-              </p>
-              <button
-                onClick={() => handleCheckout('price_tracker_slot', 1)}
-                disabled={loading === 'price_tracker_slot_1' || !user?.steamId}
-                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-purple-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {loading === 'price_tracker_slot_1' ? (
-                  <>
-                    <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart size={12} /> Purchase Slot
-                  </>
-                )}
-              </button>
-            </div>
-
+          <div className="grid grid-cols-1 gap-4 md:gap-6 max-w-md mx-auto">
             {/* Wishlist Slots */}
             <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
               <div className="flex items-center gap-3 mb-2">
