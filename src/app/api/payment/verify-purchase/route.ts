@@ -116,18 +116,29 @@ export async function POST(request: Request) {
         const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
         const userRewards = existingRewards[steamId] || [];
 
-        // Add consumable rewards
-        for (let i = 0; i < quantity; i++) {
-          userRewards.push({
-            type: consumableType,
-            grantedAt: new Date().toISOString(),
-            source: 'purchase',
-            sessionId,
-          });
-        }
+        // Check if already granted for this session
+        const alreadyGranted = userRewards.filter((r: any) => 
+          r?.type === consumableType && r?.sessionId === sessionId
+        ).length;
 
-        existingRewards[steamId] = userRewards;
-        await kv.set(rewardsKey, existingRewards);
+        if (alreadyGranted < quantity) {
+          // Grant missing rewards
+          const toGrant = quantity - alreadyGranted;
+          for (let i = 0; i < toGrant; i++) {
+            userRewards.push({
+              type: consumableType,
+              grantedAt: new Date().toISOString(),
+              source: 'purchase',
+              sessionId,
+            });
+          }
+
+          existingRewards[steamId] = userRewards;
+          await kv.set(rewardsKey, existingRewards);
+          console.log(`✅ Granted ${toGrant} ${consumableType} to ${steamId} (${alreadyGranted} already existed)`);
+        } else {
+          console.log(`ℹ️ Rewards already granted for session ${sessionId}`);
+        }
 
         // Record purchase
         existingPurchases.push({
