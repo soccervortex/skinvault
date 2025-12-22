@@ -65,9 +65,9 @@ export default function ShopPage() {
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center pt-8 md:pt-12">
         <div className="w-full max-w-4xl bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
-          <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
+          <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6 pt-4 md:pt-6">
             <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
               <ShoppingCart className="text-blue-400" size={20} />
             </div>
@@ -130,7 +130,7 @@ export default function ShopPage() {
                 </div>
               </div>
               <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
-                Get Discord bot access and create up to 5 price trackers. Receive price alerts directly in Discord for your favorite items.
+                Get Discord bot access and create up to 3 price trackers. Receive price alerts directly in Discord for your favorite items.
               </p>
               <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
                 ✓ Permanent access - never expires
