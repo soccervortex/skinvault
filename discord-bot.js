@@ -692,6 +692,11 @@ async function getAlerts(steamId) {
 
 // Handle slash commands
 client.on('interactionCreate', async (interaction) => {
+  // Log all interactions for debugging
+  if (interaction.isChatInputCommand()) {
+    log(`📥 Received command: /${interaction.commandName} from user ${interaction.user.id} (${interaction.user.username})`);
+  }
+  
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName, user } = interaction;
