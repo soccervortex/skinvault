@@ -3,7 +3,7 @@
 export const PRO_LIMITS = {
   WISHLIST_FREE: 10, // Free users can have max 10 wishlist items
   WISHLIST_PRO: Infinity, // Pro users have unlimited
-  PRICE_TRACKER_FREE: 5, // Free users can have max 5 price trackers
+  PRICE_TRACKER_FREE: 0, // Price trackers require Pro subscription (Discord integration)
   PRICE_TRACKER_PRO: Infinity, // Pro users have unlimited
 } as const;
 
@@ -110,17 +110,10 @@ async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
 }
 
 // Helper to get extra price trackers from rewards
+// NOTE: Price trackers are Pro-only, so no free rewards are available
 async function getExtraPriceTrackers(steamId?: string | null): Promise<number> {
-  const rewards = await getStoredRewards(steamId);
-  let extraTrackers = 0;
-  
-  rewards.forEach((reward: any) => {
-    if (reward?.type === 'price_tracker_free' && reward?.value) {
-      extraTrackers += reward.value;
-    }
-  });
-  
-  return extraTrackers;
+  // Price trackers require Pro subscription - no free rewards
+  return 0;
 }
 
 // Performance settings
@@ -238,12 +231,11 @@ export function getWishlistBatchSize(isProUser: boolean): number {
     : PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
 }
 
-// Get price tracker limit (includes rewards)
+// Get price tracker limit (Pro only - Discord integration requires Pro)
 export async function getPriceTrackerLimit(isProUser: boolean, steamId?: string | null): Promise<number> {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
-  const baseLimit = PRO_LIMITS.PRICE_TRACKER_FREE;
-  const extraTrackers = await getExtraPriceTrackers(steamId);
-  return baseLimit + extraTrackers;
+  // Price trackers require Pro subscription (Discord integration)
+  return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users
 }
 
 // Check if user can add more price trackers
@@ -252,59 +244,11 @@ export async function canAddPriceTracker(currentCount: number, isProUser: boolea
   return currentCount < limit;
 }
 
-// Synchronous version for backwards compatibility (uses cached value or base limit)
+// Synchronous version for backwards compatibility (Pro only - Discord integration requires Pro)
 export function getPriceTrackerLimitSync(isProUser: boolean): number {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
-  const baseLimit = PRO_LIMITS.PRICE_TRACKER_FREE;
-  let extraTrackers = 0;
-  
-  // First try cached rewards
-  if (rewardsCache.rewards.length > 0) {
-    extraTrackers = rewardsCache.rewards.reduce((sum, reward) => {
-      if (reward?.type === 'price_tracker_free' && reward?.value) {
-        return sum + reward.value;
-      }
-      return sum;
-    }, 0);
-  } else if (typeof window !== 'undefined') {
-    // Fallback to localStorage if cache is empty (for immediate use before API loads)
-    try {
-      // Check if localStorage is accessible
-      const testKey = '__localStorage_test__';
-      window.localStorage.setItem(testKey, 'test');
-      window.localStorage.removeItem(testKey);
-      
-      const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
-      themes.forEach(theme => {
-        try {
-          const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
-          const key = `sv_${theme}_rewards_${year}`;
-          const rewardsStr = window.localStorage.getItem(key);
-          if (rewardsStr) {
-            try {
-              const rewards = JSON.parse(rewardsStr);
-              if (Array.isArray(rewards)) {
-                rewards.forEach((stored: any) => {
-                  const reward = stored.reward || stored;
-                  if (reward?.type === 'price_tracker_free' && reward?.value) {
-                    extraTrackers += reward.value;
-                  }
-                });
-              }
-            } catch {
-              // Skip invalid JSON
-            }
-          }
-        } catch {
-          // Skip this theme if localStorage access fails
-        }
-      });
-    } catch {
-      // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
-    }
-  }
-  
-  return baseLimit + extraTrackers;
+  // Price trackers require Pro subscription (Discord integration)
+  return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users
 }
 
 

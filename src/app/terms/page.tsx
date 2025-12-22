@@ -49,7 +49,7 @@ export default function TermsPage() {
                 <li>Real-time inventory value tracking and portfolio management</li>
                 <li>Skin price monitoring and analytics with market data</li>
                 <li>Wishlist functionality (Free: 10 items, Pro: unlimited)</li>
-                <li>Price alerts and trackers via Discord integration (Free: 5 trackers, Pro: unlimited)</li>
+                <li>Price alerts and trackers via Discord integration (Pro only: unlimited trackers)</li>
                 <li>Player statistics and portfolio analytics (CS2 game stats)</li>
                 <li>Skin comparison tool (compare up to 3 items side by side)</li>
                 <li>Player search functionality (by Steam64 ID, Steam username, Discord username, or Discord ID)</li>
@@ -84,7 +84,7 @@ export default function TermsPage() {
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>You may connect your Discord account to receive price alert notifications and use bot commands</li>
-                <li>Free users can create up to 5 price trackers; Pro users have unlimited trackers</li>
+                <li>Price trackers require a Pro subscription; Pro users have unlimited trackers</li>
                 <li>Price alerts are sent via Discord direct messages when target prices are reached</li>
                 <li>You can disconnect your Discord account at any time, which will remove all active price trackers</li>
                 <li><strong>Discord Bot Commands Available:</strong>
@@ -125,7 +125,7 @@ export default function TermsPage() {
                 <li><strong>Pro Features Include:</strong>
                   <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
                     <li>Unlimited wishlist items (Free: 10 items max)</li>
-                    <li>Unlimited price trackers (Free: 5 trackers max)</li>
+                    <li>Unlimited price trackers (Pro only)</li>
                     <li>Advanced player statistics (ADR, MVPs, Accuracy, Rounds Played, Total Damage)</li>
                     <li>Faster price scanning (10x speed with higher concurrency)</li>
                     <li>Priority API requests</li>

@@ -127,7 +127,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
   if (!isOpen) return null;
 
-  const canCreateMore = alerts.length < maxAlerts;
+  const canCreateMore = isPro && alerts.length < maxAlerts;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -221,9 +221,9 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
               {/* Alert Limit Info */}
               <div className="bg-black/40 border border-white/5 rounded-xl p-3">
                 <p className="text-[9px] text-gray-400 text-center">
-                  {isPro ? 'Unlimited' : `${alerts.length} / ${maxAlerts}`} price trackers
-                  {!isPro && alerts.length >= maxAlerts && (
-                    <span className="block mt-1 text-yellow-400">Upgrade to Pro for unlimited trackers</span>
+                  {isPro ? 'Unlimited' : 'Pro required'} price trackers
+                  {!isPro && (
+                    <span className="block mt-1 text-yellow-400">Upgrade to Pro to create price trackers</span>
                   )}
                 </p>
               </div>

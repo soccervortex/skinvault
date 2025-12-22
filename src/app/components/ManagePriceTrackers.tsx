@@ -158,10 +158,10 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
           </div>
         )}
 
-        {!isPro && alerts.length >= maxTrackers && (
+        {!isPro && (
             <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
               <p className="text-xs text-blue-400">
-                <strong>Free tier limit:</strong> You've reached the maximum of {maxTrackers} price trackers. Upgrade to Pro for unlimited trackers!
+                <strong>Pro feature:</strong> Price trackers require a Pro subscription. Upgrade to Pro to create unlimited price trackers!
               </p>
             </div>
         )}

@@ -5,7 +5,6 @@ import { ThemeType } from './theme-storage';
 export type RewardType = 
   | 'promo_code'
   | 'wishlist_boost'
-  | 'price_tracker_free'
   | 'speed_boost'
   | 'wishlist_extra_slots'
   | 'pro_extension';
@@ -35,13 +34,6 @@ const REWARDS_FREE: Reward[] = [
     icon: '⭐',
     duration: 7,
     value: 10,
-  },
-  {
-    type: 'price_tracker_free',
-    name: 'Free Price Tracker',
-    description: 'Add 1 free price tracker',
-    icon: '🔔',
-    value: 1,
   },
   {
     type: 'speed_boost',
@@ -218,9 +210,8 @@ export function getRandomReward(theme: ThemeType, isPro: boolean = false): Rewar
     
     if (adjustedRand < 0.421) return rewards[0]; // promo_code (40% of 95% ≈ 38%)
     if (adjustedRand < 0.579) return rewards[1]; // wishlist_boost (15.8% of 95% ≈ 15%)
-    if (adjustedRand < 0.737) return rewards[2]; // price_tracker_free (15.8% of 95% ≈ 15%)
-    if (adjustedRand < 0.895) return rewards[3]; // speed_boost (15.8% of 95% ≈ 15%)
-    return rewards[4]; // wishlist_extra_slots (10.5% of 95% ≈ 10%)
+    if (adjustedRand < 0.789) return rewards[2]; // speed_boost (21% of 95% ≈ 20%)
+    return rewards[3]; // wishlist_extra_slots (21% of 95% ≈ 20%)
   }
 }
 
@@ -252,8 +243,8 @@ export function saveReward(reward: Reward, theme: ThemeType): void {
     const existing = window.localStorage.getItem(storageKey);
     const rewards: StoredReward[] = existing ? JSON.parse(existing) : [];
     
-    // Permanent rewards (wishlist_extra_slots, price_tracker_free) should never expire
-    const isPermanent = reward.type === 'wishlist_extra_slots' || reward.type === 'price_tracker_free';
+    // Permanent rewards (wishlist_extra_slots) should never expire
+    const isPermanent = reward.type === 'wishlist_extra_slots';
     
     const stored: StoredReward = {
       reward,
@@ -289,9 +280,9 @@ export function getStoredRewards(theme?: ThemeType): StoredReward[] {
       
       const rewards: StoredReward[] = JSON.parse(existing);
       const now = Date.now();
-      // Permanent rewards (wishlist_extra_slots, price_tracker_free) should never be filtered out
+      // Permanent rewards (wishlist_extra_slots) should never be filtered out
       return rewards.filter(r => {
-        const isPermanent = r.reward?.type === 'wishlist_extra_slots' || r.reward?.type === 'price_tracker_free';
+        const isPermanent = r.reward?.type === 'wishlist_extra_slots';
         return isPermanent || !r.expiresAt || r.expiresAt > now;
       });
     }
@@ -311,7 +302,7 @@ export function getStoredRewards(theme?: ThemeType): StoredReward[] {
             const now = Date.now();
             // Permanent rewards should never be filtered out
             rewards.forEach(r => {
-              const isPermanent = r.reward?.type === 'wishlist_extra_slots' || r.reward?.type === 'price_tracker_free';
+              const isPermanent = r.reward?.type === 'wishlist_extra_slots';
               if (isPermanent || !r.expiresAt || r.expiresAt > now) {
                 allRewards.push(r);
               }

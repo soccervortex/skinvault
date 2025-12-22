@@ -3,7 +3,6 @@
 export type RewardType = 
   | 'promo_code'
   | 'wishlist_boost'
-  | 'price_tracker_free'
   | 'speed_boost'
   | 'wishlist_extra_slots'
   | 'pro_extension'; // For Pro users: extends their Pro subscription
@@ -33,13 +32,6 @@ export const REWARDS_FREE: Reward[] = [
     icon: '⭐',
     duration: 7,
     value: 10,
-  },
-  {
-    type: 'price_tracker_free',
-    name: 'Gratis Price Tracker',
-    description: '1 gratis price tracker toevoegen',
-    icon: '🔔',
-    value: 1,
   },
   {
     type: 'speed_boost',
@@ -100,13 +92,12 @@ export function getRandomReward(isPro: boolean = false): Reward {
     return REWARDS_PRO[3]; // 6 months (rare)
   } else {
     // Non-Pro users get regular rewards
-    // Weighted random - promo code is more common (40%), others 15% each
+    // Weighted random - promo code is more common (40%), others 20% each
     const rand = Math.random();
     if (rand < 0.4) return REWARDS_FREE[0]; // promo_code
-    if (rand < 0.55) return REWARDS_FREE[1]; // wishlist_boost
-    if (rand < 0.70) return REWARDS_FREE[2]; // price_tracker_free
-    if (rand < 0.85) return REWARDS_FREE[3]; // speed_boost
-    return REWARDS_FREE[4]; // wishlist_extra_slots
+    if (rand < 0.6) return REWARDS_FREE[1]; // wishlist_boost
+    if (rand < 0.8) return REWARDS_FREE[2]; // speed_boost
+    return REWARDS_FREE[3]; // wishlist_extra_slots
   }
 }
 
