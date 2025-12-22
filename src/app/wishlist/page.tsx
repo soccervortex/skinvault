@@ -104,9 +104,9 @@ export default function WishlistPage() {
         // Load rewards to update limit
         if (steamId) {
           preloadRewards(steamId).then(() => {
-            setWishlistLimit(getWishlistLimitSync(false));
+            setWishlistLimit(getWishlistLimitSync(false, steamId));
           }).catch(() => {
-            setWishlistLimit(getWishlistLimitSync(false));
+            setWishlistLimit(getWishlistLimitSync(false, steamId));
           });
         } else {
           setWishlistLimit(getWishlistLimitSync(false));

@@ -79,7 +79,7 @@ export function toggleWishlistEntry(
   const currentCount = current.length;
   // For sync function, we can't check rewards from API easily, so use base limit
   // This will be updated when the page refreshes and loads rewards
-  const limit = isProUser ? Infinity : getWishlistLimitSync(isProUser);
+  const limit = isProUser ? Infinity : getWishlistLimitSync(isProUser, steamId);
   const canAdd = currentCount < limit;
   
   if (!canAdd) {

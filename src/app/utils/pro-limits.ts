@@ -97,13 +97,17 @@ async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
   let extraSlots = 0;
   
   rewards.forEach((reward: any) => {
-    // Check for permanent extra slots
+    // Check for permanent extra slots (from theme rewards)
     if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
       extraSlots += reward.value;
     }
     // Check for temporary wishlist boost (treat as permanent for now)
     if (reward?.type === 'wishlist_boost' && reward?.value) {
       extraSlots += reward.value;
+    }
+    // Check for purchased wishlist slots (each purchase = +1 slot)
+    if (reward?.type === 'wishlist_slot') {
+      extraSlots += 1;
     }
   });
   
@@ -154,21 +158,25 @@ export async function canAddToWishlist(currentCount: number, isProUser: boolean,
 }
 
 // Synchronous version for backwards compatibility (uses cached value or 0)
-export function getWishlistLimitSync(isProUser: boolean): number {
+export function getWishlistLimitSync(isProUser: boolean, steamId?: string | null): number {
   if (isProUser) return PRO_LIMITS.WISHLIST_PRO;
   const baseLimit = PRO_LIMITS.WISHLIST_FREE;
   let extraSlots = 0;
   
-  // First try cached rewards
-  if (rewardsCache.rewards.length > 0) {
+  // First try cached rewards (only if cache matches the requested steamId)
+  if (rewardsCache.rewards.length > 0 && (!steamId || rewardsCache.steamId === steamId)) {
     extraSlots = rewardsCache.rewards.reduce((sum, reward) => {
-      // Check for permanent extra slots
+      // Check for permanent extra slots (from theme rewards)
       if (reward?.type === 'wishlist_extra_slots' && reward?.value) {
         return sum + reward.value;
       }
       // Check for temporary wishlist boost (treat as permanent for now)
       if (reward?.type === 'wishlist_boost' && reward?.value) {
         return sum + reward.value;
+      }
+      // Check for purchased wishlist slots (each purchase = +1 slot)
+      if (reward?.type === 'wishlist_slot') {
+        return sum + 1;
       }
       return sum;
     }, 0);
@@ -191,6 +199,10 @@ export function getWishlistLimitSync(isProUser: boolean): number {
                 }
                 if (reward?.type === 'wishlist_boost' && reward?.value) {
                   extraSlots += reward.value;
+                }
+                // Check for purchased wishlist slots (each purchase = +1 slot)
+                if (reward?.type === 'wishlist_slot') {
+                  extraSlots += 1;
                 }
               });
             }

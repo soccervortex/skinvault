@@ -5,15 +5,12 @@ import { dbGet, dbSet } from '@/app/utils/database';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
-  // Check if test mode is enabled
+  // Check if test mode is enabled (use database abstraction)
   let testMode = false;
   try {
-    const { kv } = await import('@vercel/kv');
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-    }
+    testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
   } catch (error) {
-    // If KV fails, use production keys
+    // If database fails, use production keys
   }
 
   // Use test keys if test mode is enabled

@@ -112,9 +112,8 @@ function PaymentSuccessContent() {
             const user = JSON.parse(stored);
             if (user.steamId === steamId) {
               // Clear rewards cache to force refresh
-              localStorage.removeItem('user_rewards_cache');
-              // Also clear the in-memory cache by triggering a storage event
-              window.dispatchEvent(new Event('storage'));
+              const { clearRewardsCache } = await import('@/app/utils/pro-limits');
+              clearRewardsCache();
               // Force reload rewards by fetching from API
               try {
                 await fetch(`/api/user/rewards?steamId=${steamId}`);
