@@ -65,9 +65,11 @@ KV_REST_API_URL=https://your-kv-url.upstash.io
 KV_REST_API_TOKEN=your-kv-token
 
 # New MongoDB variables
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/skinvault?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://skinvaults:YOUR_PASSWORD@cluster0.5ceoi.mongodb.net/?appName=Cluster0
 MONGODB_DB_NAME=skinvault
 ```
+
+**Note**: Replace `YOUR_PASSWORD` with your actual MongoDB password, or use the full connection string provided by MongoDB Atlas.
 
 **For Vercel Production**:
 1. Go to your Vercel project → **Settings** → **Environment Variables**

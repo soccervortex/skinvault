@@ -723,9 +723,9 @@ function InventoryContent() {
             
             if (userHasAccess) {
               // Free user with Discord access - check connection status
-              fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
-                .then(res => res.ok ? res.json() : null)
-                .then(data => {
+    fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
                   setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
                 })
                 .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
