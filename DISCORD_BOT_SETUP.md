@@ -2,7 +2,12 @@
 
 ## Problem: "Unknown Integration" Error
 
-If you see "Unknown Integration" when using Discord bot commands, it means the bot is not properly configured for user installs in Discord Developer Portal.
+If you see "Unknown Integration" when using Discord bot commands, this usually means one of the following:
+
+1. **Bot is not installed** - You need to install the bot first
+2. **Commands not propagated** - Global commands can take up to 1 hour to appear
+3. **Bot not configured for user installs** - Bot needs to be configured in Discord Developer Portal
+4. **Bot is offline** - The bot process is not running
 
 ## Solution Steps
 
@@ -51,14 +56,26 @@ The bot automatically registers commands on startup. To force re-registration:
   - Direct Messages (DMs) with the bot
   - Servers where the bot is present
 
-### 5. Install the Bot (User Install)
+### 5. Install the Bot (User Install) - **REQUIRED**
 
-Users need to install the bot to use commands:
+**IMPORTANT:** Users MUST install the bot before they can use commands!
 
+**Option A: Via Install Link**
 1. Go to **Installation** tab in Discord Developer Portal
 2. Copy the **Install Link** (should have `integration_type=1` for user installs)
 3. Share this link with users, OR
-4. Users can install via your website's "Connect Discord" button
+4. Users can click the link to install the bot
+
+**Option B: Via Website**
+1. Go to https://skinvaults.online/inventory
+2. Sign in with Steam
+3. Click "Connect Discord" button
+4. This will install the bot automatically
+
+**After Installation:**
+- Wait up to 1 hour for commands to appear
+- Commands will work in DMs with the bot
+- Commands will work in servers where the bot is present
 
 ### 6. Test Commands
 

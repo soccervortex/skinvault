@@ -9,7 +9,6 @@ function log(message) {
 
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-// Use environment variable if set, otherwise default to skinvaults.online (without www)
 const API_BASE_URL = process.env.API_BASE_URL || 'https://skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 
@@ -696,6 +695,13 @@ client.on('interactionCreate', async (interaction) => {
   // Log all interactions for debugging
   if (interaction.isChatInputCommand()) {
     log(`📥 Received command: /${interaction.commandName} from user ${interaction.user.id} (${interaction.user.username})`);
+  } else if (interaction.isAutocomplete()) {
+    log(`📥 Received autocomplete for: ${interaction.commandName}`);
+    return;
+  } else {
+    // Log other interaction types
+    log(`📥 Received interaction type: ${interaction.type}`);
+    return;
   }
   
   if (!interaction.isChatInputCommand()) return;
