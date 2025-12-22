@@ -33,19 +33,41 @@ const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 // Initialize MongoDB connection
 async function initMongoDB(): Promise<Db | null> {
   if (!MONGODB_URI) {
+    console.warn('[Database] ⚠️ MONGODB_URI not configured');
     return null;
   }
 
   try {
+    // Check if client exists and try to ping to verify connection
     if (!mongoClient) {
+      console.log('[Database] Connecting to MongoDB...');
       mongoClient = new MongoClient(MONGODB_URI);
       await mongoClient.connect();
       mongoDb = mongoClient.db(MONGODB_DB_NAME);
-      console.log('[Database] MongoDB connected successfully');
+      console.log('[Database] ✅ MongoDB connected successfully');
+    } else {
+      // Try to ping to verify connection is still alive
+      try {
+        await mongoClient.db('admin').command({ ping: 1 });
+        console.log('[Database] MongoDB connection verified');
+      } catch (pingError) {
+        console.log('[Database] MongoDB connection lost, reconnecting...');
+        try {
+          await mongoClient.close();
+        } catch (e) {
+          // Ignore close errors
+        }
+        mongoClient = new MongoClient(MONGODB_URI);
+        await mongoClient.connect();
+        mongoDb = mongoClient.db(MONGODB_DB_NAME);
+        console.log('[Database] ✅ MongoDB reconnected successfully');
+      }
     }
     return mongoDb;
   } catch (error) {
-    console.error('[Database] MongoDB connection failed:', error);
+    console.error('[Database] ❌ MongoDB connection failed:', error);
+    mongoClient = null;
+    mongoDb = null;
     return null;
   }
 }
@@ -128,15 +150,25 @@ async function mongoGet<T>(key: string): Promise<T | null> {
 async function mongoSet<T>(key: string, value: T): Promise<boolean> {
   try {
     const collection = await getMongoCollection(key);
-    if (!collection) return false;
+    if (!collection) {
+      console.error(`[Database] Failed to get MongoDB collection for key ${key}`);
+      return false;
+    }
 
     // Store as single document with _id = key, value = actual data
-    await collection.updateOne(
+    const result = await collection.updateOne(
       { _id: key } as any,
       { $set: { _id: key, value, updatedAt: new Date() } },
       { upsert: true }
     );
-    return true;
+    
+    if (result.acknowledged) {
+      console.log(`[Database] MongoDB write acknowledged for ${key} (matched: ${result.matchedCount}, modified: ${result.modifiedCount}, upserted: ${result.upsertedCount})`);
+      return true;
+    } else {
+      console.error(`[Database] MongoDB write not acknowledged for ${key}`);
+      return false;
+    }
   } catch (error) {
     console.error(`[Database] MongoDB set failed for key ${key}:`, error);
     return false;
@@ -318,16 +350,23 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   if (MONGODB_URI) {
     writePromises.push(
       mongoSet(key, value)
-        .then(() => {
-          mongoSuccess = true;
-          if (!kvSuccess) {
-            dbStatus = 'mongodb';
+        .then((success) => {
+          if (success) {
+            mongoSuccess = true;
+            console.log(`[Database] ✅ MongoDB write succeeded for ${key}`);
+            if (!kvSuccess) {
+              dbStatus = 'mongodb';
+            }
+          } else {
+            console.error(`[Database] ❌ MongoDB write returned false for ${key} (check connection)`);
           }
         })
         .catch((error) => {
-          console.error(`[Database] MongoDB set failed for ${key}:`, error);
+          console.error(`[Database] ❌ MongoDB set failed for ${key}:`, error);
         })
     );
+  } else {
+    console.warn(`[Database] ⚠️ MONGODB_URI not configured, skipping MongoDB write for ${key}`);
   }
 
   // Wait for both writes (don't fail if one fails)
