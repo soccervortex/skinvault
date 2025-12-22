@@ -103,15 +103,25 @@ async function isKVAvailable(): Promise<boolean> {
   } catch (error: any) {
     previousKVAvailable = false;
     
-    // Check for rate limit errors
-    if (error?.message?.includes('rate limit') || 
-        error?.message?.includes('429') ||
-        error?.message?.includes('quota') ||
-        error?.message?.includes('limit')) {
-      console.warn('[Database] KV rate limit hit, switching to MongoDB');
+    // Check for rate limit errors (multiple patterns)
+    const errorMsg = error?.message?.toLowerCase() || '';
+    const errorString = JSON.stringify(error).toLowerCase();
+    
+    if (errorMsg.includes('rate limit') || 
+        errorMsg.includes('429') ||
+        errorMsg.includes('quota') ||
+        errorMsg.includes('limit') ||
+        errorMsg.includes('too many requests') ||
+        errorString.includes('rate limit') ||
+        errorString.includes('429') ||
+        errorString.includes('quota exceeded') ||
+        error?.status === 429 ||
+        error?.statusCode === 429) {
+      console.warn('[Database] ⚠️ KV rate limit hit, switching to MongoDB');
+      dbStatus = 'mongodb';
       return false;
     }
-    console.warn('[Database] KV unavailable:', error?.message);
+    console.warn('[Database] ⚠️ KV unavailable:', error?.message || error);
     return false;
   }
 }
@@ -296,8 +306,15 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
       
       dbStatus = 'kv';
       return value;
-    } catch (error) {
-      console.warn(`[Database] KV get failed for ${key}, trying MongoDB:`, error);
+    } catch (error: any) {
+      // Check if it's a rate limit error
+      const errorMsg = error?.message?.toLowerCase() || '';
+      if (errorMsg.includes('rate limit') || errorMsg.includes('429') || errorMsg.includes('quota')) {
+        console.warn(`[Database] ⚠️ KV rate limit hit during read for ${key}, falling back to MongoDB`);
+        dbStatus = 'mongodb';
+      } else {
+        console.warn(`[Database] ⚠️ KV get failed for ${key}, trying MongoDB:`, error?.message || error);
+      }
       readCache.delete(key); // Remove from cache on error
     }
   }
@@ -361,8 +378,15 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
           kvSuccess = true;
           dbStatus = 'kv';
         })
-        .catch((error) => {
-          console.warn(`[Database] KV set failed for ${key}:`, error);
+        .catch((error: any) => {
+          // Check if it's a rate limit error
+          const errorMsg = error?.message?.toLowerCase() || '';
+          if (errorMsg.includes('rate limit') || errorMsg.includes('429') || errorMsg.includes('quota')) {
+            console.warn(`[Database] ⚠️ KV rate limit hit during write for ${key}, MongoDB will handle it`);
+            dbStatus = 'mongodb';
+          } else {
+            console.warn(`[Database] ⚠️ KV set failed for ${key}:`, error?.message || error);
+          }
         })
     );
   }
@@ -392,9 +416,9 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   // Wait for both writes (don't fail if one fails)
   const results = await Promise.allSettled(writePromises);
   
-  // Log summary
-  const kvResult = results[0]?.status === 'fulfilled' ? '✅' : '❌';
-  const mongoResult = results[1]?.status === 'fulfilled' ? '✅' : '❌';
+  // Log summary (handle cases where only one write promise exists)
+  const kvResult = writePromises.length > 0 && results[0]?.status === 'fulfilled' ? '✅' : (writePromises.length > 0 && results[0]?.status === 'rejected' ? '❌' : '⏭️');
+  const mongoResult = writePromises.length > 1 && results[1]?.status === 'fulfilled' ? '✅' : (writePromises.length > 1 && results[1]?.status === 'rejected' ? '❌' : (MONGODB_URI ? '⏭️' : '🚫'));
   console.log(`[Database] Write summary for ${key}: KV ${kvResult} | MongoDB ${mongoResult}`);
 
   // If KV failed but MongoDB succeeded, try to sync back to KV when it recovers
