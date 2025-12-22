@@ -45,6 +45,65 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [removeToast]
   );
 
+  // Check for persisted banned notification on mount and page navigation
+  useEffect(() => {
+    const checkBannedNotification = () => {
+      try {
+        if (typeof window === 'undefined') return;
+        
+        const stored = window.localStorage.getItem('sv_banned_notification');
+        if (!stored) return;
+
+        const notification = JSON.parse(stored);
+        const now = Date.now();
+        const elapsed = now - notification.timestamp;
+        const remaining = Math.max(0, notification.duration - elapsed);
+
+        if (remaining > 0) {
+          // Show the notification for the remaining time
+          showToast(notification.message, 'error', remaining);
+          
+          // Clear the localStorage after the remaining time
+          setTimeout(() => {
+            try {
+              window.localStorage.removeItem('sv_banned_notification');
+            } catch {}
+          }, remaining);
+        } else {
+          // Notification expired, remove it
+          window.localStorage.removeItem('sv_banned_notification');
+        }
+      } catch (error) {
+        // Ignore errors (invalid JSON, localStorage issues, etc.)
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem('sv_banned_notification');
+          }
+        } catch {}
+      }
+    };
+
+    // Check immediately on mount
+    checkBannedNotification();
+
+    // Also check on storage events (when localStorage changes from other tabs/pages)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'sv_banned_notification') {
+        checkBannedNotification();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Check periodically in case the notification was set in the same tab
+    const interval = setInterval(checkBannedNotification, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [showToast]);
+
   const success = useCallback((message: string, duration?: number) => {
     showToast(message, 'success', duration);
   }, [showToast]);

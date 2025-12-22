@@ -516,8 +516,15 @@ function InventoryContent() {
           try {
             if (typeof window !== 'undefined') {
               window.localStorage.removeItem('steam_user');
-              // Show banned notification
-              toast.error('Your account has been banned from this service. Please contact support if you believe this is an error.');
+              // Store banned notification state with timestamp (30 seconds)
+              const bannedNotification = {
+                message: 'Your account has been banned from this service. Please contact support if you believe this is an error.',
+                timestamp: Date.now(),
+                duration: 30000, // 30 seconds
+              };
+              window.localStorage.setItem('sv_banned_notification', JSON.stringify(bannedNotification));
+              // Show banned notification immediately
+              toast.error(bannedNotification.message, 30000);
               // Clean up URL (remove OpenID params) and redirect to contact page
               setTimeout(() => {
                 // Remove all query parameters to clean the URL
