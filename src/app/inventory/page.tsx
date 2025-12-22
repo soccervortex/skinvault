@@ -512,11 +512,18 @@ function InventoryContent() {
         const banned = await isBanned(viewedSteamId);
         if (banned) {
           setLoading(false);
-          toast.error('Your account has been banned from this service. Please contact support if you believe this is an error.');
           // Clear any stored user data
           try {
             if (typeof window !== 'undefined') {
               window.localStorage.removeItem('steam_user');
+              // Show banned notification
+              toast.error('Your account has been banned from this service. Please contact support if you believe this is an error.');
+              // Clean up URL (remove OpenID params) and redirect to contact page
+              setTimeout(() => {
+                // Remove all query parameters to clean the URL
+                window.history.replaceState({}, '', '/contact');
+                window.location.href = '/contact';
+              }, 2000);
             }
           } catch {}
           return;

@@ -54,6 +54,13 @@ export async function POST(request: Request) {
 
 // GET: Check if Steam ID is banned
 export async function GET(request: Request) {
+  const adminKey = request.headers.get(ADMIN_HEADER);
+  const expected = process.env.ADMIN_PRO_TOKEN;
+
+  if (expected && adminKey !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const url = new URL(request.url);
     const rawSteamId = url.searchParams.get('steamId');
@@ -73,6 +80,39 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Failed to check ban status:', error);
     return NextResponse.json({ error: 'Failed to check ban status' }, { status: 500 });
+  }
+}
+
+// DELETE: Unban a Steam ID
+export async function DELETE(request: Request) {
+  const adminKey = request.headers.get(ADMIN_HEADER);
+  const expected = process.env.ADMIN_PRO_TOKEN;
+
+  if (expected && adminKey !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const url = new URL(request.url);
+    const rawSteamId = url.searchParams.get('steamId');
+    const steamId = rawSteamId ? sanitizeSteamId(rawSteamId) : null;
+    
+    if (!steamId) {
+      return NextResponse.json({ error: 'Invalid SteamID format' }, { status: 400 });
+    }
+
+    try {
+      const banned = await dbGet<string[]>(BANNED_KEY) || [];
+      const updatedBanned = banned.filter(id => id !== steamId);
+      await dbSet(BANNED_KEY, updatedBanned);
+      return NextResponse.json({ steamId, banned: false, message: 'User has been unbanned' });
+    } catch (error) {
+      console.error('Failed to unban Steam ID:', error);
+      return NextResponse.json({ error: 'Failed to unban Steam ID' }, { status: 500 });
+    }
+  } catch (error) {
+    console.error('Failed to unban Steam ID:', error);
+    return NextResponse.json({ error: 'Failed to unban Steam ID' }, { status: 500 });
   }
 }
 

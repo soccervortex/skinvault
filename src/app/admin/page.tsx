@@ -14,6 +14,7 @@ import {
   Edit,
   Ban,
   ShoppingBag,
+  X,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -58,6 +59,8 @@ export default function AdminPage() {
   const [editDate, setEditDate] = useState("");
   const [banSteamId, setBanSteamId] = useState("");
   const [banning, setBanning] = useState(false);
+  const [banStatus, setBanStatus] = useState<{ steamId: string; banned: boolean } | null>(null);
+  const [loadingBanStatus, setLoadingBanStatus] = useState(false);
   const [testMode, setTestMode] = useState(false);
   const [loadingTestMode, setLoadingTestMode] = useState(true);
   const [testModeMessage, setTestModeMessage] = useState<string | null>(null);
@@ -376,12 +379,38 @@ export default function AdminPage() {
     }
   };
 
-  const handleBanSteamId = async (e: React.FormEvent) => {
+  const handleCheckBanStatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!banSteamId || !/^\d{17}$/.test(banSteamId)) {
       setError("Invalid SteamID64 format");
       return;
     }
+
+    setLoadingBanStatus(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/ban?steamId=${banSteamId}`, {
+        headers: {
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setBanStatus({ steamId: banSteamId, banned: data.banned === true });
+      } else {
+        setError(data.error || "Failed to check ban status");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Request failed.");
+    } finally {
+      setLoadingBanStatus(false);
+    }
+  };
+
+  const handleBanUser = async () => {
+    if (!banStatus?.steamId) return;
 
     setBanning(true);
     setError(null);
@@ -392,15 +421,42 @@ export default function AdminPage() {
           "Content-Type": "application/json",
           "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
-        body: JSON.stringify({ steamId: banSteamId }),
+        body: JSON.stringify({ steamId: banStatus.steamId }),
       });
 
       const data = await res.json();
       if (res.ok) {
-        setMessage(`Steam ID ${banSteamId} has been banned`);
-        setBanSteamId("");
+        setMessage(`Steam ID ${banStatus.steamId} has been banned`);
+        setBanStatus({ steamId: banStatus.steamId, banned: true });
       } else {
         setError(data.error || "Failed to ban Steam ID");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Request failed.");
+    } finally {
+      setBanning(false);
+    }
+  };
+
+  const handleUnbanUser = async () => {
+    if (!banStatus?.steamId) return;
+
+    setBanning(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/ban?steamId=${banStatus.steamId}`, {
+        method: "DELETE",
+        headers: {
+          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`Steam ID ${banStatus.steamId} has been unbanned`);
+        setBanStatus({ steamId: banStatus.steamId, banned: false });
+      } else {
+        setError(data.error || "Failed to unban Steam ID");
       }
     } catch (e: any) {
       setError(e?.message || "Request failed.");
@@ -1035,30 +1091,93 @@ export default function AdminPage() {
           </div>
 
           <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
-            Ban a Steam ID from accessing the site. Banned users will not be able to log in.
+            Enter a Steam ID to check their ban status and ban or unban them.
           </p>
 
-          <form onSubmit={handleBanSteamId} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px]">
+          <form onSubmit={handleCheckBanStatus} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
               <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
-                SteamID64 to Ban
+                SteamID64 to check
               </label>
               <input
                 value={banSteamId}
-                onChange={(e) => setBanSteamId(e.target.value)}
+                onChange={(e) => {
+                  setBanSteamId(e.target.value);
+                  setBanStatus(null); // Clear status when input changes
+                }}
                 placeholder="7656119..."
                 className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-red-500 outline-none focus:border-red-500 transition-all placeholder:text-gray-700"
               />
             </div>
             <button
               type="submit"
-              disabled={banning}
+              disabled={loadingBanStatus}
               className="w-full bg-red-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-red-500 transition-all shadow-xl shadow-red-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {banning && <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" />}
-              {banning ? "Banning..." : "Ban Steam ID"}
+              {loadingBanStatus && <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" />}
+              {loadingBanStatus ? "Checking..." : "Check Status"}
             </button>
           </form>
+
+          {banStatus && (
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[9px] md:text-[10px] uppercase tracking-[0.3em] text-gray-500">
+                  Status for {banStatus.steamId}
+                </p>
+                <button
+                  onClick={() => {
+                    setBanStatus(null);
+                    setBanSteamId("");
+                  }}
+                  className="text-gray-500 hover:text-white transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[10px] md:text-[11px] text-gray-400 mb-1">Ban Status:</p>
+                  <p className={`text-[11px] md:text-[12px] font-black ${banStatus.banned ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {banStatus.banned ? '❌ Banned' : '✅ Not Banned'}
+                  </p>
+                </div>
+              </div>
+              {banStatus.banned ? (
+                <button
+                  onClick={handleUnbanUser}
+                  disabled={banning}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {banning ? (
+                    <>
+                      <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Unbanning...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={12} /> Unban User
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleBanUser}
+                  disabled={banning}
+                  className="w-full bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-red-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {banning ? (
+                    <>
+                      <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Banning...
+                    </>
+                  ) : (
+                    <>
+                      <Ban size={12} /> Ban User
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Stripe Test Mode Section */}
