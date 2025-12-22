@@ -588,7 +588,7 @@ export default function AdminPage() {
                               />
                             ) : (
                               <>
-                                {new Date(e.proUntil).toLocaleDateString()}{" "}
+                            {new Date(e.proUntil).toLocaleDateString()}{" "}
                                 {e.isActive && `(${e.daysRemaining}d)`}
                               </>
                             )}

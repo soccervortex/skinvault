@@ -24,8 +24,8 @@ async function getStripeInstance(): Promise<Stripe> {
   }
 
   return new Stripe(secretKey, {
-    apiVersion: '2025-12-15.clover',
-  });
+  apiVersion: '2025-12-15.clover',
+});
 }
 
 const PRICES: Record<string, { amount: number; months: number }> = {

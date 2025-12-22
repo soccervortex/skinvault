@@ -32,9 +32,9 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
       loadAlerts();
       // Load rewards to update limit
       preloadRewards(steamId).then(() => {
-        setMaxTrackers(getPriceTrackerLimitSync(isPro));
+        setMaxTrackers(getPriceTrackerLimitSync(isPro, steamId));
       }).catch(() => {
-        setMaxTrackers(getPriceTrackerLimitSync(isPro));
+        setMaxTrackers(getPriceTrackerLimitSync(isPro, steamId));
       });
     }
   }, [isOpen, steamId, isPro]);

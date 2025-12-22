@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock } from 'lucide-react';
+import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock, MessageSquare } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 export default function ShopPage() {
@@ -22,7 +22,7 @@ export default function ShopPage() {
     }
   }, []);
 
-  const handleCheckout = async (type: 'wishlist_slot' | 'wishlist_batch_boost' | 'price_scan_boost' | 'cache_boost', quantity: number = 1) => {
+  const handleCheckout = async (type: 'wishlist_slot' | 'discord_access' | 'price_scan_boost' | 'cache_boost', quantity: number = 1) => {
     if (!user?.steamId) {
       toast.error('You must be signed in with Steam to purchase. Please sign in first.');
       setTimeout(() => window.location.href = '/inventory', 2000);
@@ -117,36 +117,39 @@ export default function ShopPage() {
               </button>
             </div>
 
-            {/* Wishlist Batch Boost */}
+            {/* Discord Access */}
             <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-xl bg-blue-600/20 border border-blue-500/40">
-                  <Zap className="w-5 h-5 text-blue-400" />
+                <div className="p-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40">
+                  <MessageSquare className="w-5 h-5 text-indigo-400" />
                 </div>
                 <div>
-                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Batch Boost</p>
-                  <p className="text-xl md:text-2xl font-black text-white">€1.49</p>
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Discord Access</p>
+                  <p className="text-xl md:text-2xl font-black text-white">€4.99</p>
                   <p className="text-[8px] md:text-[9px] text-gray-500">one-time</p>
                 </div>
               </div>
               <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
-                Increase wishlist price update batch size from 3 to 5 items. Update prices faster for your wishlist items.
+                Get Discord bot access and create up to 5 price trackers. Receive price alerts directly in Discord for your favorite items.
               </p>
               <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
-                ✓ Permanent upgrade - never expires
+                ✓ Permanent access - never expires
+              </p>
+              <p className="text-[8px] md:text-[9px] text-orange-400 font-bold">
+                ⚠ Free users only - Pro users already have unlimited trackers
               </p>
               <button
-                onClick={() => handleCheckout('wishlist_batch_boost', 1)}
-                disabled={loading === 'wishlist_batch_boost_1' || !user?.steamId}
-                className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-blue-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                onClick={() => handleCheckout('discord_access', 1)}
+                disabled={loading === 'discord_access_1' || !user?.steamId}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {loading === 'wishlist_batch_boost_1' ? (
+                {loading === 'discord_access_1' ? (
                   <>
                     <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
                   </>
                 ) : (
                   <>
-                    <ShoppingCart size={12} /> Purchase Boost
+                    <ShoppingCart size={12} /> Purchase Access
                   </>
                 )}
               </button>

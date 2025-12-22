@@ -35,9 +35,9 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
     // Load rewards to refresh cache and update limit
     preloadRewards(user.steamId).then(() => {
-      setMaxAlerts(getPriceTrackerLimitSync(isPro));
+      setMaxAlerts(getPriceTrackerLimitSync(isPro, user.steamId));
     }).catch(() => {
-      setMaxAlerts(getPriceTrackerLimitSync(isPro));
+      setMaxAlerts(getPriceTrackerLimitSync(isPro, user.steamId));
     });
 
     // Check Discord status

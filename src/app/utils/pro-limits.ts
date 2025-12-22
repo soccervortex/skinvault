@@ -220,13 +220,6 @@ async function hasCacheBoost(steamId?: string | null): Promise<boolean> {
   return rewards.some((reward: any) => reward?.type === 'cache_boost');
 }
 
-// Helper to check if user has wishlist batch boost
-async function hasWishlistBatchBoost(steamId?: string | null): Promise<boolean> {
-  if (!steamId) return false;
-  const rewards = await getStoredRewards(steamId);
-  return rewards.some((reward: any) => reward?.type === 'wishlist_batch_boost');
-}
-
 // Performance helpers
 export async function getPriceScanConcurrency(isProUser: boolean, steamId?: string | null): Promise<number> {
   if (isProUser) return PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_PRO;
@@ -268,28 +261,32 @@ export function getDatasetCacheTTL(isProUser: boolean): number {
     : PRO_PERFORMANCE.DATASET_CACHE_TTL_FREE;
 }
 
-export async function getWishlistBatchSize(isProUser: boolean, steamId?: string | null): Promise<number> {
-  if (isProUser) return PRO_PERFORMANCE.WISHLIST_BATCH_PRO;
-  const hasBoost = await hasWishlistBatchBoost(steamId);
-  return hasBoost ? 5 : PRO_PERFORMANCE.WISHLIST_BATCH_FREE; // Boost increases from 3 to 5
+export function getWishlistBatchSize(isProUser: boolean): number {
+  return isProUser 
+    ? PRO_PERFORMANCE.WISHLIST_BATCH_PRO 
+    : PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
 }
 
-// Synchronous version (uses cached rewards or defaults)
-export function getWishlistBatchSizeSync(isProUser: boolean, steamId?: string | null): number {
-  if (isProUser) return PRO_PERFORMANCE.WISHLIST_BATCH_PRO;
-  // Check cached rewards for boost
-  if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
-    const hasBoost = rewardsCache.rewards.some((reward: any) => reward?.type === 'wishlist_batch_boost');
-    if (hasBoost) return 5;
-  }
-  return PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
+// Synchronous version (same as async, kept for compatibility)
+export function getWishlistBatchSizeSync(isProUser: boolean): number {
+  return isProUser 
+    ? PRO_PERFORMANCE.WISHLIST_BATCH_PRO 
+    : PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
 }
 
-// Get price tracker limit (Pro only - Discord integration requires Pro)
+// Helper to check if user has Discord access (free users with consumable)
+async function hasDiscordAccess(steamId?: string | null): Promise<boolean> {
+  if (!steamId) return false;
+  const rewards = await getStoredRewards(steamId);
+  return rewards.some((reward: any) => reward?.type === 'discord_access');
+}
+
+// Get price tracker limit (Pro unlimited, free with Discord access: 5, free without: 0)
 export async function getPriceTrackerLimit(isProUser: boolean, steamId?: string | null): Promise<number> {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
-  // Price trackers require Pro subscription (Discord integration)
-  return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users
+  // Free users with Discord access get 5 price trackers
+  const hasAccess = await hasDiscordAccess(steamId);
+  return hasAccess ? 5 : PRO_LIMITS.PRICE_TRACKER_FREE; // 5 for Discord access, 0 otherwise
 }
 
 // Check if user can add more price trackers
@@ -298,11 +295,15 @@ export async function canAddPriceTracker(currentCount: number, isProUser: boolea
   return currentCount < limit;
 }
 
-// Synchronous version for backwards compatibility (Pro only - Discord integration requires Pro)
-export function getPriceTrackerLimitSync(isProUser: boolean): number {
+// Synchronous version for backwards compatibility (Pro unlimited, free with Discord access: 5, free without: 0)
+export function getPriceTrackerLimitSync(isProUser: boolean, steamId?: string | null): number {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
-  // Price trackers require Pro subscription (Discord integration)
-  return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users
+  // Check cached rewards for Discord access
+  if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
+    const hasAccess = rewardsCache.rewards.some((reward: any) => reward?.type === 'discord_access');
+    if (hasAccess) return 5;
+  }
+  return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users without Discord access
 }
 
 

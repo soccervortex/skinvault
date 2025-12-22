@@ -32,7 +32,7 @@ async function getStripeInstance(): Promise<Stripe> {
 const CONSUMABLE_PRICES: Record<string, number> = {
   'price_tracker_slot': 299, // €2.99 per slot (Pro only - not available for free users)
   'wishlist_slot': 199, // €1.99 per slot
-  'wishlist_batch_boost': 149, // €1.49 - Increase wishlist update batch size from 3 to 5
+  'discord_access': 499, // €4.99 - Discord access with 5 price trackers for free users
   'price_scan_boost': 249, // €2.49 - Increase concurrent price scans for free users
   'cache_boost': 199, // €1.99 - Longer price cache duration for free users
 };
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const consumableNames: Record<string, string> = {
       'price_tracker_slot': 'Price Tracker Slot',
       'wishlist_slot': 'Wishlist Slot',
-      'wishlist_batch_boost': 'Wishlist Batch Boost',
+      'discord_access': 'Discord Access',
       'price_scan_boost': 'Price Scan Boost',
       'cache_boost': 'Price Cache Boost',
     };
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     const consumableDescriptions: Record<string, string> = {
       'price_tracker_slot': 'Add extra price alerts (Pro feature)',
       'wishlist_slot': 'Add one additional item to your wishlist',
-      'wishlist_batch_boost': 'Increase wishlist price update batch size from 3 to 5 items',
+      'discord_access': 'Get Discord bot access with 5 price trackers (free users only)',
       'price_scan_boost': 'Increase concurrent price scans from 3 to 5',
       'cache_boost': 'Extend price cache duration from 30min to 1 hour',
     };

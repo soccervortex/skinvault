@@ -147,7 +147,7 @@ export default function WishlistPage() {
       const next: Record<string, { lowest: string; median: string; volume: string }> = {};
 
       // Pro users get faster batch processing
-      const batchSize = getWishlistBatchSizeSync(isPro, viewedUser?.steamId);
+      const batchSize = getWishlistBatchSizeSync(isPro);
       const batches: typeof items[] = [];
       for (let i = 0; i < items.length; i += batchSize) {
         batches.push(items.slice(i, i + batchSize));
