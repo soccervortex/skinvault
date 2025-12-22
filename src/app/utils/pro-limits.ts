@@ -282,12 +282,12 @@ async function hasDiscordAccess(steamId?: string | null): Promise<boolean> {
   return rewards.some((reward: any) => reward?.type === 'discord_access');
 }
 
-// Get price tracker limit (Pro unlimited, free with Discord access: 3, free without: 0)
+// Get price tracker limit (Pro unlimited, free with Discord access: 5, free without: 0)
 export async function getPriceTrackerLimit(isProUser: boolean, steamId?: string | null): Promise<number> {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
   // Free users with Discord access get 5 price trackers
   const hasAccess = await hasDiscordAccess(steamId);
-  return hasAccess ? 3 : PRO_LIMITS.PRICE_TRACKER_FREE; // 3 for Discord access, 0 otherwise
+  return hasAccess ? 5 : PRO_LIMITS.PRICE_TRACKER_FREE; // 5 for Discord access, 0 otherwise
 }
 
 // Check if user can add more price trackers
@@ -296,13 +296,13 @@ export async function canAddPriceTracker(currentCount: number, isProUser: boolea
   return currentCount < limit;
 }
 
-// Synchronous version for backwards compatibility (Pro unlimited, free with Discord access: 3, free without: 0)
+// Synchronous version for backwards compatibility (Pro unlimited, free with Discord access: 5, free without: 0)
 export function getPriceTrackerLimitSync(isProUser: boolean, steamId?: string | null): number {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
   // Check cached rewards for Discord access
   if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
     const hasAccess = rewardsCache.rewards.some((reward: any) => reward?.type === 'discord_access');
-    if (hasAccess) return 3;
+    if (hasAccess) return 5;
   }
   return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users without Discord access
 }
