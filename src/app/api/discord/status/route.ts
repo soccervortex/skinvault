@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
 import { getProUntil } from '@/app/utils/pro-storage';
+import { dbGet, dbSet, hasDiscordAccessServer } from '@/app/utils/database';
 
 // Helper to check if user has Discord access (Pro or consumable)
 async function hasDiscordAccess(steamId: string): Promise<boolean> {
@@ -10,14 +10,7 @@ async function hasDiscordAccess(steamId: string): Promise<boolean> {
   if (isPro) return true;
 
   // Check for Discord access consumable
-  try {
-    const rewardsKey = 'user_rewards';
-    const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
-    const userRewards = existingRewards[steamId] || [];
-    return userRewards.some((r: any) => r?.type === 'discord_access');
-  } catch {
-    return false;
-  }
+  return await hasDiscordAccessServer(steamId);
 }
 
 // Get Discord connection status for a Steam account
