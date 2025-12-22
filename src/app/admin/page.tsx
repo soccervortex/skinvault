@@ -62,6 +62,8 @@ export default function AdminPage() {
   const [loadingTestMode, setLoadingTestMode] = useState(true);
   const [testModeMessage, setTestModeMessage] = useState<string | null>(null);
   const [testModeError, setTestModeError] = useState<string | null>(null);
+  const [failedPurchases, setFailedPurchases] = useState<any[]>([]);
+  const [loadingFailedPurchases, setLoadingFailedPurchases] = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -162,6 +164,27 @@ export default function AdminPage() {
       }
     };
     loadTestMode();
+
+    const loadFailedPurchases = async () => {
+      if (!userIsOwner) return;
+      setLoadingFailedPurchases(true);
+      try {
+        const res = await fetch(`/api/admin/failed-purchases?steamId=${user?.steamId}`, {
+          headers: {
+            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFailedPurchases(data.failedPurchases || []);
+        }
+      } catch (e: any) {
+        console.error("Failed to load failed purchases:", e);
+      } finally {
+        setLoadingFailedPurchases(false);
+      }
+    };
+    loadFailedPurchases();
   }, [userIsOwner, user?.steamId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -632,6 +655,102 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Failed Purchases Section */}
+        {failedPurchases.length > 0 && (
+          <div className="mt-8 pt-8 border-t border-white/10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-xl md:rounded-2xl bg-red-500/10 border border-red-500/40 shrink-0">
+                <AlertTriangle className="text-red-400" size={16} />
+              </div>
+              <div>
+                <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                  Failed Purchases
+                </p>
+                <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                  Needs Manual Review
+                </h2>
+              </div>
+            </div>
+
+            <p className="text-[10px] md:text-[11px] text-gray-400 mb-6">
+              These purchases failed to fulfill automatically. Use the verify endpoint to manually fulfill them.
+            </p>
+
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl md:rounded-2xl p-3 md:p-4 max-h-96 overflow-y-auto">
+              <table className="w-full text-left text-[9px] md:text-[10px]">
+                <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
+                  <tr>
+                    <th className="py-2 pr-2">Date</th>
+                    <th className="py-2 pr-2">SteamID</th>
+                    <th className="py-2 pr-2">Type</th>
+                    <th className="py-2 pr-2">Amount</th>
+                    <th className="py-2 pr-2">Session ID</th>
+                    <th className="py-2 pr-2">Error</th>
+                    <th className="py-2 pr-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {failedPurchases.map((fp, idx) => (
+                    <tr key={idx} className="border-b border-white/5 last:border-b-0">
+                      <td className="py-2 pr-2 text-[9px]">
+                        {new Date(fp.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-2 font-mono text-[9px] break-all">
+                        {fp.steamId}
+                      </td>
+                      <td className="py-2 pr-2 text-[9px]">
+                        {fp.type === "pro" ? "👑 Pro" : "🎁 Consumable"}
+                      </td>
+                      <td className="py-2 pr-2 text-[9px]">
+                        €{fp.amount?.toFixed(2) || "0.00"}
+                      </td>
+                      <td className="py-2 pr-2 font-mono text-[8px] break-all">
+                        {fp.sessionId?.substring(0, 20)}...
+                      </td>
+                      <td className="py-2 pr-2 text-[9px] text-red-400">
+                        {fp.error || "Unknown"}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch('/api/payment/verify-purchase', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ sessionId: fp.sessionId, steamId: fp.steamId }),
+                              });
+                              const data = await res.json();
+                              if (res.ok && data.fulfilled) {
+                                setMessage(`Purchase fulfilled: ${data.message}`);
+                                // Reload failed purchases
+                                const reloadRes = await fetch(`/api/admin/failed-purchases?steamId=${user?.steamId}`, {
+                                  headers: { "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "" },
+                                });
+                                if (reloadRes.ok) {
+                                  const reloadData = await reloadRes.json();
+                                  setFailedPurchases(reloadData.failedPurchases || []);
+                                }
+                              } else {
+                                setError(data.error || 'Failed to fulfill purchase');
+                              }
+                            } catch (e: any) {
+                              setError(e?.message || "Request failed.");
+                            }
+                          }}
+                          className="p-1 text-emerald-400 hover:text-emerald-300"
+                          title="Fulfill Purchase"
+                        >
+                          <CheckCircle2 size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Purchase History Section */}
         <div className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
@@ -663,6 +782,7 @@ export default function AdminPage() {
                     <th className="py-2 pr-2">SteamID</th>
                     <th className="py-2 pr-2">Type</th>
                     <th className="py-2 pr-2">Amount</th>
+                    <th className="py-2 pr-2">Status</th>
                     <th className="py-2 pr-2">Details</th>
                   </tr>
                 </thead>
@@ -681,6 +801,13 @@ export default function AdminPage() {
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.currency === "eur" ? "€" : "$"}
                         {purchase.amount?.toFixed(2) || "0.00"}
+                      </td>
+                      <td className="py-2 pr-2 text-[9px]">
+                        {purchase.fulfilled !== false ? (
+                          <span className="text-emerald-400">✅ Fulfilled</span>
+                        ) : (
+                          <span className="text-red-400">❌ Failed</span>
+                        )}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.type === "pro"

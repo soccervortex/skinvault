@@ -22,9 +22,28 @@ function PaymentSuccessContent() {
       return;
     }
 
-    // Give webhook a moment to process, then refresh user data
-    const refreshProStatus = async (retries = 5) => {
+    // Give webhook a moment to process, then verify and refresh user data
+    const verifyAndRefresh = async (retries = 5) => {
       try {
+        // First, check if purchase was fulfilled
+        const verifyRes = await fetch(`/api/payment/verify-purchase?sessionId=${sessionId}&steamId=${steamId}`);
+        const verifyData = await verifyRes.json();
+        
+        // If not fulfilled, try to fulfill it now (manual verification)
+        if (!verifyData.fulfilled && verifyRes.ok) {
+          console.log('Purchase not fulfilled yet, attempting manual fulfillment...');
+          const fulfillRes = await fetch('/api/payment/verify-purchase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId, steamId }),
+          });
+          const fulfillData = await fulfillRes.json();
+          
+          if (fulfillData.fulfilled) {
+            console.log('✅ Purchase manually fulfilled:', fulfillData.message);
+          }
+        }
+
         // Refresh Pro status
         const res = await fetch(`/api/user/pro?id=${steamId}`);
         const data = await res.json();
@@ -43,23 +62,23 @@ function PaymentSuccessContent() {
 
         // If Pro status is still null and we have retries, wait and try again
         if (!data.proUntil && retries > 0) {
-          setTimeout(() => refreshProStatus(retries - 1), 1000);
+          setTimeout(() => verifyAndRefresh(retries - 1), 1000);
           return;
         }
 
         setLoading(false);
       } catch (e) {
         if (retries > 0) {
-          setTimeout(() => refreshProStatus(retries - 1), 1000);
+          setTimeout(() => verifyAndRefresh(retries - 1), 1000);
         } else {
-          setError('Failed to verify payment. Your Pro status may take a few moments to activate.');
+          setError('Failed to verify payment. Your Pro status may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId);
           setLoading(false);
         }
       }
     };
 
     // Start checking after 2 seconds
-    setTimeout(() => refreshProStatus(), 2000);
+    setTimeout(() => verifyAndRefresh(), 2000);
   }, [searchParams]);
 
   if (loading) {
