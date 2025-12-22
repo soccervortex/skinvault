@@ -72,14 +72,15 @@ export async function POST(request: Request) {
       const existingRewards = await kv.get<Record<string, any[]>>(rewardsKey) || {};
       const userRewards = existingRewards[steamId] || [];
 
-      // Check if already granted
-      const alreadyGranted = userRewards.some((r: any) => 
-        r?.type === consumableType && r?.sessionId === sessionId
-      );
+      // Check if already granted (check by type, not just sessionId)
+      const alreadyGrantedCount = userRewards.filter((r: any) => 
+        r?.type === consumableType
+      ).length;
 
-      if (!alreadyGranted) {
-        // Grant rewards
-        for (let i = 0; i < quantity; i++) {
+      // Grant missing rewards (if user has less than quantity)
+      if (alreadyGrantedCount < quantity) {
+        const toGrant = quantity - alreadyGrantedCount;
+        for (let i = 0; i < toGrant; i++) {
           userRewards.push({
             type: consumableType,
             grantedAt: new Date().toISOString(),
@@ -90,6 +91,9 @@ export async function POST(request: Request) {
 
         existingRewards[steamId] = userRewards;
         await kv.set(rewardsKey, existingRewards);
+        console.log(`✅ Granted ${toGrant} ${consumableType} to ${steamId} (${alreadyGrantedCount} already existed)`);
+      } else {
+        console.log(`ℹ️ User already has ${alreadyGrantedCount} ${consumableType}, no need to grant`);
       }
 
       // Update purchase history
@@ -113,12 +117,17 @@ export async function POST(request: Request) {
 
       await kv.set(purchasesKey, existingPurchases.slice(-1000));
 
+      const finalCount = existingRewards[steamId]?.filter((r: any) => r?.type === consumableType).length || 0;
+
       return NextResponse.json({ 
         success: true,
-        message: `Granted ${quantity} ${consumableType} to ${steamId}`,
+        message: alreadyGrantedCount < quantity 
+          ? `Granted ${quantity - alreadyGrantedCount} ${consumableType} to ${steamId}` 
+          : `User already has ${finalCount} ${consumableType}`,
         consumableType,
         quantity,
-        alreadyGranted,
+        alreadyGranted: alreadyGrantedCount >= quantity,
+        totalGranted: finalCount,
       });
     }
 
