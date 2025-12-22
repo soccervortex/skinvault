@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     const consumableDescriptions: Record<string, string> = {
       'price_tracker_slot': 'Add extra price alerts (Pro feature)',
       'wishlist_slot': 'Add one additional item to your wishlist',
-      'discord_access': 'Get Discord bot access with 5 price trackers (free users only)',
+      'discord_access': 'Get Discord bot access with 3 price trackers (free users only)',
       'price_scan_boost': 'Increase concurrent price scans from 3 to 5',
       'cache_boost': 'Extend price cache duration from 30min to 1 hour',
     };
