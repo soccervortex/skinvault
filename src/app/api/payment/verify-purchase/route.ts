@@ -172,11 +172,11 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const sessionId = url.searchParams.get('sessionId');
+    const sessionId = url.searchParams.get('session_id') || url.searchParams.get('sessionId');
     const steamId = url.searchParams.get('steamId');
 
     if (!sessionId) {
-      return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing session_id or sessionId' }, { status: 400 });
     }
 
     const { kv } = await import('@vercel/kv');

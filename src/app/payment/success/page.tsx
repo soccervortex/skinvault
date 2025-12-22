@@ -10,68 +10,123 @@ function PaymentSuccessContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | null>(null);
+  const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
     const steamId = searchParams.get('steamId');
+    const type = searchParams.get('type'); // 'pro' or 'consumable'
     const months = searchParams.get('months');
+    const consumableType = searchParams.get('consumableType');
+    const quantity = searchParams.get('quantity');
 
-    if (!sessionId || !steamId || !months) {
+    if (!sessionId || !steamId || !type) {
       setError('Missing payment information');
       setLoading(false);
       return;
     }
 
+    // Validate required fields based on type
+    if (type === 'pro' && !months) {
+      setError('Missing payment information (months)');
+      setLoading(false);
+      return;
+    }
+
+    if (type === 'consumable' && (!consumableType || !quantity)) {
+      setError('Missing payment information (consumable details)');
+      setLoading(false);
+      return;
+    }
+
+    setPurchaseType(type as 'pro' | 'consumable');
+
     // Give webhook a moment to process, then verify and refresh user data
     const verifyAndRefresh = async (retries = 5) => {
       try {
         // First, check if purchase was fulfilled
-        const verifyRes = await fetch(`/api/payment/verify-purchase?sessionId=${sessionId}&steamId=${steamId}`);
+        const verifyRes = await fetch(`/api/payment/verify-purchase?session_id=${sessionId}&steamId=${steamId}`);
         const verifyData = await verifyRes.json();
         
-        // If not fulfilled, try to fulfill it now (manual verification)
-        if (!verifyData.fulfilled && verifyRes.ok) {
+        // If purchase is already fulfilled, use that data
+        if (verifyData.fulfilled && verifyData.purchase) {
+          console.log('✅ Purchase already fulfilled');
+          setPurchaseDetails(verifyData.purchase);
+        } else {
+          // If not fulfilled, try to fulfill it now (manual verification)
           console.log('Purchase not fulfilled yet, attempting manual fulfillment...');
           const fulfillRes = await fetch('/api/payment/verify-purchase', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId, steamId }),
           });
+          
+          if (!fulfillRes.ok) {
+            const errorData = await fulfillRes.json();
+            throw new Error(errorData.error || 'Fulfillment request failed');
+          }
+          
           const fulfillData = await fulfillRes.json();
           
           if (fulfillData.fulfilled) {
             console.log('✅ Purchase manually fulfilled:', fulfillData.message);
+            setPurchaseDetails({
+              type: fulfillData.type,
+              consumableType: fulfillData.consumableType,
+              quantity: fulfillData.quantity,
+              months: fulfillData.months,
+              proUntil: fulfillData.proUntil,
+            });
+          } else {
+            throw new Error(fulfillData.error || 'Fulfillment failed');
           }
         }
 
-        // Refresh Pro status
-        const res = await fetch(`/api/user/pro?id=${steamId}`);
-        const data = await res.json();
-        
-        // Update localStorage if this is the logged-in user
-        const stored = localStorage.getItem('steam_user');
-        if (stored) {
-          const user = JSON.parse(stored);
-          if (user.steamId === steamId) {
-            user.proUntil = data.proUntil;
-            localStorage.setItem('steam_user', JSON.stringify(user));
-            // Trigger storage event so sidebar updates
-            window.dispatchEvent(new Event('storage'));
+        // For Pro subscriptions, refresh Pro status
+        if (type === 'pro') {
+          const res = await fetch(`/api/user/pro?id=${steamId}`);
+          const data = await res.json();
+          
+          // Update localStorage if this is the logged-in user
+          const stored = localStorage.getItem('steam_user');
+          if (stored) {
+            const user = JSON.parse(stored);
+            if (user.steamId === steamId) {
+              user.proUntil = data.proUntil;
+              localStorage.setItem('steam_user', JSON.stringify(user));
+              // Trigger storage event so sidebar updates
+              window.dispatchEvent(new Event('storage'));
+            }
           }
-        }
 
-        // If Pro status is still null and we have retries, wait and try again
-        if (!data.proUntil && retries > 0) {
-          setTimeout(() => verifyAndRefresh(retries - 1), 1000);
-          return;
+          // If Pro status is still null and we have retries, wait and try again
+          if (!data.proUntil && retries > 0) {
+            setTimeout(() => verifyAndRefresh(retries - 1), 1000);
+            return;
+          }
+        } else if (type === 'consumable') {
+          // For consumables, refresh rewards cache
+          const stored = localStorage.getItem('steam_user');
+          if (stored) {
+            const user = JSON.parse(stored);
+            if (user.steamId === steamId) {
+              // Clear rewards cache to force refresh
+              localStorage.removeItem('user_rewards_cache');
+              window.dispatchEvent(new Event('storage'));
+            }
+          }
         }
 
         setLoading(false);
-      } catch (e) {
+      } catch (e: any) {
         if (retries > 0) {
           setTimeout(() => verifyAndRefresh(retries - 1), 1000);
         } else {
-          setError('Failed to verify payment. Your Pro status may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId);
+          const errorMsg = type === 'pro' 
+            ? 'Failed to verify payment. Your Pro status may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId
+            : 'Failed to verify payment. Your consumable may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId;
+          setError(errorMsg);
           setLoading(false);
         }
       }
@@ -122,7 +177,11 @@ function PaymentSuccessContent() {
           Payment Successful!
         </h1>
         <p className="text-[10px] md:text-[11px] text-gray-400">
-          Your Pro subscription has been activated. You can now enjoy all premium features.
+          {purchaseType === 'pro' 
+            ? 'Your Pro subscription has been activated. You can now enjoy all premium features.'
+            : purchaseDetails?.consumableType
+              ? `Your ${purchaseDetails.consumableType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}${purchaseDetails.quantity > 1 ? ` (x${purchaseDetails.quantity})` : ''} has been added to your account.`
+              : 'Your purchase has been processed successfully. Your consumable has been added to your account.'}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
           <Link
@@ -131,12 +190,21 @@ function PaymentSuccessContent() {
           >
             Go to My Vault
           </Link>
-          <Link
-            href="/pro"
-            className="bg-black/40 border border-white/10 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:border-white/20 transition-all"
-          >
-            View Pro Info
-          </Link>
+          {purchaseType === 'pro' ? (
+            <Link
+              href="/pro"
+              className="bg-black/40 border border-white/10 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:border-white/20 transition-all"
+            >
+              View Pro Info
+            </Link>
+          ) : (
+            <Link
+              href="/shop"
+              className="bg-black/40 border border-white/10 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:border-white/20 transition-all"
+            >
+              Back to Shop
+            </Link>
+          )}
         </div>
       </div>
     </div>
