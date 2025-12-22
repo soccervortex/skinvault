@@ -455,6 +455,28 @@ export default function AdminPage() {
       if (res.ok) {
         setMessage(`Steam ID ${banStatus.steamId} has been unbanned`);
         setBanStatus({ steamId: banStatus.steamId, banned: false });
+        
+        // Clear the banned notification from localStorage if it exists
+        try {
+          if (typeof window !== 'undefined') {
+            const stored = window.localStorage.getItem('sv_banned_notification');
+            if (stored) {
+              const notification = JSON.parse(stored);
+              // If this is the same user, clear the notification
+              if (notification.steamId === banStatus.steamId) {
+                window.localStorage.removeItem('sv_banned_notification');
+                // Trigger a storage event so other tabs/pages also clear it
+                window.dispatchEvent(new StorageEvent('storage', {
+                  key: 'sv_banned_notification',
+                  oldValue: stored,
+                  newValue: null,
+                }));
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore errors
+        }
       } else {
         setError(data.error || "Failed to unban Steam ID");
       }

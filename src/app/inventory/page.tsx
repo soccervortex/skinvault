@@ -516,11 +516,12 @@ function InventoryContent() {
           try {
             if (typeof window !== 'undefined') {
               window.localStorage.removeItem('steam_user');
-              // Store banned notification state with timestamp (30 seconds)
+              // Store banned notification state with timestamp (30 seconds) and steamId
               const bannedNotification = {
                 message: 'Your account has been banned from this service. Please contact support if you believe this is an error.',
                 timestamp: Date.now(),
                 duration: 30000, // 30 seconds
+                steamId: viewedSteamId, // Store steamId to check ban status later
               };
               window.localStorage.setItem('sv_banned_notification', JSON.stringify(bannedNotification));
               // Show banned notification immediately

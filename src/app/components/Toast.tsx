@@ -47,7 +47,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   // Check for persisted banned notification on mount and page navigation
   useEffect(() => {
-    const checkBannedNotification = () => {
+    const checkBannedNotification = async () => {
       try {
         if (typeof window === 'undefined') return;
         
@@ -59,20 +59,39 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         const elapsed = now - notification.timestamp;
         const remaining = Math.max(0, notification.duration - elapsed);
 
-        if (remaining > 0) {
-          // Show the notification for the remaining time
-          showToast(notification.message, 'error', remaining);
-          
-          // Clear the localStorage after the remaining time
-          setTimeout(() => {
-            try {
-              window.localStorage.removeItem('sv_banned_notification');
-            } catch {}
-          }, remaining);
-        } else {
-          // Notification expired, remove it
+        // If notification has expired, remove it
+        if (remaining <= 0) {
           window.localStorage.removeItem('sv_banned_notification');
+          return;
         }
+
+        // Check if user is still banned (if steamId is stored)
+        if (notification.steamId) {
+          try {
+            const response = await fetch(`/api/admin/ban?steamId=${notification.steamId}`);
+            if (response.ok) {
+              const data = await response.json();
+              // If user is no longer banned, clear the notification
+              if (data.banned !== true) {
+                window.localStorage.removeItem('sv_banned_notification');
+                return;
+              }
+            }
+          } catch (error) {
+            // If check fails, still show notification (better safe than sorry)
+            console.warn('Failed to check ban status:', error);
+          }
+        }
+
+        // User is still banned, show the notification for the remaining time
+        showToast(notification.message, 'error', remaining);
+        
+        // Clear the localStorage after the remaining time
+        setTimeout(() => {
+          try {
+            window.localStorage.removeItem('sv_banned_notification');
+          } catch {}
+        }, remaining);
       } catch (error) {
         // Ignore errors (invalid JSON, localStorage issues, etc.)
         try {
