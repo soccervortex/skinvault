@@ -3,13 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ShoppingCart, Package, Crown, Loader2, Sparkles, Bell, Heart } from 'lucide-react';
+import { ShoppingCart, Package, Loader2, Bell, Heart } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 export default function ShopPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
-  const [categories, setCategories] = useState<any[]>([]);
   const toast = useToast();
 
   useEffect(() => {
@@ -21,15 +20,7 @@ export default function ShopPage() {
     } catch {
       setUser(null);
     }
-
-    // Load categories
-    fetch('/api/categories')
-      .then(res => res.json())
-      .then(data => setCategories(data.categories || []))
-      .catch(() => setCategories([]));
   }, []);
-
-  const isPro = user?.proUntil && new Date(user.proUntil) > new Date();
 
   const handleCheckout = async (type: 'price_tracker_slot' | 'wishlist_slot', quantity: number = 1) => {
     if (!user?.steamId) {
@@ -72,252 +63,134 @@ export default function ShopPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
-      <Sidebar categories={categories} activeCat={null} setActiveCat={() => {}} />
-      
-      <main className="ml-0 md:ml-64 p-4 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <ShoppingCart className="w-8 h-8 text-blue-400" />
-              <h1 className="text-3xl md:text-4xl font-black uppercase tracking-wider">Shop</h1>
+    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <Sidebar />
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+        <div className="w-full max-w-4xl bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
+              <ShoppingCart className="text-blue-400" size={20} />
             </div>
-            <p className="text-slate-400 text-sm md:text-base">
-              Purchase Pro subscriptions and consumables to enhance your SkinVault experience
-            </p>
-          </div>
-
-          {/* Pro Subscriptions Section */}
-          <div className="mb-12">
-            <div className="flex items-center gap-2 mb-6">
-              <Crown className="w-6 h-6 text-yellow-400" />
-              <h2 className="text-2xl font-black uppercase tracking-wider">Pro Subscriptions</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {/* 1 Month */}
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-blue-500 transition-all">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold">1 Month</h3>
-                  <Crown className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-black">€9.99</span>
-                  <span className="text-slate-400 text-sm ml-2">/month</span>
-                </div>
-                <ul className="text-sm text-slate-300 space-y-2 mb-6">
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Unlimited wishlist items
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-blue-400" />
-                    Unlimited price alerts
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Advanced stats
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Discord bot features
-                  </li>
-                </ul>
-                <Link
-                  href="/pro"
-                  className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs tracking-widest py-3 px-4 rounded-lg text-center transition-all"
-                >
-                  View Details
-                </Link>
-              </div>
-
-              {/* 3 Months */}
-              <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border-2 border-blue-500 rounded-xl p-6 hover:border-blue-400 transition-all relative">
-                <div className="absolute top-4 right-4 bg-blue-500 text-white text-xs font-black uppercase px-2 py-1 rounded">
-                  Best Value
-                </div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold">3 Months</h3>
-                  <Crown className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-black">€24.99</span>
-                  <span className="text-slate-400 text-sm ml-2">/3 months</span>
-                </div>
-                <div className="mb-4">
-                  <span className="text-green-400 text-sm font-bold">Save €4.98</span>
-                </div>
-                <ul className="text-sm text-slate-300 space-y-2 mb-6">
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Unlimited wishlist items
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-blue-400" />
-                    Unlimited price alerts
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Advanced stats
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Discord bot features
-                  </li>
-                </ul>
-                <Link
-                  href="/pro"
-                  className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs tracking-widest py-3 px-4 rounded-lg text-center transition-all"
-                >
-                  View Details
-                </Link>
-              </div>
-
-              {/* 6 Months */}
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-blue-500 transition-all">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold">6 Months</h3>
-                  <Crown className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-black">€44.99</span>
-                  <span className="text-slate-400 text-sm ml-2">/6 months</span>
-                </div>
-                <div className="mb-4">
-                  <span className="text-green-400 text-sm font-bold">Save €14.95</span>
-                </div>
-                <ul className="text-sm text-slate-300 space-y-2 mb-6">
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Unlimited wishlist items
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-blue-400" />
-                    Unlimited price alerts
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Advanced stats
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    Discord bot features
-                  </li>
-                </ul>
-                <Link
-                  href="/pro"
-                  className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs tracking-widest py-3 px-4 rounded-lg text-center transition-all"
-                >
-                  View Details
-                </Link>
-              </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Consumables</p>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">Shop</h1>
             </div>
           </div>
 
-          {/* Consumables Section */}
-          <div className="mb-12">
-            <div className="flex items-center gap-2 mb-6">
-              <Package className="w-6 h-6 text-purple-400" />
-              <h2 className="text-2xl font-black uppercase tracking-wider">Consumables</h2>
+          <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed">
+            Purchase extra slots for price trackers and wishlist items. Perfect if you only need a few extra slots without a full Pro subscription.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            {/* Price Tracker Slots */}
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-purple-600/20 border border-purple-500/40">
+                  <Bell className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Price Tracker Slots</p>
+                  <p className="text-xl md:text-2xl font-black text-white">€2.99</p>
+                  <p className="text-[8px] md:text-[9px] text-gray-500">per slot</p>
+                </div>
+              </div>
+              <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+                Add extra price alerts to track more items. Each slot allows you to set one additional price alert.
+              </p>
+              <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                ✓ Permanent slot - never expires
+              </p>
+              <button
+                onClick={() => handleCheckout('price_tracker_slot', 1)}
+                disabled={loading === 'price_tracker_slot_1' || !user?.steamId}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-purple-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading === 'price_tracker_slot_1' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={12} /> Purchase Slot
+                  </>
+                )}
+              </button>
             </div>
-            
-            <p className="text-slate-400 mb-6 text-sm">
-              Purchase extra slots for price trackers and wishlist items. Perfect if you only need a few extra slots without a full Pro subscription.
-            </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Price Tracker Slots */}
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Bell className="w-6 h-6 text-blue-400" />
-                  <h3 className="text-xl font-bold">Price Tracker Slots</h3>
+            {/* Wishlist Slots */}
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-pink-600/20 border border-pink-500/40">
+                  <Heart className="w-5 h-5 text-pink-400" />
                 </div>
-                <p className="text-slate-400 text-sm mb-4">
-                  Add extra price alerts to track more items. Each slot allows you to set one additional price alert.
-                </p>
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-2xl font-black">€2.99</span>
-                    <span className="text-slate-400 text-sm">per slot</span>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Permanent slot - never expires
-                  </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Wishlist Slots</p>
+                  <p className="text-xl md:text-2xl font-black text-white">€1.99</p>
+                  <p className="text-[8px] md:text-[9px] text-gray-500">per slot</p>
                 </div>
-                <button
-                  onClick={() => handleCheckout('price_tracker_slot', 1)}
-                  disabled={loading === 'price_tracker_slot_1' || !user?.steamId}
-                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-black uppercase text-xs tracking-widest py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2"
-                >
-                  {loading === 'price_tracker_slot_1' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-4 h-4" />
-                      Purchase Slot
-                    </>
-                  )}
-                </button>
               </div>
-
-              {/* Wishlist Slots */}
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Heart className="w-6 h-6 text-pink-400" />
-                  <h3 className="text-xl font-bold">Wishlist Slots</h3>
-                </div>
-                <p className="text-slate-400 text-sm mb-4">
-                  Add extra items to your wishlist. Each slot allows you to add one additional item to your wishlist.
-                </p>
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-2xl font-black">€1.99</span>
-                    <span className="text-slate-400 text-sm">per slot</span>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Permanent slot - never expires
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleCheckout('wishlist_slot', 1)}
-                  disabled={loading === 'wishlist_slot_1' || !user?.steamId}
-                  className="w-full bg-pink-600 hover:bg-pink-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-black uppercase text-xs tracking-widest py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2"
-                >
-                  {loading === 'wishlist_slot_1' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-4 h-4" />
-                      Purchase Slot
-                    </>
-                  )}
-                </button>
-              </div>
+              <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+                Add extra items to your wishlist. Each slot allows you to add one additional item to your wishlist.
+              </p>
+              <p className="text-[8px] md:text-[9px] text-emerald-400 font-bold">
+                ✓ Permanent slot - never expires
+              </p>
+              <button
+                onClick={() => handleCheckout('wishlist_slot', 1)}
+                disabled={loading === 'wishlist_slot_1' || !user?.steamId}
+                className="w-full bg-pink-600 hover:bg-pink-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-pink-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading === 'wishlist_slot_1' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={12} /> Purchase Slot
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
           {/* Info Section */}
-          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6">
-            <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-400" />
-              About Consumables
-            </h3>
-            <ul className="text-sm text-slate-300 space-y-2">
-              <li>• Consumables are one-time purchases that add permanent slots to your account</li>
-              <li>• Slots are permanent and never expire</li>
-              <li>• Perfect if you only need a few extra slots without a full Pro subscription</li>
-              <li>• Pro users get unlimited slots automatically - no need to purchase consumables</li>
+          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5 space-y-2">
+            <p className="font-black uppercase tracking-[0.3em] text-gray-500 text-[9px] md:text-[10px]">About Consumables</p>
+            <ul className="space-y-1 text-gray-300 text-[10px] md:text-[11px]">
+              <li>– Consumables are one-time purchases that add permanent slots to your account</li>
+              <li>– Slots are permanent and never expire</li>
+              <li>– Perfect if you only need a few extra slots without a full Pro subscription</li>
+              <li>– Pro users get unlimited slots automatically - no need to purchase consumables</li>
             </ul>
           </div>
+
+          {!user && (
+            <div className="pt-4 border-t border-white/5 text-center space-y-4">
+              <p className="text-[11px] text-gray-400">
+                Sign in with Steam to purchase consumables
+              </p>
+              <Link
+                href="/inventory"
+                className="inline-block bg-blue-600 px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-500 transition-all"
+              >
+                Sign In with Steam
+              </Link>
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-white/5 text-center">
+            <p className="text-[8px] md:text-[9px] text-gray-500 mb-2">
+              Want a full Pro subscription instead?
+            </p>
+            <Link
+              href="/pro"
+              className="inline-block text-blue-400 hover:text-blue-300 text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all"
+            >
+              View Pro Plans →
+            </Link>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
