@@ -220,6 +220,13 @@ async function hasCacheBoost(steamId?: string | null): Promise<boolean> {
   return rewards.some((reward: any) => reward?.type === 'cache_boost');
 }
 
+// Helper to check if user has wishlist batch boost
+async function hasWishlistBatchBoost(steamId?: string | null): Promise<boolean> {
+  if (!steamId) return false;
+  const rewards = await getStoredRewards(steamId);
+  return rewards.some((reward: any) => reward?.type === 'wishlist_batch_boost');
+}
+
 // Performance helpers
 export async function getPriceScanConcurrency(isProUser: boolean, steamId?: string | null): Promise<number> {
   if (isProUser) return PRO_PERFORMANCE.PRICE_SCAN_CONCURRENCY_PRO;
@@ -261,10 +268,21 @@ export function getDatasetCacheTTL(isProUser: boolean): number {
     : PRO_PERFORMANCE.DATASET_CACHE_TTL_FREE;
 }
 
-export function getWishlistBatchSize(isProUser: boolean): number {
-  return isProUser 
-    ? PRO_PERFORMANCE.WISHLIST_BATCH_PRO 
-    : PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
+export async function getWishlistBatchSize(isProUser: boolean, steamId?: string | null): Promise<number> {
+  if (isProUser) return PRO_PERFORMANCE.WISHLIST_BATCH_PRO;
+  const hasBoost = await hasWishlistBatchBoost(steamId);
+  return hasBoost ? 5 : PRO_PERFORMANCE.WISHLIST_BATCH_FREE; // Boost increases from 3 to 5
+}
+
+// Synchronous version (uses cached rewards or defaults)
+export function getWishlistBatchSizeSync(isProUser: boolean, steamId?: string | null): number {
+  if (isProUser) return PRO_PERFORMANCE.WISHLIST_BATCH_PRO;
+  // Check cached rewards for boost
+  if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
+    const hasBoost = rewardsCache.rewards.some((reward: any) => reward?.type === 'wishlist_batch_boost');
+    if (hasBoost) return 5;
+  }
+  return PRO_PERFORMANCE.WISHLIST_BATCH_FREE;
 }
 
 // Get price tracker limit (Pro only - Discord integration requires Pro)

@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
-import { getWishlistLimitSync, getWishlistBatchSize, preloadRewards } from '@/app/utils/pro-limits';
+import { getWishlistLimitSync, getWishlistBatchSize, getWishlistBatchSizeSync, preloadRewards } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
 const PROXY_LIST = [
@@ -147,7 +147,7 @@ export default function WishlistPage() {
       const next: Record<string, { lowest: string; median: string; volume: string }> = {};
 
       // Pro users get faster batch processing
-      const batchSize = getWishlistBatchSize(isPro);
+      const batchSize = getWishlistBatchSizeSync(isPro, viewedUser?.steamId);
       const batches: typeof items[] = [];
       for (let i = 0; i < items.length; i += batchSize) {
         batches.push(items.slice(i, i + batchSize));
