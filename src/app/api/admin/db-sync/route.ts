@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${result.synced} keys from MongoDB to KV`,
+      message: `Synced ${result.synced} keys from MongoDB to KV (${result.failed} failed, ${result.total} total)`,
       result,
       health,
     });

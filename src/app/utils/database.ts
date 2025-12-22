@@ -151,26 +151,47 @@ async function mongoSet<T>(key: string, value: T): Promise<boolean> {
   try {
     const collection = await getMongoCollection(key);
     if (!collection) {
-      console.error(`[Database] Failed to get MongoDB collection for key ${key}`);
+      console.error(`[Database] ❌ Failed to get MongoDB collection for key ${key}`);
       return false;
     }
 
     // Store as single document with _id = key, value = actual data
     const result = await collection.updateOne(
       { _id: key } as any,
-      { $set: { _id: key, value, updatedAt: new Date() } },
+      { 
+        $set: { 
+          _id: key, 
+          value, 
+          updatedAt: new Date(),
+          source: 'db_set'
+        } 
+      },
       { upsert: true }
     );
     
     if (result.acknowledged) {
-      console.log(`[Database] MongoDB write acknowledged for ${key} (matched: ${result.matchedCount}, modified: ${result.modifiedCount}, upserted: ${result.upsertedCount})`);
+      const action = result.upsertedCount > 0 ? 'created' : (result.modifiedCount > 0 ? 'updated' : 'no change');
+      console.log(`[Database] ✅ MongoDB write acknowledged for ${key} (${action}, matched: ${result.matchedCount}, modified: ${result.modifiedCount}, upserted: ${result.upsertedCount})`);
+      
+      // Verify the write by reading it back
+      try {
+        const verify = await collection.findOne({ _id: key } as any);
+        if (verify && JSON.stringify(verify.value) === JSON.stringify(value)) {
+          console.log(`[Database] ✅ Verified MongoDB write for ${key}`);
+        } else {
+          console.warn(`[Database] ⚠️ MongoDB write verification failed for ${key}`);
+        }
+      } catch (verifyError) {
+        console.warn(`[Database] ⚠️ Could not verify MongoDB write for ${key}:`, verifyError);
+      }
+      
       return true;
     } else {
-      console.error(`[Database] MongoDB write not acknowledged for ${key}`);
+      console.error(`[Database] ❌ MongoDB write not acknowledged for ${key}`);
       return false;
     }
-  } catch (error) {
-    console.error(`[Database] MongoDB set failed for key ${key}:`, error);
+  } catch (error: any) {
+    console.error(`[Database] ❌ MongoDB set failed for key ${key}:`, error?.message || error);
     return false;
   }
 }
@@ -353,7 +374,6 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
         .then((success) => {
           if (success) {
             mongoSuccess = true;
-            console.log(`[Database] ✅ MongoDB write succeeded for ${key}`);
             if (!kvSuccess) {
               dbStatus = 'mongodb';
             }
@@ -370,7 +390,12 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   }
 
   // Wait for both writes (don't fail if one fails)
-  await Promise.allSettled(writePromises);
+  const results = await Promise.allSettled(writePromises);
+  
+  // Log summary
+  const kvResult = results[0]?.status === 'fulfilled' ? '✅' : '❌';
+  const mongoResult = results[1]?.status === 'fulfilled' ? '✅' : '❌';
+  console.log(`[Database] Write summary for ${key}: KV ${kvResult} | MongoDB ${mongoResult}`);
 
   // If KV failed but MongoDB succeeded, try to sync back to KV when it recovers
   if (!kvSuccess && mongoSuccess) {
