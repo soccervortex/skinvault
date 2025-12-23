@@ -59,9 +59,11 @@ export async function GET(request: Request) {
     const { isOwner } = await import('@/app/utils/owner-ids');
     const isAdmin = adminSteamId && isOwner(adminSteamId);
     
-    // Verify current user is a participant in this DM
+    // Verify current user is a participant in this DM (or admin)
+    // If admin, allow access without currentUserId requirement
     const isParticipant = currentUserId && (steamId1 === currentUserId || steamId2 === currentUserId);
 
+    // Admins can view any DM, participants can view their own DMs
     if (!isAdmin && !isParticipant) {
       return NextResponse.json({ error: 'Unauthorized - you are not a participant in this DM' }, { status: 403 });
     }

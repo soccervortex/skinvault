@@ -27,6 +27,8 @@ export default function UserManagementPage() {
   const [user, setUser] = useState<any>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [dmMessages, setDmMessages] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'global' | 'dms'>('global');
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('lifetime');
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +53,8 @@ export default function UserManagementPage() {
   const userIsOwner = isOwner(user?.steamId);
 
   useEffect(() => {
+    // Wait for user to load before checking ownership
+    if (user === null) return; // Still loading
     if (!userIsOwner || !steamId) {
       router.push('/admin');
       return;
@@ -66,6 +70,7 @@ export default function UserManagementPage() {
           const data = await res.json();
           setUserInfo(data.user);
           setMessages(data.messages || []);
+          setDmMessages(data.dmMessages || []);
         }
       } catch (error) {
         console.error('Failed to load user info:', error);
@@ -172,7 +177,7 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = async (messageId: string, messageType: 'global' | 'dm' = 'global', dmId?: string) => {
     if (!userIsOwner || !messageId) return;
 
     if (!confirm('Are you sure you want to delete this message?')) {
@@ -180,7 +185,11 @@ export default function UserManagementPage() {
     }
 
     try {
-      const res = await fetch(`/api/chat/messages/${messageId}?userSteamId=${user?.steamId}&type=global`, {
+      const url = messageType === 'global'
+        ? `/api/chat/messages/${messageId}?userSteamId=${user?.steamId}&type=global`
+        : `/api/chat/messages/${messageId}?userSteamId=${user?.steamId}&type=dm&dmId=${dmId || ''}`;
+      
+      const res = await fetch(url, {
         method: 'DELETE',
       });
 
@@ -193,6 +202,7 @@ export default function UserManagementPage() {
         if (reloadRes.ok) {
           const data = await reloadRes.json();
           setMessages(data.messages || []);
+          setDmMessages(data.dmMessages || []);
           if (userInfo) {
             setUserInfo({ ...userInfo, messageCount: data.messages?.length || 0 });
           }
@@ -392,31 +402,86 @@ export default function UserManagementPage() {
 
               {/* Messages */}
               <div className="bg-[#11141d] p-6 rounded-2xl border border-white/10">
-                <h2 className="text-xl font-bold mb-4">Chat Messages ({messages.length})</h2>
-                {messages.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">No messages found</p>
-                ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
-                    {messages.map((msg) => (
-                      <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all">
-                        <div className="flex items-start justify-between mb-2">
-                          <span className="text-xs text-gray-500">
-                            {new Date(msg.timestamp).toLocaleString()}
-                          </span>
-                          {userIsOwner && msg.id && (
-                            <button
-                              onClick={() => handleDeleteMessage(msg.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
-                              title="Delete message"
-                            >
-                              <Trash2 size={14} className="text-red-400" />
-                            </button>
-                          )}
+                <div className="flex items-center gap-4 mb-4">
+                  <button
+                    onClick={() => setActiveTab('global')}
+                    className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+                      activeTab === 'global'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[#08090d] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Global Chat ({messages.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('dms')}
+                    className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+                      activeTab === 'dms'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[#08090d] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Direct Messages ({dmMessages.length})
+                  </button>
+                </div>
+                
+                {activeTab === 'global' ? (
+                  messages.length === 0 ? (
+                    <p className="text-gray-400 text-center py-8">No global messages found</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                      {messages.map((msg) => (
+                        <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all">
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-xs text-gray-500">
+                              {new Date(msg.timestamp).toLocaleString()}
+                            </span>
+                            {userIsOwner && msg.id && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id, 'global')}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                                title="Delete message"
+                              >
+                                <Trash2 size={14} className="text-red-400" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-300">{msg.message}</p>
                         </div>
-                        <p className="text-sm text-gray-300">{msg.message}</p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  dmMessages.length === 0 ? (
+                    <p className="text-gray-400 text-center py-8">No DM messages found</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                      {dmMessages.map((msg) => (
+                        <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <span className="text-xs text-gray-500">
+                                {new Date(msg.timestamp).toLocaleString()}
+                              </span>
+                              <p className="text-xs text-blue-400 mt-1">
+                                DM with: {msg.otherUserId}
+                              </p>
+                            </div>
+                            {userIsOwner && msg.id && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id, 'dm', msg.dmId)}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                                title="Delete message"
+                              >
+                                <Trash2 size={14} className="text-red-400" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-300">{msg.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
             </>

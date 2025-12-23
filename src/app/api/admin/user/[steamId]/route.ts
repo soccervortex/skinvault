@@ -3,7 +3,7 @@ import { MongoClient } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
 import { isOwner } from '@/app/utils/owner-ids';
 import { getProUntil } from '@/app/utils/pro-storage';
-import { getCollectionNamesForRange, getChatCollectionName } from '@/app/utils/chat-collections';
+import { getCollectionNamesForRange, getChatCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
