@@ -224,8 +224,11 @@ export async function PATCH(request: Request) {
     const db = client.db(MONGODB_DB_NAME);
     const reportsCollection = db.collection<Report>('chat_reports');
 
-    const update: any = { status };
-    if (adminNotes) {
+    const update: any = { 
+      status,
+      lastUpdated: new Date()
+    };
+    if (adminNotes !== undefined) {
       update.adminNotes = adminNotes;
     }
 

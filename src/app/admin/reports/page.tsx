@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, Flag, Search, Eye, CheckCircle, XCircle, MessageSquare, Users } from 'lucide-react';
+import { Loader2, Flag, Search, Eye, CheckCircle, XCircle, MessageSquare, Users, Save } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
 
@@ -36,6 +36,15 @@ export default function ReportsPage() {
   const [adminNotes, setAdminNotes] = useState('');
   const [updating, setUpdating] = useState(false);
   const toast = useToast();
+
+  // Update adminNotes when report is selected
+  useEffect(() => {
+    if (selectedReport) {
+      setAdminNotes(selectedReport.adminNotes || '');
+    } else {
+      setAdminNotes('');
+    }
+  }, [selectedReport]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -101,8 +110,12 @@ export default function ReportsPage() {
 
       if (res.ok) {
         toast.success('Report status updated');
-        setSelectedReport(null);
-        setAdminNotes('');
+        // Update selected report with new status
+        if (selectedReport) {
+          setSelectedReport({ ...selectedReport, status: newStatus, adminNotes: adminNotes || selectedReport.adminNotes });
+        }
+        // Don't clear adminNotes if we're just updating status
+        // setAdminNotes('');
         // Reload reports
         const url = statusFilter === 'all' 
           ? `/api/chat/report?adminSteamId=${user?.steamId}`
@@ -282,7 +295,46 @@ export default function ReportsPage() {
               </div>
 
               <div className="mb-6">
-                <label className="block text-xs text-gray-500 mb-2">Admin Notes</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs text-gray-500">Admin Notes</label>
+                  <button
+                    onClick={async () => {
+                      if (!selectedReport) return;
+                      setUpdating(true);
+                      try {
+                        const res = await fetch('/api/chat/report', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            reportId: selectedReport.id,
+                            adminSteamId: user?.steamId,
+                            status: selectedReport.status, // Keep current status
+                            adminNotes: adminNotes || undefined,
+                          }),
+                        });
+                        if (res.ok) {
+                          toast.success('Admin notes saved');
+                          if (selectedReport) {
+                            setSelectedReport({ ...selectedReport, adminNotes: adminNotes || undefined });
+                          }
+                        } else {
+                          const errorData = await res.json();
+                          toast.error(errorData.error || 'Failed to save notes');
+                        }
+                      } catch (error) {
+                        console.error('Failed to save notes:', error);
+                        toast.error('Failed to save notes');
+                      } finally {
+                        setUpdating(false);
+                      }
+                    }}
+                    disabled={updating}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {updating ? <Loader2 className="animate-spin" size={12} /> : <Save size={12} />}
+                    Save Notes
+                  </button>
+                </div>
                 <textarea
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}

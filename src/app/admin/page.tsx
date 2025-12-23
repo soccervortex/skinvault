@@ -1309,19 +1309,8 @@ export default function AdminPage() {
             e.stopPropagation();
             const trimmedId = searchSteamId?.trim();
             if (trimmedId && trimmedId.length >= 17 && /^\d{17}$/.test(trimmedId)) {
-              try {
-                // Verify user exists by checking the API first
-                const checkRes = await fetch(`/api/admin/user/${trimmedId}?adminSteamId=${user?.steamId}`);
-                if (checkRes.ok) {
-                  router.push(`/admin/user/${trimmedId}`);
-                } else {
-                  const errorData = await checkRes.json();
-                  toast.error(errorData.error || 'User not found');
-                }
-              } catch (error) {
-                console.error('Failed to check user:', error);
-                toast.error('Failed to search user');
-              }
+              // Navigate directly - API will handle validation
+              router.push(`/admin/user/${trimmedId}`);
             } else {
               toast.error('Please enter a valid Steam ID (17 digits)');
             }

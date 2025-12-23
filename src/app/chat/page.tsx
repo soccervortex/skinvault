@@ -241,34 +241,36 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user?.steamId) return;
     
+    // Initial fetch (preloading already handles this, but ensure it runs)
     if (activeTab === 'global') {
-      // Only fetch if messages are empty (initial load), otherwise poll
       if (messages.length === 0) {
         fetchMessages();
       }
-      // Optimize: Poll every 3 seconds for better performance
-      const interval = setInterval(fetchMessages, 3000);
-      return () => clearInterval(interval);
     } else {
-      // Only fetch if lists are empty (initial load), otherwise poll
       if (dmList.length === 0) {
         fetchDMList();
       }
       if (dmInvites.length === 0) {
         fetchDMInvites();
       }
-      // Optimize: Poll every 3 seconds
-      const interval = setInterval(() => {
+    }
+    
+    // Polling interval - optimized to 3 seconds
+    const interval = setInterval(() => {
+      if (activeTab === 'global') {
+        fetchMessages();
+      } else {
         fetchDMList();
         fetchDMInvites();
         if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           fetchDMMessages(steamId1, steamId2);
         }
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [activeTab, selectedDM, user?.steamId, isAdmin]);
+      }
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [activeTab, selectedDM, user?.steamId]);
 
   useEffect(() => {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {

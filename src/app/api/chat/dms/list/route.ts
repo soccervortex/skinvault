@@ -7,7 +7,7 @@ async function fetchSteamProfile(steamId: string): Promise<{ name: string; avata
   try {
     const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
     const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
-      next: { revalidate: 300 }, // Cache for 5 minutes
+      cache: 'no-store', // Don't cache in API routes
     });
     const text = await textRes.text();
     const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
