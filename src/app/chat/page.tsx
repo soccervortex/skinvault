@@ -9,7 +9,7 @@ import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
 import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead } from '@/app/utils/chat-notifications';
-import { useChatStream } from '@/app/hooks/useChatStream';
+import { usePusherChat } from '@/app/hooks/usePusherChat';
 import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
 
 interface ChatMessage {
@@ -124,14 +124,14 @@ export default function ChatPage() {
   const lastGlobalMessageId = messages.length > 0 ? messages[messages.length - 1]?.id : undefined;
   const lastDMMessageId = dmMessages.length > 0 ? dmMessages[dmMessages.length - 1]?.id : undefined;
   
-  const globalStream = useChatStream(
+  const globalStream = usePusherChat(
     globalChannel || '',
     user?.steamId || null,
     activeTab === 'global' && !globalChatDisabled && !searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly,
     lastGlobalMessageId
   );
   
-  const dmStream = useChatStream(
+  const dmStream = usePusherChat(
     dmChannel || '',
     user?.steamId || null,
     activeTab === 'dms' && !!selectedDM && !dmChatDisabled,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayCollectionName, getCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
+import Pusher from 'pusher';
 
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
@@ -327,6 +328,39 @@ export async function POST(request: Request) {
 
     await collection.insertOne(chatMessage);
     // Don't close connection - it's pooled and reused
+
+    // Trigger Pusher event for real-time updates
+    try {
+      const pusherAppId = process.env.PUSHER_APP_ID;
+      const pusherSecret = process.env.PUSHER_SECRET;
+      const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+
+      if (pusherAppId && pusherSecret) {
+        const pusher = new Pusher({
+          appId: pusherAppId,
+          key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+          secret: pusherSecret,
+          cluster: pusherCluster,
+          useTLS: true,
+        });
+
+        await pusher.trigger('presence-global', 'new_messages', {
+          type: 'new_messages',
+          messages: [{
+            id: chatMessage._id?.toString() || '',
+            steamId: chatMessage.steamId,
+            steamName: chatMessage.steamName,
+            avatar: chatMessage.avatar,
+            message: chatMessage.message,
+            timestamp: chatMessage.timestamp,
+            isPro: chatMessage.isPro,
+          }],
+        });
+      }
+    } catch (pusherError) {
+      console.error('Failed to trigger Pusher event:', pusherError);
+      // Don't fail the request if Pusher fails
+    }
 
     return NextResponse.json({ success: true, message: chatMessage });
   } catch (error: any) {

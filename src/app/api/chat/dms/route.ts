@@ -3,6 +3,7 @@ import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayDMCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { fetchSteamProfile, getCurrentUserInfo } from '../messages/route';
 import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
+import Pusher from 'pusher';
 
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
@@ -281,6 +282,47 @@ export async function POST(request: Request) {
 
     await collection.insertOne(dmMessage);
     // Don't close connection - it's pooled and reused
+
+    // Trigger Pusher event for real-time updates to both users
+    try {
+      const pusherAppId = process.env.PUSHER_APP_ID;
+      const pusherSecret = process.env.PUSHER_SECRET;
+      const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+
+      if (pusherAppId && pusherSecret) {
+        const pusher = new Pusher({
+          appId: pusherAppId,
+          key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+          secret: pusherSecret,
+          cluster: pusherCluster,
+          useTLS: true,
+        });
+
+        // Trigger to both users' DM channels
+        const dmChannel1 = `presence-dm_${senderId}`;
+        const dmChannel2 = `presence-dm_${receiverId}`;
+        
+        const messageData = {
+          type: 'new_messages',
+          messages: [{
+            id: dmMessage._id?.toString() || '',
+            dmId: dmMessage.dmId,
+            senderId: dmMessage.senderId,
+            receiverId: dmMessage.receiverId,
+            message: dmMessage.message,
+            timestamp: dmMessage.timestamp,
+          }],
+        };
+
+        await Promise.all([
+          pusher.trigger(dmChannel1, 'new_messages', messageData),
+          pusher.trigger(dmChannel2, 'new_messages', messageData),
+        ]);
+      }
+    } catch (pusherError) {
+      console.error('Failed to trigger Pusher event:', pusherError);
+      // Don't fail the request if Pusher fails
+    }
 
     return NextResponse.json({ success: true, message: dmMessage });
   } catch (error: any) {
