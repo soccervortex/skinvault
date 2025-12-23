@@ -868,15 +868,35 @@ export default function ChatPage() {
         
         // If DM still not found after retries, try to open it anyway (invite was accepted)
         if (!dmFound && dmId && otherUserId && user?.steamId) {
+          // Manually add DM to list if it doesn't exist yet
+          const newDM = {
+            dmId,
+            otherUserId,
+            otherUserName: invite?.otherUserName || `User ${otherUserId.slice(-4)}`,
+            otherUserAvatar: invite?.otherUserAvatar || '',
+            lastMessage: 'No messages yet',
+            lastMessageTime: new Date(),
+          };
+          
+          setDmList(prev => {
+            // Check if DM already exists
+            const exists = prev.some(dm => dm.dmId === dmId);
+            if (exists) {
+              return prev;
+            }
+            // Add new DM at the beginning
+            return [newDM, ...prev];
+          });
+          
           setSelectedDM(dmId);
           markDMAsRead(dmId, user.steamId);
           fetchDMMessages(user.steamId, otherUserId);
           toast.success('DM invite accepted!');
           
-          // Force refresh DM list one more time
+          // Force refresh DM list one more time to get correct data from server
           setTimeout(() => {
             fetchDMList();
-          }, 500);
+          }, 1000);
         }
       } else {
         const data = await res.json();

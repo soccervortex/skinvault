@@ -33,7 +33,7 @@ interface DMInvite {
   fromSteamId: string;
   toSteamId: string;
   status: 'pending' | 'accepted' | 'declined';
-  createdAt: Date;
+  createdAt: Date | string | { $date: string };
 }
 
 // GET: Get list of DMs for a user
@@ -166,7 +166,23 @@ export async function GET(request: Request) {
 
       // Add DM even if no messages yet (for newly accepted invites) or if messages exist
       // Use invite createdAt if available, otherwise use current time for newly accepted invites
-      const lastMessageTime = latestMessage?.timestamp || invite?.createdAt || new Date();
+      let lastMessageTime: Date;
+      if (latestMessage?.timestamp) {
+        lastMessageTime = latestMessage.timestamp instanceof Date ? latestMessage.timestamp : new Date(latestMessage.timestamp);
+      } else if (invite?.createdAt) {
+        // Handle MongoDB date format
+        if (invite.createdAt instanceof Date) {
+          lastMessageTime = invite.createdAt;
+        } else if (typeof invite.createdAt === 'string') {
+          lastMessageTime = new Date(invite.createdAt);
+        } else if (invite.createdAt && typeof invite.createdAt === 'object' && '$date' in invite.createdAt) {
+          lastMessageTime = new Date((invite.createdAt as any).$date);
+        } else {
+          lastMessageTime = new Date();
+        }
+      } else {
+        lastMessageTime = new Date();
+      }
       
       dmList.push({
         dmId,
