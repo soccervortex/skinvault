@@ -101,6 +101,7 @@ export default function ChatPage() {
   const [typingUsers, setTypingUsers] = useState<Array<{ steamId: string; steamName: string }>>([]);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevTabRef = useRef<'global' | 'dms'>('global');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterUser, setFilterUser] = useState('');
@@ -420,6 +421,14 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user?.steamId) return;
     
+    // Only mark DMs as read when tab actually changes
+    const tabChanged = prevTabRef.current !== activeTab;
+    if (tabChanged) {
+      prevTabRef.current = activeTab;
+      // Mark all DMs as read when switching tabs (user has viewed them)
+      markAllDMsAsRead(user.steamId);
+    }
+    
     // Initial fetch (preloading already handles this, but ensure it runs)
     if (activeTab === 'global') {
       if (messages.length === 0) {
@@ -432,19 +441,10 @@ export default function ChatPage() {
       if (dmInvites.length === 0) {
         fetchDMInvites();
       }
-      // Mark ALL DMs as read when switching to DMs tab (user has viewed the tab)
-      if (user?.steamId) {
-        markAllDMsAsRead(user.steamId);
-      }
-      // Also mark selected DM as read if one is selected
+      // Mark selected DM as read if one is selected
       if (selectedDM && user?.steamId) {
         markDMAsRead(selectedDM, user.steamId);
       }
-    }
-    
-    // When switching to global tab, also ensure all DMs are marked as read (user viewed them)
-    if (activeTab === 'global' && user?.steamId) {
-      markAllDMsAsRead(user.steamId);
     }
     
     // Fallback polling (SSE is primary, this is backup)
@@ -462,7 +462,7 @@ export default function ChatPage() {
           fetchDMInvites();
         }
       }
-    }, 5000); // Slower polling since SSE handles real-time
+    }, 10000); // Slower polling (10s) since SSE handles real-time
     
     return () => clearInterval(interval);
   }, [activeTab, selectedDM, user?.steamId, globalStream.isConnected, dmStream.isConnected, searchQuery, filterUser, filterDateFrom, filterDateTo, filterPinnedOnly, filterProOnly, globalChatDisabled, dmChatDisabled, messagePage]);

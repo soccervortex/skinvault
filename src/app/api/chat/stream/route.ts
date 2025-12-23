@@ -1,6 +1,10 @@
 import { MongoClient } from 'mongodb';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
+// Vercel needs nodejs runtime for SSE streaming
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
