@@ -73,6 +73,7 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'global' | 'dms'>('global');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
+  const fetchingRef = useRef<string | null>(null); // Track which DM is currently being fetched
   
   // Optimistic state for global messages using useOptimistic
   const [optimisticMessages, addOptimisticMessage] = useOptimistic(
@@ -382,18 +383,24 @@ export default function ChatPage() {
     }
     try {
       const dmId = [steamId1, steamId2].sort().join('_');
+      
+      // Prevent duplicate fetches for the same DM
+      if (fetchingRef.current === dmId && !checkForNew) {
+        console.log(`[DM Messages] Already fetching ${dmId}, skipping duplicate fetch`);
+        return;
+      }
+      
+      fetchingRef.current = dmId;
       console.log(`[DM Messages] Fetching messages for DM ${dmId}, checkForNew: ${checkForNew}, loadAll: ${loadAll}`);
       
-      // Check cache first (only for initial load, not when checking for new)
-      // But always fetch fresh data to ensure we have the latest messages
-      if (!checkForNew && !loadAll) {
-        const cached = getCachedMessages(dmId, 'dm');
-        if (cached && cached.messages.length > 0) {
-          // Show cached messages immediately for instant display
-          setDmMessages(cached.messages);
-          setLoading(false);
-          // Still fetch in background to update cache and get latest messages
-        }
+      // Always check cache first and show immediately for instant display
+      const cached = getCachedMessages(dmId, 'dm');
+      if (cached && cached.messages.length > 0 && !checkForNew) {
+        console.log(`[DM Messages] Showing ${cached.messages.length} cached messages immediately`);
+        // Show cached messages immediately for instant display
+        setDmMessages(cached.messages);
+        setLoading(false);
+        // Continue fetching in background to update cache and get latest messages
       }
       
       // Always pass current user's steamId so API can verify they're a participant
@@ -474,6 +481,7 @@ export default function ChatPage() {
         }
       }
     } finally {
+      fetchingRef.current = null; // Clear fetching flag
       setLoading(false);
       console.log('[DM Messages] Fetch completed, loading set to false');
     }
@@ -925,13 +933,28 @@ export default function ChatPage() {
         return;
       }
       
+      // Prevent duplicate fetches
+      if (fetchingRef.current === selectedDM) {
+        console.log(`[DM Messages] Already fetching ${selectedDM}, skipping`);
+        return;
+      }
+      
       console.log(`[DM Messages] DM selected: ${selectedDM}, fetching messages...`);
       
       // Mark DM as read when selected/viewed (immediately clear unread counter)
       markDMAsRead(selectedDM, user.steamId);
       
+      // Show cached messages immediately if available
+      const cached = getCachedMessages(selectedDM, 'dm');
+      if (cached && cached.messages.length > 0) {
+        console.log(`[DM Messages] Showing ${cached.messages.length} cached messages immediately`);
+        setDmMessages(cached.messages);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      
       // Always fetch fresh messages when DM is selected (load all 365 days)
-      setLoading(true);
       fetchDMMessages(steamId1, steamId2, false, true).finally(() => {
         setLoading(false);
       });

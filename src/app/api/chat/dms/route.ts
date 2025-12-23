@@ -87,8 +87,16 @@ export async function GET(request: Request) {
     }
     
     // Query collections in reverse order (newest first) and stop when we have enough
+    // Prioritize recent collections first for faster results
     let allMessages: DMMessage[] = [];
-    for (const collectionName of collectionNames.reverse()) {
+    const recentDays = 7; // Check last 7 days first for speed
+    const recentCollectionNames = getDMCollectionNamesForDays(recentDays).reverse();
+    const olderCollectionNames = collectionNames.slice(recentCollectionNames.length).reverse();
+    
+    // Query recent collections first
+    for (const collectionName of recentCollectionNames) {
+      if (allMessages.length >= pageSize + 1) break; // Stop if we have enough
+      
       const collection = db.collection<DMMessage>(collectionName);
       // Use projection to only fetch needed fields
       const projection = {
