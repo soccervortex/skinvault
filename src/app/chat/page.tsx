@@ -1051,14 +1051,27 @@ export default function ChatPage() {
       return;
     }
 
-    // Optimistically remove message immediately
+    // Optimistically remove message immediately from base state
+    // This ensures it stays deleted even after reload
     if (messageType === 'global') {
-      const deletedMessage = messages.find(msg => msg.id === messageId);
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== messageId);
+        // Clear cache to prevent reload from showing deleted message
+        clearCache('global', 'global');
+        // Update cache with filtered messages
+        setCachedMessages('global', filtered, messageCursor, 'global');
+        return filtered;
+      });
       toast.success('Message deleted');
     } else if (selectedDM) {
-      const deletedMessage = dmMessages.find(msg => msg.id === messageId);
-      setDmMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setDmMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== messageId);
+        // Clear cache to prevent reload from showing deleted message
+        clearCache(selectedDM, 'dm');
+        // Update cache with filtered messages
+        setCachedMessages(selectedDM, filtered, null, 'dm');
+        return filtered;
+      });
       toast.success('Message deleted');
     }
 
@@ -1070,6 +1083,7 @@ export default function ChatPage() {
       
       const res = await fetch(url, {
         method: 'DELETE',
+        cache: 'no-store', // Prevent caching
       });
 
       if (!res.ok) {
@@ -1077,10 +1091,28 @@ export default function ChatPage() {
         const data = await res.json();
         toast.error(data.error || 'Failed to delete message');
         if (messageType === 'global') {
-          fetchMessages(null, false); // Reset cursor, load from beginning
+          // Clear cache and refetch
+          clearCache('global', 'global');
+          fetchMessages(null, false).catch(() => {}); // Reset cursor, load from beginning
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
-          fetchDMMessages(steamId1, steamId2);
+          clearCache(selectedDM, 'dm');
+          fetchDMMessages(steamId1, steamId2).catch(() => {});
+        }
+      } else {
+        // Success - ensure cache is updated with deleted message removed
+        if (messageType === 'global') {
+          setMessages(prev => {
+            const filtered = prev.filter(msg => msg.id !== messageId);
+            setCachedMessages('global', filtered, messageCursor, 'global');
+            return filtered;
+          });
+        } else if (selectedDM) {
+          setDmMessages(prev => {
+            const filtered = prev.filter(msg => msg.id !== messageId);
+            setCachedMessages(selectedDM, filtered, null, 'dm');
+            return filtered;
+          });
         }
       }
     } catch (error) {
@@ -1088,10 +1120,12 @@ export default function ChatPage() {
       toast.error('Failed to delete message');
       // Revert on error
       if (messageType === 'global') {
-        fetchMessages(null, false); // Reset cursor, load from beginning
+        clearCache('global', 'global');
+        fetchMessages(null, false).catch(() => {}); // Reset cursor, load from beginning
       } else if (selectedDM) {
         const [steamId1, steamId2] = selectedDM.split('_');
-        fetchDMMessages(steamId1, steamId2);
+        clearCache(selectedDM, 'dm');
+        fetchDMMessages(steamId1, steamId2).catch(() => {});
       }
     }
   };
