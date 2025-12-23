@@ -16,7 +16,7 @@ export interface SEOConfig {
 
 const DEFAULT_OG_IMAGE = '/icons/Open Graph Image.jpg';
 
-export function generateMetadata(config: SEOConfig): Metadata {
+export function generateSEOMetadata(config: SEOConfig): Metadata {
   const {
     title,
     description = DEFAULT_DESCRIPTION,
@@ -46,6 +46,9 @@ export function generateMetadata(config: SEOConfig): Metadata {
   const url = `${BASE_URL}${path}`;
   const imageUrl = image.startsWith('http') ? image : `${BASE_URL}${image}`;
 
+  // Map 'product' type to 'website' for Next.js compatibility
+  const ogType = type === 'product' ? 'website' : type;
+
   return {
     title: fullTitle,
     description,
@@ -55,7 +58,7 @@ export function generateMetadata(config: SEOConfig): Metadata {
     publisher: SITE_NAME,
     robots: noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
     openGraph: {
-      type,
+      type: ogType,
       url,
       title: fullTitle,
       description,

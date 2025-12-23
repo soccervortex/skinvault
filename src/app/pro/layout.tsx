@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
-import { generateMetadata, pageSEO } from '../lib/seo';
+import { generateSEOMetadata, pageSEO } from '../lib/seo';
 
-export const metadata: Metadata = generateMetadata(pageSEO.pro);
+export const metadata: Metadata = generateSEOMetadata(pageSEO.pro);
 
 export default function ProLayout({
   children,
