@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2 } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
@@ -88,6 +88,8 @@ export default function ChatPage() {
   const [dmChatDisabled, setDmChatDisabled] = useState(false);
   const [unbanUser, setUnbanUser] = useState<{ steamId: string; name: string } | null>(null);
   const [unbanning, setUnbanning] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [blocking, setBlocking] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -707,6 +709,46 @@ export default function ChatPage() {
     }
   };
 
+  // Check blocked users when messages change
+  useEffect(() => {
+    if (!user?.steamId) return;
+    
+    const checkBlockedUsers = async () => {
+      const allUserIds = new Set<string>();
+      messages.forEach(msg => {
+        if (msg.steamId !== user.steamId) {
+          allUserIds.add(msg.steamId);
+        }
+      });
+      dmMessages.forEach(msg => {
+        if (msg.senderId !== user.steamId) {
+          allUserIds.add(msg.senderId);
+        }
+      });
+      
+      if (allUserIds.size === 0) return;
+      
+      const blockedSet = new Set<string>();
+      for (const userId of allUserIds) {
+        try {
+          const res = await fetch(`/api/user/block?steamId1=${user.steamId}&steamId2=${userId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.isBlocked) {
+              blockedSet.add(userId);
+            }
+          }
+        } catch (error) {
+          // Ignore errors
+        }
+      }
+      
+      setBlockedUsers(blockedSet);
+    };
+    
+    checkBlockedUsers();
+  }, [user?.steamId, messages.length, dmMessages.length]);
+
   const handleViewInventory = (steamId: string) => {
     router.push(`/inventory?steamId=${steamId}`);
   };
@@ -845,11 +887,14 @@ export default function ChatPage() {
                         isOwnMessage={msg.steamId === user?.steamId}
                         isAdmin={isAdmin}
                         isBanned={msg.isBanned}
+                        isBlocked={blockedUsers.has(msg.steamId)}
                         onReport={msg.steamId !== user?.steamId ? () => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' }) : undefined}
                         onDelete={msg.steamId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'global') : undefined}
                         onBan={isAdmin ? () => setBanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
                         onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
                         onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
+                        onBlock={msg.steamId !== user?.steamId ? () => handleBlockUser(msg.steamId, msg.steamName) : undefined}
+                        onUnblock={msg.steamId !== user?.steamId && blockedUsers.has(msg.steamId) ? () => handleUnblockUser(msg.steamId, msg.steamName) : undefined}
                       />
                       <span className="text-xs text-gray-500 ml-auto">
                         {formatTime(msg.timestamp)}
@@ -1000,6 +1045,7 @@ export default function ChatPage() {
                                     isOwnMessage={msg.senderId === user?.steamId}
                                     isAdmin={isAdmin}
                                     isBanned={msg.isBanned}
+                                    isBlocked={blockedUsers.has(msg.senderId)}
                                     onReport={msg.senderId !== user?.steamId ? () => setReportUser({ 
                                       steamId: msg.senderId, 
                                       name: msg.senderName, 
@@ -1010,6 +1056,8 @@ export default function ChatPage() {
                                     onBan={isAdmin ? () => setBanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
                                     onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
                                     onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
+                                    onBlock={msg.senderId !== user?.steamId ? () => handleBlockUser(msg.senderId, msg.senderName) : undefined}
+                                    onUnblock={msg.senderId !== user?.steamId && blockedUsers.has(msg.senderId) ? () => handleUnblockUser(msg.senderId, msg.senderName) : undefined}
                                   />
                                 </div>
                                 <span className="text-xs text-gray-500">

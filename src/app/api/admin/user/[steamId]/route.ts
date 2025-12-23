@@ -42,17 +42,38 @@ export async function GET(
     const proUntil = await getProUntil(steamId);
     const isPro = proUntil && new Date(proUntil) > new Date();
 
-    // Fetch Steam profile
+    // Fetch Steam profile with timeout and retry
     let steamName = 'Unknown User';
     let avatar = '';
     try {
       const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
-      const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`);
-      const text = await textRes.text();
-      steamName = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
-      avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
+        signal: controller.signal,
+        cache: 'no-store', // Always fetch fresh data
+      });
+      clearTimeout(timeoutId);
+      
+      if (textRes.ok) {
+        const text = await textRes.text();
+        const nameMatch = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/);
+        const avatarMatch = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/);
+        
+        steamName = nameMatch?.[1] || 'Unknown User';
+        avatar = avatarMatch?.[1] || '';
+      }
     } catch (error) {
       console.warn('Failed to fetch Steam profile:', error);
+      // Try to get from message data if available
+      if (messages.length > 0) {
+        const userMessage = messages.find((msg: any) => msg.steamId === steamId);
+        if (userMessage) {
+          steamName = userMessage.steamName || steamName;
+          avatar = userMessage.avatar || avatar;
+        }
+      }
     }
 
     // Get chat messages using date-based collections
@@ -167,18 +188,51 @@ export async function GET(
         const dmArrays = await Promise.all(dmPromises);
         const allDMs = dmArrays.flat();
         
+        // Get user info for DM participants
+        const uniqueSteamIds = [...new Set(allDMs.flatMap(msg => [msg.senderId, msg.receiverId]))];
+        const userInfoMap = new Map<string, { name: string; avatar: string }>();
+        
+        // Fetch profiles in parallel
+        await Promise.all(uniqueSteamIds.map(async (id) => {
+          try {
+            const steamUrl = `https://steamcommunity.com/profiles/${id}/?xml=1`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
+              signal: controller.signal,
+              cache: 'no-store',
+            });
+            clearTimeout(timeoutId);
+            
+            if (textRes.ok) {
+              const text = await textRes.text();
+              const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
+              const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
+              userInfoMap.set(id, { name, avatar });
+            }
+          } catch (error) {
+            // Use fallback
+            userInfoMap.set(id, { name: `User ${id.slice(-4)}`, avatar: '' });
+          }
+        }));
+
         dmMessages = allDMs
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
           .slice(0, 1000)
-          .map(msg => ({
-            id: msg._id?.toString(),
-            dmId: msg.dmId,
-            senderId: msg.senderId,
-            receiverId: msg.receiverId,
-            message: msg.message,
-            timestamp: msg.timestamp,
-            otherUserId: msg.senderId === steamId ? msg.receiverId : msg.senderId,
-          }));
+          .map(msg => {
+            const senderInfo = userInfoMap.get(msg.senderId) || { name: `User ${msg.senderId.slice(-4)}`, avatar: '' };
+            return {
+              id: msg._id?.toString(),
+              dmId: msg.dmId,
+              senderId: msg.senderId,
+              receiverId: msg.receiverId,
+              senderName: senderInfo.name,
+              senderAvatar: senderInfo.avatar,
+              message: msg.message,
+              timestamp: msg.timestamp,
+              otherUserId: msg.senderId === steamId ? msg.receiverId : msg.senderId,
+            };
+          });
         
         await client.close();
       } catch (error) {

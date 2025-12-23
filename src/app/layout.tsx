@@ -17,6 +17,7 @@ import NetworkStatus from "./components/NetworkStatus";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import ChunkErrorHandler from "./components/ChunkErrorHandler";
 import ChatNotificationListener from "./components/ChatNotificationListener";
+import GlobalChatService from "./components/GlobalChatService";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -199,6 +200,7 @@ export default function RootLayout({
             <ChunkErrorHandler />
             <KeyboardShortcuts />
             <ChatNotificationListener />
+            <GlobalChatService />
         {children}
             <ProExpirationWarning />
             <NetworkStatus />

@@ -172,6 +172,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'You are banned from chat' }, { status: 403 });
     }
 
+    // Check if users have blocked each other (user-to-user block)
+    const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+    const blockKey = [senderId, receiverId].sort().join('_');
+    if (userBlocks[blockKey] === true) {
+      return NextResponse.json({ error: 'Cannot send message to this user' }, { status: 403 });
+    }
+
     if (timeoutUsers[senderId]) {
       const timeoutUntil = new Date(timeoutUsers[senderId]);
       const now = new Date();

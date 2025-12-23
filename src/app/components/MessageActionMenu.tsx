@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreVertical, Flag, Trash2, Ban, UserX, Shield } from 'lucide-react';
+import { MoreVertical, Flag, Trash2, Ban, UserX, Shield, UserCheck } from 'lucide-react';
 
 interface MessageActionMenuProps {
   messageId?: string;
@@ -14,7 +14,10 @@ interface MessageActionMenuProps {
   onBan?: () => void;
   onUnban?: () => void;
   onTimeout?: () => void;
+  onBlock?: () => void;
+  onUnblock?: () => void;
   isBanned?: boolean;
+  isBlocked?: boolean;
 }
 
 export default function MessageActionMenu({
@@ -28,7 +31,10 @@ export default function MessageActionMenu({
   onBan,
   onUnban,
   onTimeout,
+  onBlock,
+  onUnblock,
   isBanned,
+  isBlocked,
 }: MessageActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,7 +55,7 @@ export default function MessageActionMenu({
     };
   }, [isOpen]);
 
-  if (!isOpen && !onReport && !onDelete && !onBan && !onUnban && !onTimeout) {
+  if (!isOpen && !onReport && !onDelete && !onBan && !onUnban && !onTimeout && !onBlock && !onUnblock) {
     return null;
   }
 
@@ -93,6 +99,34 @@ export default function MessageActionMenu({
             >
               <Trash2 size={14} />
               Delete
+            </button>
+          )}
+
+          {!isOwnMessage && !isBlocked && onBlock && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onBlock();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              <UserX size={14} />
+              Block User
+            </button>
+          )}
+
+          {!isOwnMessage && isBlocked && onUnblock && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onUnblock();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+            >
+              <UserCheck size={14} />
+              Unblock User
             </button>
           )}
 

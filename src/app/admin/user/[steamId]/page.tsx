@@ -499,16 +499,19 @@ export default function UserManagementPage() {
                       {messages.map((msg) => (
                         <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all">
                           <div className="flex items-start justify-between mb-2">
-                            <span className="text-xs text-gray-500">
-                              {new Date(msg.timestamp).toLocaleString()}
-                            </span>
+                            <div className="flex-1">
+                              <span className="text-xs text-gray-500">
+                                {new Date(msg.timestamp).toLocaleString()}
+                              </span>
+                            </div>
                             {userIsOwner && msg.id && (
                               <button
                                 onClick={() => handleDeleteMessage(msg.id, 'global')}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                                className="ml-2 p-2 hover:bg-red-500/20 rounded transition-colors flex items-center gap-1"
                                 title="Delete message"
                               >
-                                <Trash2 size={14} className="text-red-400" />
+                                <Trash2 size={16} className="text-red-400" />
+                                <span className="text-xs text-red-400 font-bold">Delete</span>
                               </button>
                             )}
                           </div>
@@ -553,6 +556,11 @@ export default function UserManagementPage() {
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
+                                  <img
+                                    src={msg.senderAvatar || '/icons/web-app-manifest-192x192.png'}
+                                    alt={msg.senderName || 'Unknown User'}
+                                    className="w-6 h-6 rounded-lg border border-blue-600"
+                                  />
                                   <span className="text-xs font-bold text-blue-400">
                                     {msg.senderName || 'Unknown User'}
                                   </span>
@@ -573,10 +581,11 @@ export default function UserManagementPage() {
                               {userIsOwner && msg.id && (
                                 <button
                                   onClick={() => handleDeleteMessage(msg.id, 'dm', selectedDM)}
-                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                                  className="ml-2 p-2 hover:bg-red-500/20 rounded transition-colors flex items-center gap-1"
                                   title="Delete message"
                                 >
-                                  <Trash2 size={14} className="text-red-400" />
+                                  <Trash2 size={16} className="text-red-400" />
+                                  <span className="text-xs text-red-400 font-bold">Delete</span>
                                 </button>
                               )}
                             </div>

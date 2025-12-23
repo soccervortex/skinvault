@@ -62,6 +62,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
     }
 
+    // Get user blocks to filter out blocked users
+    const { dbGet } = await import('@/app/utils/database');
+    const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+
     const client = await getMongoClient();
     const db = client.db(MONGODB_DB_NAME);
 
@@ -108,6 +112,13 @@ export async function GET(request: Request) {
 
     for (const invite of invites) {
       const otherUserId = invite.fromSteamId === steamId ? invite.toSteamId : invite.fromSteamId;
+      
+      // Skip if users have blocked each other
+      const blockKey = [steamId, otherUserId].sort().join('_');
+      if (userBlocks[blockKey] === true) {
+        continue; // Skip blocked users
+      }
+      
       const dmId = [steamId, otherUserId].sort().join('_');
       const profile = profileMap.get(otherUserId) || { name: `User ${otherUserId.slice(-4)}`, avatar: '' };
 

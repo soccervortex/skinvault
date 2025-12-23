@@ -60,9 +60,20 @@ export async function GET(request: Request) {
     const invites = await collection.find(query).sort({ createdAt: -1 }).toArray();
     await client.close();
 
-    // Fetch user info for invites
+    // Get user blocks to filter out blocked users
+    const { dbGet } = await import('@/app/utils/database');
+    const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+
+    // Fetch user info for invites and filter blocked users
     const invitesWithInfo = await Promise.all(invites.map(async (invite) => {
       const otherUserId = invite.fromSteamId === steamId ? invite.toSteamId : invite.fromSteamId;
+      
+      // Skip if users have blocked each other
+      const blockKey = [steamId, otherUserId].sort().join('_');
+      if (userBlocks[blockKey] === true) {
+        return null; // Filter out blocked users
+      }
+      
       const profileInfo = await fetchSteamProfile(otherUserId);
       
       return {
@@ -78,7 +89,10 @@ export async function GET(request: Request) {
       };
     }));
 
-    return NextResponse.json({ invites: invitesWithInfo });
+    // Filter out null values (blocked users)
+    const filteredInvites = invitesWithInfo.filter(invite => invite !== null);
+
+    return NextResponse.json({ invites: filteredInvites });
   } catch (error) {
     console.error('Failed to get DM invites:', error);
     return NextResponse.json({ error: 'Failed to get invites' }, { status: 500 });
@@ -113,6 +127,13 @@ export async function POST(request: Request) {
     
     if (bannedUsers.includes(toSteamId)) {
       return NextResponse.json({ error: 'Cannot send DM invite to a banned user' }, { status: 403 });
+    }
+
+    // Check if users have blocked each other (user-to-user block)
+    const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+    const blockKey = [fromSteamId, toSteamId].sort().join('_');
+    if (userBlocks[blockKey] === true) {
+      return NextResponse.json({ error: 'Cannot send DM invite to this user' }, { status: 403 });
     }
 
     const client = await getMongoClient();
