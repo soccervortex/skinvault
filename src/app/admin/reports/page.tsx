@@ -51,6 +51,11 @@ export default function ReportsPage() {
   const userIsOwner = isOwner(user?.steamId);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Wait a bit for user to load
+    if (!user) return;
+    
     if (!userIsOwner) {
       router.push('/admin');
       return;

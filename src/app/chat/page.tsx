@@ -38,6 +38,8 @@ interface DMMessage {
 interface DM {
   dmId: string;
   otherUserId: string;
+  otherUserName?: string;
+  otherUserAvatar?: string;
   lastMessage: string;
   lastMessageTime: Date | string;
 }
@@ -111,6 +113,39 @@ export default function ChatPage() {
         if (parsedUser?.steamId) {
           setIsAdmin(isOwner(parsedUser.steamId));
           checkProStatus(parsedUser.steamId).then(setIsPro);
+          
+          // Preload chat messages immediately after user loads
+          (async () => {
+            try {
+              // Preload global chat messages
+              const messagesRes = await fetch('/api/chat/messages');
+              if (messagesRes.ok) {
+                const messagesData = await messagesRes.json();
+                setMessages(messagesData.messages || []);
+              }
+              
+              // Preload DM list
+              const dmListRes = await fetch(`/api/chat/dms/list?steamId=${parsedUser.steamId}`);
+              if (dmListRes.ok) {
+                const dmListData = await dmListRes.json();
+                setDmList(dmListData.dms || []);
+              }
+              
+              // Preload DM invites
+              const invitesRes = await fetch(`/api/chat/dms/invites?steamId=${parsedUser.steamId}&type=pending`);
+              if (invitesRes.ok) {
+                const invitesData = await invitesRes.json();
+                setDmInvites(invitesData.invites || []);
+              }
+              
+              setLoading(false);
+            } catch (error) {
+              console.error('Failed to preload chat:', error);
+              setLoading(false);
+            }
+          })();
+        } else {
+          setLoading(false);
         }
       } catch {
         setUser(null);
@@ -204,15 +239,25 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    if (!user?.steamId) return;
+    
     if (activeTab === 'global') {
-      fetchMessages();
-      // Optimize: Poll every 2 seconds instead of 1 second for better performance
-      const interval = setInterval(fetchMessages, 2000);
+      // Only fetch if messages are empty (initial load), otherwise poll
+      if (messages.length === 0) {
+        fetchMessages();
+      }
+      // Optimize: Poll every 3 seconds for better performance
+      const interval = setInterval(fetchMessages, 3000);
       return () => clearInterval(interval);
     } else {
-      fetchDMList();
-      fetchDMInvites();
-      // Optimize: Poll every 2 seconds
+      // Only fetch if lists are empty (initial load), otherwise poll
+      if (dmList.length === 0) {
+        fetchDMList();
+      }
+      if (dmInvites.length === 0) {
+        fetchDMInvites();
+      }
+      // Optimize: Poll every 3 seconds
       const interval = setInterval(() => {
         fetchDMList();
         fetchDMInvites();
@@ -220,7 +265,7 @@ export default function ChatPage() {
           const [steamId1, steamId2] = selectedDM.split('_');
           fetchDMMessages(steamId1, steamId2);
         }
-      }, 2000);
+      }, 3000);
       return () => clearInterval(interval);
     }
   }, [activeTab, selectedDM, user?.steamId, isAdmin]);
@@ -764,17 +809,26 @@ export default function ChatPage() {
                       <button
                         key={dm.dmId}
                         onClick={() => setSelectedDM(dm.dmId)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                        className={`w-full text-left p-3 rounded-lg transition-all flex items-start gap-3 border ${
                           selectedDM === dm.dmId
-                            ? 'bg-blue-600/20 border border-blue-500/40'
-                            : 'bg-[#08090d] hover:bg-[#11141d]'
+                            ? 'bg-blue-600/20 border-blue-500/40 shadow-lg shadow-blue-500/20'
+                            : 'bg-[#08090d] hover:bg-[#11141d] border-transparent hover:border-white/5'
                         }`}
                       >
-                        <p className="text-xs font-bold mb-1 truncate">User: {dm.otherUserId}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
-                        <p className="text-[9px] text-gray-500 mt-1">
-                          {formatTime(dm.lastMessageTime)}
-                        </p>
+                        <img
+                          src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
+                          alt={dm.otherUserName || 'User'}
+                          className="w-10 h-10 rounded-lg border-2 border-blue-600 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold mb-1 truncate text-white">
+                            {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
+                          </p>
+                          <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
+                          <p className="text-[9px] text-gray-500 mt-1">
+                            {formatTime(dm.lastMessageTime)}
+                          </p>
+                        </div>
                       </button>
                     ))}
                   </div>
