@@ -800,7 +800,7 @@ export default function ChatPage() {
               
               // Check if DM is now in the list
               const dmExists = updatedDmList.some((dm: any) => dm.dmId === dmId);
-              if (dmExists) {
+              if (dmExists && otherUserId) {
                 dmFound = true;
                 setSelectedDM(dmId);
                 markDMAsRead(dmId, user.steamId);
