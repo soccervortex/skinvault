@@ -99,7 +99,9 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
+    // Cursor-based pagination: use beforeTimestamp instead of page number
+    const beforeTimestamp = searchParams.get('beforeTimestamp');
+    const beforeTimestampDate = beforeTimestamp ? new Date(beforeTimestamp) : null;
     const searchQuery = searchParams.get('search') || '';
     const filterUser = searchParams.get('user') || '';
     const filterDateFrom = searchParams.get('dateFrom') || '';
@@ -107,7 +109,6 @@ export async function GET(request: Request) {
     const filterPinnedOnly = searchParams.get('pinnedOnly') === 'true';
     const filterProOnly = searchParams.get('proOnly') === 'true';
     const pageSize = 100;
-    const skip = (page - 1) * pageSize;
 
     // Get banned and timeout users (disable cache for real-time status)
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -136,10 +137,18 @@ export async function GET(request: Request) {
     
     const collectionNames = getCollectionNamesForDays(2); // Get today and yesterday collections
     
-    // Build query filter
+    // Build query filter with cursor-based pagination
     const queryFilter: any = {
       timestamp: { $gte: dateFrom, $lte: dateTo }
     };
+    
+    // Cursor-based pagination: get messages before the cursor timestamp
+    if (beforeTimestampDate) {
+      queryFilter.timestamp = {
+        ...queryFilter.timestamp,
+        $lt: beforeTimestampDate // Get messages older than cursor
+      };
+    }
     
     if (filterUser) {
       queryFilter.steamId = filterUser;
@@ -149,27 +158,39 @@ export async function GET(request: Request) {
       queryFilter.isPro = true;
     }
     
-    // Query all relevant collections in parallel
+    // Apply text search if provided
+    if (searchQuery) {
+      queryFilter.message = { $regex: searchQuery, $options: 'i' };
+    }
+    
+    // Query all relevant collections in parallel with projections (only fetch needed fields)
     const messagePromises = collectionNames.map(async (collectionName) => {
       const collection = db.collection<ChatMessage>(collectionName);
-      let query = collection.find(queryFilter);
+      // Use projection to only fetch needed fields (reduces network transfer)
+      // Keep steamName and avatar as fallback if Steam API fails
+      const projection = {
+        _id: 1,
+        steamId: 1,
+        steamName: 1,
+        avatar: 1,
+        message: 1,
+        timestamp: 1,
+        editedAt: 1,
+        isPro: 1,
+      };
       
-      // Apply text search if provided
-      if (searchQuery) {
-        query = collection.find({
-          ...queryFilter,
-          message: { $regex: searchQuery, $options: 'i' }
-        });
-      }
-      
-      return query.sort({ timestamp: 1 }).toArray();
+      return collection
+        .find(queryFilter, { projection })
+        .sort({ timestamp: -1 }) // Sort descending (newest first) for cursor pagination
+        .limit(pageSize + 1) // Fetch one extra to check if there are more
+        .toArray();
     });
     
     const messageArrays = await Promise.all(messagePromises);
     let allMessages = messageArrays.flat();
     
-    // Sort by timestamp
-    allMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    // Sort by timestamp descending (newest first)
+    allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     
     // Get pinned messages if filter is enabled
     const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
@@ -178,10 +199,12 @@ export async function GET(request: Request) {
       allMessages = allMessages.filter(msg => pinnedIds.includes(msg._id?.toString() || ''));
     }
     
-    // Pagination
-    const totalMessages = allMessages.length;
-    const messages = allMessages.slice(skip, skip + pageSize);
-    const hasMore = skip + pageSize < totalMessages;
+    // Check if there are more messages
+    const hasMore = allMessages.length > pageSize;
+    // Take only pageSize messages (remove the extra one we fetched)
+    const messages = allMessages.slice(0, pageSize);
+    // Get the oldest message timestamp for next cursor
+    const nextCursor = messages.length > 0 ? messages[messages.length - 1].timestamp : null;
 
     await client.close();
 
@@ -192,7 +215,7 @@ export async function GET(request: Request) {
     const userInfoMap = await getCurrentUserInfo(uniqueSteamIds);
 
     return NextResponse.json({ 
-      messages: messages.map(msg => {
+      messages: messages.reverse().map(msg => { // Reverse to show oldest first in chat
         const currentUserInfo = userInfoMap.get(msg.steamId);
         const isBanned = bannedUsers.includes(msg.steamId);
         const timeoutUntil = timeoutUsers[msg.steamId];
@@ -221,8 +244,7 @@ export async function GET(request: Request) {
         };
       }),
       hasMore,
-      total: totalMessages,
-      page,
+      nextCursor: nextCursor?.toISOString() || null, // Return cursor for next page
     });
   } catch (error: any) {
     console.error('Failed to get chat messages:', error);

@@ -80,21 +80,53 @@ export async function GET(request: Request) {
     const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const collectionNames = getDMCollectionNamesForDays(365);
     
+    // Cursor-based pagination support
+    const beforeTimestamp = searchParams.get('beforeTimestamp');
+    const beforeTimestampDate = beforeTimestamp ? new Date(beforeTimestamp) : null;
+    const pageSize = parseInt(searchParams.get('limit') || '500'); // Default 500 for DMs
+    
+    // Build query with cursor
+    const queryFilter: any = {
+      dmId,
+      timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
+    };
+    
+    if (beforeTimestampDate) {
+      queryFilter.timestamp.$lt = beforeTimestampDate; // Get messages older than cursor
+    }
+    
     const messagePromises = collectionNames.map(async (collectionName) => {
       const collection = db.collection<DMMessage>(collectionName);
+      // Use projection to only fetch needed fields
+      const projection = {
+        _id: 1,
+        dmId: 1,
+        senderId: 1,
+        receiverId: 1,
+        message: 1,
+        timestamp: 1,
+        editedAt: 1,
+      };
+      
       return collection
-        .find({ 
-          dmId,
-          timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
-        })
-        .sort({ timestamp: 1 })
+        .find(queryFilter, { projection })
+        .sort({ timestamp: -1 }) // Sort descending for cursor pagination
+        .limit(pageSize + 1) // Fetch one extra to check if there are more
         .toArray();
     });
     
     const messageArrays = await Promise.all(messagePromises);
-    const allMessages = messageArrays.flat();
+    let allMessages = messageArrays.flat();
     
-    const messages = allMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    // Sort by timestamp descending
+    allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    // Check if there are more messages
+    const hasMore = allMessages.length > pageSize;
+    // Take only pageSize messages
+    const messages = allMessages.slice(0, pageSize);
+    // Reverse to show oldest first in chat
+    const sortedMessages = messages.reverse();
 
     await client.close();
 
@@ -123,7 +155,7 @@ export async function GET(request: Request) {
     const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
 
     return NextResponse.json({
-      messages: messages.map(msg => {
+      messages: sortedMessages.map(msg => {
         const senderInfo = userInfoMap.get(msg.senderId);
         const isBanned = bannedUsers.includes(msg.senderId);
         const timeoutUntil = timeoutUsers[msg.senderId];
@@ -146,7 +178,9 @@ export async function GET(request: Request) {
           isTimedOut,
           isPinned,
         };
-      })
+      }),
+      hasMore,
+      nextCursor: sortedMessages.length > 0 ? sortedMessages[sortedMessages.length - 1].timestamp.toISOString() : null,
     });
   } catch (error: any) {
     console.error('Failed to get DM messages:', error);

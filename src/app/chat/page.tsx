@@ -109,7 +109,7 @@ export default function ChatPage() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterPinnedOnly, setFilterPinnedOnly] = useState(false);
   const [filterProOnly, setFilterProOnly] = useState(false);
-  const [messagePage, setMessagePage] = useState(1);
+  const [messageCursor, setMessageCursor] = useState<string | null>(null); // Cursor for pagination
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
@@ -287,10 +287,13 @@ export default function ChatPage() {
     };
   }, [toast, router, isAdmin]);
 
-  const fetchMessages = async (page = 1, append = false) => {
+  const fetchMessages = async (beforeCursor: string | null = null, append = false) => {
     try {
       const params = new URLSearchParams();
-      if (page > 1) params.set('page', page.toString());
+      // Use cursor-based pagination instead of page numbers
+      if (beforeCursor) {
+        params.set('beforeTimestamp', beforeCursor);
+      }
       if (searchQuery) params.set('search', searchQuery);
       if (filterUser) params.set('user', filterUser);
       if (filterDateFrom) params.set('dateFrom', filterDateFrom);
@@ -326,6 +329,8 @@ export default function ChatPage() {
           });
         }
         setHasMoreMessages(data.hasMore || false);
+        // Update cursor for next page
+        setMessageCursor(data.nextCursor || null);
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);
@@ -432,7 +437,7 @@ export default function ChatPage() {
     // Initial fetch (preloading already handles this, but ensure it runs)
     if (activeTab === 'global') {
       if (messages.length === 0) {
-        fetchMessages(messagePage, false);
+        fetchMessages(null, false); // Reset cursor, load from beginning
       }
     } else {
       if (dmList.length === 0) {
@@ -453,7 +458,7 @@ export default function ChatPage() {
       if (activeTab === 'global') {
         const shouldPoll = !globalStream.isConnected || searchQuery || filterUser || filterDateFrom || filterDateTo || filterPinnedOnly || filterProOnly;
         if (shouldPoll && !globalChatDisabled) {
-          fetchMessages(messagePage, false);
+          fetchMessages(null, false); // Reset cursor, load from beginning
         }
       } else {
         const shouldPoll = !dmStream.isConnected && selectedDM;
@@ -465,7 +470,7 @@ export default function ChatPage() {
     }, 10000); // Slower polling (10s) since SSE handles real-time
     
     return () => clearInterval(interval);
-  }, [activeTab, selectedDM, user?.steamId, globalStream.isConnected, dmStream.isConnected, searchQuery, filterUser, filterDateFrom, filterDateTo, filterPinnedOnly, filterProOnly, globalChatDisabled, dmChatDisabled, messagePage]);
+  }, [activeTab, selectedDM, user?.steamId, globalStream.isConnected, dmStream.isConnected, searchQuery, filterUser, filterDateFrom, filterDateTo, filterPinnedOnly, filterProOnly, globalChatDisabled, dmChatDisabled]);
 
   // Merge SSE stream messages with existing messages (real-time updates)
   // NOTE: useChatStream already handles deduplication, so we just need to update state
@@ -676,7 +681,7 @@ export default function ChatPage() {
         if (res.ok) {
           // Remove temp message and refresh to get real one with server timestamp
           setMessages(prev => prev.filter(msg => msg.id !== tempId));
-          fetchMessages(messagePage, false).catch(() => {});
+          fetchMessages(null, false).catch(() => {});
         } else {
           // Remove failed message
           setMessages(prev => prev.filter(msg => msg.id !== tempId));
@@ -895,7 +900,7 @@ export default function ChatPage() {
         const data = await res.json();
         toast.error(data.error || 'Failed to delete message');
         if (messageType === 'global') {
-          fetchMessages(messagePage, false);
+          fetchMessages(null, false); // Reset cursor, load from beginning
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           fetchDMMessages(steamId1, steamId2);
@@ -906,7 +911,7 @@ export default function ChatPage() {
       toast.error('Failed to delete message');
       // Revert on error
       if (messageType === 'global') {
-        fetchMessages(messagePage, false);
+        fetchMessages(null, false); // Reset cursor, load from beginning
       } else if (selectedDM) {
         const [steamId1, steamId2] = selectedDM.split('_');
         fetchDMMessages(steamId1, steamId2);
@@ -932,7 +937,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success(`User ${timeoutUser.name} timed out for ${timeoutDuration}`);
         setTimeoutUser(null);
-        await fetchMessages(messagePage, false); // Refresh messages to show timeout badge
+        await fetchMessages(null, false); // Refresh messages to show timeout badge
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to timeout user');
@@ -961,7 +966,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success(`User ${banUser.name} has been banned`);
         setBanUser(null);
-        await fetchMessages(messagePage, false); // Refresh messages to show banned badge
+        await fetchMessages(null, false); // Refresh messages to show banned badge
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to ban user');
@@ -990,7 +995,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success(`User ${unbanUser.name} has been unbanned`);
         setUnbanUser(null);
-        await fetchMessages(messagePage, false); // Refresh messages
+        await fetchMessages(null, false); // Refresh messages
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to unban user');
@@ -1058,7 +1063,7 @@ export default function ChatPage() {
         const data = await res.json();
         toast.error(data.error || 'Failed to edit message');
         if (messageType === 'global') {
-          fetchMessages(messagePage, false);
+          fetchMessages(null, false); // Reset cursor, load from beginning
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           fetchDMMessages(steamId1, steamId2);
@@ -1066,7 +1071,7 @@ export default function ChatPage() {
       } else {
         // Silently refresh to get server timestamp
         if (messageType === 'global') {
-          fetchMessages(messagePage, false).catch(() => {}); // Ignore errors in background refresh
+          fetchMessages(null, false).catch(() => {}); // Ignore errors in background refresh
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           fetchDMMessages(steamId1, steamId2).catch(() => {}); // Ignore errors in background refresh
@@ -1076,7 +1081,7 @@ export default function ChatPage() {
       console.error('Failed to edit message:', error);
       // Revert optimistic update on error
       if (messageType === 'global') {
-        fetchMessages(messagePage, false);
+        fetchMessages(null, false); // Reset cursor, load from beginning
       } else if (selectedDM) {
         const [steamId1, steamId2] = selectedDM.split('_');
         fetchDMMessages(steamId1, steamId2);
@@ -1097,7 +1102,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success('Message pinned');
         if (messageType === 'global') {
-          await fetchMessages(messagePage, false);
+          await fetchMessages(null, false);
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           await fetchDMMessages(steamId1, steamId2);
@@ -1123,7 +1128,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success('Message unpinned');
         if (activeTab === 'global') {
-          await fetchMessages(messagePage, false);
+          await fetchMessages(null, false);
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           await fetchDMMessages(steamId1, steamId2);
@@ -1619,9 +1624,8 @@ export default function ChatPage() {
                 <div className="flex justify-center py-4">
                             <button
                     onClick={() => {
-                      const nextPage = messagePage + 1;
-                      setMessagePage(nextPage);
-                      fetchMessages(nextPage, true);
+                      // Use cursor for next page (load older messages)
+                      fetchMessages(messageCursor, true);
                     }}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-sm transition-colors"
                             >
