@@ -64,14 +64,24 @@ export function markDMAsRead(dmId: string, currentUserId: string): void {
     if (typeof window === 'undefined') return;
     
     const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
-    if (unreadDms[dmId]) {
-      unreadDms[dmId].count = 0;
-      unreadDms[dmId].lastRead = Date.now();
-      localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
-      
-      // Dispatch event for other components
-      window.dispatchEvent(new CustomEvent('chat-unread-updated'));
+    // Always create/update the entry to ensure it's marked as read
+    if (!unreadDms[dmId]) {
+      unreadDms[dmId] = {
+        userId: currentUserId,
+        count: 0,
+        lastMessage: '',
+        lastMessageTime: 0,
+        senderName: '',
+        senderAvatar: '',
+      };
     }
+    // Reset count and update last read time
+    unreadDms[dmId].count = 0;
+    unreadDms[dmId].lastRead = Date.now();
+    localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
+    
+    // Dispatch event for other components
+    window.dispatchEvent(new CustomEvent('chat-unread-updated'));
   } catch {
     // Ignore errors
   }

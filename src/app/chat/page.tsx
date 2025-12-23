@@ -347,7 +347,7 @@ export default function ChatPage() {
           const dmId = [steamId1, steamId2].sort().join('_');
           const lastMessage = newMessages[newMessages.length - 1];
           
-          // Only track if message is from other user and DM is not currently selected
+          // Only track if message is from other user and DM is not currently selected/viewed
           if (lastMessage.senderId !== user.steamId && selectedDM !== dmId) {
             addUnreadDM(
               dmId,
@@ -361,7 +361,7 @@ export default function ChatPage() {
         
         setDmMessages(newMessages);
         
-        // Mark DM as read when viewing
+        // Mark DM as read when viewing (always mark as read when messages are loaded for selected DM)
         const dmId = [steamId1, steamId2].sort().join('_');
         if (selectedDM === dmId) {
           markDMAsRead(dmId, user.steamId);
@@ -432,6 +432,10 @@ export default function ChatPage() {
       if (dmInvites.length === 0) {
         fetchDMInvites();
       }
+      // Mark selected DM as read when switching to DMs tab
+      if (selectedDM) {
+        markDMAsRead(selectedDM, user.steamId);
+      }
     }
     
     // Fallback polling (SSE is primary, this is backup)
@@ -479,9 +483,12 @@ export default function ChatPage() {
         const existingIds = new Set(prev.map(m => m.id));
         const newMessages = dmStream.messages.filter(m => m.id && !existingIds.has(m.id));
         if (newMessages.length > 0) {
-          // Track unread if message is from other user
+          // Only track unread if message is from other user AND user is NOT currently viewing this DM
+          // If user is viewing the DM (selectedDM === msg.dmId), messages should NOT be marked as unread
           newMessages.forEach(msg => {
-            if (msg.senderId !== user?.steamId) {
+            // Don't mark as unread if message is from current user or if user is viewing this DM
+            if (msg.senderId !== user?.steamId && msg.dmId !== selectedDM) {
+              // Only mark as unread if not viewing this DM
               addUnreadDM(
                 msg.dmId,
                 user?.steamId || '',
@@ -491,6 +498,10 @@ export default function ChatPage() {
               );
             }
           });
+          // Always mark selected DM as read since user is viewing it
+          if (selectedDM && activeTab === 'dms') {
+            markDMAsRead(selectedDM, user?.steamId || '');
+          }
           // Auto-scroll to new messages
           setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -505,6 +516,8 @@ export default function ChatPage() {
   useEffect(() => {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');
+      // Mark DM as read when selected/viewed (immediately clear unread counter)
+      markDMAsRead(selectedDM, user.steamId);
       fetchDMMessages(steamId1, steamId2);
       // Reduced polling since SSE handles real-time updates
       // Only poll if SSE is not connected
@@ -514,7 +527,6 @@ export default function ChatPage() {
         }, 5000); // Slower polling since SSE is primary
         return () => clearInterval(interval);
       }
-      return () => clearInterval(interval);
     }
   }, [selectedDM, activeTab, user?.steamId, isAdmin, dmStream.isConnected]);
 
@@ -740,6 +752,8 @@ export default function ChatPage() {
 
       if (res.ok) {
         toast.success('DM invite accepted!');
+        // Mark invite as read when accepted
+        markInviteAsRead(inviteId, user?.steamId || '');
         await fetchDMInvites();
         await fetchDMList();
         // Open the DM
@@ -747,6 +761,8 @@ export default function ChatPage() {
         if (invite) {
           const dmId = [user?.steamId, invite.otherUserId].sort().join('_');
           setSelectedDM(dmId);
+          // Mark DM as read immediately when opened
+          markDMAsRead(dmId, user?.steamId || '');
         }
       } else {
         const data = await res.json();
@@ -772,6 +788,8 @@ export default function ChatPage() {
 
       if (res.ok) {
         toast.success('DM invite declined');
+        // Mark invite as read when declined (to remove from unread count)
+        markInviteAsRead(inviteId, user?.steamId || '');
         await fetchDMInvites();
       } else {
         const data = await res.json();
