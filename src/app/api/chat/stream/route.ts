@@ -40,29 +40,59 @@ async function getMongoClient() {
 
 // SSE endpoint for real-time chat updates
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const channel = searchParams.get('channel') || 'global'; // 'global' or dmId
-  const lastMessageId = searchParams.get('lastMessageId') || '';
-  const currentUserId = searchParams.get('currentUserId') || '';
+  try {
+    const { searchParams } = new URL(request.url);
+    const channel = searchParams.get('channel') || 'global'; // 'global' or dmId
+    const lastMessageId = searchParams.get('lastMessageId') || '';
+    const currentUserId = searchParams.get('currentUserId') || '';
 
-  // If MongoDB is not configured, return empty stream
-  if (!MONGODB_URI) {
-    const stream = new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder();
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel })}\n\n`));
-        // Close immediately since we can't provide updates
-        controller.close();
-      },
-    });
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-      },
-    });
-  }
+    // If MongoDB is not configured, return a keep-alive stream that just sends heartbeats
+    if (!MONGODB_URI) {
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          
+          // Send connected message
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel })}\n\n`));
+          } catch {
+            // Connection closed
+          }
+          
+          // Send periodic heartbeats to keep connection alive
+          const heartbeatInterval = setInterval(() => {
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`));
+            } catch {
+              clearInterval(heartbeatInterval);
+              try {
+                controller.close();
+              } catch {
+                // Already closed
+              }
+            }
+          }, 30000); // Every 30 seconds
+          
+          // Cleanup on abort
+          request.signal.addEventListener('abort', () => {
+            clearInterval(heartbeatInterval);
+            try {
+              controller.close();
+            } catch {
+              // Already closed
+            }
+          });
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        },
+      });
+    }
 
   // Create SSE stream
   const stream = new ReadableStream({
@@ -277,16 +307,47 @@ export async function GET(request: Request) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET',
-      'Access-Control-Allow-Headers': 'Cache-Control',
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET',
+        'Access-Control-Allow-Headers': 'Cache-Control',
+      },
+    });
+  } catch (error: any) {
+    // If anything fails, return a minimal SSE stream that just sends connected and closes gracefully
+    console.error('SSE endpoint error:', error);
+    const fallbackStream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel: 'global' })}\n\n`));
+        } catch {
+          // Ignore
+        }
+        // Send a heartbeat then close
+        setTimeout(() => {
+          try {
+            controller.close();
+          } catch {
+            // Already closed
+          }
+        }, 100);
+      },
+    });
+    
+    return new Response(fallbackStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    });
+  }
 }
 
