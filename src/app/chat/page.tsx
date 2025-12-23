@@ -772,18 +772,60 @@ export default function ChatPage() {
       });
 
       if (res.ok) {
-        toast.success('DM invite accepted!');
+        // Get the invite before it's removed from the list
+        const invite = dmInvites.find(i => i.id === inviteId);
+        const otherUserId = invite?.otherUserId;
+        
         // Mark invite as read when accepted
         markInviteAsRead(inviteId, user?.steamId || '');
+        
+        // Refresh invites first
         await fetchDMInvites();
-        await fetchDMList();
-        // Open the DM
-        const invite = dmInvites.find(i => i.id === inviteId);
-        if (invite) {
-          const dmId = [user?.steamId, invite.otherUserId].sort().join('_');
+        
+        // Wait a bit for database to update, then refresh DM list (retry if needed)
+        let retries = 3;
+        let dmFound = false;
+        const dmId = otherUserId && user?.steamId ? [user.steamId, otherUserId].sort().join('_') : null;
+        
+        while (retries > 0 && !dmFound && dmId) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Fetch DM list and check response directly
+          try {
+            const listRes = await fetch(`/api/chat/dms/list?steamId=${user.steamId}`);
+            if (listRes.ok) {
+              const listData = await listRes.json();
+              const updatedDmList = listData.dms || [];
+              setDmList(updatedDmList);
+              
+              // Check if DM is now in the list
+              const dmExists = updatedDmList.some((dm: any) => dm.dmId === dmId);
+              if (dmExists) {
+                dmFound = true;
+                setSelectedDM(dmId);
+                markDMAsRead(dmId, user.steamId);
+                fetchDMMessages(user.steamId, otherUserId);
+                toast.success('DM invite accepted!');
+                break;
+              }
+            }
+          } catch (error) {
+            console.error('Failed to fetch DM list:', error);
+          }
+          retries--;
+        }
+        
+        // If DM still not found after retries, try to open it anyway (invite was accepted)
+        if (!dmFound && dmId && otherUserId && user?.steamId) {
           setSelectedDM(dmId);
-          // Mark DM as read immediately when opened
-          markDMAsRead(dmId, user?.steamId || '');
+          markDMAsRead(dmId, user.steamId);
+          fetchDMMessages(user.steamId, otherUserId);
+          toast.success('DM invite accepted!');
+          
+          // Force refresh DM list one more time
+          setTimeout(() => {
+            fetchDMList();
+          }, 500);
         }
       } else {
         const data = await res.json();

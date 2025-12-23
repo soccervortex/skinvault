@@ -189,13 +189,16 @@ export async function GET(request: Request) {
       });
 
       // Add DM even if no messages yet (for newly accepted invites) or if messages exist
+      // Use invite createdAt if available, otherwise use current time for newly accepted invites
+      const lastMessageTime = latestMessage?.timestamp || invite?.createdAt || new Date();
+      
       dmList.push({
         dmId,
         otherUserId,
         otherUserName: profile.name,
         otherUserAvatar: profile.avatar,
         lastMessage: latestMessage?.message || 'No messages yet',
-        lastMessageTime: latestMessage?.timestamp || invite?.createdAt || new Date(),
+        lastMessageTime,
       });
     }
 
