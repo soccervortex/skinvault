@@ -416,6 +416,8 @@ export default function ChatPage() {
         const data = await res.json();
         const newMessages = data.messages || [];
         
+        console.log(`[DM Messages] Fetched ${newMessages.length} messages for DM ${dmId}`);
+        
         // Always update messages, even if we showed cached ones
         setDmMessages(newMessages);
         
@@ -648,6 +650,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (dmStream.messages.length > 0 && activeTab === 'dms' && selectedDM) {
+      console.log(`[DM Stream] Received ${dmStream.messages.length} messages, selectedDM: ${selectedDM}`);
       setDmMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id));
         // Filter messages to only include those for the currently selected DM
@@ -656,6 +659,7 @@ export default function ChatPage() {
           !existingIds.has(m.id) && 
           m.dmId === selectedDM // Only show messages for the selected DM
         );
+        console.log(`[DM Stream] Filtered to ${newMessages.length} new messages for selected DM`);
         if (newMessages.length > 0) {
           // Remove optimistic messages with temp IDs when real messages arrive
           // Filter out any messages with temp IDs that match the new real messages
@@ -2306,7 +2310,7 @@ export default function ChatPage() {
                       <div className="flex items-center justify-center h-full">
                         <Loader2 className="animate-spin text-blue-500" size={32} />
                       </div>
-                    ) : dmMessages.length === 0 ? (
+                    ) : optimisticDMMessages.length === 0 ? (
                       <div className="flex items-center justify-center h-full text-gray-500">
                         <p>No messages yet. Start the conversation!</p>
                       </div>
