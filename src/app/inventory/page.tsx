@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy } from 'lucide-react';
 import { getPriceScanConcurrencySync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
@@ -87,6 +87,7 @@ function InventoryContent() {
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
   const [viewedUser, setViewedUser] = useState<any>(null);
   const [playerStats, setPlayerStats] = useState<any>(null);
+  const [faceitStats, setFaceitStats] = useState<any>(null);
   const [statsPrivate, setStatsPrivate] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [priceScanDone, setPriceScanDone] = useState(false);
@@ -241,6 +242,107 @@ function InventoryContent() {
         }
       }
     } catch (e) { console.error("Stats failed", e); }
+  };
+
+  const fetchFaceitStats = async (id: string) => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const res = await fetch(`/api/faceit/stats?id=${id}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        if (res.status === 404) {
+          // Player not found on Faceit - this is normal, not an error
+          setFaceitStats(null);
+          return;
+        }
+        console.warn("Faceit stats API error", await res.text());
+        return;
+      }
+      
+      const data = await res.json();
+      const player = data?.player;
+      const stats = data?.stats;
+      
+      if (player) {
+        // Even if stats are not available, show basic player info (ELO, level)
+        if (!stats) {
+          const elo = player?.games?.cs2?.faceit_elo || 0;
+          const level = player?.games?.cs2?.skill_level || 0;
+          
+          if (elo > 0 || level > 0) {
+            setFaceitStats({
+              elo: elo.toLocaleString(),
+              level: level.toString(),
+              playerId: player?.player_id,
+              nickname: player?.nickname,
+            });
+          }
+          return;
+        }
+        // Extract relevant stats from Faceit API response
+        const lifetime = stats?.lifetime || {};
+        const segments = stats?.segments || [];
+        const currentSegment = segments.find((s: any) => s.mode === '5v5') || segments[0] || {};
+        
+        // Get ELO and level from player data
+        const elo = player?.games?.cs2?.faceit_elo || 0;
+        const level = player?.games?.cs2?.skill_level || 0;
+        
+        // Calculate stats
+        const matches = Number(lifetime?.Matches || currentSegment?.stats?.Matches || 0);
+        const wins = Number(lifetime?.Wins || currentSegment?.stats?.Wins || 0);
+        const losses = Number(lifetime?.Losses || currentSegment?.stats?.Losses || 0);
+        const kills = Number(lifetime?.Kills || currentSegment?.stats?.Kills || 0);
+        const deaths = Number(lifetime?.Deaths || currentSegment?.stats?.Deaths || 0);
+        const assists = Number(lifetime?.Assists || currentSegment?.stats?.Assists || 0);
+        const headshots = Number(lifetime?.Headshots || currentSegment?.stats?.Headshots || 0);
+        const mvps = Number(lifetime?.MVPs || currentSegment?.stats?.MVPs || 0);
+        const tripleKills = Number(lifetime?.['Triple Kills'] || currentSegment?.stats?.['Triple Kills'] || 0);
+        const quadKills = Number(lifetime?.['Quadro Kills'] || currentSegment?.stats?.['Quadro Kills'] || 0);
+        const aceKills = Number(lifetime?.['Penta Kills'] || currentSegment?.stats?.['Penta Kills'] || 0);
+        
+        const kd = deaths > 0 ? (kills / deaths) : kills > 0 ? kills : 0;
+        const winRate = matches > 0 ? (wins / matches) * 100 : 0;
+        const hsPercent = kills > 0 ? (headshots / kills) * 100 : 0;
+        const kast = matches > 0 ? Number(lifetime?.KAST || currentSegment?.stats?.KAST || 0) : 0;
+        const avgKills = matches > 0 ? (kills / matches) : 0;
+        const avgDeaths = matches > 0 ? (deaths / matches) : 0;
+        const avgAssists = matches > 0 ? (assists / matches) : 0;
+        
+        setFaceitStats({
+          elo: elo.toLocaleString(),
+          level: level.toString(),
+          kd: kd.toFixed(2),
+          winRate: winRate.toFixed(1),
+          hsPercent: hsPercent.toFixed(1),
+          kast: kast.toFixed(1),
+          matches: matches.toLocaleString(),
+          wins: wins.toLocaleString(),
+          losses: losses.toLocaleString(),
+          kills: kills.toLocaleString(),
+          deaths: deaths.toLocaleString(),
+          assists: assists.toLocaleString(),
+          headshots: headshots.toLocaleString(),
+          mvps: mvps.toLocaleString(),
+          tripleKills: tripleKills.toLocaleString(),
+          quadKills: quadKills.toLocaleString(),
+          aceKills: aceKills.toLocaleString(),
+          avgKills: avgKills.toFixed(2),
+          avgDeaths: avgDeaths.toFixed(2),
+          avgAssists: avgAssists.toFixed(2),
+          playerId: player?.player_id,
+          nickname: player?.nickname,
+        });
+      }
+    } catch (e) { 
+      console.error("Faceit stats failed", e);
+      setFaceitStats(null);
+    }
   };
 
   const mergeAndStorePrices = (next: Record<string, string>) => {
@@ -555,6 +657,7 @@ function InventoryContent() {
       
       // These can load in background - use correct Pro status for inventory
       fetchPlayerStats(viewedSteamId).catch(() => {});
+      fetchFaceitStats(viewedSteamId).catch(() => {});
       fetchInventory(viewedSteamId, proStatusForInventory).catch(() => {});
 
       // Wait for profile with timeout - Pro info already fetched above
@@ -1231,6 +1334,63 @@ function InventoryContent() {
                 </div>
               </div>
             ))}
+
+            {/* Faceit Stats Section */}
+            {faceitStats && (
+              <div className="mt-6">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
+                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-orange-400 flex items-center gap-2">
+                    <Trophy size={14} className="text-orange-400" />
+                    <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/40 text-[8px]">FACEIT</span>
+                    {faceitStats.nickname && (
+                      <span className="text-[9px] text-gray-400">@{faceitStats.nickname}</span>
+                    )}
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                  <StatCard label="ELO" icon={<Trophy size={12}/>} val={faceitStats.elo} color="text-orange-400" />
+                  <StatCard label="Level" icon={<Award size={12}/>} val={faceitStats.level} color="text-orange-300" />
+                  <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={faceitStats.kd} color="text-orange-200" />
+                  <StatCard label="Win Rate" icon={<TrendingUp size={12}/>} val={faceitStats.winRate} unit="%" color="text-emerald-400" />
+                  <StatCard label="HS %" icon={<Target size={12}/>} val={faceitStats.hsPercent} unit="%" color="text-cyan-400" />
+                  <StatCard label="KAST" icon={<Target size={12}/>} val={faceitStats.kast} unit="%" color="text-purple-400" />
+                </div>
+                {isPro && (
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                    <StatCard label="Matches" icon={<PackageOpen size={12}/>} val={faceitStats.matches} color="text-blue-400" />
+                    <StatCard label="Wins" icon={<Award size={12}/>} val={faceitStats.wins} color="text-emerald-400" />
+                    <StatCard label="Losses" icon={<Skull size={12}/>} val={faceitStats.losses} color="text-red-400" />
+                    <StatCard label="Total Kills" icon={<Swords size={12}/>} val={faceitStats.kills} color="text-blue-500" />
+                    <StatCard label="Total Deaths" icon={<Skull size={12}/>} val={faceitStats.deaths} color="text-red-500" />
+                    <StatCard label="Total Assists" icon={<Award size={12}/>} val={faceitStats.assists} color="text-yellow-400" />
+                    <StatCard label="Headshots" icon={<Target size={12}/>} val={faceitStats.headshots} color="text-cyan-500" />
+                    <StatCard label="MVPs" icon={<Award size={12}/>} val={faceitStats.mvps} color="text-amber-400" />
+                    <StatCard label="Avg Kills" icon={<Swords size={12}/>} val={faceitStats.avgKills} color="text-blue-300" />
+                    <StatCard label="Avg Deaths" icon={<Skull size={12}/>} val={faceitStats.avgDeaths} color="text-red-300" />
+                    <StatCard label="Avg Assists" icon={<Award size={12}/>} val={faceitStats.avgAssists} color="text-yellow-300" />
+                    <StatCard label="Triple Kills" icon={<Swords size={12}/>} val={faceitStats.tripleKills} color="text-purple-300" />
+                    <StatCard label="Quad Kills" icon={<Swords size={12}/>} val={faceitStats.quadKills} color="text-indigo-300" />
+                    <StatCard label="Ace Kills" icon={<Swords size={12}/>} val={faceitStats.aceKills} color="text-pink-300" />
+                  </div>
+                )}
+                {faceitStats.playerId && (
+                  <div className="mt-4 px-2">
+                    <a
+                      href={`https://www.faceit.com/en/players/${faceitStats.nickname || faceitStats.playerId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase text-orange-400 hover:text-orange-300 transition-colors"
+                    >
+                      <Trophy size={12} />
+                      View Full Faceit Profile
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
             <section className="space-y-6 md:space-y-10">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-6">
                 <div className="flex items-center gap-3 md:gap-4">
