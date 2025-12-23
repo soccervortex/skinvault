@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const steamId1 = searchParams.get('steamId1');
     const steamId2 = searchParams.get('steamId2');
+    const currentUserId = searchParams.get('currentUserId'); // Current user making the request
     const adminSteamId = searchParams.get('adminSteamId');
 
     if (!steamId1 || !steamId2) {
@@ -57,10 +58,12 @@ export async function GET(request: Request) {
     // Check if admin is trying to view someone else's DM
     const { isOwner } = await import('@/app/utils/owner-ids');
     const isAdmin = adminSteamId && isOwner(adminSteamId);
-    const isParticipant = steamId1 === adminSteamId || steamId2 === adminSteamId;
+    
+    // Verify current user is a participant in this DM
+    const isParticipant = currentUserId && (steamId1 === currentUserId || steamId2 === currentUserId);
 
     if (!isAdmin && !isParticipant) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      return NextResponse.json({ error: 'Unauthorized - you are not a participant in this DM' }, { status: 403 });
     }
 
     const dmId = generateDMId(steamId1, steamId2);

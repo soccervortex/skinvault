@@ -199,8 +199,10 @@ export default function ChatPage() {
   };
 
   const fetchDMMessages = async (steamId1: string, steamId2: string) => {
+    if (!user?.steamId) return;
     try {
-      const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}${isAdmin ? `&adminSteamId=${user?.steamId}` : ''}`);
+      // Always pass current user's steamId so API can verify they're a participant
+      const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${user.steamId}${isAdmin ? `&adminSteamId=${user.steamId}` : ''}`);
       if (res.ok) {
         const data = await res.json();
         setDmMessages(data.messages || []);
