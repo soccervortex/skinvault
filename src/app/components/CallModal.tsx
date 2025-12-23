@@ -31,11 +31,8 @@ export default function CallModal({
   currentUserId,
 }: CallModalProps) {
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(callType === 'video');
   const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
   const [callStatus, setCallStatus] = useState<'ringing' | 'active' | 'ended'>('ringing');
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const signalingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -53,9 +50,6 @@ export default function CallModal({
         });
 
         localStreamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
 
         // Create peer connection
         const pc = new RTCPeerConnection({
@@ -70,11 +64,12 @@ export default function CallModal({
           pc.addTrack(track, stream);
         });
 
-        // Handle remote stream
+        // Handle remote stream (audio only)
         pc.ontrack = (event) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
+          // Audio will play automatically through the remote stream
+          const audioElement = new Audio();
+          audioElement.srcObject = event.streams[0];
+          audioElement.play().catch(console.error);
         };
 
         // Handle ICE candidates
@@ -195,14 +190,6 @@ export default function CallModal({
     setIsMuted(!isMuted);
   };
 
-  const toggleVideo = () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getVideoTracks().forEach(track => {
-        track.enabled = !isVideoEnabled;
-      });
-    }
-    setIsVideoEnabled(!isVideoEnabled);
-  };
 
   if (!callId || callStatus === 'ended') return null;
 
@@ -222,7 +209,7 @@ export default function CallModal({
           <p className="text-sm text-gray-400">
             {callStatus === 'ringing' 
               ? (isIncoming ? 'Incoming call' : 'Calling...')
-              : callType === 'video' ? 'Video call' : 'Voice call'}
+              : 'Voice call'}
           </p>
         </div>
 

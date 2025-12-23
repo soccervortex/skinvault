@@ -270,16 +270,16 @@ export default function ChatPage() {
     checkBanStatus();
     // Check ban status every 5 seconds
     const banCheckInterval = setInterval(checkBanStatus, 5000);
-    
+
     // Check chat disable status
     const checkChatStatus = async () => {
-      try {
+    try {
         const stored = window.localStorage.getItem('steam_user');
         const currentUser = stored ? JSON.parse(stored) : null;
         if (isAdmin && currentUser?.steamId) {
           const res = await fetch(`/api/admin/chat-control?adminSteamId=${currentUser.steamId}`);
-          if (res.ok) {
-            const data = await res.json();
+      if (res.ok) {
+        const data = await res.json();
             setGlobalChatDisabled(data.globalChatDisabled || false);
             setDmChatDisabled(data.dmChatDisabled || false);
           }
@@ -1853,16 +1853,16 @@ export default function ChatPage() {
               ))}
               {hasMoreMessages && (
                 <div className="flex justify-center py-4">
-                  <button
+                            <button
                     onClick={() => {
                       const nextPage = messagePage + 1;
                       setMessagePage(nextPage);
                       fetchMessages(nextPage, true);
                     }}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-sm transition-colors"
-                  >
+                            >
                     Load More Messages
-                  </button>
+                            </button>
                 </div>
               )}
             {typingUsers.length > 0 && (
@@ -1888,13 +1888,13 @@ export default function ChatPage() {
                       <Pin size={20} className="text-yellow-400" />
                       Pinned Messages
                     </h3>
-                    <button
+                            <button
                       onClick={() => setShowPinnedMessages(false)}
                       className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                    >
+                            >
                       <X size={20} className="text-gray-400" />
-                    </button>
-                  </div>
+                            </button>
+                      </div>
                   
                   {pinnedMessages.length === 0 ? (
                     <p className="text-gray-400 text-center py-8">No pinned messages</p>
@@ -1917,14 +1917,14 @@ export default function ChatPage() {
                                 <span className="font-bold text-white">{pinned.steamName}</span>
                                 <span className="text-xs text-gray-500">
                                   {pinned.messageType === 'global' ? 'Global Chat' : 'DM'}
-                                </span>
+                      </span>
                                 <Pin size={12} className="text-yellow-400" />
-                              </div>
+                    </div>
                               <p className="text-sm text-gray-300 mb-2 line-clamp-2">{pinned.message}</p>
                               <p className="text-xs text-gray-500">
                                 {new Date(pinned.timestamp).toLocaleString()}
                               </p>
-                            </div>
+                  </div>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1934,11 +1934,11 @@ export default function ChatPage() {
                             >
                               View
                             </button>
-                          </div>
-                        </div>
+                </div>
+              </div>
                       ))}
                     </div>
-                  )}
+            )}
                 </div>
               </div>
             )}
@@ -2017,22 +2017,22 @@ export default function ChatPage() {
                         <button
                           onClick={() => setSelectedDM(dm.dmId)}
                           className="flex-1 text-left flex items-start gap-3 min-w-0"
-                        >
-                          <img
-                            src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
-                            alt={dm.otherUserName || 'User'}
-                            className="w-10 h-10 rounded-lg border-2 border-blue-600 flex-shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold mb-1 truncate text-white">
-                              {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
-                            </p>
-                            <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
-                            <p className="text-[9px] text-gray-500 mt-1">
-                              {formatTime(dm.lastMessageTime)}
-                            </p>
-                          </div>
-                        </button>
+                      >
+                        <img
+                          src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
+                          alt={dm.otherUserName || 'User'}
+                          className="w-10 h-10 rounded-lg border-2 border-blue-600 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold mb-1 truncate text-white">
+                            {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
+                          </p>
+                          <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
+                          <p className="text-[9px] text-gray-500 mt-1">
+                            {formatTime(dm.lastMessageTime)}
+                          </p>
+                        </div>
+                      </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2117,10 +2117,10 @@ export default function ChatPage() {
                                     isBlocked={blockedUsers.has(msg.senderId)}
                                     isPinned={msg.isPinned}
                                     onReport={msg.senderId !== user?.steamId ? () => setReportUser({ 
-                                      steamId: msg.senderId, 
-                                      name: msg.senderName, 
-                                      type: 'dm',
-                                      dmId: selectedDM || undefined
+                                        steamId: msg.senderId, 
+                                        name: msg.senderName, 
+                                        type: 'dm',
+                                        dmId: selectedDM || undefined
                                     }) : undefined}
                                     onDelete={msg.senderId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'dm') : undefined}
                                     onEdit={msg.id ? () => handleEditMessage(msg.id!, msg.message, 'dm') : undefined}
@@ -2308,7 +2308,7 @@ export default function ChatPage() {
                 </button>
               </div>
             )}
-            <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
+          <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
             <div className="flex gap-3">
               <input
                 type="text"
