@@ -135,7 +135,8 @@ export default function ChatPage() {
 
   // Real-time SSE streams (after all state declarations)
   const globalChannel = activeTab === 'global' ? 'global' : null;
-  const dmChannel = activeTab === 'dms' && selectedDM ? selectedDM : null;
+  // DM channel should be dm_${steamId} to match what server sends, not the dmId
+  const dmChannel = activeTab === 'dms' && user?.steamId ? `dm_${user.steamId}` : null;
   const lastGlobalMessageId = optimisticMessages.length > 0 ? optimisticMessages[optimisticMessages.length - 1]?.id : undefined;
   const lastDMMessageId = optimisticDMMessages.length > 0 ? optimisticDMMessages[optimisticDMMessages.length - 1]?.id : undefined;
   
@@ -149,7 +150,7 @@ export default function ChatPage() {
   const dmStream = usePusherChat(
     dmChannel || '',
     user?.steamId || null,
-    activeTab === 'dms' && !!selectedDM && !dmChatDisabled,
+    activeTab === 'dms' && !!user?.steamId && !dmChatDisabled,
     lastDMMessageId
   );
 
@@ -620,7 +621,12 @@ export default function ChatPage() {
     if (dmStream.messages.length > 0 && activeTab === 'dms' && selectedDM) {
       setDmMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = dmStream.messages.filter(m => m.id && !existingIds.has(m.id));
+        // Filter messages to only include those for the currently selected DM
+        const newMessages = dmStream.messages.filter(m => 
+          m.id && 
+          !existingIds.has(m.id) && 
+          m.dmId === selectedDM // Only show messages for the selected DM
+        );
         if (newMessages.length > 0) {
           // Remove optimistic messages with temp IDs when real messages arrive
           // Filter out any messages with temp IDs that match the new real messages

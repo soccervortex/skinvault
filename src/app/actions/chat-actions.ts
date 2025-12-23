@@ -97,6 +97,10 @@ export async function sendDMMessage(
       getProUntil(senderId),
     ]);
 
+    const senderName = profileInfo.name || 'Unknown User';
+    const senderAvatar = profileInfo.avatar || '';
+    const senderIsPro = proUntil ? new Date(proUntil) > new Date() : false;
+
     // Use today's date-based collection
     const collectionName = getTodayDMCollectionName();
     const collection = db.collection<DMMessage>(collectionName);
@@ -142,6 +146,9 @@ export async function sendDMMessage(
             dmId: insertedMessage.dmId,
             senderId: insertedMessage.senderId,
             receiverId: insertedMessage.receiverId,
+            senderName,
+            senderAvatar,
+            senderIsPro,
             message: insertedMessage.message,
             timestamp: insertedMessage.timestamp,
           }],
