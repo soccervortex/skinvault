@@ -4,7 +4,7 @@
  * This dramatically improves performance
  */
 
-import { MongoClient } from 'mongodb';
+import { MongoClient, Db } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
@@ -57,7 +57,7 @@ export async function getMongoClient(): Promise<MongoClient> {
 /**
  * Get database instance (cached)
  */
-export async function getDatabase(): Promise<any> {
+export async function getDatabase(): Promise<Db> {
   if (cachedDb) {
     return cachedDb;
   }
