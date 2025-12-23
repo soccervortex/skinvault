@@ -696,6 +696,40 @@ export default function ChatPage() {
             const updatedMessages = [...filteredPrev, ...newMessages];
             setCachedMessages(selectedDM, updatedMessages, null, 'dm');
           }
+          
+          // Update DM list with new last message and timestamp (syncs across devices)
+          if (newMessages.length > 0 && user?.steamId) {
+            const lastMessage = newMessages[newMessages.length - 1];
+            setDmList(prev => {
+              const updated = prev.map(dm => {
+                if (dm.dmId === lastMessage.dmId) {
+                  return {
+                    ...dm,
+                    lastMessage: lastMessage.message,
+                    lastMessageTime: new Date(lastMessage.timestamp),
+                  };
+                }
+                return dm;
+              });
+              // If DM not in list, add it (shouldn't happen, but just in case)
+              if (!updated.find(dm => dm.dmId === lastMessage.dmId)) {
+                const [steamId1, steamId2] = lastMessage.dmId.split('_');
+                const otherUserId = steamId1 === user.steamId ? steamId2 : steamId1;
+                updated.push({
+                  dmId: lastMessage.dmId,
+                  otherUserId,
+                  otherUserName: lastMessage.senderName || `User ${otherUserId.slice(-4)}`,
+                  otherUserAvatar: lastMessage.senderAvatar || '',
+                  lastMessage: lastMessage.message,
+                  lastMessageTime: new Date(lastMessage.timestamp),
+                });
+              }
+              // Save updated DM list to localStorage (syncs across tabs/devices)
+              saveDMList(updated, user.steamId);
+              return updated;
+            });
+          }
+          
           // Auto-scroll to new messages
           setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -808,10 +842,67 @@ export default function ChatPage() {
     };
     dmChannel.bind('message_deleted', handleDMDelete);
 
+    // Listen for new DM messages to update DM list across all devices
+    const handleDMNewMessage = (data: any) => {
+      if (data.type === 'new_messages' && data.messages && data.messages.length > 0 && user?.steamId) {
+        // Update DM list for any new messages, even if DM is not currently selected
+        data.messages.forEach((msg: any) => {
+          if (msg.dmId) {
+            setDmList(prev => {
+              const existingDM = prev.find(dm => dm.dmId === msg.dmId);
+              if (existingDM) {
+                // Update existing DM with new last message
+                const updated = prev.map(dm => {
+                  if (dm.dmId === msg.dmId) {
+                    return {
+                      ...dm,
+                      lastMessage: msg.message,
+                      lastMessageTime: new Date(msg.timestamp),
+                    };
+                  }
+                  return dm;
+                });
+                // Save to localStorage to sync across devices
+                saveDMList(updated, user.steamId);
+                return updated;
+              } else {
+                // DM not in list, add it (shouldn't happen often, but possible if invite was just accepted)
+                const [steamId1, steamId2] = msg.dmId.split('_');
+                const otherUserId = steamId1 === user.steamId ? steamId2 : steamId1;
+                const updated = [...prev, {
+                  dmId: msg.dmId,
+                  otherUserId,
+                  otherUserName: msg.senderName || `User ${otherUserId.slice(-4)}`,
+                  otherUserAvatar: msg.senderAvatar || '',
+                  lastMessage: msg.message,
+                  lastMessageTime: new Date(msg.timestamp),
+                }];
+                // Save to localStorage to sync across devices
+                saveDMList(updated, user.steamId);
+                return updated;
+              }
+            });
+          }
+        });
+      }
+    };
+    dmChannel.bind('new_messages', handleDMNewMessage);
+
+    // Listen for DM list updates (when invites are accepted on other devices)
+    const handleDMListUpdate = (data: any) => {
+      if (data.type === 'dm_list_updated' && user?.steamId) {
+        // Refresh DM list from server to get the latest data
+        fetchDMList(true).catch(() => {});
+      }
+    };
+    dmChannel.bind('dm_list_updated', handleDMListUpdate);
+
     return () => {
       globalChannel.unbind('message_deleted', handleGlobalDelete);
       globalChannel.unsubscribe();
       dmChannel.unbind('message_deleted', handleDMDelete);
+      dmChannel.unbind('new_messages', handleDMNewMessage);
+      dmChannel.unbind('dm_list_updated', handleDMListUpdate);
       dmChannel.unsubscribe();
       pusher.disconnect();
     };

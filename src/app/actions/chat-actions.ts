@@ -212,6 +212,41 @@ export async function acceptDMInvite(
       { $set: { status: 'accepted' } }
     );
 
+    // Trigger Pusher event to notify both users to refresh their DM lists
+    try {
+      const pusherAppId = process.env.PUSHER_APP_ID;
+      const pusherSecret = process.env.PUSHER_SECRET;
+      const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+
+      if (pusherAppId && pusherSecret) {
+        const pusher = new Pusher({
+          appId: pusherAppId,
+          key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+          secret: pusherSecret,
+          cluster: pusherCluster,
+          useTLS: true,
+        });
+
+        // Notify both users to refresh their DM lists
+        const dmChannel1 = `dm_${invite.fromSteamId}`;
+        const dmChannel2 = `dm_${invite.toSteamId}`;
+        
+        await Promise.all([
+          pusher.trigger(dmChannel1, 'dm_list_updated', {
+            type: 'dm_list_updated',
+            dmId: generateDMId(invite.fromSteamId, invite.toSteamId),
+          }),
+          pusher.trigger(dmChannel2, 'dm_list_updated', {
+            type: 'dm_list_updated',
+            dmId: generateDMId(invite.fromSteamId, invite.toSteamId),
+          }),
+        ]);
+      }
+    } catch (pusherError) {
+      console.error('Failed to trigger Pusher DM list update event:', pusherError);
+      // Don't fail the invite acceptance if Pusher fails
+    }
+
     return { success: true, status: 'accepted' };
   } catch (error: any) {
     console.error('Failed to accept DM invite:', error);
