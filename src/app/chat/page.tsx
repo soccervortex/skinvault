@@ -216,8 +216,10 @@ export default function ChatPage() {
     // Check chat disable status
     const checkChatStatus = async () => {
       try {
-        if (isAdmin && parsedUser?.steamId) {
-          const res = await fetch(`/api/admin/chat-control?adminSteamId=${parsedUser.steamId}`);
+        const stored = window.localStorage.getItem('steam_user');
+        const currentUser = stored ? JSON.parse(stored) : null;
+        if (isAdmin && currentUser?.steamId) {
+          const res = await fetch(`/api/admin/chat-control?adminSteamId=${currentUser.steamId}`);
           if (res.ok) {
             const data = await res.json();
             setGlobalChatDisabled(data.globalChatDisabled || false);
