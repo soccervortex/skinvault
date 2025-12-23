@@ -19,8 +19,6 @@ async function fetchSteamProfile(steamId: string): Promise<{ name: string; avata
   }
 }
 
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
 interface DMMessage {
   _id?: string;
   dmId: string;
@@ -38,30 +36,9 @@ interface DMInvite {
   createdAt: Date;
 }
 
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // 5 second timeout
-    connectTimeoutMS: 5000,
-  });
-  await client.connect();
-  
-  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
-  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
-  autoSetupIndexes().catch(() => {}); // Don't block on index setup
-  
-  return client;
-}
-
 // GET: Get list of DMs for a user
 export async function GET(request: Request) {
   try {
-    if (!MONGODB_URI) {
-      return NextResponse.json({ dms: [] });
-    }
-
     const { searchParams } = new URL(request.url);
     const steamId = searchParams.get('steamId');
 
@@ -209,8 +186,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ dms: dmList });
   } catch (error: any) {
     console.error('Failed to get DM list:', error);
-    // If MongoDB is not configured or connection fails, return empty list instead of error
-    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+    // If MongoDB connection fails, return empty list instead of error
+    if (error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
       return NextResponse.json({ dms: [] });
     }
     return NextResponse.json({ error: 'Failed to get DM list' }, { status: 500 });

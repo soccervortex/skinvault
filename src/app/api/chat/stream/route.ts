@@ -84,13 +84,10 @@ export async function GET(request: Request) {
       // Send initial connection message
       send({ type: 'connected', channel });
 
-      // If MongoDB is not configured, just send heartbeats
-      if (!MONGODB_URI) {
-        heartbeatInterval = setInterval(() => {
-          send({ type: 'heartbeat', timestamp: Date.now() });
-        }, 30000);
-        return;
-      }
+      // Start heartbeat (MongoDB connection will be checked when needed)
+      heartbeatInterval = setInterval(() => {
+        send({ type: 'heartbeat', timestamp: Date.now() });
+      }, 30000);
 
       // Start heartbeat (keep connection alive)
       heartbeatInterval = setInterval(() => {

@@ -81,10 +81,6 @@ export async function getCurrentUserInfo(uniqueSteamIds: string[]): Promise<Map<
 
 export async function GET(request: Request) {
   try {
-    if (!MONGODB_URI) {
-      return NextResponse.json({ messages: [] });
-    }
-
     const { searchParams } = new URL(request.url);
     // Cursor-based pagination: use beforeTimestamp instead of page number
     const beforeTimestamp = searchParams.get('beforeTimestamp');
@@ -246,8 +242,8 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error('Failed to get chat messages:', error);
-    // If MongoDB is not configured or connection fails, return empty messages instead of error
-    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+    // If MongoDB connection fails, return empty messages instead of error
+    if (error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
       return NextResponse.json({ messages: [], hasMore: false, total: 0, page: 1 });
     }
     return NextResponse.json({ error: 'Failed to get messages' }, { status: 500 });
@@ -256,10 +252,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    if (!MONGODB_URI) {
-      return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
-    }
-
     const body = await request.json();
     const { steamId, steamName, avatar, message } = body;
 
@@ -339,8 +331,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: chatMessage });
   } catch (error: any) {
     console.error('Failed to send chat message:', error);
-    // If MongoDB is not configured or connection fails, return error
-    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+    // If MongoDB connection fails, return error
+    if (error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
       return NextResponse.json({ error: 'Chat service is currently unavailable' }, { status: 503 });
     }
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
