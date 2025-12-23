@@ -114,36 +114,61 @@ export default function ChatPage() {
           setIsAdmin(isOwner(parsedUser.steamId));
           checkProStatus(parsedUser.steamId).then(setIsPro);
           
-          // Preload chat messages immediately after user loads
-          (async () => {
-            try {
-              // Preload global chat messages
-              const messagesRes = await fetch('/api/chat/messages');
-              if (messagesRes.ok) {
-                const messagesData = await messagesRes.json();
-                setMessages(messagesData.messages || []);
+          // Try to use preloaded data first (instant load)
+          const { getPreloadedChatData, preloadChatData } = await import('@/app/utils/chat-preloader');
+          const preloaded = getPreloadedChatData();
+          
+          if (preloaded) {
+            // Use preloaded data for instant display
+            setMessages(preloaded.messages || []);
+            setDmList(preloaded.dmList || []);
+            setDmInvites(preloaded.dmInvites || []);
+            setLoading(false);
+            
+            // Refresh in background
+            preloadChatData(parsedUser.steamId).then(() => {
+              const fresh = getPreloadedChatData();
+              if (fresh) {
+                setMessages(fresh.messages || []);
+                setDmList(fresh.dmList || []);
+                setDmInvites(fresh.dmInvites || []);
               }
-              
-              // Preload DM list
-              const dmListRes = await fetch(`/api/chat/dms/list?steamId=${parsedUser.steamId}`);
-              if (dmListRes.ok) {
-                const dmListData = await dmListRes.json();
-                setDmList(dmListData.dms || []);
+            });
+          } else {
+            // No preloaded data, fetch now
+            (async () => {
+              try {
+                // Preload global chat messages
+                const messagesRes = await fetch('/api/chat/messages');
+                if (messagesRes.ok) {
+                  const messagesData = await messagesRes.json();
+                  setMessages(messagesData.messages || []);
+                }
+                
+                // Preload DM list
+                const dmListRes = await fetch(`/api/chat/dms/list?steamId=${parsedUser.steamId}`);
+                if (dmListRes.ok) {
+                  const dmListData = await dmListRes.json();
+                  setDmList(dmListData.dms || []);
+                }
+                
+                // Preload DM invites
+                const invitesRes = await fetch(`/api/chat/dms/invites?steamId=${parsedUser.steamId}&type=pending`);
+                if (invitesRes.ok) {
+                  const invitesData = await invitesRes.json();
+                  setDmInvites(invitesData.invites || []);
+                }
+                
+                // Store for next time
+                await preloadChatData(parsedUser.steamId);
+                
+                setLoading(false);
+              } catch (error) {
+                console.error('Failed to preload chat:', error);
+                setLoading(false);
               }
-              
-              // Preload DM invites
-              const invitesRes = await fetch(`/api/chat/dms/invites?steamId=${parsedUser.steamId}&type=pending`);
-              if (invitesRes.ok) {
-                const invitesData = await invitesRes.json();
-                setDmInvites(invitesData.invites || []);
-              }
-              
-              setLoading(false);
-            } catch (error) {
-              console.error('Failed to preload chat:', error);
-              setLoading(false);
-            }
-          })();
+            })();
+          }
         } else {
           setLoading(false);
         }

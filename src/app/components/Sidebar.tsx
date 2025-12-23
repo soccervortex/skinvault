@@ -4,6 +4,7 @@ import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileTe
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
+import ChatPreloader from './ChatPreloader';
 
 export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const pathname = usePathname();
@@ -171,6 +172,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
   return (
     <>
+      <ChatPreloader />
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
