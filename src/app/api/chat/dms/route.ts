@@ -93,10 +93,22 @@ export async function GET(request: Request) {
     const uniqueSteamIds = [...new Set(messages.map(msg => [msg.senderId, msg.receiverId]).flat())];
     const userInfoMap = await getCurrentUserInfo(uniqueSteamIds);
 
-    // Get banned and timeout users
-    const { dbGet } = await import('@/app/utils/database');
-    const bannedUsers = await dbGet<string[]>('banned_steam_ids') || [];
-    const timeoutUsers = await dbGet<Record<string, string>>('timeout_users') || {};
+    // Get banned and timeout users (disable cache for real-time status)
+    const { dbGet, dbSet } = await import('@/app/utils/database');
+    const bannedUsers = await dbGet<string[]>('banned_steam_ids', false) || [];
+    const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
+    
+    // Clean up expired timeouts
+    const now = new Date();
+    const activeTimeouts: Record<string, string> = {};
+    for (const [id, timeoutUntil] of Object.entries(timeoutUsers)) {
+      if (new Date(timeoutUntil) > now) {
+        activeTimeouts[id] = timeoutUntil;
+      }
+    }
+    if (Object.keys(activeTimeouts).length !== Object.keys(timeoutUsers).length) {
+      await dbSet('timeout_users', activeTimeouts);
+    }
 
     return NextResponse.json({
       messages: messages.map(msg => {
@@ -140,10 +152,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if user is banned or timed out
-    const { dbGet } = await import('@/app/utils/database');
-    const bannedUsers = await dbGet<string[]>('banned_steam_ids') || [];
-    const timeoutUsers = await dbGet<Record<string, string>>('timeout_users') || {};
+    // Check if user is banned or timed out (disable cache for real-time checks)
+    const { dbGet, dbSet } = await import('@/app/utils/database');
+    const bannedUsers = await dbGet<string[]>('banned_steam_ids', false) || [];
+    const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
     
     if (bannedUsers.includes(senderId)) {
       return NextResponse.json({ error: 'You are banned from chat' }, { status: 403 });
@@ -151,11 +163,17 @@ export async function POST(request: Request) {
 
     if (timeoutUsers[senderId]) {
       const timeoutUntil = new Date(timeoutUsers[senderId]);
-      if (timeoutUntil > new Date()) {
-        const minutesLeft = Math.ceil((timeoutUntil.getTime() - Date.now()) / (1000 * 60));
+      const now = new Date();
+      if (timeoutUntil > now) {
+        const minutesLeft = Math.ceil((timeoutUntil.getTime() - now.getTime()) / (1000 * 60));
+        console.log(`[DM] User ${senderId} is timed out until ${timeoutUntil.toISOString()}, ${minutesLeft} minutes remaining`);
         return NextResponse.json({ 
           error: `You are timed out for ${minutesLeft} more minute(s)` 
         }, { status: 403 });
+      } else {
+        // Timeout expired, clean it up
+        delete timeoutUsers[senderId];
+        await dbSet('timeout_users', timeoutUsers);
       }
     }
 

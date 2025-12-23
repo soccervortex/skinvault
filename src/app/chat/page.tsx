@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
@@ -77,6 +77,9 @@ export default function ChatPage() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserSteamId, setNewUserSteamId] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [reportUser, setReportUser] = useState<{ steamId: string; name: string; type: 'global' | 'dm'; dmId?: string } | null>(null);
+  const [reportSteamId, setReportSteamId] = useState('');
+  const [reporting, setReporting] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -203,11 +206,13 @@ export default function ChatPage() {
   useEffect(() => {
     if (activeTab === 'global') {
       fetchMessages();
-      const interval = setInterval(fetchMessages, 1000);
+      // Optimize: Poll every 2 seconds instead of 1 second for better performance
+      const interval = setInterval(fetchMessages, 2000);
       return () => clearInterval(interval);
     } else {
       fetchDMList();
       fetchDMInvites();
+      // Optimize: Poll every 2 seconds
       const interval = setInterval(() => {
         fetchDMList();
         fetchDMInvites();
@@ -215,7 +220,7 @@ export default function ChatPage() {
           const [steamId1, steamId2] = selectedDM.split('_');
           fetchDMMessages(steamId1, steamId2);
         }
-      }, 1000);
+      }, 2000);
       return () => clearInterval(interval);
     }
   }, [activeTab, selectedDM, user?.steamId, isAdmin]);
@@ -224,9 +229,10 @@ export default function ChatPage() {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');
       fetchDMMessages(steamId1, steamId2);
+      // Optimize: Poll every 2 seconds
       const interval = setInterval(() => {
         fetchDMMessages(steamId1, steamId2);
-      }, 1000);
+      }, 2000);
       return () => clearInterval(interval);
     }
   }, [selectedDM, activeTab, user?.steamId, isAdmin]);
@@ -376,6 +382,51 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Failed to decline invite:', error);
       toast.error('Failed to decline invite');
+    }
+  };
+
+  const handleReport = async () => {
+    if (!reportUser || !user?.steamId || reporting) return;
+
+    // Validate reported Steam ID
+    if (!reportSteamId.trim() || !/^\d{17}$/.test(reportSteamId.trim())) {
+      toast.error('Please enter a valid Steam ID (17 digits)');
+      return;
+    }
+
+    if (reportSteamId.trim() !== reportUser.steamId) {
+      toast.error('Steam ID does not match the user you are reporting');
+      return;
+    }
+
+    setReporting(true);
+    try {
+      const res = await fetch('/api/chat/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reporterSteamId: user.steamId,
+          reporterName: user.name,
+          reportedSteamId: reportUser.steamId,
+          reportedName: reportUser.name,
+          reportType: reportUser.type,
+          dmId: reportUser.dmId,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Report submitted successfully. Thank you for helping keep the community safe.');
+        setReportUser(null);
+        setReportSteamId('');
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Failed to submit report:', error);
+      toast.error('Failed to submit report');
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -711,6 +762,20 @@ export default function ChatPage() {
                                     <Crown size={8} />
                                     Pro
                                   </span>
+                                )}
+                                {msg.senderId !== user?.steamId && (
+                                  <button
+                                    onClick={() => setReportUser({ 
+                                      steamId: msg.senderId, 
+                                      name: msg.senderName, 
+                                      type: 'dm',
+                                      dmId: selectedDM || undefined
+                                    })}
+                                    className="p-1 hover:bg-orange-500/20 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Report user"
+                                  >
+                                    <Flag size={12} className="text-orange-400" />
+                                  </button>
                                 )}
                                 <span className="text-xs text-gray-500 ml-auto">
                                   {formatTime(msg.timestamp)}

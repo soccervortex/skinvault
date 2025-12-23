@@ -17,6 +17,7 @@ import {
   X,
   Clock,
   Search,
+  Flag,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -1253,6 +1254,32 @@ export default function AdminPage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Reports Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-orange-500/10 border border-orange-500/40 shrink-0">
+              <Flag className="text-orange-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Moderation
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Chat Reports
+              </h2>
+            </div>
+          </div>
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
+            View and manage user reports from global chat and DMs.
+          </p>
+          <button
+            onClick={() => router.push('/admin/reports')}
+            className="w-full bg-orange-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-orange-500 transition-all shadow-xl shadow-orange-600/20 flex items-center justify-center gap-2"
+          >
+            <Flag size={14} /> View Reports
+          </button>
         </div>
 
         {/* User Search Section */}

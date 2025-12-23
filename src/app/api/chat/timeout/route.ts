@@ -33,7 +33,19 @@ export async function POST(request: Request) {
     const timeoutUntil = new Date(Date.now() + TIMEOUT_DURATIONS[duration]);
     
     timeoutUsers[steamId] = timeoutUntil.toISOString();
-    await dbSet(TIMEOUT_USERS_KEY, timeoutUsers);
+    const success = await dbSet(TIMEOUT_USERS_KEY, timeoutUsers);
+    
+    if (!success) {
+      console.error(`[Timeout] Failed to save timeout for ${steamId}`);
+      return NextResponse.json({ error: 'Failed to save timeout' }, { status: 500 });
+    }
+    
+    // Verify the timeout was saved
+    const verify = await dbGet<Record<string, string>>(TIMEOUT_USERS_KEY);
+    if (!verify || !verify[steamId]) {
+      console.error(`[Timeout] Verification failed - timeout not found for ${steamId}`);
+      return NextResponse.json({ error: 'Timeout verification failed' }, { status: 500 });
+    }
 
     return NextResponse.json({ 
       success: true, 
