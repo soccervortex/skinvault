@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp, Phone, Video } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
 import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime } from '@/app/utils/chat-notifications';
 import { useChatStream } from '@/app/hooks/useChatStream';
+import CallModal from '@/app/components/CallModal';
 
 interface ChatMessage {
   id?: string;
@@ -112,6 +113,16 @@ export default function ChatPage() {
   const [messagePage, setMessagePage] = useState(1);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [activeCall, setActiveCall] = useState<{
+    callId: string;
+    callerId: string;
+    receiverId: string;
+    callType: 'voice' | 'video';
+    isIncoming: boolean;
+    callerName?: string;
+    callerAvatar?: string;
+  } | null>(null);
+  const callPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toast = useToast();
 
   // Real-time SSE streams (after all state declarations)
@@ -1278,6 +1289,158 @@ export default function ChatPage() {
     }
   };
 
+  // Call handlers
+  const handleInitiateCall = async (userId: string, userName: string, userAvatar: string, callType: 'voice' | 'video' = 'voice') => {
+    if (!user?.steamId || activeCall) return;
+
+    try {
+      const res = await fetch('/api/chat/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callerId: user.steamId,
+          receiverId: userId,
+          callType,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setActiveCall({
+          callId: data.callId,
+          callerId: user.steamId,
+          receiverId: userId,
+          callType,
+          isIncoming: false,
+          callerName: user.name,
+          callerAvatar: user.avatar,
+        });
+        toast.success(`Calling ${userName}...`);
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Failed to initiate call');
+      }
+    } catch (error) {
+      console.error('Failed to initiate call:', error);
+      toast.error('Failed to initiate call');
+    }
+  };
+
+  const handleAnswerCall = async () => {
+    if (!activeCall || !user?.steamId) return;
+
+    try {
+      const res = await fetch('/api/chat/call', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callId: activeCall.callId,
+          action: 'answer',
+          userId: user.steamId,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Call answered');
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Failed to answer call');
+      }
+    } catch (error) {
+      console.error('Failed to answer call:', error);
+      toast.error('Failed to answer call');
+    }
+  };
+
+  const handleDeclineCall = async () => {
+    if (!activeCall || !user?.steamId) return;
+
+    try {
+      const res = await fetch('/api/chat/call', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callId: activeCall.callId,
+          action: 'decline',
+          userId: user.steamId,
+        }),
+      });
+
+      if (res.ok) {
+        setActiveCall(null);
+        toast.info('Call declined');
+      }
+    } catch (error) {
+      console.error('Failed to decline call:', error);
+      setActiveCall(null);
+    }
+  };
+
+  const handleEndCall = async () => {
+    if (!activeCall || !user?.steamId) return;
+
+    try {
+      const res = await fetch(`/api/chat/call?callId=${activeCall.callId}&userId=${user.steamId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setActiveCall(null);
+        toast.info('Call ended');
+      }
+    } catch (error) {
+      console.error('Failed to end call:', error);
+      setActiveCall(null);
+    }
+  };
+
+  // Poll for incoming calls
+  useEffect(() => {
+    if (!user?.steamId) return;
+
+    const checkCalls = async () => {
+      try {
+        const res = await fetch(`/api/chat/call?userId=${user.steamId}`);
+        if (res.ok) {
+          const { calls } = await res.json();
+          if (calls.length > 0 && !activeCall) {
+            const incomingCall = calls.find((call: any) => 
+              call.receiverId === user.steamId && call.status === 'ringing'
+            );
+            
+            if (incomingCall) {
+              // Get caller info from DM list
+              const callerInfo = dmList.find(dm => 
+                dm.otherUserId === incomingCall.callerId
+              );
+              
+              setActiveCall({
+                callId: incomingCall.callId,
+                callerId: incomingCall.callerId,
+                receiverId: incomingCall.receiverId,
+                callType: incomingCall.type || 'voice',
+                isIncoming: true,
+                callerName: callerInfo?.otherUserName || 'Unknown User',
+                callerAvatar: callerInfo?.otherUserAvatar || '',
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check calls:', error);
+      }
+    };
+
+    checkCalls();
+    callPollIntervalRef.current = setInterval(checkCalls, 2000);
+
+    return () => {
+      if (callPollIntervalRef.current) {
+        clearInterval(callPollIntervalRef.current);
+      }
+    };
+  }, [user?.steamId, dmList, activeCall]);
+
   // Check blocked users when messages change
   useEffect(() => {
     if (!user?.steamId) return;
@@ -1685,30 +1848,56 @@ export default function ChatPage() {
                 ) : (
                   <div className="p-2 space-y-1">
                     {dmList.map((dm) => (
-                      <button
+                      <div
                         key={dm.dmId}
-                        onClick={() => setSelectedDM(dm.dmId)}
-                        className={`w-full text-left p-3 rounded-lg transition-all flex items-start gap-3 border ${
+                        className={`w-full p-3 rounded-lg transition-all flex items-start gap-3 border ${
                           selectedDM === dm.dmId
                             ? 'bg-blue-600/20 border-blue-500/40 shadow-lg shadow-blue-500/20'
                             : 'bg-[#08090d] hover:bg-[#11141d] border-transparent hover:border-white/5'
                         }`}
                       >
-                        <img
-                          src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
-                          alt={dm.otherUserName || 'User'}
-                          className="w-10 h-10 rounded-lg border-2 border-blue-600 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold mb-1 truncate text-white">
-                            {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
-                          </p>
-                          <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
-                          <p className="text-[9px] text-gray-500 mt-1">
-                            {formatTime(dm.lastMessageTime)}
-                          </p>
+                        <button
+                          onClick={() => setSelectedDM(dm.dmId)}
+                          className="flex-1 text-left flex items-start gap-3 min-w-0"
+                        >
+                          <img
+                            src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
+                            alt={dm.otherUserName || 'User'}
+                            className="w-10 h-10 rounded-lg border-2 border-blue-600 flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold mb-1 truncate text-white">
+                              {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
+                            </p>
+                            <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
+                            <p className="text-[9px] text-gray-500 mt-1">
+                              {formatTime(dm.lastMessageTime)}
+                            </p>
+                          </div>
+                        </button>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleInitiateCall(dm.otherUserId, dm.otherUserName || 'User', dm.otherUserAvatar || '', 'voice');
+                            }}
+                            className="p-1.5 bg-green-600 hover:bg-green-500 rounded transition-colors"
+                            title="Voice call"
+                          >
+                            <Phone size={14} className="text-white" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleInitiateCall(dm.otherUserId, dm.otherUserName || 'User', dm.otherUserAvatar || '', 'video');
+                            }}
+                            className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+                            title="Video call"
+                          >
+                            <Video size={14} className="text-white" />
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -2104,6 +2293,23 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Call Modal */}
+        {activeCall && (
+          <CallModal
+            callId={activeCall.callId}
+            callerId={activeCall.callerId}
+            receiverId={activeCall.receiverId}
+            callType={activeCall.callType}
+            isIncoming={activeCall.isIncoming}
+            callerName={activeCall.callerName}
+            callerAvatar={activeCall.callerAvatar}
+            onAnswer={handleAnswerCall}
+            onDecline={handleDeclineCall}
+            onEnd={handleEndCall}
+            currentUserId={user?.steamId || ''}
+          />
         )}
       </main>
     </div>
