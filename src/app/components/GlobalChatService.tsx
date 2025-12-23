@@ -64,7 +64,7 @@ export default function GlobalChatService() {
             for (const dm of recentDms) {
               try {
                 const [steamId1, steamId2] = dm.dmId.split('_');
-                const dmRes = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${currentUserId}`);
+                const dmRes: Response = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${currentUserId}`);
                 
                 if (dmRes.ok) {
                   const dmData = await dmRes.json();

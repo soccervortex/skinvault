@@ -1530,7 +1530,7 @@ export default function ChatPage() {
                                   {formatTime(msg.timestamp)}
                                 </span>
                               </div>
-                              {editingMessage?.id === msg.id && editingMessage.type === 'dm' ? (
+                              {editingMessage?.id === msg.id && editingMessage?.type === 'dm' ? (
                                 <div className="space-y-2">
                                   <textarea
                                     value={editText}
