@@ -86,16 +86,18 @@ export async function GET(request: Request) {
       queryFilter.timestamp.$lt = beforeTimestampDate; // Get messages older than cursor
     }
     
-    // Query collections in reverse order (newest first) and stop when we have enough
-    // Prioritize recent collections first for faster results
+    // Query all 365 days of collections, but prioritize recent ones for speed
+    // We check recent collections first, then continue through all 365 days
     let allMessages: DMMessage[] = [];
-    const recentDays = 7; // Check last 7 days first for speed
-    const recentCollectionNames = getDMCollectionNamesForDays(recentDays).reverse();
-    const olderCollectionNames = collectionNames.slice(recentCollectionNames.length).reverse();
     
-    // Query recent collections first
-    for (const collectionName of recentCollectionNames) {
-      if (allMessages.length >= pageSize + 1) break; // Stop if we have enough
+    // Query all collections in reverse order (newest first)
+    // This ensures we get messages from all 365 days, but recent ones appear first
+    for (const collectionName of collectionNames.reverse()) {
+      // Stop early if we have enough messages for pagination (but still check all if loadAll is true)
+      // For loadAll, we want to check all collections to ensure we get everything
+      if (!loadAll && allMessages.length >= pageSize + 1) {
+        break; // Early exit for non-loadAll requests
+      }
       
       const collection = db.collection<DMMessage>(collectionName);
       // Use projection to only fetch needed fields
@@ -112,44 +114,15 @@ export async function GET(request: Request) {
       const messages = await collection
         .find(queryFilter, { projection })
         .sort({ timestamp: -1 }) // Sort descending for cursor pagination
-        .limit(pageSize + 1) // Fetch one extra to check if there are more
+        .limit(loadAll ? 1000 : pageSize + 1) // For loadAll, fetch more to ensure we get all messages
         .toArray();
       
       allMessages.push(...messages);
       
-      // If we have enough messages, stop querying older collections
-      if (allMessages.length >= pageSize + 1) {
+      // For loadAll, continue through all collections to ensure we get everything
+      // For regular requests, stop once we have enough
+      if (!loadAll && allMessages.length >= pageSize + 1) {
         break;
-      }
-    }
-    
-    // Only query older collections if we need more messages and loadAll is true
-    if (loadAll && allMessages.length < pageSize) {
-      for (const collectionName of olderCollectionNames) {
-        if (allMessages.length >= pageSize + 1) break;
-        
-        const collection = db.collection<DMMessage>(collectionName);
-        const projection = {
-          _id: 1,
-          dmId: 1,
-          senderId: 1,
-          receiverId: 1,
-          message: 1,
-          timestamp: 1,
-          editedAt: 1,
-        };
-        
-        const messages = await collection
-          .find(queryFilter, { projection })
-          .sort({ timestamp: -1 })
-          .limit(pageSize + 1 - allMessages.length) // Only fetch what we need
-          .toArray();
-        
-        allMessages.push(...messages);
-        
-        if (allMessages.length >= pageSize + 1) {
-          break;
-        }
       }
     }
     
