@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
@@ -31,120 +30,101 @@ async function getMongoClient() {
     throw new Error('MongoDB URI not configured');
   }
   const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // 5 second timeout
+    serverSelectionTimeoutMS: 5000,
     connectTimeoutMS: 5000,
   });
   await client.connect();
   return client;
 }
 
-// SSE endpoint for real-time chat updates
+// Modern SSE endpoint using Next.js streaming
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const channel = searchParams.get('channel') || 'global'; // 'global' or dmId
-    const lastMessageId = searchParams.get('lastMessageId') || '';
-    const currentUserId = searchParams.get('currentUserId') || '';
+  const { searchParams } = new URL(request.url);
+  const channel = searchParams.get('channel') || 'global';
+  const lastMessageId = searchParams.get('lastMessageId') || '';
+  const currentUserId = searchParams.get('currentUserId') || '';
 
-    // If MongoDB is not configured, return a keep-alive stream that just sends heartbeats
-    if (!MONGODB_URI) {
-      const stream = new ReadableStream({
-        start(controller) {
-          const encoder = new TextEncoder();
-          
-          // Send connected message
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel })}\n\n`));
-          } catch {
-            // Connection closed
-          }
-          
-          // Send periodic heartbeats to keep connection alive
-          const heartbeatInterval = setInterval(() => {
-            try {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`));
-            } catch {
-              clearInterval(heartbeatInterval);
-              try {
-                controller.close();
-              } catch {
-                // Already closed
-              }
-            }
-          }, 30000); // Every 30 seconds
-          
-          // Cleanup on abort
-          request.signal.addEventListener('abort', () => {
-            clearInterval(heartbeatInterval);
-            try {
-              controller.close();
-            } catch {
-              // Already closed
-            }
-          });
-        },
-      });
-      return new Response(stream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache, no-transform',
-          'Connection': 'keep-alive',
-          'X-Accel-Buffering': 'no',
-        },
-      });
-    }
-
-  // Create SSE stream
+  // Use modern streaming response
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      
-      // Send initial connection message
+      let isActive = true;
+      let lastCheckedId = lastMessageId;
+      let pollInterval: NodeJS.Timeout | null = null;
+      let heartbeatInterval: NodeJS.Timeout | null = null;
+
       const send = (data: any) => {
+        if (!isActive) return;
         try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          const message = `data: ${JSON.stringify(data)}\n\n`;
+          controller.enqueue(encoder.encode(message));
         } catch (error) {
-          // Connection closed, ignore
+          // Stream closed, cleanup
+          isActive = false;
+          cleanup();
         }
       };
 
-      send({ type: 'connected', channel });
-
-      let lastCheckedId = lastMessageId;
-      let isActive = true;
-
-      // Cleanup on client disconnect
-      request.signal.addEventListener('abort', () => {
+      const cleanup = () => {
         isActive = false;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
         try {
           controller.close();
         } catch {
           // Already closed
         }
+      };
+
+      // Handle client disconnect
+      request.signal.addEventListener('abort', () => {
+        cleanup();
       });
 
-      // Poll for new messages (SSE keeps connection alive)
-      const pollInterval = setInterval(async () => {
+      // Send initial connection message
+      send({ type: 'connected', channel });
+
+      // If MongoDB is not configured, just send heartbeats
+      if (!MONGODB_URI) {
+        heartbeatInterval = setInterval(() => {
+          send({ type: 'heartbeat', timestamp: Date.now() });
+        }, 30000);
+        return;
+      }
+
+      // Start heartbeat (keep connection alive)
+      heartbeatInterval = setInterval(() => {
+        if (isActive) {
+          send({ type: 'heartbeat', timestamp: Date.now() });
+        }
+      }, 30000);
+
+      // Poll for new messages
+      pollInterval = setInterval(async () => {
         if (!isActive) {
-          clearInterval(pollInterval);
-          try {
-            controller.close();
-          } catch {
-            // Already closed
-          }
+          cleanup();
           return;
         }
 
+        let client: MongoClient | null = null;
         try {
-          const client = await getMongoClient();
+          client = await getMongoClient();
           const db = client.db(MONGODB_DB_NAME);
 
           if (channel === 'global') {
-            // Check global chat for new messages
+            // Global chat messages
             const collectionNames = getCollectionNamesForDays(2);
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
             
             for (const collectionName of collectionNames) {
+              if (!isActive) break;
+              
               const collection = db.collection<ChatMessage>(collectionName);
               const query: any = { timestamp: { $gte: twentyFourHoursAgo } };
               
@@ -153,7 +133,7 @@ export async function GET(request: Request) {
                   const { ObjectId } = await import('mongodb');
                   query._id = { $gt: new ObjectId(lastCheckedId) };
                 } catch {
-                  // If lastCheckedId is not a valid ObjectId, ignore it
+                  // Invalid ObjectId, ignore
                 }
               }
               
@@ -202,7 +182,7 @@ export async function GET(request: Request) {
               }
             }
           } else {
-            // Check DM for new messages
+            // DM messages
             const [steamId1, steamId2] = channel.split('_');
             if (steamId1 && steamId2) {
               const dmId = channel;
@@ -210,6 +190,8 @@ export async function GET(request: Request) {
               const collectionNames = getDMCollectionNamesForDays(7);
 
               for (const collectionName of collectionNames) {
+                if (!isActive) break;
+                
                 const collection = db.collection<DMMessage>(collectionName);
                 const query: any = { 
                   dmId,
@@ -221,7 +203,7 @@ export async function GET(request: Request) {
                     const { ObjectId } = await import('mongodb');
                     query._id = { $gt: new ObjectId(lastCheckedId) };
                   } catch {
-                    // If lastCheckedId is not a valid ObjectId, ignore it
+                    // Invalid ObjectId, ignore
                   }
                 }
 
@@ -273,81 +255,30 @@ export async function GET(request: Request) {
             }
           }
 
-          await client.close();
+          if (client) {
+            await client.close();
+          }
         } catch (error: any) {
-          console.error('SSE poll error:', error);
-          // Silently handle errors - don't send error messages that would spam the client
-          // The client will use fallback polling if SSE fails
-          if (!isActive) {
-            clearInterval(pollInterval);
+          // Silently handle errors - don't spam client with error messages
+          if (client) {
             try {
-              controller.close();
+              await client.close();
             } catch {
-              // Already closed
+              // Ignore close errors
             }
           }
+          // Continue polling even on error
         }
-      }, 500); // Check every 500ms for near-instant updates
-
-      // Keep connection alive with heartbeat
-      const heartbeatInterval = setInterval(() => {
-        if (isActive) {
-          send({ type: 'heartbeat', timestamp: Date.now() });
-        } else {
-          clearInterval(heartbeatInterval);
-        }
-      }, 30000); // Every 30 seconds
-
-      // Cleanup on close
-      return () => {
-        clearInterval(pollInterval);
-        clearInterval(heartbeatInterval);
-        isActive = false;
-      };
+      }, 2000); // Poll every 2 seconds (more reasonable than 500ms)
     },
   });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Cache-Control',
-      },
-    });
-  } catch (error: any) {
-    // If anything fails, return a minimal SSE stream that just sends connected and closes gracefully
-    console.error('SSE endpoint error:', error);
-    const fallbackStream = new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder();
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel: 'global' })}\n\n`));
-        } catch {
-          // Ignore
-        }
-        // Send a heartbeat then close
-        setTimeout(() => {
-          try {
-            controller.close();
-          } catch {
-            // Already closed
-          }
-        }, 100);
-      },
-    });
-    
-    return new Response(fallbackStream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      },
-    });
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }
-
