@@ -214,17 +214,26 @@ export function useChatStream(
       params.set('lastMessageId', lastMessageIdRef.current);
     }
 
+    // Double-check we're not already connecting or connected
+    if (eventSourceRef.current || isConnectingRef.current) {
+      return;
+    }
+    
+    isConnectingRef.current = true;
     try {
       const eventSource = new EventSource(`/api/chat/stream?${params.toString()}`);
       eventSourceRef.current = eventSource;
+      isConnectingRef.current = false;
 
       eventSource.onopen = () => {
         if (!isMountedRef.current) {
           eventSource.close();
+          isConnectingRef.current = false;
           return;
         }
         setIsConnected(true);
         reconnectAttemptsRef.current = 0; // Reset on successful connection
+        isConnectingRef.current = false;
       };
 
       eventSource.onmessage = (event) => {
@@ -274,6 +283,7 @@ export function useChatStream(
         }
       };
     } catch (error) {
+      isConnectingRef.current = false;
       // If EventSource creation fails, try to reconnect
       reconnect();
     }
