@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
@@ -12,6 +12,7 @@ import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCh
 import { usePusherChat } from '@/app/hooks/usePusherChat';
 import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
 import { saveDMList, mergeDMList, loadDMList } from '@/app/utils/dm-list-persistence';
+import { sendDMMessage, acceptDMInvite, sendDMInvite, sendGlobalMessage } from '@/app/actions/chat-actions';
 
 interface ChatMessage {
   id?: string;
@@ -71,6 +72,19 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'global' | 'dms'>('global');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
+  
+  // Optimistic state for global messages using useOptimistic
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state: ChatMessage[], newMessage: ChatMessage) => [...state, newMessage]
+  );
+  
+  // Optimistic state for DM messages using useOptimistic
+  const [optimisticDMMessages, addOptimisticDMMessage] = useOptimistic(
+    dmMessages,
+    (state: DMMessage[], newMessage: DMMessage) => [...state, newMessage]
+  );
+  
   const [dmList, setDmList] = useState<DM[]>([]);
   const [dmInvites, setDmInvites] = useState<DMInvite[]>([]);
   const [selectedDM, setSelectedDM] = useState<string | null>(null);
@@ -122,8 +136,8 @@ export default function ChatPage() {
   // Real-time SSE streams (after all state declarations)
   const globalChannel = activeTab === 'global' ? 'global' : null;
   const dmChannel = activeTab === 'dms' && selectedDM ? selectedDM : null;
-  const lastGlobalMessageId = messages.length > 0 ? messages[messages.length - 1]?.id : undefined;
-  const lastDMMessageId = dmMessages.length > 0 ? dmMessages[dmMessages.length - 1]?.id : undefined;
+  const lastGlobalMessageId = optimisticMessages.length > 0 ? optimisticMessages[optimisticMessages.length - 1]?.id : undefined;
+  const lastDMMessageId = optimisticDMMessages.length > 0 ? optimisticDMMessages[optimisticDMMessages.length - 1]?.id : undefined;
   
   const globalStream = usePusherChat(
     globalChannel || '',
@@ -572,8 +586,24 @@ export default function ChatPage() {
         const existingIds = new Set(prev.map(m => m.id));
         const newMessages = globalStream.messages.filter(m => m.id && !existingIds.has(m.id));
         if (newMessages.length > 0) {
+          // Remove optimistic messages with temp IDs when real messages arrive
+          // Filter out any messages with temp IDs that match the new real messages
+          const filteredPrev = prev.filter(m => {
+            // Keep messages that are not temp IDs, or temp IDs that don't match new real messages
+            if (m.id?.startsWith('temp_')) {
+              // Check if this temp message matches a new real message (same sender, similar time, same content)
+              const matchingReal = newMessages.find(real => 
+                real.steamId === m.steamId && 
+                real.message === m.message &&
+                Math.abs(new Date(real.timestamp).getTime() - new Date(m.timestamp).getTime()) < 5000
+              );
+              return !matchingReal; // Remove if matches
+            }
+            return true;
+          });
+          
           // Update cache with new messages
-          const updatedMessages = [...prev, ...newMessages];
+          const updatedMessages = [...filteredPrev, ...newMessages];
           setCachedMessages('global', updatedMessages, messageCursor, 'global');
           // Auto-scroll to new messages
           setTimeout(() => {
@@ -592,6 +622,22 @@ export default function ChatPage() {
         const existingIds = new Set(prev.map(m => m.id));
         const newMessages = dmStream.messages.filter(m => m.id && !existingIds.has(m.id));
         if (newMessages.length > 0) {
+          // Remove optimistic messages with temp IDs when real messages arrive
+          // Filter out any messages with temp IDs that match the new real messages
+          const filteredPrev = prev.filter(m => {
+            // Keep messages that are not temp IDs, or temp IDs that don't match new real messages
+            if (m.id?.startsWith('temp_')) {
+              // Check if this temp message matches a new real message (same sender, similar time, same content)
+              const matchingReal = newMessages.find(real => 
+                real.senderId === m.senderId && 
+                real.message === m.message &&
+                Math.abs(new Date(real.timestamp).getTime() - new Date(m.timestamp).getTime()) < 5000
+              );
+              return !matchingReal; // Remove if matches
+            }
+            return true;
+          });
+          
           // Only track unread if message is from other user AND user is NOT currently viewing this DM
           // If user is viewing the DM (selectedDM === msg.dmId), messages should NOT be marked as unread
           newMessages.forEach(msg => {
@@ -611,14 +657,14 @@ export default function ChatPage() {
           if (selectedDM && activeTab === 'dms') {
             markDMAsRead(selectedDM, user?.steamId || '');
             // Update cache with new messages
-            const updatedMessages = [...prev, ...newMessages];
+            const updatedMessages = [...filteredPrev, ...newMessages];
             setCachedMessages(selectedDM, updatedMessages, null, 'dm');
           }
           // Auto-scroll to new messages
           setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
           }, 100);
-          return [...prev, ...newMessages];
+          return [...filteredPrev, ...newMessages];
         }
         return prev;
       });
@@ -726,14 +772,16 @@ export default function ChatPage() {
     };
 
     if (activeTab === 'global') {
-      setMessages(prev => [...prev, optimisticMessage]);
+      // Use useOptimistic to add message optimistically
+      addOptimisticMessage(optimisticMessage);
     } else if (activeTab === 'dms' && selectedDM) {
       const [steamId1, steamId2] = selectedDM.split('_');
+      const receiverId = steamId1 === user.steamId ? steamId2 : steamId1;
       const optimisticDMMessage = {
         id: tempId,
         dmId: selectedDM,
         senderId: user.steamId,
-        receiverId: steamId1 === user.steamId ? steamId2 : steamId1,
+        receiverId,
         senderName: user.name || 'You',
         senderAvatar: user.avatar || '',
         senderIsPro: user.isPro || false,
@@ -742,7 +790,10 @@ export default function ChatPage() {
         isBanned: false,
         isTimedOut: false,
       };
-      setDmMessages(prev => [...prev, optimisticDMMessage]);
+      
+      // Use useOptimistic to add message optimistically
+      addOptimisticDMMessage(optimisticDMMessage);
+      
       // Update DM list optimistically and persist
       setDmList(prev => {
         const updated = prev.map(dm => 
@@ -773,51 +824,35 @@ export default function ChatPage() {
     // Send in background
     try {
       if (activeTab === 'global') {
-        const res = await fetch('/api/chat/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            steamId: user.steamId,
-            message: messageText,
-          }),
-        });
+        // Use server action with useOptimistic
+        const result = await sendGlobalMessage(user.steamId, messageText);
 
-        if (res.ok) {
-          // Clear cache since we have new message
+        if (result.success) {
+          // Server action succeeded - Pusher will update messages via usePusherChat hook
+          // The optimistic message will be replaced by the real one from Pusher
+          // No need to manually refresh - Pusher handles it
           clearCache('global', 'global');
-          // Remove temp message and refresh to get real one with server timestamp
-          setMessages(prev => prev.filter(msg => msg.id !== tempId));
-          fetchMessages(null, false).catch(() => {});
         } else {
-          // Remove failed message
+          // Remove failed optimistic message
           setMessages(prev => prev.filter(msg => msg.id !== tempId));
-          const data = await res.json();
-          toast.error(data.error || 'Failed to send message');
+          toast.error(result.error || 'Failed to send message');
         }
       } else if (activeTab === 'dms' && selectedDM) {
         const [steamId1, steamId2] = selectedDM.split('_');
         const receiverId = steamId1 === user.steamId ? steamId2 : steamId1;
         
-        const res = await fetch('/api/chat/dms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            senderId: user.steamId,
-            receiverId,
-            message: messageText,
-          }),
-        });
+        // Use server action with useOptimistic
+        const result = await sendDMMessage(user.steamId, receiverId, messageText);
 
-        if (res.ok) {
-          // Remove temp message and refresh
-          setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
-          fetchDMMessages(steamId1, steamId2).catch(() => {});
+        if (result.success) {
+          // Server action succeeded - Pusher will update messages via usePusherChat hook
+          // The optimistic message will be replaced by the real one from Pusher
+          // No need to manually refresh - Pusher handles it
           fetchDMList().catch(() => {});
         } else {
-          // Remove failed message
+          // Remove failed optimistic message
           setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
-          const data = await res.json();
-          toast.error(data.error || 'Failed to send message');
+          toast.error(result.error || 'Failed to send message');
         }
       }
     } catch (error) {
@@ -826,6 +861,7 @@ export default function ChatPage() {
       if (activeTab === 'global') {
         setMessages(prev => prev.filter(msg => msg.id !== tempId));
       } else {
+        // Remove failed optimistic DM message
         setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
       }
       toast.error('Failed to send message');
@@ -839,23 +875,16 @@ export default function ChatPage() {
 
     setSendingInvite(true);
     try {
-      const res = await fetch('/api/chat/dms/invites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromSteamId: user.steamId,
-          toSteamId: newUserSteamId.trim(),
-        }),
-      });
+      // Use server action
+      const result = await sendDMInvite(user.steamId, newUserSteamId.trim());
 
-      if (res.ok) {
+      if (result.success) {
         toast.success('DM invite sent!');
         setNewUserSteamId('');
         setShowAddUser(false);
         await fetchDMInvites();
       } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to send invite');
+        toast.error(result.error || 'Failed to send invite');
       }
     } catch (error) {
       console.error('Failed to send DM invite:', error);
@@ -866,143 +895,73 @@ export default function ChatPage() {
   };
 
   const handleAcceptInvite = async (inviteId: string) => {
+    if (!user?.steamId) return;
+    
     try {
-      const res = await fetch('/api/chat/dms/invites', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inviteId,
-          steamId: user?.steamId,
-          action: 'accept',
-        }),
-      });
+      // Get the invite before it's removed from the list (for optimistic update)
+      const invite = dmInvites.find(i => i.id === inviteId);
+      const otherUserId = invite?.otherUserId;
+      const dmId = otherUserId ? [user.steamId, otherUserId].sort().join('_') : null;
+      
+      // Optimistically update invites list
+      setDmInvites(prev => prev.filter(i => i.id !== inviteId));
+      
+      // Optimistically add DM to list if we have the info
+      if (dmId && otherUserId && invite) {
+        const optimisticDM: DM = {
+          dmId,
+          otherUserId,
+          otherUserName: invite.otherUserName,
+          otherUserAvatar: invite.otherUserAvatar,
+          lastMessage: 'No messages yet',
+          lastMessageTime: new Date(),
+        };
+        setDmList(prev => {
+          // Check if DM already exists
+          const exists = prev.some(dm => dm.dmId === dmId);
+          if (!exists) {
+            const updated = [optimisticDM, ...prev];
+            if (user?.steamId) {
+              saveDMList(updated, user.steamId);
+            }
+            return updated;
+          }
+          return prev;
+        });
+      }
+      
+      // Mark invite as read when accepted
+      markInviteAsRead(inviteId, user.steamId);
+      
+      // Use server action
+      const result = await acceptDMInvite(inviteId, user.steamId);
 
-      if (res.ok) {
-        // Get the invite before it's removed from the list
-        const invite = dmInvites.find(i => i.id === inviteId);
-        const otherUserId = invite?.otherUserId;
-        
-        // Mark invite as read when accepted
-        markInviteAsRead(inviteId, user?.steamId || '');
-        
-        // Refresh invites first
+      if (result.success) {
+        // Refresh invites to get updated list
         await fetchDMInvites();
         
-        // Wait a bit for database to update, then refresh DM list (retry if needed)
-        let retries = 3;
-        let dmFound = false;
-        const dmId = otherUserId && user?.steamId ? [user.steamId, otherUserId].sort().join('_') : null;
+        // Refresh DM list to get server data
+        await fetchDMList();
         
-        while (retries > 0 && !dmFound && dmId) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          // Fetch DM list and check response directly
-          try {
-            const listRes = await fetch(`/api/chat/dms/list?steamId=${user.steamId}`);
-            if (listRes.ok) {
-              const listData = await listRes.json();
-              const updatedDmList = listData.dms || [];
-              setDmList(updatedDmList);
-              
-              // Check if DM is now in the list
-              const dmExists = updatedDmList.some((dm: any) => dm.dmId === dmId);
-              if (dmExists && otherUserId) {
-                dmFound = true;
-                setSelectedDM(dmId);
-                markDMAsRead(dmId, user.steamId);
-                fetchDMMessages(user.steamId, otherUserId);
-                toast.success('DM invite accepted!');
-                break;
-              }
-            }
-          } catch (error) {
-            console.error('Failed to fetch DM list:', error);
-          }
-          retries--;
+        // Open the DM if we have the ID
+        if (dmId && otherUserId) {
+          setSelectedDM(dmId);
+          markDMAsRead(dmId, user.steamId);
+          fetchDMMessages(user.steamId, otherUserId);
         }
         
-        // If DM still not found after retries, try to open it anyway (invite was accepted)
-        if (!dmFound && dmId && otherUserId && user?.steamId) {
-          console.log(`[DM Accept] DM not found after retries, manually adding: ${dmId}`);
-          
-          // Fetch user profile for the other user
-          try {
-            const profileRes = await fetch(`https://steamcommunity.com/profiles/${otherUserId}/?xml=1`);
-            const profileText = await profileRes.text();
-            const otherUserName = profileText.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || `User ${otherUserId.slice(-4)}`;
-            const otherUserAvatar = profileText.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
-            
-            // Manually add DM to list if it doesn't exist yet
-            const newDM = {
-              dmId,
-              otherUserId,
-              otherUserName,
-              otherUserAvatar,
-              lastMessage: 'No messages yet',
-              lastMessageTime: new Date(),
-            };
-            
-            console.log(`[DM Accept] Adding DM to list:`, newDM);
-            
-            setDmList(prev => {
-              // Check if DM already exists
-              const exists = prev.some(dm => dm.dmId === dmId);
-              if (exists) {
-                console.log(`[DM Accept] DM already exists in list`);
-                return prev;
-              }
-              // Add new DM at the beginning
-              console.log(`[DM Accept] Adding new DM to list`);
-              const updated = [newDM, ...prev];
-              // Persist immediately
-              saveDMList(updated, user.steamId);
-              return updated;
-            });
-            
-            setSelectedDM(dmId);
-            markDMAsRead(dmId, user.steamId);
-            fetchDMMessages(user.steamId, otherUserId);
-            toast.success('DM invite accepted!');
-          } catch (profileError) {
-            console.error('Failed to fetch user profile:', profileError);
-            // Still add DM even if profile fetch fails
-            const newDM = {
-              dmId,
-              otherUserId,
-              otherUserName: `User ${otherUserId.slice(-4)}`,
-              otherUserAvatar: '',
-              lastMessage: 'No messages yet',
-              lastMessageTime: new Date(),
-            };
-            
-            setDmList(prev => {
-              const exists = prev.some(dm => dm.dmId === dmId);
-              if (exists) return prev;
-              const updated = [newDM, ...prev];
-              // Persist immediately
-              saveDMList(updated, user.steamId);
-              return updated;
-            });
-            
-            setSelectedDM(dmId);
-            markDMAsRead(dmId, user.steamId);
-            fetchDMMessages(user.steamId, otherUserId);
-            toast.success('DM invite accepted!');
-          }
-          
-          // Force refresh DM list one more time to get correct data from server
-          // Use merge=true to preserve manually added DM
-          setTimeout(() => {
-            console.log(`[DM Accept] Refreshing DM list from server (merge mode)`);
-            fetchDMList(true); // Merge instead of replace
-          }, 1000);
-        }
+        toast.success('DM invite accepted!');
       } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to accept invite');
+        // Revert optimistic updates on error
+        await fetchDMInvites();
+        await fetchDMList();
+        toast.error(result.error || 'Failed to accept invite');
       }
     } catch (error) {
       console.error('Failed to accept invite:', error);
+      // Revert optimistic updates on error
+      await fetchDMInvites();
+      await fetchDMList();
       toast.error('Failed to accept invite');
     }
   };
@@ -1726,7 +1685,7 @@ export default function ChatPage() {
               </div>
             ) : (
               <>
-                {messages.map((msg) => (
+                {optimisticMessages.map((msg) => (
               <div
                 key={msg.id || `${msg.steamId}-${msg.timestamp}`}
                 className="bg-[#11141d] p-4 rounded-xl border border-white/5 hover:border-white/10 transition-all group"
@@ -2034,7 +1993,7 @@ export default function ChatPage() {
                         <p>No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      dmMessages.map((msg) => (
+                      optimisticDMMessages.map((msg) => (
                         <div
                           key={msg.id || `${msg.senderId}-${msg.timestamp}`}
                           data-message-id={msg.id}

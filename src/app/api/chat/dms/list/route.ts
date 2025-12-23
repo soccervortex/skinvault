@@ -156,19 +156,18 @@ export async function GET(request: Request) {
         return invOtherUserId === otherUserId;
       });
 
-      // Find latest message in this DM (optimized - only check recent collections)
-      // For performance, only check last 7 days of collections for latest message
+      // Find latest message in this DM (check all 365 days)
+      // Optimize by checking recent collections first, then older ones
       let latestMessage: DMMessage | null = null;
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const recentCollectionNames = getDMCollectionNamesForDays(7);
       
-      // Check recent collections first (most likely to have latest message)
-      for (const collectionName of recentCollectionNames.reverse()) {
+      // Check all collections in reverse order (newest first) to find latest message
+      // This ensures we find messages from the full 365-day period
+      for (const collectionName of collectionNames.reverse()) {
         const collection = db.collection<DMMessage>(collectionName);
         const messages = await collection
           .find({ 
             dmId,
-            timestamp: { $gte: sevenDaysAgo }
+            timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
           })
           .sort({ timestamp: -1 })
           .limit(1)
@@ -177,26 +176,6 @@ export async function GET(request: Request) {
         if (messages.length > 0) {
           latestMessage = messages[0];
           break; // Found latest, no need to check older collections
-        }
-      }
-      
-      // If no recent message found, check older collections (but only if we have an invite)
-      if (!latestMessage && invite) {
-        for (const collectionName of collectionNames.slice(recentCollectionNames.length)) {
-          const collection = db.collection<DMMessage>(collectionName);
-          const messages = await collection
-            .find({ 
-              dmId,
-              timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
-            })
-            .sort({ timestamp: -1 })
-            .limit(1)
-            .toArray();
-          
-          if (messages.length > 0) {
-            latestMessage = messages[0];
-            break;
-          }
         }
       }
 
