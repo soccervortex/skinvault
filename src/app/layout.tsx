@@ -29,8 +29,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'),
-  title: "SkinVault",
-  description: "Premium CS2 skin analytics and inventory management",
+  title: "SkinVault - CS2 Skin Analytics & Inventory Management",
+  description: "SkinVault is a comprehensive CS2 skin analytics platform that helps you track your inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist. View your Steam inventory, get real-time market prices, track price changes, and make informed trading decisions.",
   icons: {
     icon: [
       { url: '/icons/favicon.ico', type: 'image/x-icon' },
@@ -60,15 +60,24 @@ export const metadata: Metadata = {
     viewportFit: 'cover',
   },
   openGraph: {
-    title: 'SkinVault - CS2 Skin Analytics',
-    description: 'Premium CS2 skin analytics and inventory management',
+    title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
+    description: 'Track your CS2 inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist. Real-time market prices and comprehensive skin analytics for CS2 traders.',
     type: 'website',
-    images: [{ url: '/icons/web-app-manifest-512x512.png', width: 512, height: 512 }],
+    url: process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online',
+    siteName: 'SkinVault',
+    images: [
+      { 
+        url: '/icons/web-app-manifest-512x512.png', 
+        width: 512, 
+        height: 512,
+        alt: 'SkinVault - CS2 Skin Analytics',
+      }
+    ],
   },
   twitter: {
-    card: 'summary',
-    title: 'SkinVault - CS2 Skin Analytics',
-    description: 'Premium CS2 skin analytics and inventory management',
+    card: 'summary_large_image',
+    title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
+    description: 'Track your CS2 inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist.',
     images: ['/icons/web-app-manifest-512x512.png'],
   },
 };
