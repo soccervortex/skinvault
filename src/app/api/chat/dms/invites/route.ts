@@ -18,7 +18,10 @@ interface DMInvite {
 // GET: Get invites for a user (pending, sent, received)
 export async function GET(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    // Check if MongoDB is configured via connection pool
+    try {
+      await getDatabase();
+    } catch {
       return NextResponse.json({ invites: [] });
     }
 
@@ -89,7 +92,7 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error('Failed to get DM invites:', error);
     // If MongoDB is not configured or connection fails, return empty invites instead of error
-    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+    if (error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
       return NextResponse.json({ invites: [] });
     }
     return NextResponse.json({ error: 'Failed to get invites' }, { status: 500 });
@@ -99,7 +102,10 @@ export async function GET(request: Request) {
 // POST: Send a DM invite
 export async function POST(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    // Check if MongoDB is configured via connection pool
+    try {
+      await getDatabase();
+    } catch {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -170,7 +176,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Failed to send DM invite:', error);
     // If MongoDB is not configured or connection fails, return error
-    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+    if (error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
       return NextResponse.json({ error: 'Chat service is currently unavailable' }, { status: 503 });
     }
     return NextResponse.json({ error: 'Failed to send invite' }, { status: 500 });
@@ -180,7 +186,10 @@ export async function POST(request: Request) {
 // PATCH: Accept or decline a DM invite
 export async function PATCH(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    // Check if MongoDB is configured via connection pool
+    try {
+      await getDatabase();
+    } catch {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -237,7 +246,7 @@ export async function PATCH(request: Request) {
   } catch (error: any) {
     console.error('Failed to update DM invite:', error);
     // If MongoDB is not configured or connection fails, return error
-    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+    if (error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
       return NextResponse.json({ error: 'Chat service is currently unavailable' }, { status: 503 });
     }
     return NextResponse.json({ error: 'Failed to update invite' }, { status: 500 });
