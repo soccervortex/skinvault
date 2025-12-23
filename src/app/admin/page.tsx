@@ -73,6 +73,8 @@ export default function AdminPage() {
   const [fixingPurchase, setFixingPurchase] = useState(false);
   const [fixMessage, setFixMessage] = useState<string | null>(null);
   const [fixError, setFixError] = useState<string | null>(null);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [loadingUserCount, setLoadingUserCount] = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -196,6 +198,23 @@ export default function AdminPage() {
       }
     };
     loadFailedPurchases();
+
+    const loadUserCount = async () => {
+      if (!userIsOwner) return;
+      setLoadingUserCount(true);
+      try {
+        const res = await fetch('/api/admin/user-count');
+        if (res.ok) {
+          const data = await res.json();
+          setTotalUsers(data.totalUsers || 0);
+        }
+      } catch (e: any) {
+        console.error('Failed to load user count:', e);
+      } finally {
+        setLoadingUserCount(false);
+      }
+    };
+    loadUserCount();
   }, [userIsOwner, user?.steamId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -629,7 +648,15 @@ export default function AdminPage() {
           date passes.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+          <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+              Total Users
+            </p>
+            <p className="text-xl md:text-2xl font-black text-blue-400">
+              {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
+            </p>
+          </div>
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
             <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Total Pro users

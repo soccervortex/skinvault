@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -213,6 +213,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16}/> Wishlist
               </Link>
+              <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
+                <MessageSquare size={16}/> Chat
+              </Link>
               <button 
                 onClick={() => {
                   setIsSearchOpen(true);
@@ -371,6 +374,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16}/> Wishlist
+          </Link>
+          <Link href="/chat" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
+            <MessageSquare size={16}/> Chat
           </Link>
           <button 
             onClick={() => setIsSearchOpen(true)}

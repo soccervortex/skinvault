@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/chat/reset",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
+
