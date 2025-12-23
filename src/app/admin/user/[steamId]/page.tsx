@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, ArrowLeft, Ban, Clock, Crown, Search, User, Shield } from 'lucide-react';
+import { Loader2, ArrowLeft, Ban, Clock, Crown, Search, User, Shield, Trash2 } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
 
@@ -169,6 +169,41 @@ export default function UserManagementPage() {
     } catch (error) {
       console.error('Failed to remove timeout:', error);
       toast.error('Failed to remove timeout');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!userIsOwner || !messageId) return;
+
+    if (!confirm('Are you sure you want to delete this message?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/chat/messages/${messageId}?userSteamId=${user?.steamId}&type=global`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        toast.success('Message deleted');
+        // Reload messages
+        const reloadRes = await fetch(
+          `/api/admin/user/${steamId}?adminSteamId=${user?.steamId}&time=${timeFilter}&search=${encodeURIComponent(searchQuery)}`
+        );
+        if (reloadRes.ok) {
+          const data = await reloadRes.json();
+          setMessages(data.messages || []);
+          if (userInfo) {
+            setUserInfo({ ...userInfo, messageCount: data.messages?.length || 0 });
+          }
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete message');
+      }
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast.error('Failed to delete message');
     }
   };
 
@@ -363,11 +398,20 @@ export default function UserManagementPage() {
                 ) : (
                   <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
                     {messages.map((msg) => (
-                      <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5">
+                      <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all">
                         <div className="flex items-start justify-between mb-2">
                           <span className="text-xs text-gray-500">
                             {new Date(msg.timestamp).toLocaleString()}
                           </span>
+                          {userIsOwner && msg.id && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                              title="Delete message"
+                            >
+                              <Trash2 size={14} className="text-red-400" />
+                            </button>
+                          )}
                         </div>
                         <p className="text-sm text-gray-300">{msg.message}</p>
                       </div>

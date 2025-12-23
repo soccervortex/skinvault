@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2 } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
@@ -430,6 +430,41 @@ export default function ChatPage() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string, messageType: 'global' | 'dm' = 'global') => {
+    if (!user?.steamId || !messageId) return;
+
+    if (!confirm('Are you sure you want to delete this message?')) {
+      return;
+    }
+
+    try {
+      const url = messageType === 'global'
+        ? `/api/chat/messages/${messageId}?userSteamId=${user.steamId}&type=global`
+        : `/api/chat/messages/${messageId}?userSteamId=${user.steamId}&type=dm&dmId=${selectedDM}`;
+      
+      const res = await fetch(url, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        toast.success('Message deleted');
+        // Refresh messages
+        if (messageType === 'global') {
+          await fetchMessages();
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          await fetchDMMessages(steamId1, steamId2);
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete message');
+      }
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast.error('Failed to delete message');
+    }
+  };
+
   const handleTimeout = async () => {
     if (!timeoutUser || !isAdmin) return;
 
@@ -763,21 +798,32 @@ export default function ChatPage() {
                                     Pro
                                   </span>
                                 )}
-                                {msg.senderId !== user?.steamId && (
-                                  <button
-                                    onClick={() => setReportUser({ 
-                                      steamId: msg.senderId, 
-                                      name: msg.senderName, 
-                                      type: 'dm',
-                                      dmId: selectedDM || undefined
-                                    })}
-                                    className="p-1 hover:bg-orange-500/20 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Report user"
-                                  >
-                                    <Flag size={12} className="text-orange-400" />
-                                  </button>
-                                )}
-                                <span className="text-xs text-gray-500 ml-auto">
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                                  {(msg.senderId === user?.steamId || isAdmin) && msg.id && (
+                                    <button
+                                      onClick={() => handleDeleteMessage(msg.id!, 'dm')}
+                                      className="p-1 hover:bg-red-500/20 rounded"
+                                      title="Delete message"
+                                    >
+                                      <Trash2 size={12} className="text-red-400" />
+                                    </button>
+                                  )}
+                                  {msg.senderId !== user?.steamId && (
+                                    <button
+                                      onClick={() => setReportUser({ 
+                                        steamId: msg.senderId, 
+                                        name: msg.senderName, 
+                                        type: 'dm',
+                                        dmId: selectedDM || undefined
+                                      })}
+                                      className="p-1 hover:bg-orange-500/20 rounded"
+                                      title="Report user"
+                                    >
+                                      <Flag size={12} className="text-orange-400" />
+                                    </button>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">
                                   {formatTime(msg.timestamp)}
                                 </span>
                               </div>
