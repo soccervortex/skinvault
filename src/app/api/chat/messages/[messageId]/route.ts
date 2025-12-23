@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { MongoClient, ObjectId } from 'mongodb';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { isOwner } from '@/app/utils/owner-ids';
+import Pusher from 'pusher';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
@@ -219,6 +220,55 @@ export async function DELETE(
 
     if (!deleted) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
+
+    // Broadcast deletion via Pusher for real-time updates
+    try {
+      const pusherAppId = process.env.PUSHER_APP_ID;
+      const pusherSecret = process.env.PUSHER_SECRET;
+      const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+
+      if (pusherAppId && pusherSecret) {
+        const pusher = new Pusher({
+          appId: pusherAppId,
+          key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+          secret: pusherSecret,
+          cluster: pusherCluster,
+          useTLS: true,
+        });
+
+        if (messageType === 'global') {
+          // Broadcast to global channel
+          await pusher.trigger('global', 'message_deleted', {
+            type: 'message_deleted',
+            messageId,
+            messageType: 'global',
+          });
+        } else if (messageType === 'dm' && dmId) {
+          // Broadcast to both users' DM channels
+          const [steamId1, steamId2] = dmId.split('_');
+          const dmChannel1 = `dm_${steamId1}`;
+          const dmChannel2 = `dm_${steamId2}`;
+          
+          await Promise.all([
+            pusher.trigger(dmChannel1, 'message_deleted', {
+              type: 'message_deleted',
+              messageId,
+              messageType: 'dm',
+              dmId,
+            }),
+            pusher.trigger(dmChannel2, 'message_deleted', {
+              type: 'message_deleted',
+              messageId,
+              messageType: 'dm',
+              dmId,
+            }),
+          ]);
+        }
+      }
+    } catch (pusherError) {
+      console.error('Failed to trigger Pusher delete event:', pusherError);
+      // Don't fail the request if Pusher fails
     }
 
     return NextResponse.json({ 

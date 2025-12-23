@@ -677,6 +677,62 @@ export default function ChatPage() {
     }
   }, [dmStream.messages, user?.steamId, selectedDM, activeTab]);
 
+  // Handle real-time message deletions from Pusher
+  useEffect(() => {
+    if (!user?.steamId) return;
+
+    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
+    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu';
+
+    if (!pusherKey) return;
+
+    // Use the same Pusher client pattern as usePusherChat
+    const Pusher = require('pusher-js').default;
+    const pusher = new Pusher(pusherKey, {
+      cluster: pusherCluster,
+    });
+
+    // Listen for global message deletions
+    const globalChannel = pusher.subscribe('global');
+    const handleGlobalDelete = (data: any) => {
+      if (data.type === 'message_deleted' && data.messageId && data.messageType === 'global') {
+        setMessages(prev => {
+          const filtered = prev.filter(msg => msg.id !== data.messageId);
+          clearCache('global', 'global');
+          setCachedMessages('global', filtered, messageCursor, 'global');
+          return filtered;
+        });
+      }
+    };
+    globalChannel.bind('message_deleted', handleGlobalDelete);
+
+    // Listen for DM message deletions
+    const dmChannel = pusher.subscribe(`dm_${user.steamId}`);
+    const handleDMDelete = (data: any) => {
+      if (data.type === 'message_deleted' && data.messageId && data.messageType === 'dm' && data.dmId) {
+        // Remove from all DMs, not just selected (in case user switches DMs)
+        setDmMessages(prev => {
+          if (selectedDM === data.dmId) {
+            const filtered = prev.filter(msg => msg.id !== data.messageId);
+            clearCache(selectedDM, 'dm');
+            setCachedMessages(selectedDM, filtered, null, 'dm');
+            return filtered;
+          }
+          return prev;
+        });
+      }
+    };
+    dmChannel.bind('message_deleted', handleDMDelete);
+
+    return () => {
+      globalChannel.unbind('message_deleted', handleGlobalDelete);
+      globalChannel.unsubscribe();
+      dmChannel.unbind('message_deleted', handleDMDelete);
+      dmChannel.unsubscribe();
+      pusher.disconnect();
+    };
+  }, [user?.steamId, selectedDM, messageCursor]);
+
   useEffect(() => {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');

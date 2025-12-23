@@ -7,11 +7,14 @@ import { getPusherClient } from '@/app/utils/pusher-client';
  * Much faster and more reliable than SSE, especially on Vercel.
  */
 interface StreamMessage {
-  type: 'connected' | 'new_messages' | 'error' | 'heartbeat';
+  type: 'connected' | 'new_messages' | 'error' | 'heartbeat' | 'message_deleted';
   channel?: string;
   messages?: any[];
   message?: string;
   timestamp?: number;
+  messageId?: string;
+  messageType?: 'global' | 'dm';
+  dmId?: string;
 }
 
 export function usePusherChat(
@@ -22,6 +25,7 @@ export function usePusherChat(
 ) {
   const [messages, setMessages] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [deletedMessageIds, setDeletedMessageIds] = useState<Set<string>>(new Set());
   const pusherRef = useRef<Pusher | null>(null);
   const channelRef = useRef<any>(null);
   const lastMessageIdRef = useRef<string>(lastMessageId || '');
@@ -143,6 +147,16 @@ export function usePusherChat(
       }
     });
 
+    // Listen for message deletions
+    pusherChannel.bind('message_deleted', (data: StreamMessage) => {
+      if (!isMountedRef.current) return;
+
+      if (data.type === 'message_deleted' && data.messageId) {
+        setDeletedMessageIds(prev => new Set([...prev, data.messageId!]));
+        setMessages(prev => prev.filter(m => m.id !== data.messageId));
+      }
+    });
+
     // Listen for heartbeat
     pusherChannel.bind('heartbeat', (data: StreamMessage) => {
       // Just keep connection alive
@@ -154,6 +168,11 @@ export function usePusherChat(
     };
   }, [channel, currentUserId, enabled, cleanup]);
 
-  return { messages, isConnected, clearMessages: () => setMessages([]) };
+  return { 
+    messages: messages.filter(m => !deletedMessageIds.has(m.id)), 
+    isConnected, 
+    clearMessages: () => setMessages([]),
+    deletedMessageIds 
+  };
 }
 
