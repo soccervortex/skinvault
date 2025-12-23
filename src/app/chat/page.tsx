@@ -1516,7 +1516,7 @@ export default function ChatPage() {
                                       dmId: selectedDM || undefined
                                     }) : undefined}
                                     onDelete={msg.senderId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'dm') : undefined}
-                                    onEdit={msg.id ? () => handleEditMessage(msg.id, msg.message, 'dm') : undefined}
+                                    onEdit={msg.id ? () => handleEditMessage(msg.id!, msg.message, 'dm') : undefined}
                                     onPin={isAdmin && msg.id && !msg.isPinned ? () => handlePinMessage(msg.id!, 'dm') : undefined}
                                     onUnpin={isAdmin && msg.id && msg.isPinned ? () => handleUnpinMessage(msg.id!) : undefined}
                                     onBan={isAdmin ? () => setBanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
