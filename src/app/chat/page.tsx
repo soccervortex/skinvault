@@ -13,6 +13,7 @@ import { usePusherChat } from '@/app/hooks/usePusherChat';
 import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
 import { saveDMList, mergeDMList, loadDMList } from '@/app/utils/dm-list-persistence';
 import { sendDMMessage, acceptDMInvite, sendDMInvite, sendGlobalMessage } from '@/app/actions/chat-actions';
+import { getPusherClient } from '@/app/utils/pusher-client';
 
 interface ChatMessage {
   id?: string;
@@ -799,16 +800,10 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user?.steamId) return;
 
-    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
-    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu';
-
-    if (!pusherKey) return;
-
-    // Use the same Pusher client pattern as usePusherChat
-    const Pusher = require('pusher-js').default;
-    const pusher = new Pusher(pusherKey, {
-      cluster: pusherCluster,
-    });
+    // Use centralized Pusher client
+    const pusher = getPusherClient();
+    
+    if (!pusher) return;
 
     // Listen for global message deletions
     const globalChannel = pusher.subscribe('global');

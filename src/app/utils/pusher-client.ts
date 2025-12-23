@@ -27,12 +27,7 @@ export function getPusherClient(): Pusher | null {
     cluster: pusherCluster,
     enabledTransports: ['ws', 'wss'],
     forceTLS: true,
-    authEndpoint: '/api/pusher/auth',
-    auth: {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
+    // No authEndpoint for public channels - simpler and works without auth endpoint
   });
   
   // Log connection events for debugging
