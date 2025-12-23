@@ -53,20 +53,21 @@ export function useChatStream(
     setIsConnected(false);
   }, []);
 
-  // Reconnect with exponential backoff
+  // Reconnect with faster exponential backoff
   const reconnect = useCallback(() => {
     if (!isMountedRef.current || !enabled || !currentUserId || !channel) {
       return;
     }
 
-    const maxAttempts = 5;
+    const maxAttempts = 3; // Reduced to 3 attempts
     if (reconnectAttemptsRef.current >= maxAttempts) {
-      console.warn('Max reconnection attempts reached');
+      // Reset after a longer delay to allow server recovery
+      reconnectAttemptsRef.current = 0;
       return;
     }
 
-    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 16000);
+    // Faster exponential backoff: 0.5s, 1s, 2s (much faster)
+    const delay = Math.min(500 * Math.pow(2, reconnectAttemptsRef.current), 2000);
     reconnectAttemptsRef.current += 1;
 
     reconnectTimeoutRef.current = setTimeout(() => {
@@ -124,19 +125,21 @@ export function useChatStream(
           }
         };
 
-        eventSource.onerror = () => {
+        eventSource.onerror = (error) => {
           if (!isMountedRef.current) return;
           
           setIsConnected(false);
           
-          // Close current connection
+          // Close current connection immediately
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
 
-          // Only reconnect if it's a connection error (not a manual close)
-          if (eventSource.readyState === EventSource.CLOSED) {
+          // Reconnect immediately on error (EventSource will handle retries)
+          // Only reconnect if it's a connection error
+          if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
+            // Immediate retry for faster recovery
             reconnect();
           }
         };
@@ -158,9 +161,81 @@ export function useChatStream(
     // Close existing connection before creating new one
     cleanup();
 
-    // Initial connection
+    // Initial connection - connect immediately
     reconnectAttemptsRef.current = 0;
-    reconnect();
+    
+    // Build SSE URL
+    const params = new URLSearchParams({
+      channel,
+      currentUserId,
+    });
+    if (lastMessageIdRef.current) {
+      params.set('lastMessageId', lastMessageIdRef.current);
+    }
+
+    try {
+      const eventSource = new EventSource(`/api/chat/stream?${params.toString()}`);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onopen = () => {
+        if (!isMountedRef.current) {
+          eventSource.close();
+          return;
+        }
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0; // Reset on successful connection
+      };
+
+      eventSource.onmessage = (event) => {
+        if (!isMountedRef.current) return;
+        
+        try {
+          const data: StreamMessage = JSON.parse(event.data);
+
+          if (data.type === 'connected') {
+            setIsConnected(true);
+            reconnectAttemptsRef.current = 0;
+          } else if (data.type === 'new_messages' && data.messages) {
+            setMessages(prev => {
+              const existingIds = new Set(prev.map(m => m.id));
+              const newMessages = data.messages!.filter(m => m.id && !existingIds.has(m.id));
+              
+              if (newMessages.length > 0) {
+                const latestId = newMessages[newMessages.length - 1].id;
+                if (latestId) {
+                  lastMessageIdRef.current = latestId;
+                }
+                return [...prev, ...newMessages];
+              }
+              return prev;
+            });
+          }
+          // Ignore heartbeat and error messages
+        } catch (error) {
+          // Ignore parse errors
+        }
+      };
+
+      eventSource.onerror = () => {
+        if (!isMountedRef.current) return;
+        
+        setIsConnected(false);
+        
+        // Close current connection
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+
+        // Reconnect immediately on error
+        if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
+          reconnect();
+        }
+      };
+    } catch (error) {
+      // If EventSource creation fails, try to reconnect
+      reconnect();
+    }
 
     return () => {
       isMountedRef.current = false;

@@ -39,13 +39,14 @@ async function getMongoClient() {
 
 // Modern SSE endpoint using Next.js streaming
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const channel = searchParams.get('channel') || 'global';
-  const lastMessageId = searchParams.get('lastMessageId') || '';
-  const currentUserId = searchParams.get('currentUserId') || '';
+  try {
+    const { searchParams } = new URL(request.url);
+    const channel = searchParams.get('channel') || 'global';
+    const lastMessageId = searchParams.get('lastMessageId') || '';
+    const currentUserId = searchParams.get('currentUserId') || '';
 
-  // Use modern streaming response
-  const stream = new ReadableStream({
+    // Use modern streaming response
+    const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       let isActive = true;
@@ -273,12 +274,60 @@ export async function GET(request: Request) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    });
+  } catch (error: any) {
+    // Always return a valid SSE response, even on error
+    console.error('SSE endpoint error:', error);
+    const fallbackStream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel: 'global' })}\n\n`));
+          // Send heartbeat to keep connection alive
+          const heartbeat = setInterval(() => {
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`));
+            } catch {
+              clearInterval(heartbeat);
+              try {
+                controller.close();
+              } catch {
+                // Already closed
+              }
+            }
+          }, 30000);
+          request.signal.addEventListener('abort', () => {
+            clearInterval(heartbeat);
+            try {
+              controller.close();
+            } catch {
+              // Already closed
+            }
+          });
+        } catch {
+          try {
+            controller.close();
+          } catch {
+            // Already closed
+          }
+        }
+      },
+    });
+    
+    return new Response(fallbackStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    });
+  }
 }
