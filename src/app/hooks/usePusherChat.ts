@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Pusher from 'pusher-js';
 import { getPusherClient } from '@/app/utils/pusher-client';
+import type Pusher from 'pusher-js';
 
 /**
  * Chat hook using Pusher WebSockets for real-time updates.
@@ -54,10 +54,9 @@ export function usePusherChat(
       channelRef.current.unbind_all();
       channelRef.current = null;
     }
-    if (pusherRef.current) {
-      pusherRef.current.disconnect();
-      pusherRef.current = null;
-    }
+    // Don't disconnect the shared Pusher instance - just clear our reference
+    // The centralized client manages the connection lifecycle
+    pusherRef.current = null;
     setIsConnected(false);
   }, []);
 
@@ -72,20 +71,13 @@ export function usePusherChat(
     // Cleanup existing connection
     cleanup();
 
-    // Initialize Pusher
-    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
-    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu';
+    // Use centralized Pusher client (singleton pattern)
+    const pusher = getPusherClient();
 
-    if (!pusherKey) {
+    if (!pusher) {
       console.error('Pusher key not configured');
       return;
     }
-
-    // Use public channels (no auth needed) - simpler and works without auth endpoint
-    const pusher = new Pusher(pusherKey, {
-      cluster: pusherCluster,
-      // No authEndpoint needed for public channels
-    });
 
     pusherRef.current = pusher;
 

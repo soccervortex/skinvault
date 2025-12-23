@@ -899,7 +899,8 @@ export default function ChatPage() {
       dmChannel.unbind('new_messages', handleDMNewMessage);
       dmChannel.unbind('dm_list_updated', handleDMListUpdate);
       dmChannel.unsubscribe();
-      pusher.disconnect();
+      // Don't disconnect the shared Pusher instance - just unsubscribe from channels
+      // The centralized client manages the connection lifecycle
     };
   }, [user?.steamId, selectedDM, messageCursor]);
 
