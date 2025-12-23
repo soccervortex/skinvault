@@ -93,6 +93,12 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       { 
+        url: `${BASE_URL}/icons/Open Graph Image.jpg`, 
+        width: 1200, 
+        height: 630,
+        alt: 'SkinVault - CS2 Skin Analytics & Inventory Management',
+      },
+      { 
         url: `${BASE_URL}/icons/web-app-manifest-512x512.png`, 
         width: 512, 
         height: 512,
@@ -110,7 +116,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
     description: LONG_DESCRIPTION,
-    images: [`${BASE_URL}/icons/web-app-manifest-512x512.png`],
+    images: [`${BASE_URL}/icons/Open Graph Image.jpg`],
   },
   alternates: {
     canonical: BASE_URL,
@@ -161,9 +167,15 @@ export default function RootLayout({
     ],
     "logo": {
       "@type": "ImageObject",
-      "url": `${baseUrl}/icons/web-app-manifest-512x512.png`,
-      "width": 512,
-      "height": 512
+      "url": `${baseUrl}/icons/Open Graph Image.jpg`,
+      "width": 1200,
+      "height": 630
+    },
+    "image": {
+      "@type": "ImageObject",
+      "url": `${baseUrl}/icons/Open Graph Image.jpg`,
+      "width": 1200,
+      "height": 630
     }
   };
 

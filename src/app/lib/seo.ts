@@ -14,12 +14,14 @@ export interface SEOConfig {
   keywords?: string[];
 }
 
+const DEFAULT_OG_IMAGE = '/icons/Open Graph Image.jpg';
+
 export function generateMetadata(config: SEOConfig): Metadata {
   const {
     title,
     description = DEFAULT_DESCRIPTION,
     path = '',
-    image = '/icons/web-app-manifest-512x512.png',
+    image = DEFAULT_OG_IMAGE,
     type = 'website',
     noindex = false,
     keywords = [
