@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, ArrowLeft, Ban, Clock, Crown, Search, User, Shield, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, Ban, Clock, Crown, Search, User, Shield, Trash2, MessageSquare } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
 
@@ -29,9 +29,15 @@ export default function UserManagementPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [dmMessages, setDmMessages] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'global' | 'dms'>('global');
+  const [selectedDM, setSelectedDM] = useState<string | null>(null);
+  const [selectedDMMessages, setSelectedDMMessages] = useState<any[]>([]);
+  const [selectedDMOtherUserId, setSelectedDMOtherUserId] = useState<string | null>(null);
+  const [dmConversations, setDmConversations] = useState<Array<{dmId: string; otherUserId: string; messageCount: number; lastMessage: any}>>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDM, setLoadingDM] = useState(false);
   const [timeFilter, setTimeFilter] = useState('lifetime');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [timeoutDuration, setTimeoutDuration] = useState('5min');
   const [timeouting, setTimeouting] = useState(false);
   const [banning, setBanning] = useState(false);
@@ -81,7 +87,67 @@ export default function UserManagementPage() {
     };
 
     loadUserInfo();
-  }, [steamId, userIsOwner, user?.steamId, timeFilter, searchQuery, router, toast]);
+  }, [steamId, userIsOwner, user?.steamId, timeFilter, debouncedSearchQuery, router, toast]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Group DM messages by conversation
+  useEffect(() => {
+    if (dmMessages.length > 0) {
+      const conversations = new Map<string, {dmId: string; otherUserId: string; messages: any[]}>();
+      
+      dmMessages.forEach(msg => {
+        if (!conversations.has(msg.dmId)) {
+          conversations.set(msg.dmId, {
+            dmId: msg.dmId,
+            otherUserId: msg.otherUserId,
+            messages: []
+          });
+        }
+        conversations.get(msg.dmId)!.messages.push(msg);
+      });
+
+      const conversationList = Array.from(conversations.values()).map(conv => ({
+        dmId: conv.dmId,
+        otherUserId: conv.otherUserId,
+        messageCount: conv.messages.length,
+        lastMessage: conv.messages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+      }));
+
+      setDmConversations(conversationList.sort((a, b) => 
+        new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+      ));
+    } else {
+      setDmConversations([]);
+    }
+  }, [dmMessages]);
+
+  // Load specific DM conversation
+  const loadDMConversation = async (dmId: string, otherUserId: string) => {
+    setLoadingDM(true);
+    setSelectedDM(dmId);
+    setSelectedDMOtherUserId(otherUserId);
+    try {
+      const [steamId1, steamId2] = dmId.split('_');
+      const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${steamId}&adminSteamId=${user?.steamId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedDMMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('Failed to load DM conversation:', error);
+      toast.error('Failed to load DM conversation');
+    } finally {
+      setLoadingDM(false);
+    }
+  };
 
   const handleTimeout = async () => {
     if (!steamId || !userIsOwner) return;
@@ -421,7 +487,7 @@ export default function UserManagementPage() {
                         : 'bg-[#08090d] text-gray-400 hover:text-white'
                     }`}
                   >
-                    Direct Messages ({dmMessages.length})
+                    Direct Messages ({dmConversations.length})
                   </button>
                 </div>
                 
@@ -451,34 +517,111 @@ export default function UserManagementPage() {
                       ))}
                     </div>
                   )
-                ) : (
-                  dmMessages.length === 0 ? (
-                    <p className="text-gray-400 text-center py-8">No DM messages found</p>
-                  ) : (
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
-                      {dmMessages.map((msg) => (
-                        <div key={msg.id} className="bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <span className="text-xs text-gray-500">
-                                {new Date(msg.timestamp).toLocaleString()}
-                              </span>
-                              <p className="text-xs text-blue-400 mt-1">
-                                DM with: {msg.otherUserId}
-                              </p>
+                ) : selectedDM ? (
+                  // DM Conversation Detail View
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <button
+                        onClick={() => {
+                          setSelectedDM(null);
+                          setSelectedDMMessages([]);
+                          setSelectedDMOtherUserId(null);
+                        }}
+                        className="px-3 py-1 bg-[#08090d] hover:bg-[#11141d] rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                      >
+                        <ArrowLeft size={16} />
+                        Back to DM List
+                      </button>
+                      {selectedDMOtherUserId && (
+                        <p className="text-sm text-gray-400">
+                          DM with: {selectedDMOtherUserId}
+                        </p>
+                      )}
+                    </div>
+                    {loadingDM ? (
+                      <div className="flex items-center justify-center py-20">
+                        <Loader2 className="animate-spin text-blue-500" size={32} />
+                      </div>
+                    ) : selectedDMMessages.length === 0 ? (
+                      <p className="text-gray-400 text-center py-8">No messages in this conversation</p>
+                    ) : (
+                      <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                        {selectedDMMessages.map((msg) => (
+                          <div key={msg.id} className={`bg-[#08090d] p-4 rounded-lg border border-white/5 group hover:border-white/10 transition-all ${
+                            msg.senderId === steamId ? 'bg-blue-500/5 border-blue-500/20' : ''
+                          }`}>
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-bold text-blue-400">
+                                    {msg.senderName || 'Unknown User'}
+                                  </span>
+                                  {msg.senderIsPro && (
+                                    <Crown size={12} className="text-emerald-400" />
+                                  )}
+                                  {msg.isBanned && (
+                                    <Ban size={12} className="text-red-400" />
+                                  )}
+                                  {msg.isTimedOut && (
+                                    <Clock size={12} className="text-amber-400" />
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(msg.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              {userIsOwner && msg.id && (
+                                <button
+                                  onClick={() => handleDeleteMessage(msg.id, 'dm', selectedDM)}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                                  title="Delete message"
+                                >
+                                  <Trash2 size={14} className="text-red-400" />
+                                </button>
+                              )}
                             </div>
-                            {userIsOwner && msg.id && (
-                              <button
-                                onClick={() => handleDeleteMessage(msg.id, 'dm', msg.dmId)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
-                                title="Delete message"
-                              >
-                                <Trash2 size={14} className="text-red-400" />
-                              </button>
-                            )}
+                            <p className="text-sm text-gray-300">{msg.message}</p>
                           </div>
-                          <p className="text-sm text-gray-300">{msg.message}</p>
-                        </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // DM Conversations List
+                  dmConversations.length === 0 ? (
+                    <p className="text-gray-400 text-center py-8">No DM conversations found</p>
+                  ) : (
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+                      {dmConversations.map((conv) => (
+                        <button
+                          key={conv.dmId}
+                          onClick={() => loadDMConversation(conv.dmId, conv.otherUserId)}
+                          className="w-full text-left bg-[#08090d] p-4 rounded-lg border border-white/5 hover:border-blue-500/40 hover:bg-[#11141d] transition-all group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-blue-400 mb-1">
+                                DM with: {conv.otherUserId}
+                              </p>
+                              <p className="text-xs text-gray-400 mb-1">
+                                {conv.messageCount} message{conv.messageCount !== 1 ? 's' : ''}
+                              </p>
+                              {conv.lastMessage && (
+                                <>
+                                  <p className="text-xs text-gray-500 truncate">
+                                    {conv.lastMessage.message}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    {new Date(conv.lastMessage.timestamp).toLocaleString()}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ArrowLeft size={16} className="text-blue-400 rotate-180" />
+                            </div>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   )
