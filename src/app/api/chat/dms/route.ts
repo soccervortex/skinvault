@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     const beforeTimestamp = searchParams.get('beforeTimestamp');
     const beforeTimestampDate = beforeTimestamp ? new Date(beforeTimestamp) : null;
     const loadAll = searchParams.get('loadAll') === 'true'; // Option to load all 365 days
-    const pageSize = parseInt(searchParams.get('limit') || '100'); // Default 100 for initial load
+    const pageSize = parseInt(searchParams.get('limit') || '50'); // Default 50 for faster initial load
     
     // Use fewer collections for initial load (30 days), more if explicitly requested
     const daysToLoad = loadAll ? 365 : 30;
@@ -127,29 +127,37 @@ export async function GET(request: Request) {
 
     // Don't close connection - it's pooled and reused
 
-    // Get unique Steam IDs and fetch current user info
-    const uniqueSteamIds = [...new Set(messages.map(msg => [msg.senderId, msg.receiverId]).flat())];
-    const userInfoMap = await getCurrentUserInfo(uniqueSteamIds);
-
-    // Get banned and timeout users (disable cache for real-time status)
-    const { dbGet, dbSet } = await import('@/app/utils/database');
-    const bannedUsers = await dbGet<string[]>('banned_steam_ids', false) || [];
-    const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
+    // Get unique Steam IDs and fetch current user info (only for messages we're returning)
+    const uniqueSteamIds = [...new Set(sortedMessages.map(msg => [msg.senderId, msg.receiverId]).flat())];
     
-    // Clean up expired timeouts
-    const now = new Date();
-    const activeTimeouts: Record<string, string> = {};
-    for (const [id, timeoutUntil] of Object.entries(timeoutUsers)) {
-      if (new Date(timeoutUntil) > now) {
-        activeTimeouts[id] = timeoutUntil;
-      }
-    }
-    if (Object.keys(activeTimeouts).length !== Object.keys(timeoutUsers).length) {
-      await dbSet('timeout_users', activeTimeouts);
-    }
-
-    // Get pinned messages
-    const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
+    // Fetch user info and metadata in parallel for better performance
+    const [userInfoMap, bannedUsers, timeoutUsers, pinnedMessages] = await Promise.all([
+      getCurrentUserInfo(uniqueSteamIds),
+      (async () => {
+        const { dbGet } = await import('@/app/utils/database');
+        return await dbGet<string[]>('banned_steam_ids', false) || [];
+      })(),
+      (async () => {
+        const { dbGet, dbSet } = await import('@/app/utils/database');
+        const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
+        // Clean up expired timeouts
+        const now = new Date();
+        const activeTimeouts: Record<string, string> = {};
+        for (const [id, timeoutUntil] of Object.entries(timeoutUsers)) {
+          if (new Date(timeoutUntil) > now) {
+            activeTimeouts[id] = timeoutUntil;
+          }
+        }
+        if (Object.keys(activeTimeouts).length !== Object.keys(timeoutUsers).length) {
+          await dbSet('timeout_users', activeTimeouts);
+        }
+        return activeTimeouts;
+      })(),
+      (async () => {
+        const { dbGet } = await import('@/app/utils/database');
+        return await dbGet<Record<string, any>>('pinned_messages', false) || {};
+      })(),
+    ]);
 
     return NextResponse.json({
       messages: sortedMessages.map(msg => {

@@ -378,7 +378,7 @@ export default function ChatPage() {
         steamId1,
         steamId2,
         currentUserId: user.steamId,
-        limit: '100', // Load 100 messages initially
+        limit: '50', // Load 50 messages initially for faster loading
       });
       if (isAdmin) params.set('adminSteamId', user.steamId);
       if (loadAll) params.set('loadAll', 'true');
