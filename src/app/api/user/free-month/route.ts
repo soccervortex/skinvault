@@ -7,9 +7,9 @@ import {
   markFreeMonthClaimed 
 } from '@/app/utils/pro-storage';
 
-// First week free promotion: Users can claim 1 month free Pro within 7 days of first login
+// First week free promotion: Users can claim 2 weeks free Pro within 7 days of first login
 const FREE_MONTH_DAYS = 7;
-const FREE_MONTHS = 1;
+const FREE_WEEKS = 2; // 2 weeks = 0.5 months
 
 export async function POST(request: Request) {
   try {
@@ -28,11 +28,11 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Check if user has already claimed the free month (one-time only)
+    // Check if user has already claimed the free two weeks (one-time only)
     const alreadyClaimed = await hasClaimedFreeMonth(steamId);
     if (alreadyClaimed) {
       return NextResponse.json({ 
-        error: 'You have already claimed your free month trial. This offer is only available once.',
+        error: 'You have already claimed your free two weeks trial. This offer is only available once.',
         alreadyClaimed: true 
       }, { status: 400 });
     }
@@ -58,8 +58,8 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // All checks passed - grant the free month
-    const newProUntil = await grantPro(steamId, FREE_MONTHS);
+    // All checks passed - grant the free two weeks (0.5 months)
+    const newProUntil = await grantPro(steamId, 0.5);
     
     // Mark as claimed (one-time only)
     await markFreeMonthClaimed(steamId);
@@ -67,11 +67,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       proUntil: newProUntil,
-      message: `Congratulations! You've claimed your free ${FREE_MONTHS} month${FREE_MONTHS > 1 ? 's' : ''} of Pro!`,
+      message: `Congratulations! You've claimed your free two weeks of Pro!`,
     });
   } catch (error) {
-    console.error('Failed to claim free month:', error);
-    return NextResponse.json({ error: 'Failed to claim free month' }, { status: 500 });
+    console.error('Failed to claim free two weeks:', error);
+    return NextResponse.json({ error: 'Failed to claim free two weeks' }, { status: 500 });
   }
 }
 
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         eligible: false,
         alreadyClaimed: true,
-        message: 'You have already claimed your free month trial. This offer is only available once.',
+        message: 'You have already claimed your free two weeks trial. This offer is only available once.',
       });
     }
 
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
       eligible: true,
       hasPro: false,
       daysRemaining,
-      message: `You are eligible for 1 month free Pro! ${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining > 1 ? 's' : ''} remaining to claim.` : 'Claim it now!'}`,
+      message: `You are eligible for two weeks free Pro! ${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining > 1 ? 's' : ''} remaining to claim.` : 'Claim it now!'}`,
     });
   } catch (error) {
     console.error('Failed to check free month eligibility:', error);

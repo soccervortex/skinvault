@@ -48,7 +48,7 @@ export default function ProInfoPage() {
 
   const handleClaimFreeMonth = async () => {
     if (!user?.steamId) {
-      toast.error('You must be signed in with Steam to claim the free month.');
+      toast.error('You must be signed in with Steam to claim the free two weeks.');
       setTimeout(() => window.location.href = '/inventory', 2000);
       return;
     }
@@ -64,7 +64,7 @@ export default function ProInfoPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to claim free month');
+        toast.error(data.error || 'Failed to claim free two weeks');
         setClaimingFreeMonth(false);
         return;
       }
@@ -76,11 +76,11 @@ export default function ProInfoPage() {
         setUser(updatedUser);
         window.dispatchEvent(new Event('storage'));
         setFreeMonthEligible(false);
-        toast.success(data.message || 'Free month claimed successfully!');
+        toast.success(data.message || 'Free two weeks claimed successfully!');
       }
       setClaimingFreeMonth(false);
     } catch (error) {
-      toast.error('Failed to claim free month. Please try again.');
+      toast.error('Failed to claim free two weeks. Please try again.');
       setClaimingFreeMonth(false);
     }
   };
@@ -203,7 +203,7 @@ export default function ProInfoPage() {
                     </h3>
                   </div>
                   <p className="text-[11px] md:text-[12px] text-gray-300 mb-4 leading-relaxed">
-                    Claim <span className="font-black text-emerald-400">1 month FREE</span> of Pro! 
+                    Claim <span className="font-black text-emerald-400">two weeks FREE</span> of Pro! 
                     This special offer is available for new users in their first week. 
                     Unlock unlimited wishlist, advanced stats, and all Pro features.
                   </p>
@@ -218,7 +218,7 @@ export default function ProInfoPage() {
                       </>
                     ) : (
                       <>
-                        <Gift size={16} /> Claim Free Month Now
+                        <Gift size={16} /> Claim Free Two Weeks Now
                       </>
                     )}
                   </button>

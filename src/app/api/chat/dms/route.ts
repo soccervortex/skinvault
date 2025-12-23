@@ -129,14 +129,10 @@ export async function GET(request: Request) {
     // Sort by timestamp descending
     allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    // For loadAll, return all messages (up to a reasonable limit to prevent memory issues)
-    // For regular pagination, limit to pageSize
-    const maxMessages = loadAll ? 10000 : pageSize; // Allow up to 10k messages when loadAll=true
-    const messages = allMessages.slice(0, maxMessages);
-    
-    // Check if there are more messages (only relevant for pagination, not loadAll)
-    const hasMore = !loadAll && allMessages.length > pageSize;
-    
+    // Check if there are more messages
+    const hasMore = allMessages.length > pageSize;
+    // Take only pageSize messages
+    const messages = allMessages.slice(0, pageSize);
     // Reverse to show oldest first in chat
     const sortedMessages = messages.reverse();
 
