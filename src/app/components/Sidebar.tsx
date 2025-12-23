@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
 import ChatPreloader from './ChatPreloader';
+import { getUnreadCounts } from '@/app/utils/chat-notifications';
 
 export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const pathname = usePathname();
@@ -15,6 +16,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [themesDisabled, setThemesDisabled] = useState(false);
   const [hasActiveTheme, setHasActiveTheme] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // 1. Sync User state met LocalStorage & andere tabbladen
   useEffect(() => {
@@ -101,6 +103,31 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
+      clearInterval(interval);
+    };
+  }, [user?.steamId]);
+
+  // Update unread counts
+  useEffect(() => {
+    const updateUnreadCount = () => {
+      if (user?.steamId) {
+        const counts = getUnreadCounts(user.steamId);
+        setUnreadCount(counts.total);
+      } else {
+        setUnreadCount(0);
+      }
+    };
+
+    updateUnreadCount();
+    
+    // Listen for unread updates
+    window.addEventListener('chat-unread-updated', updateUnreadCount);
+    
+    // Poll for updates every 2 seconds
+    const interval = setInterval(updateUnreadCount, 2000);
+    
+    return () => {
+      window.removeEventListener('chat-unread-updated', updateUnreadCount);
       clearInterval(interval);
     };
   }, [user?.steamId]);
@@ -215,8 +242,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16}/> Wishlist
               </Link>
-              <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
+              <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)} className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
                 <MessageSquare size={16}/> Chat
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
               <button 
                 onClick={() => {
@@ -377,8 +409,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16}/> Wishlist
           </Link>
-          <Link href="/chat" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
+          <Link href="/chat" className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
             <MessageSquare size={16}/> Chat
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </Link>
           <button 
             onClick={() => setIsSearchOpen(true)}

@@ -18,6 +18,7 @@ import {
   Clock,
   Search,
   Flag,
+  MessageSquare,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -83,6 +84,11 @@ export default function AdminPage() {
   const [timeouts, setTimeouts] = useState<Array<{ steamId: string; timeoutUntil: string; minutesRemaining: number }>>([]);
   const [loadingTimeouts, setLoadingTimeouts] = useState(true);
   const [searchSteamId, setSearchSteamId] = useState("");
+  const [globalChatDisabled, setGlobalChatDisabled] = useState(false);
+  const [dmChatDisabled, setDmChatDisabled] = useState(false);
+  const [loadingChatControl, setLoadingChatControl] = useState(true);
+  const [chatControlMessage, setChatControlMessage] = useState<string | null>(null);
+  const [chatControlError, setChatControlError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -141,6 +147,24 @@ export default function AdminPage() {
       }
     };
     loadThemes();
+
+    const loadChatControl = async () => {
+      if (!userIsOwner) return;
+      setLoadingChatControl(true);
+      try {
+        const res = await fetch(`/api/admin/chat-control?adminSteamId=${user?.steamId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setGlobalChatDisabled(data.globalChatDisabled || false);
+          setDmChatDisabled(data.dmChatDisabled || false);
+        }
+      } catch (e: any) {
+        console.error("Failed to load chat control:", e);
+      } finally {
+        setLoadingChatControl(false);
+      }
+    };
+    loadChatControl();
 
     const loadPurchases = async () => {
       if (!userIsOwner) return;
@@ -397,6 +421,35 @@ export default function AdminPage() {
       }
     } catch (e: any) {
       setError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleChatControlToggle = async (type: 'global' | 'dm', disabled: boolean) => {
+    setChatControlMessage(null);
+    setChatControlError(null);
+    
+    try {
+      const res = await fetch(`/api/admin/chat-control?adminSteamId=${user?.steamId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          [type === 'global' ? 'globalChatDisabled' : 'dmChatDisabled']: disabled,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setChatControlError(data?.error || `Failed to ${disabled ? 'disable' : 'enable'} ${type} chat.`);
+      } else {
+        setGlobalChatDisabled(data.globalChatDisabled || false);
+        setDmChatDisabled(data.dmChatDisabled || false);
+        setChatControlMessage(`${type === 'global' ? 'Global' : 'DM'} chat ${disabled ? 'disabled' : 'enabled'}`);
+        setTimeout(() => setChatControlMessage(null), 3000);
+      }
+    } catch (e: any) {
+      setChatControlError(e?.message || "Request failed.");
     }
   };
 
@@ -1547,6 +1600,100 @@ export default function AdminPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Chat Control Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+              <MessageSquare className="text-blue-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Chat Management
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Disable Chat Features
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-6">
+            Temporarily disable global chat or DM chats for maintenance or fixes. Users will see a message that chat is disabled.
+          </p>
+
+          {chatControlMessage && (
+            <div className="mb-4 flex items-center gap-2 text-emerald-400 text-[10px] md:text-[11px]">
+              <CheckCircle2 size={12} /> <span>{chatControlMessage}</span>
+            </div>
+          )}
+          {chatControlError && (
+            <div className="mb-4 flex items-center gap-2 text-red-400 text-[10px] md:text-[11px]">
+              <AlertTriangle size={12} /> <span>{chatControlError}</span>
+            </div>
+          )}
+
+          {loadingChatControl ? (
+            <div className="flex items-center justify-center gap-2 text-gray-400 text-[11px] py-8">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading chat control status...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-gray-300">
+                    Global Chat
+                  </span>
+                  <p className="text-[9px] md:text-[10px] text-gray-500 mt-1">
+                    {globalChatDisabled 
+                      ? 'Global chat is currently disabled' 
+                      : 'Global chat is enabled'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleChatControlToggle('global', !globalChatDisabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    globalChatDisabled
+                      ? "bg-red-600"
+                      : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      globalChatDisabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-gray-300">
+                    DM Chat
+                  </span>
+                  <p className="text-[9px] md:text-[10px] text-gray-500 mt-1">
+                    {dmChatDisabled 
+                      ? 'DM chat is currently disabled' 
+                      : 'DM chat is enabled'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleChatControlToggle('dm', !dmChatDisabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    dmChatDisabled
+                      ? "bg-red-600"
+                      : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      dmChatDisabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -103,6 +103,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cannot send DM invite to yourself' }, { status: 400 });
     }
 
+    // Check if either user is banned
+    const { dbGet } = await import('@/app/utils/database');
+    const bannedUsers = await dbGet<string[]>('banned_steam_ids', false) || [];
+    
+    if (bannedUsers.includes(fromSteamId)) {
+      return NextResponse.json({ error: 'You are banned and cannot send DM invites' }, { status: 403 });
+    }
+    
+    if (bannedUsers.includes(toSteamId)) {
+      return NextResponse.json({ error: 'Cannot send DM invite to a banned user' }, { status: 403 });
+    }
+
     const client = await getMongoClient();
     const db = client.db(MONGODB_DB_NAME);
     const collection = db.collection<DMInvite>('dm_invites');

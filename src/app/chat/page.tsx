@@ -7,6 +7,8 @@ import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlu
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
+import MessageActionMenu from '@/app/components/MessageActionMenu';
+import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime } from '@/app/utils/chat-notifications';
 
 interface ChatMessage {
   id?: string;
@@ -82,6 +84,10 @@ export default function ChatPage() {
   const [reportUser, setReportUser] = useState<{ steamId: string; name: string; type: 'global' | 'dm'; dmId?: string } | null>(null);
   const [reportSteamId, setReportSteamId] = useState('');
   const [reporting, setReporting] = useState(false);
+  const [globalChatDisabled, setGlobalChatDisabled] = useState(false);
+  const [dmChatDisabled, setDmChatDisabled] = useState(false);
+  const [unbanUser, setUnbanUser] = useState<{ steamId: string; name: string } | null>(null);
+  const [unbanning, setUnbanning] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -206,8 +212,31 @@ export default function ChatPage() {
     checkBanStatus();
     // Check ban status every 5 seconds
     const banCheckInterval = setInterval(checkBanStatus, 5000);
-    return () => clearInterval(banCheckInterval);
-  }, [toast, router]);
+    
+    // Check chat disable status
+    const checkChatStatus = async () => {
+      try {
+        if (isAdmin && parsedUser?.steamId) {
+          const res = await fetch(`/api/admin/chat-control?adminSteamId=${parsedUser.steamId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setGlobalChatDisabled(data.globalChatDisabled || false);
+            setDmChatDisabled(data.dmChatDisabled || false);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check chat status:', error);
+      }
+    };
+    
+    checkChatStatus();
+    const chatStatusInterval = setInterval(checkChatStatus, 5000);
+    
+    return () => {
+      clearInterval(banCheckInterval);
+      clearInterval(chatStatusInterval);
+    };
+  }, [toast, router, isAdmin]);
 
   const fetchMessages = async () => {
     try {
@@ -223,14 +252,39 @@ export default function ChatPage() {
     }
   };
 
-  const fetchDMMessages = async (steamId1: string, steamId2: string) => {
+  const fetchDMMessages = async (steamId1: string, steamId2: string, checkForNew = false) => {
     if (!user?.steamId) return;
     try {
       // Always pass current user's steamId so API can verify they're a participant
       const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${user.steamId}${isAdmin ? `&adminSteamId=${user.steamId}` : ''}`);
       if (res.ok) {
         const data = await res.json();
-        setDmMessages(data.messages || []);
+        const newMessages = data.messages || [];
+        
+        // If checking for new messages (polling), track unread for messages from other user
+        if (checkForNew && newMessages.length > 0) {
+          const dmId = [steamId1, steamId2].sort().join('_');
+          const lastMessage = newMessages[newMessages.length - 1];
+          
+          // Only track if message is from other user and DM is not currently selected
+          if (lastMessage.senderId !== user.steamId && selectedDM !== dmId) {
+            addUnreadDM(
+              dmId,
+              user.steamId,
+              lastMessage.message,
+              lastMessage.senderName,
+              lastMessage.senderAvatar
+            );
+          }
+        }
+        
+        setDmMessages(newMessages);
+        
+        // Mark DM as read when viewing
+        const dmId = [steamId1, steamId2].sort().join('_');
+        if (selectedDM === dmId) {
+          markDMAsRead(dmId, user.steamId);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch DM messages:', error);
@@ -255,10 +309,27 @@ export default function ChatPage() {
   const fetchDMInvites = async () => {
     if (!user?.steamId) return;
     try {
+      const lastCheck = getLastCheckTime();
       const res = await fetch(`/api/chat/dms/invites?steamId=${user.steamId}&type=pending`);
       if (res.ok) {
         const data = await res.json();
-        setDmInvites(data.invites || []);
+        const newInvites = data.invites || [];
+        
+        // Track new invites for notifications
+        newInvites.forEach((invite: any) => {
+          if (invite.createdAt && new Date(invite.createdAt).getTime() > lastCheck) {
+            addUnreadInvite(
+              invite.id,
+              invite.fromSteamId || invite.otherUserId,
+              user.steamId,
+              invite.otherUserName || 'Unknown User',
+              invite.otherUserAvatar
+            );
+          }
+        });
+        
+        setDmInvites(newInvites);
+        updateLastCheckTime();
       }
     } catch (error) {
       console.error('Failed to fetch DM invites:', error);
@@ -282,19 +353,23 @@ export default function ChatPage() {
       }
     }
     
-    // Polling interval - optimized to 3 seconds
+    // Polling interval - optimized to 2 seconds for faster updates
     const interval = setInterval(() => {
       if (activeTab === 'global') {
-        fetchMessages();
+        if (!globalChatDisabled) {
+          fetchMessages();
+        }
       } else {
+        if (!dmChatDisabled) {
         fetchDMList();
         fetchDMInvites();
         if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
-          fetchDMMessages(steamId1, steamId2);
+          fetchDMMessages(steamId1, steamId2, true);
+        }
         }
       }
-    }, 3000);
+    }, 2000);
     
     return () => clearInterval(interval);
   }, [activeTab, selectedDM, user?.steamId]);
@@ -303,10 +378,12 @@ export default function ChatPage() {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');
       fetchDMMessages(steamId1, steamId2);
-      // Optimize: Poll every 2 seconds
+      // Optimize: Poll every 1.5 seconds for active DM
       const interval = setInterval(() => {
-        fetchDMMessages(steamId1, steamId2);
-      }, 2000);
+        if (!dmChatDisabled) {
+          fetchDMMessages(steamId1, steamId2, true);
+        }
+      }, 1500);
       return () => clearInterval(interval);
     }
   }, [selectedDM, activeTab, user?.steamId, isAdmin]);
@@ -599,6 +676,35 @@ export default function ChatPage() {
     }
   };
 
+  const handleUnban = async () => {
+    if (!unbanUser || !isAdmin) return;
+
+    setUnbanning(true);
+    try {
+      const res = await fetch(`/api/admin/ban?steamId=${unbanUser.steamId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+      });
+
+      if (res.ok) {
+        toast.success(`User ${unbanUser.name} has been unbanned`);
+        setUnbanUser(null);
+        await fetchMessages(); // Refresh messages
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to unban user');
+      }
+    } catch (error) {
+      console.error('Failed to unban user:', error);
+      toast.error('Failed to unban user');
+    } finally {
+      setUnbanning(false);
+    }
+  };
+
   const handleViewInventory = (steamId: string) => {
     router.push(`/inventory?steamId=${steamId}`);
   };
@@ -674,7 +780,15 @@ export default function ChatPage() {
 
         {activeTab === 'global' ? (
           <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-            {loading ? (
+            {globalChatDisabled ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <Ban size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-bold mb-2">Global Chat is Disabled</p>
+                  <p className="text-sm">Global chat is currently disabled by an administrator.</p>
+                </div>
+              </div>
+            ) : loading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="animate-spin text-blue-500" size={32} />
               </div>
@@ -722,44 +836,19 @@ export default function ChatPage() {
                           Timeout
                         </span>
                       )}
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {(msg.steamId === user?.steamId || isAdmin) && msg.id && (
-                          <button
-                            onClick={() => handleDeleteMessage(msg.id!, 'global')}
-                            className="p-1 hover:bg-red-500/20 rounded"
-                            title="Delete message"
-                          >
-                            <Trash2 size={14} className="text-red-400" />
-                          </button>
-                        )}
-                        {msg.steamId !== user?.steamId && (
-                          <button
-                            onClick={() => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' })}
-                            className="p-1 hover:bg-orange-500/20 rounded"
-                            title="Report user"
-                          >
-                            <Flag size={14} className="text-orange-400" />
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <>
-                            <button
-                              onClick={() => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName })}
-                              className="p-1 hover:bg-red-500/20 rounded"
-                              title="Timeout user"
-                            >
-                              <Clock size={14} className="text-red-400" />
-                            </button>
-                            <button
-                              onClick={() => setBanUser({ steamId: msg.steamId, name: msg.steamName })}
-                              className="p-1 hover:bg-red-500/20 rounded"
-                              title="Ban user"
-                            >
-                              <Ban size={14} className="text-red-500" />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      <MessageActionMenu
+                        messageId={msg.id}
+                        steamId={msg.steamId}
+                        userName={msg.steamName}
+                        isOwnMessage={msg.steamId === user?.steamId}
+                        isAdmin={isAdmin}
+                        isBanned={msg.isBanned}
+                        onReport={msg.steamId !== user?.steamId ? () => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' }) : undefined}
+                        onDelete={msg.steamId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'global') : undefined}
+                        onBan={isAdmin ? () => setBanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
+                        onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
+                        onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
+                      />
                       <span className="text-xs text-gray-500 ml-auto">
                         {formatTime(msg.timestamp)}
                       </span>
@@ -882,7 +971,7 @@ export default function ChatPage() {
                       dmMessages.map((msg) => (
                         <div
                           key={msg.id || `${msg.senderId}-${msg.timestamp}`}
-                          className={`bg-[#11141d] p-4 rounded-xl border border-white/5 ${
+                          className={`bg-[#11141d] p-4 rounded-xl border border-white/5 group ${
                             msg.senderId === user?.steamId ? 'ml-auto max-w-[70%]' : 'mr-auto max-w-[70%]'
                           }`}
                         >
@@ -901,30 +990,25 @@ export default function ChatPage() {
                                     Pro
                                   </span>
                                 )}
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-                                  {(msg.senderId === user?.steamId || isAdmin) && msg.id && (
-                                    <button
-                                      onClick={() => handleDeleteMessage(msg.id!, 'dm')}
-                                      className="p-1 hover:bg-red-500/20 rounded"
-                                      title="Delete message"
-                                    >
-                                      <Trash2 size={12} className="text-red-400" />
-                                    </button>
-                                  )}
-                                  {msg.senderId !== user?.steamId && (
-                                    <button
-                                      onClick={() => setReportUser({ 
-                                        steamId: msg.senderId, 
-                                        name: msg.senderName, 
-                                        type: 'dm',
-                                        dmId: selectedDM || undefined
-                                      })}
-                                      className="p-1 hover:bg-orange-500/20 rounded"
-                                      title="Report user"
-                                    >
-                                      <Flag size={12} className="text-orange-400" />
-                                    </button>
-                                  )}
+                                <div className="ml-auto">
+                                  <MessageActionMenu
+                                    messageId={msg.id}
+                                    steamId={msg.senderId}
+                                    userName={msg.senderName}
+                                    isOwnMessage={msg.senderId === user?.steamId}
+                                    isAdmin={isAdmin}
+                                    isBanned={msg.isBanned}
+                                    onReport={msg.senderId !== user?.steamId ? () => setReportUser({ 
+                                      steamId: msg.senderId, 
+                                      name: msg.senderName, 
+                                      type: 'dm',
+                                      dmId: selectedDM || undefined
+                                    }) : undefined}
+                                    onDelete={msg.senderId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'dm') : undefined}
+                                    onBan={isAdmin ? () => setBanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
+                                    onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
+                                    onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
+                                  />
                                 </div>
                                 <span className="text-xs text-gray-500">
                                   {formatTime(msg.timestamp)}
@@ -1014,7 +1098,33 @@ export default function ChatPage() {
           </div>
         )}
 
-        {(activeTab === 'global' || (activeTab === 'dms' && selectedDM)) && (
+        {/* Unban Modal */}
+        {unbanUser && isAdmin && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[#11141d] p-6 rounded-2xl border border-emerald-500/30 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold mb-4 text-emerald-400">Unban User</h3>
+              <p className="text-gray-400 mb-4">Are you sure you want to unban <strong>{unbanUser.name}</strong>?</p>
+              <p className="text-sm text-emerald-400 mb-4">This will restore their access to chat and other features.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleUnban}
+                  disabled={unbanning}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50"
+                >
+                  {unbanning ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'Confirm Unban'}
+                </button>
+                <button
+                  onClick={() => setUnbanUser(null)}
+                  className="flex-1 bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(activeTab === 'global' || (activeTab === 'dms' && selectedDM)) && !(activeTab === 'global' && globalChatDisabled) && !(activeTab === 'dms' && dmChatDisabled) && (
           <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
             <div className="flex gap-3">
               <input
@@ -1024,10 +1134,11 @@ export default function ChatPage() {
                 placeholder={activeTab === 'global' ? 'Type a message...' : 'Type a DM...'}
                 className="flex-1 bg-[#08090d] border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 maxLength={500}
+                disabled={activeTab === 'global' ? globalChatDisabled : dmChatDisabled}
               />
               <button
                 type="submit"
-                disabled={!message.trim() || sending || (activeTab === 'dms' && !selectedDM)}
+                disabled={!message.trim() || sending || (activeTab === 'dms' && !selectedDM) || (activeTab === 'global' && globalChatDisabled) || (activeTab === 'dms' && dmChatDisabled)}
                 className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {sending ? (

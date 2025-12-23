@@ -157,8 +157,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if user is banned or timed out (disable cache for real-time checks)
+    // Check if DM chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
+    const dmChatDisabled = (await dbGet<boolean>('dm_chat_disabled', false)) || false;
+    if (dmChatDisabled) {
+      return NextResponse.json({ error: 'DM chat is currently disabled' }, { status: 503 });
+    }
+
+    // Check if user is banned or timed out (disable cache for real-time checks)
     const bannedUsers = await dbGet<string[]>('banned_steam_ids', false) || [];
     const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
     
