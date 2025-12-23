@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
+import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
@@ -22,36 +23,76 @@ export async function POST(request: Request) {
     const client = new MongoClient(MONGODB_URI);
     await client.connect();
     const db = client.db(MONGODB_DB_NAME);
-    const chatsCollection = db.collection('chats');
     const backupsCollection = db.collection('chat_backups');
+    const dmBackupsCollection = db.collection('dm_backups');
 
-    // Get all messages from last 24 hours
+    // Backup and clear global chat (24 hours)
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const messages = await chatsCollection
-      .find({ timestamp: { $gte: twentyFourHoursAgo } })
-      .toArray();
+    const collectionNames = getCollectionNamesForDays(2);
+    
+    const allMessages: any[] = [];
+    for (const collectionName of collectionNames) {
+      const collection = db.collection(collectionName);
+      const messages = await collection
+        .find({ timestamp: { $gte: twentyFourHoursAgo } })
+        .toArray();
+      allMessages.push(...messages);
+    }
 
-    // Create backup document
-    if (messages.length > 0) {
+    if (allMessages.length > 0) {
       const backup = {
         backupDate: new Date(),
-        messageCount: messages.length,
-        messages: messages,
+        messageCount: allMessages.length,
+        messages: allMessages,
       };
-
       await backupsCollection.insertOne(backup);
     }
 
-    // Clear messages older than 24 hours
-    const result = await chatsCollection.deleteMany({ timestamp: { $lt: twentyFourHoursAgo } });
+    let deletedCount = 0;
+    for (const collectionName of collectionNames) {
+      const collection = db.collection(collectionName);
+      const result = await collection.deleteMany({ timestamp: { $lt: twentyFourHoursAgo } });
+      deletedCount += result.deletedCount;
+    }
+
+    // Backup and clear DMs (7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const dmCollectionNames = getDMCollectionNamesForDays(7);
+    
+    const allDMMessages: any[] = [];
+    for (const collectionName of dmCollectionNames) {
+      const collection = db.collection(collectionName);
+      const messages = await collection
+        .find({ timestamp: { $gte: sevenDaysAgo } })
+        .toArray();
+      allDMMessages.push(...messages);
+    }
+
+    if (allDMMessages.length > 0) {
+      const dmBackup = {
+        backupDate: new Date(),
+        messageCount: allDMMessages.length,
+        messages: allDMMessages,
+      };
+      await dmBackupsCollection.insertOne(dmBackup);
+    }
+
+    let deletedDMCount = 0;
+    for (const collectionName of dmCollectionNames) {
+      const collection = db.collection(collectionName);
+      const result = await collection.deleteMany({ timestamp: { $lt: sevenDaysAgo } });
+      deletedDMCount += result.deletedCount;
+    }
 
     await client.close();
 
     return NextResponse.json({ 
       success: true, 
-      message: `Backed up ${messages.length} messages and cleared ${result.deletedCount} old messages`,
-      backedUp: messages.length,
-      deleted: result.deletedCount,
+      message: `Backed up ${allMessages.length} chat messages and ${allDMMessages.length} DM messages`,
+      backedUp: allMessages.length,
+      deleted: deletedCount,
+      dmBackedUp: allDMMessages.length,
+      dmDeleted: deletedDMCount,
     });
   } catch (error) {
     console.error('Failed to reset chat:', error);

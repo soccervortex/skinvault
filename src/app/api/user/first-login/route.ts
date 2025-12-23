@@ -10,6 +10,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing or invalid steamId' }, { status: 400 });
     }
 
+    // Validate Steam ID format (should be numeric, 17 digits)
+    if (!/^\d{17}$/.test(steamId)) {
+      console.warn('Invalid Steam ID format:', steamId);
+      return NextResponse.json({ error: 'Invalid Steam ID format' }, { status: 400 });
+    }
+
     // Record first login (only records if not already recorded)
     await recordFirstLogin(steamId);
 

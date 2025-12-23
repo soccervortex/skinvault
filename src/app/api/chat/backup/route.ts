@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { isOwner } from '@/app/utils/owner-ids';
+import { getCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
@@ -31,33 +32,44 @@ export async function POST(request: Request) {
 
     const client = await getMongoClient();
     const db = client.db(MONGODB_DB_NAME);
-    const chatsCollection = db.collection('chats');
     const backupsCollection = db.collection('chat_backups');
 
-    // Get all messages from last 24 hours
+    // Get all messages from last 24 hours using date-based collections
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const messages = await chatsCollection
-      .find({ timestamp: { $gte: twentyFourHoursAgo } })
-      .toArray();
+    const collectionNames = getCollectionNamesForDays(2); // Today and yesterday
+    
+    const allMessages: any[] = [];
+    for (const collectionName of collectionNames) {
+      const collection = db.collection(collectionName);
+      const messages = await collection
+        .find({ timestamp: { $gte: twentyFourHoursAgo } })
+        .toArray();
+      allMessages.push(...messages);
+    }
 
     // Create backup document
-    const backup = {
-      backupDate: new Date(),
-      messageCount: messages.length,
-      messages: messages,
-    };
+    if (allMessages.length > 0) {
+      const backup = {
+        backupDate: new Date(),
+        messageCount: allMessages.length,
+        messages: allMessages,
+      };
 
-    await backupsCollection.insertOne(backup);
+      await backupsCollection.insertOne(backup);
+    }
 
-    // Clear old messages (older than 24 hours)
-    await chatsCollection.deleteMany({ timestamp: { $lt: twentyFourHoursAgo } });
+    // Clear old messages from collections (older than 24 hours)
+    for (const collectionName of collectionNames) {
+      const collection = db.collection(collectionName);
+      await collection.deleteMany({ timestamp: { $lt: twentyFourHoursAgo } });
+    }
 
     await client.close();
 
     return NextResponse.json({ 
       success: true, 
-      message: `Backed up ${messages.length} messages and cleared old chat`,
-      backupDate: backup.backupDate,
+      message: `Backed up ${allMessages.length} messages and cleared old chat`,
+      backupDate: allMessages.length > 0 ? new Date() : null,
     });
   } catch (error) {
     console.error('Failed to backup and clear chat:', error);

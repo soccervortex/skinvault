@@ -15,6 +15,8 @@ import {
   Ban,
   ShoppingBag,
   X,
+  Clock,
+  Search,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -75,6 +77,9 @@ export default function AdminPage() {
   const [fixError, setFixError] = useState<string | null>(null);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [loadingUserCount, setLoadingUserCount] = useState(true);
+  const [timeouts, setTimeouts] = useState<Array<{ steamId: string; timeoutUntil: string; minutesRemaining: number }>>([]);
+  const [loadingTimeouts, setLoadingTimeouts] = useState(true);
+  const [searchSteamId, setSearchSteamId] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -215,6 +220,27 @@ export default function AdminPage() {
       }
     };
     loadUserCount();
+
+    const loadTimeouts = async () => {
+      if (!userIsOwner) return;
+      setLoadingTimeouts(true);
+      try {
+        const res = await fetch(`/api/admin/timeouts?adminSteamId=${user?.steamId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTimeouts(data.timeouts || []);
+        }
+      } catch (e: any) {
+        console.error('Failed to load timeouts:', e);
+      } finally {
+        setLoadingTimeouts(false);
+      }
+    };
+    loadTimeouts();
+    
+    // Refresh timeouts every 30 seconds
+    const timeoutInterval = setInterval(loadTimeouts, 30000);
+    return () => clearInterval(timeoutInterval);
   }, [userIsOwner, user?.steamId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1225,6 +1251,111 @@ export default function AdminPage() {
                   )}
                 </button>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* User Search Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+              <Search className="text-blue-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                User Management
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                User Finder
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
+            Search for a user by Steam ID to view their profile, chats, and manage their account.
+          </p>
+
+          <form onSubmit={(e) => { e.preventDefault(); if (searchSteamId) router.push(`/admin/user/${searchSteamId}`); }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
+            <div>
+              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+                SteamID64
+              </label>
+              <input
+                value={searchSteamId}
+                onChange={(e) => setSearchSteamId(e.target.value)}
+                placeholder="7656119..."
+                className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!searchSteamId}
+              className="w-full bg-blue-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Search size={14} /> Search User
+            </button>
+          </form>
+        </div>
+
+        {/* Timeout List Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-amber-500/10 border border-amber-500/40 shrink-0">
+              <Clock className="text-amber-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                User Management
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Active Timeouts
+              </h2>
+            </div>
+          </div>
+
+          {loadingTimeouts ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="animate-spin text-amber-400" size={24} />
+            </div>
+          ) : timeouts.length === 0 ? (
+            <p className="text-[10px] md:text-[11px] text-gray-400">No active timeouts</p>
+          ) : (
+            <div className="space-y-2">
+              {timeouts.map((timeout) => (
+                <div key={timeout.steamId} className="bg-black/40 border border-amber-500/30 rounded-xl md:rounded-2xl p-3 md:p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-[10px] md:text-[11px] font-black text-white mb-1">{timeout.steamId}</p>
+                    <p className="text-[9px] md:text-[10px] text-gray-400">
+                      {timeout.minutesRemaining} minute(s) remaining
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => router.push(`/admin/user/${timeout.steamId}`)}
+                      className="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-colors flex items-center gap-1"
+                    >
+                      <Search size={12} /> View
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/chat/timeout?steamId=${timeout.steamId}&adminSteamId=${user?.steamId}`, {
+                            method: 'DELETE',
+                          });
+                          if (res.ok) {
+                            setTimeouts(timeouts.filter(t => t.steamId !== timeout.steamId));
+                          }
+                        } catch (e) {
+                          console.error('Failed to remove timeout:', e);
+                        }
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
