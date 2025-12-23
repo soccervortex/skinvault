@@ -64,16 +64,19 @@ export function getUnreadCounts(currentUserId: string): UnreadCounts {
  */
 export function markDMAsRead(dmId: string, currentUserId: string): void {
   try {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !dmId || !currentUserId) return;
     
     const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
     
     // Extract participants from DM ID (format: steamId1_steamId2)
-    const participants = dmId.split('_');
-    const isParticipant = participants.includes(currentUserId);
+    const participants = dmId.split('_').filter(Boolean);
     
-    // Only mark as read if current user is a participant in this DM
-    if (isParticipant) {
+    // Check if current user is a participant (handle both sorted and unsorted DM IDs)
+    const isParticipant = participants.length === 2 && participants.includes(currentUserId);
+    
+    // Always mark as read if DM ID is valid format (even if participant check fails, still mark it)
+    // This ensures DMs are always marked as read when viewed
+    if (participants.length === 2) {
       // Always create/update the entry to ensure it's marked as read
       if (!unreadDms[dmId]) {
         unreadDms[dmId] = {
@@ -85,7 +88,7 @@ export function markDMAsRead(dmId: string, currentUserId: string): void {
           senderAvatar: '',
         };
       }
-      // Reset count and update last read time (regardless of stored userId)
+      // Reset count and update last read time (regardless of stored userId or participant check)
       unreadDms[dmId].count = 0;
       unreadDms[dmId].lastRead = Date.now();
       unreadDms[dmId].userId = currentUserId; // Update userId to current user
@@ -94,8 +97,9 @@ export function markDMAsRead(dmId: string, currentUserId: string): void {
       // Dispatch event for other components
       window.dispatchEvent(new CustomEvent('chat-unread-updated'));
     }
-  } catch {
-    // Ignore errors
+  } catch (error) {
+    // Log error for debugging but don't throw
+    console.warn('Error marking DM as read:', error);
   }
 }
 

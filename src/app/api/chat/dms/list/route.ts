@@ -95,9 +95,41 @@ export async function GET(request: Request) {
       unreadCount?: number;
     }> = [];
 
-    // Fetch user profiles for all DMs in parallel
-    const userProfilePromises = invites.map(async (invite) => {
+    // Also find DMs from messages (in case invite is missing but messages exist)
+    const dmIdsFromMessages = new Set<string>();
+    for (const collectionName of collectionNames) {
+      const collection = db.collection<DMMessage>(collectionName);
+      const messages = await collection
+        .find({ 
+          $or: [
+            { senderId: steamId, timestamp: { $gte: threeHundredSixtyFiveDaysAgo } },
+            { receiverId: steamId, timestamp: { $gte: threeHundredSixtyFiveDaysAgo } }
+          ]
+        })
+        .toArray();
+      
+      messages.forEach(msg => {
+        dmIdsFromMessages.add(msg.dmId);
+      });
+    }
+
+    // Combine invites and message-based DMs
+    const allDmIds = new Set<string>();
+    invites.forEach(invite => {
       const otherUserId = invite.fromSteamId === steamId ? invite.toSteamId : invite.fromSteamId;
+      const dmId = [steamId, otherUserId].sort().join('_');
+      allDmIds.add(dmId);
+    });
+    dmIdsFromMessages.forEach(dmId => allDmIds.add(dmId));
+
+    // Fetch user profiles for all DMs in parallel
+    const otherUserIds = Array.from(allDmIds).map(dmId => {
+      const [id1, id2] = dmId.split('_');
+      return id1 === steamId ? id2 : id1;
+    });
+    const uniqueOtherUserIds = [...new Set(otherUserIds)];
+
+    const userProfilePromises = uniqueOtherUserIds.map(async (otherUserId) => {
       try {
         const profile = await fetchSteamProfile(otherUserId);
         return { otherUserId, profile };
@@ -113,8 +145,9 @@ export async function GET(request: Request) {
     const userProfiles = await Promise.all(userProfilePromises);
     const profileMap = new Map(userProfiles.map(up => [up.otherUserId, up.profile]));
 
-    for (const invite of invites) {
-      const otherUserId = invite.fromSteamId === steamId ? invite.toSteamId : invite.fromSteamId;
+    for (const dmId of allDmIds) {
+      const [id1, id2] = dmId.split('_');
+      const otherUserId = id1 === steamId ? id2 : id1;
       
       // Skip if users have blocked each other
       const blockKey = [steamId, otherUserId].sort().join('_');
@@ -122,7 +155,6 @@ export async function GET(request: Request) {
         continue; // Skip blocked users
       }
       
-      const dmId = [steamId, otherUserId].sort().join('_');
       const profile = profileMap.get(otherUserId) || { name: `User ${otherUserId.slice(-4)}`, avatar: '' };
 
       // Find latest message in this DM
@@ -145,14 +177,20 @@ export async function GET(request: Request) {
         }
       }
 
-      // Add DM even if no messages yet (for newly accepted invites)
+      // Find invite for this DM (if exists)
+      const invite = invites.find(inv => {
+        const invOtherUserId = inv.fromSteamId === steamId ? inv.toSteamId : inv.fromSteamId;
+        return invOtherUserId === otherUserId;
+      });
+
+      // Add DM even if no messages yet (for newly accepted invites) or if messages exist
       dmList.push({
         dmId,
         otherUserId,
         otherUserName: profile.name,
         otherUserAvatar: profile.avatar,
         lastMessage: latestMessage?.message || 'No messages yet',
-        lastMessageTime: latestMessage?.timestamp || invite.createdAt,
+        lastMessageTime: latestMessage?.timestamp || invite?.createdAt || new Date(),
       });
     }
 
