@@ -188,9 +188,6 @@ export async function GET(request: Request) {
     // Fetch current user info for all unique users
     const userInfoMap = await getCurrentUserInfo(uniqueSteamIds);
 
-    // Get pinned messages
-    const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
-
     return NextResponse.json({ 
       messages: messages.map(msg => {
         const currentUserInfo = userInfoMap.get(msg.steamId);

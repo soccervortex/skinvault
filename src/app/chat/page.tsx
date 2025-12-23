@@ -1269,8 +1269,12 @@ export default function ChatPage() {
                         isAdmin={isAdmin}
                         isBanned={msg.isBanned}
                         isBlocked={blockedUsers.has(msg.steamId)}
+                        isPinned={msg.isPinned}
                         onReport={msg.steamId !== user?.steamId ? () => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' }) : undefined}
                         onDelete={msg.steamId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'global') : undefined}
+                        onEdit={msg.id ? () => handleEditMessage(msg.id, msg.message, 'global') : undefined}
+                        onPin={isAdmin && msg.id && !msg.isPinned ? () => handlePinMessage(msg.id!, 'global') : undefined}
+                        onUnpin={isAdmin && msg.id && msg.isPinned ? () => handleUnpinMessage(msg.id!) : undefined}
                         onBan={isAdmin ? () => setBanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
                         onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
                         onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
@@ -1346,6 +1350,8 @@ export default function ChatPage() {
               </div>
             )}
             <div ref={messagesEndRef} />
+              </>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex overflow-hidden">
