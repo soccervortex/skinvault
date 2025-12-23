@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Pusher from 'pusher-js';
+import { getPusherClient } from '@/app/utils/pusher-client';
 
 /**
  * Chat hook using Pusher WebSockets for real-time updates.

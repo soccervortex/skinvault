@@ -117,7 +117,7 @@ export async function GET(request: Request) {
     
     // Sort by timestamp descending
     allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    
+
     // Check if there are more messages
     const hasMore = allMessages.length > pageSize;
     // Take only pageSize messages
@@ -138,19 +138,19 @@ export async function GET(request: Request) {
         return await dbGet<string[]>('banned_steam_ids', false) || [];
       })(),
       (async () => {
-        const { dbGet, dbSet } = await import('@/app/utils/database');
-        const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
-        // Clean up expired timeouts
-        const now = new Date();
-        const activeTimeouts: Record<string, string> = {};
-        for (const [id, timeoutUntil] of Object.entries(timeoutUsers)) {
-          if (new Date(timeoutUntil) > now) {
-            activeTimeouts[id] = timeoutUntil;
-          }
-        }
-        if (Object.keys(activeTimeouts).length !== Object.keys(timeoutUsers).length) {
-          await dbSet('timeout_users', activeTimeouts);
-        }
+    const { dbGet, dbSet } = await import('@/app/utils/database');
+    const timeoutUsers = await dbGet<Record<string, string>>('timeout_users', false) || {};
+    // Clean up expired timeouts
+    const now = new Date();
+    const activeTimeouts: Record<string, string> = {};
+    for (const [id, timeoutUntil] of Object.entries(timeoutUsers)) {
+      if (new Date(timeoutUntil) > now) {
+        activeTimeouts[id] = timeoutUntil;
+      }
+    }
+    if (Object.keys(activeTimeouts).length !== Object.keys(timeoutUsers).length) {
+      await dbSet('timeout_users', activeTimeouts);
+    }
         return activeTimeouts;
       })(),
       (async () => {

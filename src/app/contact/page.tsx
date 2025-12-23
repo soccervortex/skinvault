@@ -7,7 +7,7 @@ import { Mail, Copy, Check } from 'lucide-react';
 export default function ContactPage() {
   const [copied, setCopied] = useState(false);
 
-  const contactEmail = 'drmizayt2@gmail.com';
+  const contactEmail = 'contact@skinvaults.online';
   
   const exampleTemplate = `Subject: [Reason] - [Your Name]
 

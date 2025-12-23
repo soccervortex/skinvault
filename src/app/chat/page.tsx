@@ -11,6 +11,7 @@ import MessageActionMenu from '@/app/components/MessageActionMenu';
 import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead } from '@/app/utils/chat-notifications';
 import { usePusherChat } from '@/app/hooks/usePusherChat';
 import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
+import { saveDMList, mergeDMList, loadDMList } from '@/app/utils/dm-list-persistence';
 
 interface ChatMessage {
   id?: string;
@@ -431,26 +432,38 @@ export default function ChatPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        const newDMs = data.dms || [];
-        console.log(`[DM List Frontend] Fetched ${newDMs.length} DMs from server:`, newDMs);
+        const serverDMs = data.dms || [];
+        console.log(`[DM List Frontend] Fetched ${serverDMs.length} DMs from server`);
         
-        if (merge) {
-          // Merge with existing DMs instead of replacing (preserve manually added DMs)
-          setDmList(prev => {
-            const existingIds = new Set(prev.map(dm => dm.dmId));
-            const newDMsToAdd = newDMs.filter((dm: any) => !existingIds.has(dm.dmId));
-            return [...prev, ...newDMsToAdd].sort((a, b) => 
-              new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-            );
-          });
-        } else {
-          setDmList(newDMs);
-        }
+        // Always merge with persisted DMs to prevent disappearing
+        const mergedDMs = merge ? mergeDMList(serverDMs, user.steamId) : serverDMs;
+        
+        // Save to localStorage for persistence
+        saveDMList(mergedDMs, user.steamId);
+        
+        setDmList(mergedDMs);
+        console.log(`[DM List Frontend] Set ${mergedDMs.length} DMs (${serverDMs.length} from server, ${mergedDMs.length - serverDMs.length} from persistence)`);
       } else {
         console.error('[DM List Frontend] Failed to fetch DM list:', res.status, res.statusText);
+        // On error, try to load from persistence
+        if (merge) {
+          const persisted = mergeDMList([], user.steamId);
+          if (persisted.length > 0) {
+            console.log(`[DM List Frontend] Using ${persisted.length} persisted DMs due to server error`);
+            setDmList(persisted);
+          }
+        }
       }
     } catch (error) {
       console.error('[DM List Frontend] Failed to fetch DM list:', error);
+      // On error, try to load from persistence
+      if (merge) {
+        const persisted = mergeDMList([], user.steamId);
+        if (persisted.length > 0) {
+          console.log(`[DM List Frontend] Using ${persisted.length} persisted DMs due to fetch error`);
+          setDmList(persisted);
+        }
+      }
     }
   };
 
@@ -501,6 +514,22 @@ export default function ChatPage() {
         fetchMessages(null, false); // Reset cursor, load from beginning
       }
     } else {
+      // Load persisted DMs first for instant display
+      if (dmList.length === 0 && user?.steamId) {
+        const persisted = loadDMList(user.steamId);
+        if (persisted.length > 0) {
+          const initialDMs = persisted.map(dm => ({
+            dmId: dm.dmId,
+            otherUserId: dm.otherUserId,
+            otherUserName: dm.otherUserName,
+            otherUserAvatar: dm.otherUserAvatar,
+            lastMessage: dm.lastMessage,
+            lastMessageTime: new Date(dm.lastMessageTime),
+          }));
+          setDmList(initialDMs);
+        }
+      }
+      
       if (dmList.length === 0) {
         fetchDMList();
       }
@@ -714,12 +743,18 @@ export default function ChatPage() {
         isTimedOut: false,
       };
       setDmMessages(prev => [...prev, optimisticDMMessage]);
-      // Update DM list optimistically
-      setDmList(prev => prev.map(dm => 
-        dm.dmId === selectedDM 
-          ? { ...dm, lastMessage: messageText, lastMessageTime: new Date() }
-          : dm
-      ));
+      // Update DM list optimistically and persist
+      setDmList(prev => {
+        const updated = prev.map(dm => 
+          dm.dmId === selectedDM 
+            ? { ...dm, lastMessage: messageText, lastMessageTime: new Date() }
+            : dm
+        );
+        if (user?.steamId) {
+          saveDMList(updated, user.steamId);
+        }
+        return updated;
+      });
     }
 
     // Clear input immediately
@@ -918,7 +953,10 @@ export default function ChatPage() {
               }
               // Add new DM at the beginning
               console.log(`[DM Accept] Adding new DM to list`);
-              return [newDM, ...prev];
+              const updated = [newDM, ...prev];
+              // Persist immediately
+              saveDMList(updated, user.steamId);
+              return updated;
             });
             
             setSelectedDM(dmId);
@@ -940,7 +978,10 @@ export default function ChatPage() {
             setDmList(prev => {
               const exists = prev.some(dm => dm.dmId === dmId);
               if (exists) return prev;
-              return [newDM, ...prev];
+              const updated = [newDM, ...prev];
+              // Persist immediately
+              saveDMList(updated, user.steamId);
+              return updated;
             });
             
             setSelectedDM(dmId);

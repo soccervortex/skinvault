@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sanitizeString, sanitizeEmail, escapeHtml } from '@/app/utils/sanitize';
 import nodemailer from 'nodemailer';
 
-const RECIPIENT_EMAIL = 'drmizayt2@gmail.com';
+const RECIPIENT_EMAIL = 'contact@skinvaults.online';
 
 // Create transporter (using Gmail SMTP or your preferred email service)
 function createTransporter() {

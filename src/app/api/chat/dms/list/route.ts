@@ -54,13 +54,19 @@ export async function GET(request: Request) {
     const db = await getDatabase();
 
     // Get all accepted DM invites for this user
+    // Use index for faster query
     const invitesCollection = db.collection<DMInvite>('dm_invites');
-    const invites = await invitesCollection.find({
-      $or: [
-        { fromSteamId: steamId, status: 'accepted' },
-        { toSteamId: steamId, status: 'accepted' }
-      ]
-    }).toArray();
+    const invites = await invitesCollection
+      .find({
+        $or: [
+          { fromSteamId: steamId, status: 'accepted' },
+          { toSteamId: steamId, status: 'accepted' }
+        ]
+      })
+      .sort({ createdAt: -1 }) // Most recent first
+      .toArray();
+    
+    console.log(`[DM List API] Found ${invites.length} accepted invites for ${steamId}`);
 
     // Get latest message for each DM
     const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
@@ -144,31 +150,55 @@ export async function GET(request: Request) {
       
       const profile = profileMap.get(otherUserId) || { name: `User ${otherUserId.slice(-4)}`, avatar: '' };
 
-      // Find latest message in this DM
+      // Find invite for this DM (if exists) - needed for optimization logic
+      const invite = invites.find(inv => {
+        const invOtherUserId = inv.fromSteamId === steamId ? inv.toSteamId : inv.fromSteamId;
+        return invOtherUserId === otherUserId;
+      });
+
+      // Find latest message in this DM (optimized - only check recent collections)
+      // For performance, only check last 7 days of collections for latest message
       let latestMessage: DMMessage | null = null;
-      for (const collectionName of collectionNames) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const recentCollectionNames = getDMCollectionNamesForDays(7);
+      
+      // Check recent collections first (most likely to have latest message)
+      for (const collectionName of recentCollectionNames.reverse()) {
         const collection = db.collection<DMMessage>(collectionName);
         const messages = await collection
           .find({ 
             dmId,
-            timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
+            timestamp: { $gte: sevenDaysAgo }
           })
           .sort({ timestamp: -1 })
           .limit(1)
           .toArray();
         
         if (messages.length > 0) {
-          if (!latestMessage || messages[0].timestamp > latestMessage.timestamp) {
+          latestMessage = messages[0];
+          break; // Found latest, no need to check older collections
+        }
+      }
+      
+      // If no recent message found, check older collections (but only if we have an invite)
+      if (!latestMessage && invite) {
+        for (const collectionName of collectionNames.slice(recentCollectionNames.length)) {
+          const collection = db.collection<DMMessage>(collectionName);
+          const messages = await collection
+            .find({ 
+              dmId,
+              timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
+            })
+            .sort({ timestamp: -1 })
+            .limit(1)
+            .toArray();
+          
+          if (messages.length > 0) {
             latestMessage = messages[0];
+            break;
           }
         }
       }
-
-      // Find invite for this DM (if exists)
-      const invite = invites.find(inv => {
-        const invOtherUserId = inv.fromSteamId === steamId ? inv.toSteamId : inv.fromSteamId;
-        return invOtherUserId === otherUserId;
-      });
 
       // Add DM even if no messages yet (for newly accepted invites) or if messages exist
       // Use invite createdAt if available, otherwise use current time for newly accepted invites

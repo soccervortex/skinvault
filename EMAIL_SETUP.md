@@ -1,6 +1,6 @@
 # Email Setup Guide for Contact Form
 
-The contact form sends emails to **drmizayt2@gmail.com**. You need to configure an email service.
+The contact form sends emails to **contact@skinvaults.online**. You need to configure an email service.
 
 ## Option 1: Resend (Recommended - Free & Easy)
 
@@ -41,7 +41,7 @@ SMTP_FROM=noreply@skinvault.app
 ## Testing
 
 1. **Without Email Service**: The form will work but log to console (for development)
-2. **With Email Service**: Emails will be sent to drmizayt2@gmail.com
+2. **With Email Service**: Emails will be sent to contact@skinvaults.online
 
 ## Environment Variables to Add in Vercel
 
@@ -61,7 +61,7 @@ Add one of these configurations:
 
 ## Notes
 
-- The recipient email is hardcoded to: **drmizayt2@gmail.com**
+- The recipient email is hardcoded to: **contact@skinvaults.online**
 - Images are attached to the email
 - Form includes: reason, name, email, description, and images
 - Works on both mobile and desktop
