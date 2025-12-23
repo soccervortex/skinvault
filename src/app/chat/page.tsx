@@ -519,16 +519,23 @@ export default function ChatPage() {
       // Mark DM as read when selected/viewed (immediately clear unread counter)
       markDMAsRead(selectedDM, user.steamId);
       fetchDMMessages(steamId1, steamId2);
+      
       // Reduced polling since SSE handles real-time updates
       // Only poll if SSE is not connected
+      let interval: NodeJS.Timeout | undefined;
       if (!dmStream.isConnected && !dmChatDisabled) {
-        const interval = setInterval(() => {
+        interval = setInterval(() => {
           fetchDMMessages(steamId1, steamId2, true);
         }, 5000); // Slower polling since SSE is primary
-        return () => clearInterval(interval);
       }
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
     }
-  }, [selectedDM, activeTab, user?.steamId, isAdmin, dmStream.isConnected]);
+  }, [selectedDM, activeTab, user?.steamId, isAdmin, dmStream.isConnected, dmChatDisabled]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
