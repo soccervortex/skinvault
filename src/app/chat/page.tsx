@@ -376,9 +376,13 @@ export default function ChatPage() {
   };
 
   const fetchDMMessages = async (steamId1: string, steamId2: string, checkForNew = false, loadAll = false) => {
-    if (!user?.steamId) return;
+    if (!user?.steamId) {
+      console.log('[DM Messages] Cannot fetch: no user steamId');
+      return;
+    }
     try {
       const dmId = [steamId1, steamId2].sort().join('_');
+      console.log(`[DM Messages] Fetching messages for DM ${dmId}, checkForNew: ${checkForNew}, loadAll: ${loadAll}`);
       
       // Check cache first (only for initial load, not when checking for new)
       // But always fetch fresh data to ensure we have the latest messages
@@ -408,10 +412,13 @@ export default function ChatPage() {
         params.set('loadAll', 'true');
       }
       
-      const res = await fetch(`/api/chat/dms?${params.toString()}`, {
+      const url = `/api/chat/dms?${params.toString()}`;
+      console.log(`[DM Messages] Fetching from: ${url}`);
+      const res = await fetch(url, {
         cache: 'no-store', // Always fetch fresh data
       });
       
+      console.log(`[DM Messages] Response status: ${res.status}`);
       if (res.ok) {
         const data = await res.json();
         const newMessages = data.messages || [];
@@ -447,26 +454,28 @@ export default function ChatPage() {
           markDMAsRead(dmId, user.steamId);
         }
       } else {
-        console.error('Failed to fetch DM messages:', res.status, res.statusText);
+        console.error(`[DM Messages] Failed to fetch: ${res.status} ${res.statusText}`);
         // If fetch fails and we have cached messages, keep showing them
         // Otherwise show error
         if (dmMessages.length === 0) {
           const errorData = await res.json().catch(() => ({}));
-          console.error('DM fetch error:', errorData);
+          console.error('[DM Messages] Error details:', errorData);
         }
       }
     } catch (error) {
-      console.error('Failed to fetch DM messages:', error);
+      console.error('[DM Messages] Fetch error:', error);
       // If error and no messages, try to load from cache as fallback
       if (dmMessages.length === 0) {
         const dmId = [steamId1, steamId2].sort().join('_');
         const cached = getCachedMessages(dmId, 'dm');
+        console.log(`[DM Messages] Trying cache for ${dmId}:`, cached ? `${cached.messages.length} messages` : 'no cache');
         if (cached && cached.messages.length > 0) {
           setDmMessages(cached.messages);
         }
       }
     } finally {
       setLoading(false);
+      console.log('[DM Messages] Fetch completed, loading set to false');
     }
   };
 
@@ -911,7 +920,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');
-      if (!steamId1 || !steamId2) return;
+      if (!steamId1 || !steamId2) {
+        console.log('[DM Messages] Invalid DM ID:', selectedDM);
+        return;
+      }
+      
+      console.log(`[DM Messages] DM selected: ${selectedDM}, fetching messages...`);
       
       // Mark DM as read when selected/viewed (immediately clear unread counter)
       markDMAsRead(selectedDM, user.steamId);
