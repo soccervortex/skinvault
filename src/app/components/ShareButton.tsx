@@ -24,8 +24,8 @@ export default function ShareButton({
 
   const handleShare = async () => {
     const shareData = {
-      title: title || 'Check this out on SkinVault',
-      text: text || 'Check out this CS2 skin on SkinVault',
+      title: title || 'Check this out on SkinVaults',
+      text: text || 'Check out this CS2 skin on SkinVaults',
       url: url,
     };
 

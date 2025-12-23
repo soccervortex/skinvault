@@ -1,6 +1,6 @@
 {
-  "name": "SkinVault",
-  "short_name": "SkinVault",
+  "name": "SkinVaults",
+  "short_name": "SkinVaults",
   "icons": [
     {
       "src": "/icons/web-app-manifest-192x192.png",

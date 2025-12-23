@@ -19,7 +19,7 @@ De chat gebruikt nu **Pusher** voor real-time updates in plaats van SSE. Dit is 
 
 1. Na het kiezen van Channels, klik op "Get started"
 2. Klik op "Create app" of "New app"
-3. Kies een naam (bijv. "SkinVault Chat")
+3. Kies een naam (bijv. "SkinVaults Chat")
 4. Kies een cluster (bijv. "eu" voor Europa, of "us-east" voor VS)
 5. Kies "Vanilla JS" als frontend framework (of laat standaard)
 6. Klik "Create app"

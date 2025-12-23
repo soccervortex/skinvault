@@ -1,4 +1,4 @@
-# SkinVault - Premium CS2 Skin Analytics Platform
+# SkinVaults - Premium CS2 Skin Analytics Platform
 
 A high-performance Next.js application for tracking CS2 (Counter-Strike 2) skin inventories, prices, and analytics with Pro subscription features including Discord price alerts.
 
@@ -80,7 +80,7 @@ SMTP_PASS=your-app-password
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
 2. Click "New Application"
-3. Name it "SkinVault Bot"
+3. Name it "SkinVaults Bot"
 4. Go to "Bot" section
 5. Click "Add Bot"
 6. Copy the **Bot Token** → `DISCORD_BOT_TOKEN`

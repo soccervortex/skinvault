@@ -362,8 +362,8 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 {typeof window !== 'undefined' && (
                   <ShareButton
                     url={window.location.href}
-                    title={`${item?.name} - SkinVault`}
-                    text={`Check out ${item?.name} on SkinVault`}
+                    title={`${item?.name} - SkinVaults`}
+                    text={`Check out ${item?.name} on SkinVaults`}
                     variant="icon"
                   />
                 )}
@@ -427,8 +427,8 @@ export default function ItemDetail({ params }: { params: Promise<{ id: string }>
                 {typeof window !== 'undefined' && (
                   <ShareButton
                     url={window.location.href}
-                    title={`${item?.name} - SkinVault`}
-                    text={`Check out ${item?.name} on SkinVault`}
+                    title={`${item?.name} - SkinVaults`}
+                    text={`Check out ${item?.name} on SkinVaults`}
                     variant="icon"
                     className="hidden md:flex"
                   />

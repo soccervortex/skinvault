@@ -134,7 +134,7 @@ export default function InstallPrompt() {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm md:text-base font-black uppercase tracking-tighter mb-1">
-              Install SkinVault
+              Install SkinVaults
             </h3>
             <p className="text-[10px] md:text-[11px] text-gray-400 mb-3">
               Install as an app for faster access and a better experience

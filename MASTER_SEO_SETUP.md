@@ -36,7 +36,7 @@
 ## 📋 Current SEO Configuration
 
 ### Main Layout (`src/app/layout.tsx`)
-- **Title**: "SkinVault - CS2 Skin Analytics & Inventory Management"
+- **Title**: "SkinVaults - CS2 Skin Analytics & Inventory Management"
 - **Description**: 200+ character comprehensive description
 - **Keywords**: 15+ relevant keywords
 - **Robots**: Index, follow, max-image-preview

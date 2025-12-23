@@ -1,4 +1,4 @@
-# SkinVault Marketing & User Engagement Strategy
+# SkinVaults Marketing & User Engagement Strategy
 
 ## 🎯 Goal
 Increase website traffic, user engagement, and Pro subscription conversions.
@@ -53,13 +53,13 @@ Increase website traffic, user engagement, and Pro subscription conversions.
    - Use hashtags: #CS2 #CS2Skins #SkinTrading
 
 3. **Discord**
-   - Create SkinVault Discord server
+   - Create SkinVaults Discord server
    - Community features (price alerts, discussions)
    - Bot integration for price checks
    - Pro member exclusive channels
 
 4. **YouTube**
-   - Tutorial videos: "How to use SkinVault"
+   - Tutorial videos: "How to use SkinVaults"
    - Market analysis videos
    - Feature walkthroughs
    - Skin investment guides
@@ -233,7 +233,7 @@ Increase website traffic, user engagement, and Pro subscription conversions.
 
 ## 💡 Creative Ideas
 
-1. **SkinVault Challenges**: Monthly competitions (best collection, biggest gain, etc.)
+1. **SkinVaults Challenges**: Monthly competitions (best collection, biggest gain, etc.)
 2. **Market Predictions**: Let users predict skin prices, reward accuracy
 3. **Skin Stories**: Users share their skin journey/collection story
 4. **Trading Simulator**: Practice trading without real money (Pro feature)
@@ -275,7 +275,7 @@ Increase website traffic, user engagement, and Pro subscription conversions.
 ```
 Hi [Name],
 
-I'm [Your Name], creator of SkinVault - a CS2 skin analytics platform.
+I'm [Your Name], creator of SkinVaults - a CS2 skin analytics platform.
 
 We help players track their inventory value, compare skins, and make smarter trading decisions.
 

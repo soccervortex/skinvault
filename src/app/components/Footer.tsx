@@ -38,13 +38,14 @@ export default function Footer() {
 
           {/* Copyright */}
           <div className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-600 text-center md:text-right">
-            © {currentYear} SkinVault. All rights reserved.
+            © {currentYear} SkinVaults. All rights reserved.
           </div>
         </div>
       </div>
     </footer>
   );
 }
+
 
 
 

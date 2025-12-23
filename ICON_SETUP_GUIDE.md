@@ -1,4 +1,4 @@
-# Icon Setup Guide for SkinVault
+# Icon Setup Guide for SkinVaults
 
 ## Required Icon Sizes
 

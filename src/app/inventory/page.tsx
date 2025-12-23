@@ -1037,8 +1037,8 @@ function InventoryContent() {
                     <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
                       <ShareButton
                         url={shareUrl}
-                        title={`${viewedUser?.name || 'User'}'s Vault - SkinVault`}
-                        text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVault`}
+                        title={`${viewedUser?.name || 'User'}'s Vault - SkinVaults`}
+                        text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVaults`}
                         variant="button"
                         className="text-[8px] md:text-[9px]"
                       />

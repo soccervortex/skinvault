@@ -75,7 +75,7 @@ For better social sharing and search results:
 
 1. **Create 1200x630px image**:
    - Include your logo prominently
-   - Add text: "SkinVault - CS2 Skin Analytics"
+   - Add text: "SkinVaults - CS2 Skin Analytics"
    - Use your brand colors
    - Save as: `public/og-image.png`
 

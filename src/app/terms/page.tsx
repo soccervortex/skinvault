@@ -34,7 +34,7 @@ export default function TermsPage() {
                 1. Acceptance of Terms
               </h2>
               <p className="text-gray-300 mb-4">
-                By accessing and using SkinVault ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+                By accessing and using SkinVaults ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
               </p>
             </section>
 
@@ -43,7 +43,7 @@ export default function TermsPage() {
                 2. Description of Service
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault is a CS2 (Counter-Strike 2) skin inventory tracking and analytics platform that provides:
+                SkinVaults is a CS2 (Counter-Strike 2) skin inventory tracking and analytics platform that provides:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Real-time inventory value tracking and portfolio management</li>
@@ -80,7 +80,7 @@ export default function TermsPage() {
                 4. Discord Integration and Bot Commands
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault offers optional Discord integration with a comprehensive bot:
+                SkinVaults offers optional Discord integration with a comprehensive bot:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>You may connect your Discord account to receive price alert notifications and use bot commands</li>
@@ -113,7 +113,7 @@ export default function TermsPage() {
                 5. Pro Subscription and Consumables
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault offers a Pro subscription service and consumable items with the following terms:
+                SkinVaults offers a Pro subscription service and consumable items with the following terms:
               </p>
               
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
@@ -146,7 +146,7 @@ export default function TermsPage() {
                 5.2 Consumables (One-Time Purchases)
               </h3>
               <p className="text-gray-300 mb-4">
-                SkinVault offers consumable items that enhance your free account. These are one-time purchases that never expire:
+                SkinVaults offers consumable items that enhance your free account. These are one-time purchases that never expire:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Wishlist Slots (€1.99 per slot):</strong> Add one additional item to your wishlist. Each purchase adds +1 to your wishlist limit. Pro users already have unlimited wishlist items.</li>
@@ -229,7 +229,7 @@ export default function TermsPage() {
                 9. Intellectual Property
               </h2>
               <p className="text-gray-300 mb-4">
-                All content, features, and functionality of the Service are owned by SkinVault and are protected by international copyright, trademark, and other intellectual property laws. You may not:
+                All content, features, and functionality of the Service are owned by SkinVaults and are protected by international copyright, trademark, and other intellectual property laws. You may not:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Copy, modify, or create derivative works</li>
@@ -244,7 +244,7 @@ export default function TermsPage() {
                 10. Limitation of Liability
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault is provided "as is" without warranties of any kind. We are not liable for:
+                SkinVaults is provided "as is" without warranties of any kind. We are not liable for:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Any loss or damage resulting from use of the Service</li>

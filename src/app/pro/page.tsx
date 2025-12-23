@@ -161,7 +161,7 @@ export default function ProInfoPage() {
             </div>
             <div>
               <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Premium tier</p>
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">SkinVault Pro</h1>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">SkinVaults Pro</h1>
             </div>
             </div>
             <Link

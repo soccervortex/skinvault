@@ -47,8 +47,6 @@ export function generateSEOMetadata(config: SEOConfig): Metadata {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   } = config;
 
@@ -144,8 +142,6 @@ export const pageSEO = {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   },
   inventory: {
@@ -181,8 +177,6 @@ export const pageSEO = {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   },
   wishlist: {
@@ -217,8 +211,6 @@ export const pageSEO = {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   },
   compare: {
@@ -253,13 +245,11 @@ export const pageSEO = {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   },
   pro: {
     title: 'Pro Subscription - Unlock Advanced CS2 Analytics',
-    description: 'Upgrade to SkinVault Pro for advanced CS2 skin analytics, faster price scanning, unlimited wishlist items, price alerts, Discord integration, and exclusive features. Get the most out of your CS2 skin trading.',
+    description: 'Upgrade to SkinVaults Pro for advanced CS2 skin analytics, faster price scanning, unlimited wishlist items, price alerts, Discord integration, and exclusive features. Get the most out of your CS2 skin trading.',
     path: '/pro',
     keywords: [
       'CS2 skin analytics pro',
@@ -289,8 +279,6 @@ export const pageSEO = {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   },
   item: (itemName: string) => ({
@@ -326,8 +314,6 @@ export const pageSEO = {
       'CS2 price alerts',
       'Skinvaults',
       'SkinVaults',
-      'Skinvault',
-      'SkinVault',
     ],
   }),
 };

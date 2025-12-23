@@ -153,7 +153,7 @@ export async function POST(request: Request) {
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@skinvaults.online',
       to: RECIPIENT_EMAIL,
-      subject: `SkinVault Contact: ${reasonLabels[reason] || reason} - ${name}`,
+      subject: `SkinVaults Contact: ${reasonLabels[reason] || reason} - ${name}`,
       html: emailHtml,
       text: `
 New Contact Form Submission

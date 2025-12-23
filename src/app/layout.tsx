@@ -29,11 +29,11 @@ const geistMono = Geist_Mono({
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-const LONG_DESCRIPTION = 'SkinVault is the ultimate CS2 skin analytics and inventory management platform. Track your Steam inventory value in real-time, monitor skin prices with advanced analytics, set custom price alerts, compare skins side-by-side, and manage your wishlist. Get instant market prices, price history charts, and make informed trading decisions. Perfect for CS2 traders, collectors, and investors who want to maximize their skin portfolio value. Features include real-time price tracking, inventory valuation, price alerts, skin comparison tools, wishlist management, and comprehensive market analytics.';
+const LONG_DESCRIPTION = 'SkinVaults is the ultimate CS2 skin analytics and inventory management platform. Track your Steam inventory value in real-time, monitor skin prices with advanced analytics, set custom price alerts, compare skins side-by-side, and manage your wishlist. Get instant market prices, price history charts, and make informed trading decisions. Perfect for CS2 traders, collectors, and investors who want to maximize their skin portfolio value. Features include real-time price tracking, inventory valuation, price alerts, skin comparison tools, wishlist management, and comprehensive market analytics.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: "SkinVault - CS2 Skin Analytics & Inventory Management",
+  title: "SkinVaults - CS2 Skin Analytics & Inventory Management",
   description: LONG_DESCRIPTION,
   keywords: [
     'CS2 skins',
@@ -53,9 +53,9 @@ export const metadata: Metadata = {
     'CS2 inventory management',
     'CS2 skin portfolio',
   ].join(', '),
-  authors: [{ name: 'SkinVault' }],
-  creator: 'SkinVault',
-  publisher: 'SkinVault',
+  authors: [{ name: 'SkinVaults' }],
+  creator: 'SkinVaults',
+  publisher: 'SkinVaults',
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   icons: {
     icon: [
@@ -76,7 +76,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'SkinVault',
+    title: 'SkinVaults',
   },
   viewport: {
     width: 'device-width',
@@ -86,36 +86,36 @@ export const metadata: Metadata = {
     viewportFit: 'cover',
   },
   openGraph: {
-    title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
+    title: 'SkinVaults - CS2 Skin Analytics & Inventory Management',
     description: LONG_DESCRIPTION,
     type: 'website',
     url: BASE_URL,
-    siteName: 'SkinVault',
+    siteName: 'SkinVaults',
     locale: 'en_US',
     images: [
       { 
         url: `${BASE_URL}/icons/Open Graph Image.jpg`, 
         width: 1200, 
         height: 630,
-        alt: 'SkinVault - CS2 Skin Analytics & Inventory Management',
+        alt: 'SkinVaults - CS2 Skin Analytics & Inventory Management',
       },
       { 
         url: `${BASE_URL}/icons/web-app-manifest-512x512.png`, 
         width: 512, 
         height: 512,
-        alt: 'SkinVault - CS2 Skin Analytics Logo',
+        alt: 'SkinVaults - CS2 Skin Analytics Logo',
       },
       {
         url: `${BASE_URL}/icons/web-app-manifest-192x192.png`,
         width: 192,
         height: 192,
-        alt: 'SkinVault Logo',
+        alt: 'SkinVaults Logo',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
+    title: 'SkinVaults - CS2 Skin Analytics & Inventory Management',
     description: LONG_DESCRIPTION,
     images: [`${BASE_URL}/icons/Open Graph Image.jpg`],
   },
@@ -140,7 +140,7 @@ export default function RootLayout({
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "SkinVault",
+    "name": "SkinVaults",
     "description": LONG_DESCRIPTION,
     "url": baseUrl,
     "applicationCategory": "GameApplication",

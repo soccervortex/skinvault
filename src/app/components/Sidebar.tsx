@@ -221,7 +221,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           >
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVault</h1>
+                <h1 className="text-2xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVaults</h1>
                 <p className="text-[8px] font-black text-gray-600 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
               </div>
               <button
@@ -380,7 +380,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   </Link>
                 </div>
                 <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
-                  © {new Date().getFullYear()} SkinVault. All rights reserved.
+                  © {new Date().getFullYear()} SkinVaults. All rights reserved.
                 </div>
               </div>
             </div>
@@ -391,7 +391,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
       {/* Desktop Sidebar */}
       <aside className="w-80 bg-[#0f111a] border-r border-white/5 hidden lg:flex flex-col p-8 overflow-y-auto shrink-0">
         <div className="mb-12 px-4">
-          <h1 className="text-3xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVault</h1>
+          <h1 className="text-3xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVaults</h1>
           <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
         </div>
         

@@ -33,7 +33,7 @@ export default function PrivacyPage() {
                 1. Introduction
               </h2>
               <p className="text-gray-300 mb-4">
-                SkinVault ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service.
+                SkinVaults ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service.
               </p>
             </section>
 

@@ -19,7 +19,7 @@ The metadata in `src/app/layout.tsx` is now configured to use `/icons/web-app-ma
 
 1. **Create a 1200x630px Open Graph Image**
    - Include your logo/branding
-   - Add text like "SkinVault - CS2 Skin Analytics"
+   - Add text like "SkinVaults - CS2 Skin Analytics"
    - Use your brand colors
    - Make it visually appealing
 
@@ -35,7 +35,7 @@ The metadata in `src/app/layout.tsx` is now configured to use `/icons/web-app-ma
      ```
      To:
      ```typescript
-     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'SkinVault - CS2 Skin Analytics' }],
+     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'SkinVaults - CS2 Skin Analytics' }],
      ```
 
 ### Tools to Create OG Images
@@ -52,7 +52,7 @@ After creating and updating the image:
 4. Clear Google's cache (may take time for Google to re-crawl)
 
 ### Current Status
-✅ Metadata description updated to explain what SkinVault is and what it can do
+✅ Metadata description updated to explain what SkinVaults is and what it can do
 ✅ Open Graph metadata improved with better descriptions
 ⚠️ OG image still uses square icon - create 1200x630px image for best results
 
