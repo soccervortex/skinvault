@@ -5,9 +5,10 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const steamId = searchParams.get('id');
+    const nickname = searchParams.get('nickname');
 
-    if (!steamId) {
-      return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
+    if (!steamId && !nickname) {
+      return NextResponse.json({ error: 'Missing id or nickname parameter' }, { status: 400 });
     }
 
     // Faceit API key is optional for public endpoints, but recommended for rate limits
@@ -20,19 +21,51 @@ export async function GET(req: Request) {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    // First, get the Faceit player ID from Steam ID
-    const playerUrl = `https://open.faceit.com/data/v4/players?game=cs2&game_player_id=${steamId}`;
-    const playerRes = await fetch(playerUrl, { 
-      headers,
-      cache: 'no-store' 
-    });
+    // First, get the Faceit player ID
+    let playerUrl: string;
+    let playerRes: Response;
+
+    if (nickname) {
+      // Try by nickname first if provided
+      playerUrl = `https://open.faceit.com/data/v4/players?nickname=${encodeURIComponent(nickname)}`;
+      playerRes = await fetch(playerUrl, { 
+        headers,
+        cache: 'no-store' 
+      });
+    } else if (steamId) {
+      // Try with CS2 game parameter first
+      playerUrl = `https://open.faceit.com/data/v4/players?game=cs2&game_player_id=${steamId}`;
+      playerRes = await fetch(playerUrl, { 
+        headers,
+        cache: 'no-store' 
+      });
+
+      // If not found with CS2, try without game parameter (for CS:GO/CS2 compatibility)
+      if (!playerRes.ok && playerRes.status === 404) {
+        playerUrl = `https://open.faceit.com/data/v4/players?game_player_id=${steamId}`;
+        playerRes = await fetch(playerUrl, { 
+          headers,
+          cache: 'no-store' 
+        });
+      }
+    } else {
+      return NextResponse.json({ error: 'Missing id or nickname parameter' }, { status: 400 });
+    }
 
     if (!playerRes.ok) {
       if (playerRes.status === 404) {
-        return NextResponse.json({ error: 'Player not found on Faceit' }, { status: 404 });
+        // Try to get more info from the response
+        const errorText = await playerRes.text();
+        console.log('Faceit API 404 response:', errorText);
+        return NextResponse.json({ 
+          error: 'Player not found on Faceit',
+          message: 'This Steam account may not be linked to a Faceit account, or the account may not exist on Faceit.'
+        }, { status: 404 });
       }
+      const errorText = await playerRes.text();
+      console.error('Faceit API error:', playerRes.status, errorText);
       return NextResponse.json(
-        { error: 'Faceit API error', status: playerRes.status },
+        { error: 'Faceit API error', status: playerRes.status, details: errorText },
         { status: 502 }
       );
     }
