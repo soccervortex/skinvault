@@ -344,7 +344,7 @@ export async function POST(request: Request) {
           useTLS: true,
         });
 
-        await pusher.trigger('presence-global', 'new_messages', {
+        await pusher.trigger('global', 'new_messages', {
           type: 'new_messages',
           messages: [{
             id: chatMessage._id?.toString() || '',

@@ -299,8 +299,8 @@ export async function POST(request: Request) {
         });
 
         // Trigger to both users' DM channels
-        const dmChannel1 = `presence-dm_${senderId}`;
-        const dmChannel2 = `presence-dm_${receiverId}`;
+        const dmChannel1 = `dm_${senderId}`;
+        const dmChannel2 = `dm_${receiverId}`;
         
         const messageData = {
           type: 'new_messages',

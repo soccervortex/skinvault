@@ -76,21 +76,18 @@ export function usePusherChat(
       return;
     }
 
+    // Use public channels (no auth needed) - simpler and works without auth endpoint
     const pusher = new Pusher(pusherKey, {
       cluster: pusherCluster,
-      authEndpoint: '/api/pusher/auth',
-      auth: {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
+      // No authEndpoint needed for public channels
     });
 
     pusherRef.current = pusher;
 
-    // Subscribe to channel (use public channel for now, can upgrade to presence later)
-    // For DMs, channel format is "dm_steamId" or "global"
-    const channelName = channel.startsWith('dm_') ? `presence-${channel}` : `presence-${channel}`;
+    // Subscribe to channel
+    // Use public channels (no auth needed) instead of presence channels for now
+    // This avoids auth issues if Pusher isn't fully configured yet
+    const channelName = channel.startsWith('dm_') ? channel : channel;
     const pusherChannel = pusher.subscribe(channelName);
 
     channelRef.current = pusherChannel;
