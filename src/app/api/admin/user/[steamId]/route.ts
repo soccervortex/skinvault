@@ -136,6 +136,56 @@ export async function GET(
       }
     }
 
+    // Get DM messages for this user
+    let dmMessages: any[] = [];
+    if (MONGODB_URI) {
+      try {
+        const client = await getMongoClient();
+        const db = client.db(MONGODB_DB_NAME);
+        
+        // Get all DMs where this user is sender or receiver
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const dmCollectionNames = getDMCollectionNamesForDays(7);
+        
+        const dmQuery: any = {
+          $or: [
+            { senderId: steamId },
+            { receiverId: steamId }
+          ],
+          timestamp: { $gte: sevenDaysAgo }
+        };
+        
+        if (searchQuery) {
+          dmQuery.message = { $regex: searchQuery, $options: 'i' };
+        }
+        
+        const dmPromises = dmCollectionNames.map(async (collectionName) => {
+          const collection = db.collection(collectionName);
+          return collection.find(dmQuery).sort({ timestamp: -1 }).toArray();
+        });
+        
+        const dmArrays = await Promise.all(dmPromises);
+        const allDMs = dmArrays.flat();
+        
+        dmMessages = allDMs
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, 1000)
+          .map(msg => ({
+            id: msg._id?.toString(),
+            dmId: msg.dmId,
+            senderId: msg.senderId,
+            receiverId: msg.receiverId,
+            message: msg.message,
+            timestamp: msg.timestamp,
+            otherUserId: msg.senderId === steamId ? msg.receiverId : msg.senderId,
+          }));
+        
+        await client.close();
+      } catch (error) {
+        console.error('Failed to get DM messages:', error);
+      }
+    }
+
     return NextResponse.json({
       user: {
         steamId,
@@ -154,6 +204,7 @@ export async function GET(
         message: msg.message,
         timestamp: msg.timestamp,
       })),
+      dmMessages,
     });
   } catch (error) {
     console.error('Failed to get user info:', error);
