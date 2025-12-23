@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreVertical, Flag, Trash2, Ban, UserX, Shield, UserCheck } from 'lucide-react';
+import { MoreVertical, Flag, Trash2, Ban, UserX, Shield, UserCheck, Edit, Pin, PinOff } from 'lucide-react';
 
 interface MessageActionMenuProps {
   messageId?: string;
@@ -11,6 +11,9 @@ interface MessageActionMenuProps {
   isAdmin: boolean;
   onReport?: () => void;
   onDelete?: () => void;
+  onEdit?: () => void;
+  onPin?: () => void;
+  onUnpin?: () => void;
   onBan?: () => void;
   onUnban?: () => void;
   onTimeout?: () => void;
@@ -18,6 +21,7 @@ interface MessageActionMenuProps {
   onUnblock?: () => void;
   isBanned?: boolean;
   isBlocked?: boolean;
+  isPinned?: boolean;
 }
 
 export default function MessageActionMenu({
@@ -28,6 +32,9 @@ export default function MessageActionMenu({
   isAdmin,
   onReport,
   onDelete,
+  onEdit,
+  onPin,
+  onUnpin,
   onBan,
   onUnban,
   onTimeout,
@@ -35,6 +42,7 @@ export default function MessageActionMenu({
   onUnblock,
   isBanned,
   isBlocked,
+  isPinned,
 }: MessageActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -88,6 +96,20 @@ export default function MessageActionMenu({
             </button>
           )}
           
+          {isOwnMessage && messageId && onEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+                onEdit();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-blue-400 hover:bg-blue-500/10 transition-colors"
+            >
+              <Edit size={14} />
+              Edit
+            </button>
+          )}
+
           {isOwnMessage && messageId && onDelete && (
             <button
               onClick={(e) => {
@@ -100,6 +122,52 @@ export default function MessageActionMenu({
               <Trash2 size={14} />
               Delete
             </button>
+          )}
+
+          {isAdmin && messageId && (
+            <>
+              {!isPinned && onPin && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    onPin();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+                >
+                  <Pin size={14} />
+                  Pin Message
+                </button>
+              )}
+
+              {isPinned && onUnpin && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    onUnpin();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+                >
+                  <PinOff size={14} />
+                  Unpin Message
+                </button>
+              )}
+
+              {isAdmin && messageId && onEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                    onEdit();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-blue-400 hover:bg-blue-500/10 transition-colors"
+                >
+                  <Edit size={14} />
+                  Edit (Admin)
+                </button>
+              )}
+            </>
           )}
 
           {!isOwnMessage && !isBlocked && onBlock && (

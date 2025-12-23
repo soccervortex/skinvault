@@ -14,6 +14,7 @@ interface ChatMessage {
   message: string;
   timestamp: Date;
   isPro: boolean;
+  editedAt?: Date;
 }
 
 interface UserInfo {
@@ -88,11 +89,22 @@ export async function getCurrentUserInfo(uniqueSteamIds: string[]): Promise<Map<
   return userInfoMap;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     if (!MONGODB_URI) {
       return NextResponse.json({ messages: [] });
     }
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const searchQuery = searchParams.get('search') || '';
+    const filterUser = searchParams.get('user') || '';
+    const filterDateFrom = searchParams.get('dateFrom') || '';
+    const filterDateTo = searchParams.get('dateTo') || '';
+    const filterPinnedOnly = searchParams.get('pinnedOnly') === 'true';
+    const filterProOnly = searchParams.get('proOnly') === 'true';
+    const pageSize = 100;
+    const skip = (page - 1) * pageSize;
 
     // Get banned and timeout users (disable cache for real-time status)
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -116,24 +128,57 @@ export async function GET() {
 
     // Get messages from last 24 hours using date-based collections
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const dateFrom = filterDateFrom ? new Date(filterDateFrom) : twentyFourHoursAgo;
+    const dateTo = filterDateTo ? new Date(filterDateTo) : new Date();
+    
     const collectionNames = getCollectionNamesForDays(2); // Get today and yesterday collections
+    
+    // Build query filter
+    const queryFilter: any = {
+      timestamp: { $gte: dateFrom, $lte: dateTo }
+    };
+    
+    if (filterUser) {
+      queryFilter.steamId = filterUser;
+    }
+    
+    if (filterProOnly) {
+      queryFilter.isPro = true;
+    }
     
     // Query all relevant collections in parallel
     const messagePromises = collectionNames.map(async (collectionName) => {
       const collection = db.collection<ChatMessage>(collectionName);
-      return collection
-        .find({ timestamp: { $gte: twentyFourHoursAgo } })
-        .sort({ timestamp: 1 })
-        .toArray();
+      let query = collection.find(queryFilter);
+      
+      // Apply text search if provided
+      if (searchQuery) {
+        query = collection.find({
+          ...queryFilter,
+          message: { $regex: searchQuery, $options: 'i' }
+        });
+      }
+      
+      return query.sort({ timestamp: 1 }).toArray();
     });
     
     const messageArrays = await Promise.all(messagePromises);
-    const allMessages = messageArrays.flat();
+    let allMessages = messageArrays.flat();
     
-    // Sort by timestamp and limit
-    const messages = allMessages
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-      .slice(-500); // Get last 500 messages
+    // Sort by timestamp
+    allMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    // Get pinned messages if filter is enabled
+    const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
+    if (filterPinnedOnly) {
+      const pinnedIds = Object.keys(pinnedMessages).filter(id => pinnedMessages[id].messageType === 'global');
+      allMessages = allMessages.filter(msg => pinnedIds.includes(msg._id?.toString() || ''));
+    }
+    
+    // Pagination
+    const totalMessages = allMessages.length;
+    const messages = allMessages.slice(skip, skip + pageSize);
+    const hasMore = skip + pageSize < totalMessages;
 
     await client.close();
 
@@ -143,12 +188,17 @@ export async function GET() {
     // Fetch current user info for all unique users
     const userInfoMap = await getCurrentUserInfo(uniqueSteamIds);
 
+    // Get pinned messages
+    const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
+
     return NextResponse.json({ 
       messages: messages.map(msg => {
         const currentUserInfo = userInfoMap.get(msg.steamId);
         const isBanned = bannedUsers.includes(msg.steamId);
         const timeoutUntil = timeoutUsers[msg.steamId];
         const isTimedOut = timeoutUntil && new Date(timeoutUntil) > new Date();
+        const messageId = msg._id?.toString() || '';
+        const isPinned = pinnedMessages[messageId]?.messageType === 'global';
         
         // Use current user info if available, otherwise fall back to stored info
         const steamName = currentUserInfo?.steamName || msg.steamName;
@@ -156,18 +206,23 @@ export async function GET() {
         const isPro = currentUserInfo?.isPro ?? msg.isPro;
         
         return {
-          id: msg._id?.toString(),
+          id: messageId,
           steamId: msg.steamId,
           steamName,
           avatar,
           message: msg.message,
           timestamp: msg.timestamp,
+          editedAt: msg.editedAt,
           isPro,
           isBanned,
           isTimedOut,
           timeoutUntil: isTimedOut ? timeoutUntil : null,
+          isPinned,
         };
-      })
+      }),
+      hasMore,
+      total: totalMessages,
+      page,
     });
   } catch (error) {
     console.error('Failed to get chat messages:', error);

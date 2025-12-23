@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
@@ -17,10 +17,12 @@ interface ChatMessage {
   avatar: string;
   message: string;
   timestamp: Date | string;
+  editedAt?: Date | string;
   isPro: boolean;
   isBanned?: boolean;
   isTimedOut?: boolean;
   timeoutUntil?: string | null;
+  isPinned?: boolean;
 }
 
 interface DMMessage {
@@ -90,6 +92,23 @@ export default function ChatPage() {
   const [unbanning, setUnbanning] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
   const [blocking, setBlocking] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<{ id: string; type: 'global' | 'dm'; currentText: string } | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
+  const [typingUsers, setTypingUsers] = useState<Array<{ steamId: string; steamName: string }>>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterUser, setFilterUser] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterPinnedOnly, setFilterPinnedOnly] = useState(false);
+  const [filterProOnly, setFilterProOnly] = useState(false);
+  const [messagePage, setMessagePage] = useState(1);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -242,12 +261,26 @@ export default function ChatPage() {
     };
   }, [toast, router, isAdmin]);
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (page = 1, append = false) => {
     try {
-      const res = await fetch('/api/chat/messages');
+      const params = new URLSearchParams();
+      if (page > 1) params.set('page', page.toString());
+      if (searchQuery) params.set('search', searchQuery);
+      if (filterUser) params.set('user', filterUser);
+      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
+      if (filterDateTo) params.set('dateTo', filterDateTo);
+      if (filterPinnedOnly) params.set('pinnedOnly', 'true');
+      if (filterProOnly) params.set('proOnly', 'true');
+      
+      const res = await fetch(`/api/chat/messages?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        if (append) {
+          setMessages(prev => [...prev, ...(data.messages || [])]);
+        } else {
+          setMessages(data.messages || []);
+        }
+        setHasMoreMessages(data.hasMore || false);
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);
@@ -346,7 +379,7 @@ export default function ChatPage() {
     // Initial fetch (preloading already handles this, but ensure it runs)
     if (activeTab === 'global') {
       if (messages.length === 0) {
-        fetchMessages();
+        fetchMessages(messagePage, false);
       }
     } else {
       if (dmList.length === 0) {
@@ -360,8 +393,8 @@ export default function ChatPage() {
     // Polling interval - optimized to 2 seconds for faster updates
     const interval = setInterval(() => {
       if (activeTab === 'global') {
-        if (!globalChatDisabled) {
-          fetchMessages();
+        if (!globalChatDisabled && !searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly) {
+          fetchMessages(messagePage, false);
         }
       } else {
         if (!dmChatDisabled) {
@@ -397,11 +430,65 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, dmMessages]);
 
+  // Typing indicator handler
+  const handleTyping = async () => {
+    if (!user?.steamId || isTyping) return;
+    
+    const channel = activeTab === 'global' ? 'global' : selectedDM || 'global';
+    
+    try {
+      await fetch('/api/chat/typing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steamId: user.steamId,
+          steamName: user.name,
+          channel,
+        }),
+      });
+      
+      setIsTyping(true);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 5000);
+    } catch (error) {
+      // Ignore typing errors
+    }
+  };
+
+  // Poll for typing indicators
+  useEffect(() => {
+    if (!user?.steamId) return;
+    
+    const channel = activeTab === 'global' ? 'global' : selectedDM || 'global';
+    const pollTyping = async () => {
+      try {
+        const res = await fetch(`/api/chat/typing?channel=${channel}&currentUserId=${user.steamId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTypingUsers(data.typingUsers || []);
+        }
+      } catch (error) {
+        // Ignore errors
+      }
+    };
+    
+    pollTyping();
+    const interval = setInterval(pollTyping, 2000);
+    return () => clearInterval(interval);
+  }, [activeTab, selectedDM, user?.steamId]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !user || sending) return;
 
     setSending(true);
+    setIsTyping(false);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
     try {
       if (activeTab === 'global') {
         // Server will fetch current user info (name, avatar, pro status)
@@ -416,7 +503,7 @@ export default function ChatPage() {
 
         if (res.ok) {
           setMessage('');
-          await fetchMessages();
+          await fetchMessages(messagePage, false);
         } else {
           const data = await res.json();
           toast.error(data.error || 'Failed to send message');
@@ -605,7 +692,7 @@ export default function ChatPage() {
         toast.success('Message deleted');
         // Refresh messages
         if (messageType === 'global') {
-          await fetchMessages();
+          await fetchMessages(messagePage, false);
         } else if (selectedDM) {
           const [steamId1, steamId2] = selectedDM.split('_');
           await fetchDMMessages(steamId1, steamId2);
@@ -638,7 +725,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success(`User ${timeoutUser.name} timed out for ${timeoutDuration}`);
         setTimeoutUser(null);
-        await fetchMessages(); // Refresh messages to show timeout badge
+        await fetchMessages(messagePage, false); // Refresh messages to show timeout badge
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to timeout user');
@@ -667,7 +754,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success(`User ${banUser.name} has been banned`);
         setBanUser(null);
-        await fetchMessages(); // Refresh messages to show banned badge
+        await fetchMessages(messagePage, false); // Refresh messages to show banned badge
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to ban user');
@@ -696,7 +783,7 @@ export default function ChatPage() {
       if (res.ok) {
         toast.success(`User ${unbanUser.name} has been unbanned`);
         setUnbanUser(null);
-        await fetchMessages(); // Refresh messages
+        await fetchMessages(messagePage, false); // Refresh messages
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to unban user');
@@ -706,6 +793,219 @@ export default function ChatPage() {
       toast.error('Failed to unban user');
     } finally {
       setUnbanning(false);
+    }
+  };
+
+  const handleEditMessage = (messageId: string, currentText: string, messageType: 'global' | 'dm') => {
+    setEditingMessage({ id: messageId, type: messageType, currentText });
+    setEditText(currentText);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !editText.trim() || !user?.steamId || editing) return;
+
+    setEditing(true);
+    try {
+      const url = editingMessage.type === 'global'
+        ? `/api/chat/messages/${editingMessage.id}?userSteamId=${user.steamId}&type=global`
+        : `/api/chat/messages/${editingMessage.id}?userSteamId=${user.steamId}&type=dm&dmId=${selectedDM}`;
+      
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newMessage: editText.trim() }),
+      });
+
+      if (res.ok) {
+        toast.success('Message edited');
+        setEditingMessage(null);
+        setEditText('');
+        if (editingMessage.type === 'global') {
+          await fetchMessages(messagePage, false);
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          await fetchDMMessages(steamId1, steamId2);
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to edit message');
+      }
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      toast.error('Failed to edit message');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handlePinMessage = async (messageId: string, messageType: 'global' | 'dm') => {
+    if (!isAdmin || !user?.steamId) return;
+
+    try {
+      const res = await fetch(`/api/admin/chat/pin?adminSteamId=${user.steamId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, messageType }),
+      });
+
+      if (res.ok) {
+        toast.success('Message pinned');
+        if (messageType === 'global') {
+          await fetchMessages(messagePage, false);
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          await fetchDMMessages(steamId1, steamId2);
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to pin message');
+      }
+    } catch (error) {
+      console.error('Failed to pin message:', error);
+      toast.error('Failed to pin message');
+    }
+  };
+
+  const handleUnpinMessage = async (messageId: string) => {
+    if (!isAdmin || !user?.steamId) return;
+
+    try {
+      const res = await fetch(`/api/admin/chat/pin?adminSteamId=${user.steamId}&messageId=${messageId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        toast.success('Message unpinned');
+        if (activeTab === 'global') {
+          await fetchMessages(messagePage, false);
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          await fetchDMMessages(steamId1, steamId2);
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to unpin message');
+      }
+    } catch (error) {
+      console.error('Failed to unpin message:', error);
+      toast.error('Failed to unpin message');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!isAdmin || !user?.steamId || selectedMessages.size === 0) return;
+
+    if (!confirm(`Are you sure you want to delete ${selectedMessages.size} message(s)?`)) {
+      return;
+    }
+
+    try {
+      const messageType = activeTab === 'global' ? 'global' : 'dm';
+      const res = await fetch(`/api/admin/chat/bulk-delete?adminSteamId=${user.steamId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageIds: Array.from(selectedMessages),
+          messageType,
+          dmId: activeTab === 'dms' ? selectedDM : undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Deleted ${data.deletedCount} message(s)`);
+        setSelectedMessages(new Set());
+        if (messageType === 'global') {
+          await fetchMessages(messagePage, false);
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          await fetchDMMessages(steamId1, steamId2);
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete messages');
+      }
+    } catch (error) {
+      console.error('Failed to bulk delete messages:', error);
+      toast.error('Failed to delete messages');
+    }
+  };
+
+  const toggleMessageSelection = (messageId: string) => {
+    const newSelected = new Set(selectedMessages);
+    if (newSelected.has(messageId)) {
+      newSelected.delete(messageId);
+    } else {
+      newSelected.add(messageId);
+    }
+    setSelectedMessages(newSelected);
+  };
+
+  const handleBlockUser = async (steamId: string, userName: string) => {
+    if (!user?.steamId || blocking) return;
+
+    setBlocking(true);
+    try {
+      const res = await fetch('/api/user/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steamId1: user.steamId,
+          steamId2: steamId,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`Blocked ${userName}`);
+        setBlockedUsers(prev => new Set([...prev, steamId]));
+        if (activeTab === 'dms' && selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          if (steamId === steamId1 || steamId === steamId2) {
+            setSelectedDM(null);
+          }
+        }
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to block user');
+      }
+    } catch (error) {
+      console.error('Failed to block user:', error);
+      toast.error('Failed to block user');
+    } finally {
+      setBlocking(false);
+    }
+  };
+
+  const handleUnblockUser = async (steamId: string) => {
+    if (!user?.steamId || blocking) return;
+
+    setBlocking(true);
+    try {
+      const res = await fetch('/api/user/block', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steamId1: user.steamId,
+          steamId2: steamId,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('User unblocked');
+        setBlockedUsers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(steamId);
+          return newSet;
+        });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to unblock user');
+      }
+    } catch (error) {
+      console.error('Failed to unblock user:', error);
+      toast.error('Failed to unblock user');
+    } finally {
+      setBlocking(false);
     }
   };
 
@@ -820,10 +1120,87 @@ export default function ChatPage() {
           <p className="text-sm text-gray-400 mt-1">
             {activeTab === 'global' ? 'Messages reset every 24 hours' : 'Messages reset after 7 days'}
           </p>
+          {activeTab === 'global' && showFilters && (
+            <div className="mt-4 p-4 bg-[#08090d] border border-white/10 rounded-lg space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Filter by User (Steam ID)</label>
+                  <input
+                    type="text"
+                    value={filterUser}
+                    onChange={(e) => setFilterUser(e.target.value)}
+                    placeholder="Enter Steam ID..."
+                    className="w-full bg-[#11141d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Date From</label>
+                  <input
+                    type="datetime-local"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                    className="w-full bg-[#11141d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Date To</label>
+                  <input
+                    type="datetime-local"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                    className="w-full bg-[#11141d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filterPinnedOnly}
+                    onChange={(e) => setFilterPinnedOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-[#11141d] text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-300">Pinned messages only</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filterProOnly}
+                    onChange={(e) => setFilterProOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-[#11141d] text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-300">Pro users only</span>
+                </label>
+                <button
+                  onClick={() => {
+                    setMessagePage(1);
+                    fetchMessages(1, false);
+                  }}
+                  className="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-colors"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {activeTab === 'global' ? (
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar relative">
+            {isAdmin && selectedMessages.size > 0 && (
+              <div className="sticky top-0 z-10 bg-[#08090d] border border-white/10 rounded-lg p-3 mb-4 flex items-center justify-between">
+                <span className="text-sm font-bold text-white">
+                  {selectedMessages.size} message(s) selected
+                </span>
+                <button
+                  onClick={handleBulkDelete}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                >
+                  <Trash2 size={16} />
+                  Delete Selected
+                </button>
+              </div>
+            )}
             {globalChatDisabled ? (
               <div className="flex items-center justify-center h-full text-gray-500">
                 <div className="text-center">
@@ -841,7 +1218,8 @@ export default function ChatPage() {
                 <p>No messages yet. Be the first to chat!</p>
               </div>
             ) : (
-              messages.map((msg) => (
+              <>
+                {messages.map((msg) => (
               <div
                 key={msg.id || `${msg.steamId}-${msg.timestamp}`}
                 className="bg-[#11141d] p-4 rounded-xl border border-white/5 hover:border-white/10 transition-all group"
@@ -856,6 +1234,9 @@ export default function ChatPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
+                      {msg.isPinned && (
+                        <Pin size={12} className="text-yellow-400" />
+                      )}
                       <span
                         className="font-bold text-white cursor-pointer hover:text-blue-400 transition-colors"
                         onClick={() => handleViewInventory(msg.steamId)}
@@ -894,17 +1275,75 @@ export default function ChatPage() {
                         onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
                         onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName }) : undefined}
                         onBlock={msg.steamId !== user?.steamId ? () => handleBlockUser(msg.steamId, msg.steamName) : undefined}
-                        onUnblock={msg.steamId !== user?.steamId && blockedUsers.has(msg.steamId) ? () => handleUnblockUser(msg.steamId, msg.steamName) : undefined}
+                        onUnblock={msg.steamId !== user?.steamId && blockedUsers.has(msg.steamId) ? () => handleUnblockUser(msg.steamId) : undefined}
                       />
                       <span className="text-xs text-gray-500 ml-auto">
                         {formatTime(msg.timestamp)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-300 break-words">{msg.message}</p>
+                    {editingMessage?.id === msg.id && editingMessage.type === 'global' ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full bg-[#08090d] border border-white/10 rounded-lg p-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500"
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={editing || !editText.trim()}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold transition-colors"
+                          >
+                            {editing ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingMessage(null);
+                              setEditText('');
+                            }}
+                            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs font-bold transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-300 break-words">
+                        {msg.message}
+                        {msg.editedAt && (
+                          <span className="text-xs text-gray-500 ml-2 italic">(edited)</span>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
-              ))
+              ))}
+              {hasMoreMessages && (
+                <div className="flex justify-center py-4">
+                  <button
+                    onClick={() => {
+                      const nextPage = messagePage + 1;
+                      setMessagePage(nextPage);
+                      fetchMessages(nextPage, true);
+                    }}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-sm transition-colors"
+                  >
+                    Load More Messages
+                  </button>
+                </div>
+              )}
+            {typingUsers.length > 0 && (
+              <div className="text-xs text-gray-400 italic px-4 py-2">
+                {typingUsers.map((u, i) => (
+                  <span key={u.steamId}>
+                    {u.steamName} is typing...
+                    {i < typingUsers.length - 1 && ', '}
+                  </span>
+                ))}
+              </div>
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -1037,7 +1476,22 @@ export default function ChatPage() {
                                     Pro
                                   </span>
                                 )}
-                                <div className="ml-auto">
+                                <div className="ml-auto flex items-center gap-2">
+                                  {isAdmin && msg.id && (
+                                    <button
+                                      onClick={() => toggleMessageSelection(msg.id!)}
+                                      className="p-1 hover:bg-white/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                    >
+                                      {selectedMessages.has(msg.id!) ? (
+                                        <CheckSquare size={14} className="text-blue-400" />
+                                      ) : (
+                                        <Square size={14} className="text-gray-400" />
+                                      )}
+                                    </button>
+                                  )}
+                                  {msg.isPinned && (
+                                    <Pin size={12} className="text-yellow-400" />
+                                  )}
                                   <MessageActionMenu
                                     messageId={msg.id}
                                     steamId={msg.senderId}
@@ -1046,6 +1500,7 @@ export default function ChatPage() {
                                     isAdmin={isAdmin}
                                     isBanned={msg.isBanned}
                                     isBlocked={blockedUsers.has(msg.senderId)}
+                                    isPinned={msg.isPinned}
                                     onReport={msg.senderId !== user?.steamId ? () => setReportUser({ 
                                       steamId: msg.senderId, 
                                       name: msg.senderName, 
@@ -1053,22 +1508,70 @@ export default function ChatPage() {
                                       dmId: selectedDM || undefined
                                     }) : undefined}
                                     onDelete={msg.senderId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'dm') : undefined}
+                                    onEdit={msg.id ? () => handleEditMessage(msg.id, msg.message, 'dm') : undefined}
+                                    onPin={isAdmin && msg.id && !msg.isPinned ? () => handlePinMessage(msg.id!, 'dm') : undefined}
+                                    onUnpin={isAdmin && msg.id && msg.isPinned ? () => handleUnpinMessage(msg.id!) : undefined}
                                     onBan={isAdmin ? () => setBanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
                                     onUnban={isAdmin && msg.isBanned ? () => setUnbanUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
                                     onTimeout={isAdmin ? () => setTimeoutUser({ steamId: msg.senderId, name: msg.senderName }) : undefined}
                                     onBlock={msg.senderId !== user?.steamId ? () => handleBlockUser(msg.senderId, msg.senderName) : undefined}
-                                    onUnblock={msg.senderId !== user?.steamId && blockedUsers.has(msg.senderId) ? () => handleUnblockUser(msg.senderId, msg.senderName) : undefined}
+                                    onUnblock={msg.senderId !== user?.steamId && blockedUsers.has(msg.senderId) ? () => handleUnblockUser(msg.senderId) : undefined}
                                   />
                                 </div>
                                 <span className="text-xs text-gray-500">
                                   {formatTime(msg.timestamp)}
                                 </span>
                               </div>
-                              <p className="text-sm text-gray-300 break-words">{msg.message}</p>
+                              {editingMessage?.id === msg.id && editingMessage.type === 'dm' ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    className="w-full bg-[#08090d] border border-white/10 rounded-lg p-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500"
+                                    rows={3}
+                                    autoFocus
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={handleSaveEdit}
+                                      disabled={editing || !editText.trim()}
+                                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold transition-colors"
+                                    >
+                                      {editing ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingMessage(null);
+                                        setEditText('');
+                                      }}
+                                      className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs font-bold transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-300 break-words">
+                                  {msg.message}
+                                  {msg.editedAt && (
+                                    <span className="text-xs text-gray-500 ml-2 italic">(edited)</span>
+                                  )}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
                       ))
+                    )}
+                    {typingUsers.length > 0 && (
+                      <div className="text-xs text-gray-400 italic px-4 py-2">
+                        {typingUsers.map((u, i) => (
+                          <span key={u.steamId}>
+                            {u.steamName} is typing...
+                            {i < typingUsers.length - 1 && ', '}
+                          </span>
+                        ))}
+                      </div>
                     )}
                     <div ref={messagesEndRef} />
                   </div>
@@ -1175,16 +1678,40 @@ export default function ChatPage() {
         )}
 
         {(activeTab === 'global' || (activeTab === 'dms' && selectedDM)) && !(activeTab === 'global' && globalChatDisabled) && !(activeTab === 'dms' && dmChatDisabled) && (
-          <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
+          <>
+            {editingMessage && editingMessage.type === activeTab && (
+              <div className="bg-yellow-500/10 border-t border-yellow-500/20 p-3 flex items-center justify-between">
+                <span className="text-sm text-yellow-400">Editing message...</span>
+                <button
+                  onClick={() => {
+                    setEditingMessage(null);
+                    setEditText('');
+                  }}
+                  className="text-yellow-400 hover:text-yellow-300"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+            <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
             <div className="flex gap-3">
               <input
                 type="text"
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  handleTyping();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend(e);
+                  }
+                }}
                 placeholder={activeTab === 'global' ? 'Type a message...' : 'Type a DM...'}
                 className="flex-1 bg-[#08090d] border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 maxLength={500}
-                disabled={activeTab === 'global' ? globalChatDisabled : dmChatDisabled}
+                disabled={activeTab === 'global' ? globalChatDisabled : dmChatDisabled || !!editingMessage}
               />
               <button
                 type="submit"
@@ -1202,6 +1729,7 @@ export default function ChatPage() {
               </button>
             </div>
           </form>
+          </>
         )}
 
         {/* Report Modal */}

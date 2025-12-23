@@ -14,6 +14,7 @@ interface DMMessage {
   receiverId: string;
   message: string;
   timestamp: Date;
+  editedAt?: Date;
 }
 
 interface DMInvite {
@@ -115,15 +116,20 @@ export async function GET(request: Request) {
       await dbSet('timeout_users', activeTimeouts);
     }
 
+    // Get pinned messages
+    const pinnedMessages = await dbGet<Record<string, any>>('pinned_messages', false) || {};
+
     return NextResponse.json({
       messages: messages.map(msg => {
         const senderInfo = userInfoMap.get(msg.senderId);
         const isBanned = bannedUsers.includes(msg.senderId);
         const timeoutUntil = timeoutUsers[msg.senderId];
         const isTimedOut = timeoutUntil && new Date(timeoutUntil) > new Date();
+        const messageId = msg._id?.toString() || '';
+        const isPinned = pinnedMessages[messageId]?.messageType === 'dm';
 
         return {
-          id: msg._id?.toString(),
+          id: messageId,
           dmId: msg.dmId,
           senderId: msg.senderId,
           receiverId: msg.receiverId,
@@ -132,8 +138,10 @@ export async function GET(request: Request) {
           senderIsPro: senderInfo?.isPro || false,
           message: msg.message,
           timestamp: msg.timestamp,
+          editedAt: msg.editedAt,
           isBanned,
           isTimedOut,
+          isPinned,
         };
       })
     });
