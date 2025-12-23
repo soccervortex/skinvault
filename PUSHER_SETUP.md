@@ -8,15 +8,23 @@ De chat gebruikt nu **Pusher** voor real-time updates in plaats van SSE. Dit is 
 2. Klik op "Sign Up" (gratis)
 3. Maak een account aan
 
-## Stap 2: Maak een nieuwe app
+## Stap 2: Kies Channels product
 
-1. Na het inloggen, klik op "Create app"
-2. Kies een naam (bijv. "SkinVault Chat")
-3. Kies een cluster (bijv. "eu" voor Europa, of "us-east" voor VS)
-4. Kies "Vanilla JS" als frontend framework
-5. Klik "Create app"
+1. Op het welkomstscherm zie je twee opties: **Channels** en **Beams**
+2. Kies **Channels** (de linker optie met "SANDBOX PLAN" label)
+3. Channels is voor real-time chat via WebSockets
+4. Beams is voor push notifications - die heb je niet nodig
 
-## Stap 3: Haal je credentials op
+## Stap 3: Maak een nieuwe app
+
+1. Na het kiezen van Channels, klik op "Get started"
+2. Klik op "Create app" of "New app"
+3. Kies een naam (bijv. "SkinVault Chat")
+4. Kies een cluster (bijv. "eu" voor Europa, of "us-east" voor VS)
+5. Kies "Vanilla JS" als frontend framework (of laat standaard)
+6. Klik "Create app"
+
+## Stap 4: Haal je credentials op
 
 Na het aanmaken van de app zie je:
 - **App ID**
@@ -24,7 +32,7 @@ Na het aanmaken van de app zie je:
 - **Secret** (dit is je `PUSHER_SECRET`)
 - **Cluster** (bijv. "eu")
 
-## Stap 4: Voeg environment variables toe
+## Stap 5: Voeg environment variables toe
 
 Voeg deze toe aan je `.env.local` en Vercel environment variables:
 
@@ -39,7 +47,7 @@ PUSHER_CLUSTER=eu
 - `NEXT_PUBLIC_PUSHER_KEY` moet beginnen met `NEXT_PUBLIC_` omdat het gebruikt wordt in de browser
 - De andere variabelen zijn server-side only
 
-## Stap 5: Pusher gratis tier limits
+## Stap 6: Pusher gratis tier limits (SANDBOX PLAN)
 
 De gratis tier van Pusher biedt:
 - ✅ 200,000 messages per dag
@@ -49,7 +57,7 @@ De gratis tier van Pusher biedt:
 
 Dit is ruim voldoende voor de meeste chat applicaties.
 
-## Stap 6: Test de chat
+## Stap 7: Test de chat
 
 1. Start de development server: `npm run dev`
 2. Ga naar `/chat`
