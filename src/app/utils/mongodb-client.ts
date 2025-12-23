@@ -11,7 +11,7 @@ const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 // Global connection pool
 let cachedClient: MongoClient | null = null;
-let cachedDb: any = null;
+let cachedDb: Db | null = null;
 
 /**
  * Get or create MongoDB client (connection pooling)
@@ -57,7 +57,7 @@ export async function getMongoClient(): Promise<MongoClient> {
 /**
  * Get database instance (cached)
  */
-export async function getDatabase() {
+export async function getDatabase(): Promise<any> {
   if (cachedDb) {
     return cachedDb;
   }
