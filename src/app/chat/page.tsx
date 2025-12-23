@@ -658,6 +658,15 @@ export default function ChatPage() {
                             <Trash2 size={14} className="text-red-400" />
                           </button>
                         )}
+                        {msg.steamId !== user?.steamId && (
+                          <button
+                            onClick={() => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' })}
+                            className="p-1 hover:bg-orange-500/20 rounded"
+                            title="Report user"
+                          >
+                            <Flag size={14} className="text-orange-400" />
+                          </button>
+                        )}
                         {isAdmin && (
                           <>
                             <button
@@ -675,15 +684,6 @@ export default function ChatPage() {
                               <Ban size={14} className="text-red-500" />
                             </button>
                           </>
-                        )}
-                        {msg.steamId !== user?.steamId && (
-                          <button
-                            onClick={() => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' })}
-                            className="p-1 hover:bg-orange-500/20 rounded"
-                            title="Report user"
-                          >
-                            <Flag size={14} className="text-orange-400" />
-                          </button>
                         )}
                       </div>
                       <span className="text-xs text-gray-500 ml-auto">

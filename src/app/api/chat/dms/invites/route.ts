@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { fetchSteamProfile } from '../../messages/route';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -165,7 +165,14 @@ export async function PATCH(request: Request) {
     const db = client.db(MONGODB_DB_NAME);
     const collection = db.collection<DMInvite>('dm_invites');
 
-    const invite = await collection.findOne({ _id: inviteId as any });
+    // Convert inviteId string to ObjectId
+    let invite;
+    try {
+      invite = await collection.findOne({ _id: new ObjectId(inviteId) } as any);
+    } catch (error) {
+      await client.close();
+      return NextResponse.json({ error: 'Invalid invite ID' }, { status: 400 });
+    }
 
     if (!invite) {
       await client.close();
@@ -183,7 +190,7 @@ export async function PATCH(request: Request) {
     }
 
     await collection.updateOne(
-      { _id: inviteId as any },
+      { _id: new ObjectId(inviteId) } as any,
       { $set: { status: action === 'accept' ? 'accepted' : 'declined' } }
     );
 

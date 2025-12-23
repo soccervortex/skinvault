@@ -1383,7 +1383,12 @@ export default function AdminPage() {
             Search for a user by Steam ID to view their profile, chats, and manage their account.
           </p>
 
-          <form onSubmit={(e) => { e.preventDefault(); if (searchSteamId) router.push(`/admin/user/${searchSteamId}`); }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
+          <form onSubmit={(e) => { 
+            e.preventDefault(); 
+            if (searchSteamId && searchSteamId.trim()) {
+              router.push(`/admin/user/${searchSteamId.trim()}`);
+            }
+          }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
               <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 SteamID64

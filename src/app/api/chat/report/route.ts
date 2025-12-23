@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
@@ -229,8 +229,17 @@ export async function PATCH(request: Request) {
       update.adminNotes = adminNotes;
     }
 
+    // Convert reportId string to ObjectId
+    let objectId;
+    try {
+      objectId = new ObjectId(reportId);
+    } catch (error) {
+      await client.close();
+      return NextResponse.json({ error: 'Invalid report ID' }, { status: 400 });
+    }
+
     await reportsCollection.updateOne(
-      { _id: reportId as any },
+      { _id: objectId } as any,
       { $set: update }
     );
 
