@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayDMCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { fetchSteamProfile, getCurrentUserInfo } from '../messages/route';
+import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface DMMessage {
@@ -23,23 +22,6 @@ interface DMInvite {
   toSteamId: string;
   status: 'pending' | 'accepted' | 'declined';
   createdAt: Date;
-}
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // 5 second timeout
-    connectTimeoutMS: 5000,
-  });
-  await client.connect();
-  
-  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
-  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
-  autoSetupIndexes().catch(() => {}); // Don't block on index setup
-  
-  return client;
 }
 
 // Generate DM ID from two Steam IDs (sorted to ensure consistency)
@@ -78,8 +60,8 @@ export async function GET(request: Request) {
     }
 
     const dmId = generateDMId(steamId1, steamId2);
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
 
     // Get messages from last 30 days initially (can load more with cursor)
     // This is much faster than querying 365 days of collections
@@ -146,7 +128,7 @@ export async function GET(request: Request) {
     // Reverse to show oldest first in chat
     const sortedMessages = messages.reverse();
 
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     // Get unique Steam IDs and fetch current user info
     const uniqueSteamIds = [...new Set(messages.map(msg => [msg.senderId, msg.receiverId]).flat())];
@@ -263,8 +245,7 @@ export async function POST(request: Request) {
     }
 
     // Check if DM exists (check invites)
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
     const invitesCollection = db.collection<DMInvite>('dm_invites');
     
     const dmId = generateDMId(senderId, receiverId);
@@ -277,7 +258,6 @@ export async function POST(request: Request) {
     });
 
     if (!invite) {
-      await client.close();
       return NextResponse.json({ error: 'DM not accepted. Please wait for the other user to accept your invite.' }, { status: 403 });
     }
 
@@ -308,7 +288,7 @@ export async function POST(request: Request) {
     };
 
     await collection.insertOne(dmMessage);
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     return NextResponse.json({ success: true, message: dmMessage });
   } catch (error: any) {

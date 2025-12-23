@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { fetchSteamProfile } from '../../messages/route';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface DMInvite {
@@ -13,22 +13,7 @@ interface DMInvite {
   createdAt: Date;
 }
 
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // 5 second timeout
-    connectTimeoutMS: 5000,
-  });
-  await client.connect();
-  
-  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
-  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
-  autoSetupIndexes().catch(() => {}); // Don't block on index setup
-  
-  return client;
-}
+// Use connection pool from mongodb-client utility
 
 // GET: Get invites for a user (pending, sent, received)
 export async function GET(request: Request) {
@@ -45,8 +30,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     let query: any = {};
@@ -66,7 +51,7 @@ export async function GET(request: Request) {
     }
 
     const invites = await collection.find(query).sort({ createdAt: -1 }).toArray();
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     // Get user blocks to filter out blocked users
     const { dbGet } = await import('@/app/utils/database');
@@ -148,8 +133,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cannot send DM invite to this user' }, { status: 403 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     // Check if invite already exists
@@ -162,11 +147,11 @@ export async function POST(request: Request) {
 
     if (existingInvite) {
       if (existingInvite.status === 'accepted') {
-        await client.close();
+        // Don't close connection - it's pooled and reused
         return NextResponse.json({ error: 'DM already exists' }, { status: 400 });
       }
       if (existingInvite.status === 'pending' && existingInvite.fromSteamId === fromSteamId) {
-        await client.close();
+        // Don't close connection - it's pooled and reused
         return NextResponse.json({ error: 'Invite already sent' }, { status: 400 });
       }
     }
@@ -179,7 +164,7 @@ export async function POST(request: Request) {
     };
 
     await collection.insertOne(invite);
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     return NextResponse.json({ success: true, invite });
   } catch (error: any) {
@@ -210,8 +195,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     // Convert inviteId string to ObjectId
@@ -219,22 +204,22 @@ export async function PATCH(request: Request) {
     try {
       invite = await collection.findOne({ _id: new ObjectId(inviteId) } as any);
     } catch (error) {
-      await client.close();
+      // Don't close connection - it's pooled and reused
       return NextResponse.json({ error: 'Invalid invite ID' }, { status: 400 });
     }
 
     if (!invite) {
-      await client.close();
+      // Don't close connection - it's pooled and reused
       return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     }
 
     if (invite.toSteamId !== steamId) {
-      await client.close();
+      // Don't close connection - it's pooled and reused
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     if (invite.status !== 'pending') {
-      await client.close();
+      // Don't close connection - it's pooled and reused
       return NextResponse.json({ error: 'Invite already processed' }, { status: 400 });
     }
 
@@ -243,7 +228,7 @@ export async function PATCH(request: Request) {
       { $set: { status: action === 'accept' ? 'accepted' : 'declined' } }
     );
 
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     return NextResponse.json({ 
       success: true, 

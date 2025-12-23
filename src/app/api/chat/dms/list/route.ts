@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
 import { getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 // Fetch Steam profile helper
 async function fetchSteamProfile(steamId: string): Promise<{ name: string; avatar: string }> {
@@ -19,7 +19,6 @@ async function fetchSteamProfile(steamId: string): Promise<{ name: string; avata
   }
 }
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface DMMessage {
@@ -74,8 +73,8 @@ export async function GET(request: Request) {
     const { dbGet } = await import('@/app/utils/database');
     const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
 
     // Get all accepted DM invites for this user
     const invitesCollection = db.collection<DMInvite>('dm_invites');
@@ -202,7 +201,7 @@ export async function GET(request: Request) {
       });
     }
 
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     // Sort by last message time
     dmList.sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());

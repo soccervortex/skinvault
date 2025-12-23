@@ -10,6 +10,7 @@ import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
 import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead } from '@/app/utils/chat-notifications';
 import { useChatStream } from '@/app/hooks/useChatStream';
+import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
 
 interface ChatMessage {
   id?: string;
@@ -289,6 +290,18 @@ export default function ChatPage() {
 
   const fetchMessages = async (beforeCursor: string | null = null, append = false) => {
     try {
+      // Check cache first (only for initial load, not when appending)
+      if (!append && !beforeCursor && !searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly) {
+        const cached = getCachedMessages('global', 'global');
+        if (cached && cached.messages.length > 0) {
+          setMessages(cached.messages);
+          setMessageCursor(cached.cursor || null);
+          setHasMoreMessages(true); // Assume there are more
+          setLoading(false);
+          // Still fetch in background to update cache
+        }
+      }
+      
       const params = new URLSearchParams();
       // Use cursor-based pagination instead of page numbers
       if (beforeCursor) {
@@ -307,6 +320,11 @@ export default function ChatPage() {
       if (res.ok) {
         const data = await res.json();
         const newMessages = data.messages || [];
+        
+        // Cache messages if no filters/search (for instant loading next time)
+        if (!searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly && !beforeCursor) {
+          setCachedMessages('global', newMessages, data.nextCursor || null, 'global');
+        }
         
         // Only update if messages actually changed (avoid unnecessary re-renders)
         if (append) {
@@ -342,6 +360,18 @@ export default function ChatPage() {
   const fetchDMMessages = async (steamId1: string, steamId2: string, checkForNew = false, loadAll = false) => {
     if (!user?.steamId) return;
     try {
+      const dmId = [steamId1, steamId2].sort().join('_');
+      
+      // Check cache first (only for initial load, not when checking for new)
+      if (!checkForNew && !loadAll) {
+        const cached = getCachedMessages(dmId, 'dm');
+        if (cached && cached.messages.length > 0) {
+          setDmMessages(cached.messages);
+          setLoading(false);
+          // Still fetch in background to update cache
+        }
+      }
+      
       // Always pass current user's steamId so API can verify they're a participant
       // Limit to 30 days initially for faster loading, can load more with loadAll=true
       const params = new URLSearchParams({
@@ -358,9 +388,13 @@ export default function ChatPage() {
         const data = await res.json();
         const newMessages = data.messages || [];
         
+        // Cache messages for faster loading next time
+        if (!checkForNew) {
+          setCachedMessages(dmId, newMessages, data.nextCursor || null, 'dm');
+        }
+        
         // If checking for new messages (polling), track unread for messages from other user
         if (checkForNew && newMessages.length > 0) {
-          const dmId = [steamId1, steamId2].sort().join('_');
           const lastMessage = newMessages[newMessages.length - 1];
           
           // Only track if message is from other user and DM is not currently selected/viewed
@@ -378,7 +412,6 @@ export default function ChatPage() {
         setDmMessages(newMessages);
         
         // Mark DM as read when viewing (always mark as read when messages are loaded for selected DM)
-        const dmId = [steamId1, steamId2].sort().join('_');
         if (selectedDM === dmId) {
           markDMAsRead(dmId, user.steamId);
         }
@@ -490,16 +523,19 @@ export default function ChatPage() {
         const existingIds = new Set(prev.map(m => m.id));
         const newMessages = globalStream.messages.filter(m => m.id && !existingIds.has(m.id));
         if (newMessages.length > 0) {
+          // Update cache with new messages
+          const updatedMessages = [...prev, ...newMessages];
+          setCachedMessages('global', updatedMessages, messageCursor, 'global');
           // Auto-scroll to new messages
           setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
           }, 100);
-          return [...prev, ...newMessages];
+          return updatedMessages;
         }
         return prev;
       });
     }
-  }, [globalStream.messages, activeTab]);
+  }, [globalStream.messages, activeTab, messageCursor]);
 
   useEffect(() => {
     if (dmStream.messages.length > 0 && activeTab === 'dms' && selectedDM) {
@@ -525,6 +561,9 @@ export default function ChatPage() {
           // Always mark selected DM as read since user is viewing it
           if (selectedDM && activeTab === 'dms') {
             markDMAsRead(selectedDM, user?.steamId || '');
+            // Update cache with new messages
+            const updatedMessages = [...prev, ...newMessages];
+            setCachedMessages(selectedDM, updatedMessages, null, 'dm');
           }
           // Auto-scroll to new messages
           setTimeout(() => {
@@ -689,6 +728,8 @@ export default function ChatPage() {
         });
 
         if (res.ok) {
+          // Clear cache since we have new message
+          clearCache('global', 'global');
           // Remove temp message and refresh to get real one with server timestamp
           setMessages(prev => prev.filter(msg => msg.id !== tempId));
           fetchMessages(null, false).catch(() => {});

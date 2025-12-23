@@ -1,11 +1,10 @@
-import { MongoClient } from 'mongodb';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 // Vercel needs nodejs runtime for SSE streaming
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface ChatMessage {
@@ -29,22 +28,7 @@ interface DMMessage {
   editedAt?: Date;
 }
 
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000,
-    connectTimeoutMS: 5000,
-  });
-  await client.connect();
-  
-  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
-  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
-  autoSetupIndexes().catch(() => {}); // Don't block on index setup
-  
-  return client;
-}
+// Use connection pool from mongodb-client utility
 
 // Modern SSE endpoint using Next.js streaming
 export async function GET(request: Request) {
@@ -122,10 +106,8 @@ export async function GET(request: Request) {
           return;
         }
 
-        let client: MongoClient | null = null;
         try {
-          client = await getMongoClient();
-          const db = client.db(MONGODB_DB_NAME);
+          const db = await getDatabase();
 
           if (channel === 'global') {
             // Global chat messages
@@ -265,18 +247,9 @@ export async function GET(request: Request) {
             }
           }
 
-          if (client) {
-            await client.close();
-          }
+          // Don't close connection - it's pooled and reused
         } catch (error: any) {
           // Silently handle errors - don't spam client with error messages
-          if (client) {
-            try {
-              await client.close();
-            } catch {
-              // Ignore close errors
-            }
-          }
           // Continue polling even on error
         }
       }, 2000); // Poll every 2 seconds (more reasonable than 500ms)

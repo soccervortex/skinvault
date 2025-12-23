@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayCollectionName, getCollectionNamesForDays } from '@/app/utils/chat-collections';
+import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface ChatMessage {
@@ -22,23 +21,6 @@ interface UserInfo {
   steamName: string;
   avatar: string;
   isPro: boolean;
-}
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // 5 second timeout
-    connectTimeoutMS: 5000,
-  });
-  await client.connect();
-  
-  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
-  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
-  autoSetupIndexes().catch(() => {}); // Don't block on index setup
-  
-  return client;
 }
 
 // Fetch current Steam profile information
@@ -132,8 +114,8 @@ export async function GET(request: Request) {
       await dbSet('timeout_users', activeTimeouts);
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
 
     // Get messages from last 24 hours using date-based collections
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -185,11 +167,12 @@ export async function GET(request: Request) {
       };
       
       // Limit per collection to avoid fetching too much
+      // Use lean() equivalent - return plain objects instead of full documents
       return collection
         .find(queryFilter, { projection })
         .sort({ timestamp: -1 }) // Sort descending (newest first) for cursor pagination
         .limit(pageSize + 1) // Fetch one extra to check if there are more
-        .toArray();
+        .toArray() as Promise<ChatMessage[]>;
     });
     
     // Process collections sequentially until we have enough messages
@@ -221,7 +204,7 @@ export async function GET(request: Request) {
     // Get the oldest message timestamp for next cursor
     const nextCursor = messages.length > 0 ? messages[messages.length - 1].timestamp : null;
 
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     // Get unique Steam IDs from messages
     const uniqueSteamIds = [...new Set(messages.map(msg => msg.steamId))];
@@ -330,8 +313,8 @@ export async function POST(request: Request) {
     const currentAvatar = profileInfo.avatar || avatar || '';
     const currentIsPro = proUntil ? new Date(proUntil) > new Date() : false;
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use connection pool
+    const db = await getDatabase();
     
     // Use today's date-based collection
     const collectionName = getTodayCollectionName();
@@ -351,7 +334,7 @@ export async function POST(request: Request) {
     };
 
     await collection.insertOne(chatMessage);
-    await client.close();
+    // Don't close connection - it's pooled and reused
 
     return NextResponse.json({ success: true, message: chatMessage });
   } catch (error: any) {
