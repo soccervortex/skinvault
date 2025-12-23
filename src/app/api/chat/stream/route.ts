@@ -237,9 +237,12 @@ export async function GET(request: Request) {
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no', // Disable nginx buffering
+      'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET',
+      'Access-Control-Allow-Headers': 'Cache-Control',
     },
   });
 }

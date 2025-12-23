@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { X, Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 
 interface CallModalProps {
   callId: string | null;
   callerId: string;
   receiverId: string;
-  callType: 'voice' | 'video';
+  callType: 'voice';
   isIncoming: boolean;
   callerName?: string;
   callerAvatar?: string;
@@ -46,10 +46,10 @@ export default function CallModal({
     // Initialize WebRTC
     const initWebRTC = async () => {
       try {
-        // Get user media
+        // Get user media (voice only)
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
-          video: callType === 'video',
+          video: false,
         });
 
         localStreamRef.current = stream;
@@ -226,24 +226,6 @@ export default function CallModal({
           </p>
         </div>
 
-        {/* Video Streams */}
-        {callStatus === 'active' && callType === 'video' && (
-          <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute bottom-4 right-4 w-32 h-24 rounded-lg object-cover border-2 border-white/20"
-            />
-          </div>
-        )}
 
         {/* Call Controls */}
         <div className="flex items-center justify-center gap-4">
@@ -284,16 +266,6 @@ export default function CallModal({
               >
                 {isMuted ? <MicOff size={20} className="text-white" /> : <Mic size={20} className="text-white" />}
               </button>
-              {callType === 'video' && (
-                <button
-                  onClick={toggleVideo}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
-                    !isVideoEnabled ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
-                >
-                  {!isVideoEnabled ? <VideoOff size={20} className="text-white" /> : <Video size={20} className="text-white" />}
-                </button>
-              )}
               <button
                 onClick={() => setIsSpeakerEnabled(!isSpeakerEnabled)}
                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${

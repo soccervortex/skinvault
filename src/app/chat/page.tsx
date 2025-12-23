@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp, Phone, Video } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp, Phone } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
@@ -117,12 +117,15 @@ export default function ChatPage() {
     callId: string;
     callerId: string;
     receiverId: string;
-    callType: 'voice' | 'video';
+    callType: 'voice';
     isIncoming: boolean;
     callerName?: string;
     callerAvatar?: string;
   } | null>(null);
   const callPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false);
+  const [pinnedMessages, setPinnedMessages] = useState<Array<{ id: string; message: string; timestamp: string; steamName: string; avatar: string; messageType: 'global' | 'dm'; dmId?: string }>>([]);
+  const [viewingPinnedMessageId, setViewingPinnedMessageId] = useState<string | null>(null);
   const toast = useToast();
 
   // Real-time SSE streams (after all state declarations)
@@ -1147,6 +1150,8 @@ export default function ChatPage() {
           const [steamId1, steamId2] = selectedDM.split('_');
           await fetchDMMessages(steamId1, steamId2);
         }
+        // Refresh pinned messages list
+        fetchPinnedMessages();
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to unpin message');
@@ -1156,6 +1161,95 @@ export default function ChatPage() {
       toast.error('Failed to unpin message');
     }
   };
+
+  const fetchPinnedMessages = async () => {
+    try {
+      const res = await fetch('/api/admin/chat/pin');
+      if (res.ok) {
+        const { pinnedMessages: pinnedData } = await res.json();
+        // Fetch full message details for pinned messages
+        const pinnedList: Array<{ id: string; message: string; timestamp: string; steamName: string; avatar: string; messageType: 'global' | 'dm'; dmId?: string }> = [];
+        
+        for (const pinned of pinnedData) {
+          if (pinned.messageType === 'global') {
+            // Find in global messages
+            const msg = messages.find(m => m.id === pinned.id);
+            if (msg) {
+              pinnedList.push({
+                id: msg.id || '',
+                message: msg.message,
+                timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : msg.timestamp.toISOString(),
+                steamName: msg.steamName,
+                avatar: msg.avatar,
+                messageType: 'global',
+              });
+            }
+          } else {
+            // Find in DM messages
+            const msg = dmMessages.find(m => m.id === pinned.id);
+            if (msg) {
+              pinnedList.push({
+                id: msg.id || '',
+                message: msg.message,
+                timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : msg.timestamp.toISOString(),
+                steamName: msg.senderName,
+                avatar: msg.senderAvatar,
+                messageType: 'dm',
+                dmId: msg.dmId,
+              });
+            }
+          }
+        }
+        
+        setPinnedMessages(pinnedList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+      }
+    } catch (error) {
+      console.error('Failed to fetch pinned messages:', error);
+    }
+  };
+
+  const handleViewPinnedMessage = (pinned: { id: string; messageType: 'global' | 'dm'; dmId?: string }) => {
+    setViewingPinnedMessageId(pinned.id);
+    setShowPinnedMessages(false);
+    
+    if (pinned.messageType === 'dm' && pinned.dmId) {
+      // Switch to DM tab and select the DM
+      setActiveTab('dms');
+      setSelectedDM(pinned.dmId);
+      // Scroll to message after a short delay
+      setTimeout(() => {
+        const messageElement = document.querySelector(`[data-message-id="${pinned.id}"]`);
+        if (messageElement) {
+          messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the message
+          messageElement.classList.add('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+          setTimeout(() => {
+            messageElement.classList.remove('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+          }, 3000);
+        }
+      }, 500);
+    } else {
+      // Switch to global tab
+      setActiveTab('global');
+      setTimeout(() => {
+        const messageElement = document.querySelector(`[data-message-id="${pinned.id}"]`);
+        if (messageElement) {
+          messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the message
+          messageElement.classList.add('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+          setTimeout(() => {
+            messageElement.classList.remove('ring-2', 'ring-yellow-400', 'ring-opacity-50');
+          }, 3000);
+        }
+      }, 500);
+    }
+  };
+
+  useEffect(() => {
+    if (showPinnedMessages) {
+      fetchPinnedMessages();
+    }
+  }, [showPinnedMessages, messages, dmMessages]);
 
   const handleBulkDelete = async () => {
     if (!isAdmin || !user?.steamId || selectedMessages.size === 0) return;
@@ -1290,7 +1384,7 @@ export default function ChatPage() {
   };
 
   // Call handlers
-  const handleInitiateCall = async (userId: string, userName: string, userAvatar: string, callType: 'voice' | 'video' = 'voice') => {
+  const handleInitiateCall = async (userId: string, userName: string, userAvatar: string, callType: 'voice' = 'voice') => {
     if (!user?.steamId || activeCall) return;
 
     try {
@@ -1784,6 +1878,70 @@ export default function ChatPage() {
             <div ref={messagesEndRef} />
               </>
             )}
+            
+            {/* Pinned Messages Panel */}
+            {showPinnedMessages && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="bg-[#11141d] rounded-2xl border border-white/10 p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Pin size={20} className="text-yellow-400" />
+                      Pinned Messages
+                    </h3>
+                    <button
+                      onClick={() => setShowPinnedMessages(false)}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      <X size={20} className="text-gray-400" />
+                    </button>
+                  </div>
+                  
+                  {pinnedMessages.length === 0 ? (
+                    <p className="text-gray-400 text-center py-8">No pinned messages</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {pinnedMessages.map((pinned) => (
+                        <div
+                          key={pinned.id}
+                          className="bg-[#08090d] border border-white/10 rounded-lg p-4 hover:border-yellow-500/40 transition-colors cursor-pointer"
+                          onClick={() => handleViewPinnedMessage(pinned)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <img
+                              src={pinned.avatar || '/icons/web-app-manifest-192x192.png'}
+                              alt={pinned.steamName}
+                              className="w-10 h-10 rounded-lg border-2 border-yellow-500/40 flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-white">{pinned.steamName}</span>
+                                <span className="text-xs text-gray-500">
+                                  {pinned.messageType === 'global' ? 'Global Chat' : 'DM'}
+                                </span>
+                                <Pin size={12} className="text-yellow-400" />
+                              </div>
+                              <p className="text-sm text-gray-300 mb-2 line-clamp-2">{pinned.message}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(pinned.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewPinnedMessage(pinned);
+                              }}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold transition-colors"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex overflow-hidden">
@@ -1875,28 +2033,16 @@ export default function ChatPage() {
                             </p>
                           </div>
                         </button>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleInitiateCall(dm.otherUserId, dm.otherUserName || 'User', dm.otherUserAvatar || '', 'voice');
-                            }}
-                            className="p-1.5 bg-green-600 hover:bg-green-500 rounded transition-colors"
-                            title="Voice call"
-                          >
-                            <Phone size={14} className="text-white" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleInitiateCall(dm.otherUserId, dm.otherUserName || 'User', dm.otherUserAvatar || '', 'video');
-                            }}
-                            className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded transition-colors"
-                            title="Video call"
-                          >
-                            <Video size={14} className="text-white" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleInitiateCall(dm.otherUserId, dm.otherUserName || 'User', dm.otherUserAvatar || '', 'voice');
+                          }}
+                          className="p-1.5 bg-green-600 hover:bg-green-500 rounded transition-colors flex-shrink-0"
+                          title="Voice call"
+                        >
+                          <Phone size={14} className="text-white" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1921,6 +2067,7 @@ export default function ChatPage() {
                       dmMessages.map((msg) => (
                         <div
                           key={msg.id || `${msg.senderId}-${msg.timestamp}`}
+                          data-message-id={msg.id}
                           className={`bg-[#11141d] p-4 rounded-xl border border-white/5 group ${
                             msg.senderId === user?.steamId ? 'ml-auto max-w-[70%]' : 'mr-auto max-w-[70%]'
                           }`}
@@ -1943,13 +2090,17 @@ export default function ChatPage() {
                                 <div className="ml-auto flex items-center gap-2">
                                   {isAdmin && msg.id && (
                                     <button
-                                      onClick={() => toggleMessageSelection(msg.id!)}
-                                      className="p-1 hover:bg-white/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleMessageSelection(msg.id!);
+                                      }}
+                                      className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                                      title="Select message"
                                     >
                                       {selectedMessages.has(msg.id!) ? (
-                                        <CheckSquare size={14} className="text-blue-400" />
+                                        <CheckSquare size={16} className="text-blue-400" />
                                       ) : (
-                                        <Square size={14} className="text-gray-400" />
+                                        <Square size={16} className="text-gray-400" />
                                       )}
                                     </button>
                                   )}

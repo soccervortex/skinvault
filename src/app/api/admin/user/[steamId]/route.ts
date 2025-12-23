@@ -181,16 +181,22 @@ export async function GET(
         const dmArrays = await Promise.all(dmPromises);
         const allDMs = dmArrays.flat();
         
-        // Get user info for DM participants
+        // Get user info for DM participants (optimized - only fetch if not already known)
         const uniqueSteamIds = [...new Set(allDMs.flatMap(msg => [msg.senderId, msg.receiverId]))];
         const userInfoMap = new Map<string, { name: string; avatar: string }>();
+
+        // Use cached Steam profile for the main user
+        userInfoMap.set(steamId, { name: steamName, avatar });
+
+        // Only fetch profiles for other users (limit to 10 to avoid timeout)
+        const otherUserIds = uniqueSteamIds.filter(id => id !== steamId).slice(0, 10);
         
-        // Fetch profiles in parallel
-        await Promise.all(uniqueSteamIds.map(async (id) => {
+        // Fetch profiles in parallel with shorter timeout
+        await Promise.all(otherUserIds.map(async (id) => {
           try {
             const steamUrl = `https://steamcommunity.com/profiles/${id}/?xml=1`;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // Reduced timeout
             const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
               signal: controller.signal,
               cache: 'no-store',
@@ -199,15 +205,24 @@ export async function GET(
             
             if (textRes.ok) {
               const text = await textRes.text();
-              const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
+              const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || `User ${id.slice(-4)}`;
               const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
               userInfoMap.set(id, { name, avatar });
+            } else {
+              userInfoMap.set(id, { name: `User ${id.slice(-4)}`, avatar: '' });
             }
           } catch (error) {
             // Use fallback
             userInfoMap.set(id, { name: `User ${id.slice(-4)}`, avatar: '' });
           }
         }));
+
+        // For remaining users, use fallback
+        uniqueSteamIds.forEach(id => {
+          if (!userInfoMap.has(id)) {
+            userInfoMap.set(id, { name: `User ${id.slice(-4)}`, avatar: '' });
+          }
+        });
 
         dmMessages = allDMs
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
