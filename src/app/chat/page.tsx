@@ -157,6 +157,14 @@ export default function ChatPage() {
     lastDMMessageId
   );
 
+  // Temporarily force activeTab to always be 'global' (DM tab disabled)
+  useEffect(() => {
+    if (activeTab === 'dms') {
+      setActiveTab('global');
+      setSelectedDM(null);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -1882,7 +1890,7 @@ export default function ChatPage() {
         <div className="bg-[#11141d] border-b border-white/5 p-4">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-2xl font-black uppercase tracking-tighter">
-              {activeTab === 'global' ? 'Community Chat' : 'Direct Messages'}
+              Community Chat
             </h1>
             <div className="flex gap-2">
               <button
@@ -1899,7 +1907,8 @@ export default function ChatPage() {
                 <MessageSquare size={16} className="inline mr-2" />
                 Global
               </button>
-              <button
+              {/* DM tab temporarily disabled */}
+              {/* <button
                 onClick={() => {
                   setActiveTab('dms');
                   setSelectedDM(null);
@@ -1917,11 +1926,11 @@ export default function ChatPage() {
                     {unreadCounts.total > 99 ? '99+' : unreadCounts.total}
                   </span>
                 )}
-              </button>
+              </button> */}
             </div>
           </div>
           <p className="text-sm text-gray-400 mt-1">
-            {activeTab === 'global' ? 'Messages reset every 24 hours' : 'Messages reset after 365 days'}
+            Messages reset every 24 hours
           </p>
           {activeTab === 'global' && showFilters && (
             <div className="mt-4 p-4 bg-[#08090d] border border-white/10 rounded-lg space-y-3">
