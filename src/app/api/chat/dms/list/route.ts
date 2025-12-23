@@ -100,8 +100,14 @@ export async function GET(request: Request) {
       const otherUserId = invite.fromSteamId === steamId ? invite.toSteamId : invite.fromSteamId;
       const dmId = [steamId, otherUserId].sort().join('_');
       allDmIds.add(dmId);
+      console.log(`[DM List] Added DM from invite: ${dmId} (otherUserId: ${otherUserId})`);
     });
-    dmIdsFromMessages.forEach(dmId => allDmIds.add(dmId));
+    dmIdsFromMessages.forEach(dmId => {
+      allDmIds.add(dmId);
+      console.log(`[DM List] Added DM from messages: ${dmId}`);
+    });
+    
+    console.log(`[DM List] Total unique DM IDs: ${allDmIds.size}`);
 
     // Fetch user profiles for all DMs in parallel
     const otherUserIds = Array.from(allDmIds).map(dmId => {

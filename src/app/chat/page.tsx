@@ -426,13 +426,18 @@ export default function ChatPage() {
   const fetchDMList = async () => {
     if (!user?.steamId) return;
     try {
-      const res = await fetch(`/api/chat/dms/list?steamId=${user.steamId}`);
+      const res = await fetch(`/api/chat/dms/list?steamId=${user.steamId}`, {
+        cache: 'no-store', // Prevent caching
+      });
       if (res.ok) {
         const data = await res.json();
+        console.log(`[DM List Frontend] Fetched ${data.dms?.length || 0} DMs from server:`, data.dms);
         setDmList(data.dms || []);
+      } else {
+        console.error('[DM List Frontend] Failed to fetch DM list:', res.status, res.statusText);
       }
     } catch (error) {
-      console.error('Failed to fetch DM list:', error);
+      console.error('[DM List Frontend] Failed to fetch DM list:', error);
     }
   };
 
@@ -868,33 +873,70 @@ export default function ChatPage() {
         
         // If DM still not found after retries, try to open it anyway (invite was accepted)
         if (!dmFound && dmId && otherUserId && user?.steamId) {
-          // Manually add DM to list if it doesn't exist yet
-          const newDM = {
-            dmId,
-            otherUserId,
-            otherUserName: invite?.otherUserName || `User ${otherUserId.slice(-4)}`,
-            otherUserAvatar: invite?.otherUserAvatar || '',
-            lastMessage: 'No messages yet',
-            lastMessageTime: new Date(),
-          };
+          console.log(`[DM Accept] DM not found after retries, manually adding: ${dmId}`);
           
-          setDmList(prev => {
-            // Check if DM already exists
-            const exists = prev.some(dm => dm.dmId === dmId);
-            if (exists) {
-              return prev;
-            }
-            // Add new DM at the beginning
-            return [newDM, ...prev];
-          });
-          
-          setSelectedDM(dmId);
-          markDMAsRead(dmId, user.steamId);
-          fetchDMMessages(user.steamId, otherUserId);
-          toast.success('DM invite accepted!');
+          // Fetch user profile for the other user
+          try {
+            const profileRes = await fetch(`https://steamcommunity.com/profiles/${otherUserId}/?xml=1`);
+            const profileText = await profileRes.text();
+            const otherUserName = profileText.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || `User ${otherUserId.slice(-4)}`;
+            const otherUserAvatar = profileText.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
+            
+            // Manually add DM to list if it doesn't exist yet
+            const newDM = {
+              dmId,
+              otherUserId,
+              otherUserName,
+              otherUserAvatar,
+              lastMessage: 'No messages yet',
+              lastMessageTime: new Date(),
+            };
+            
+            console.log(`[DM Accept] Adding DM to list:`, newDM);
+            
+            setDmList(prev => {
+              // Check if DM already exists
+              const exists = prev.some(dm => dm.dmId === dmId);
+              if (exists) {
+                console.log(`[DM Accept] DM already exists in list`);
+                return prev;
+              }
+              // Add new DM at the beginning
+              console.log(`[DM Accept] Adding new DM to list`);
+              return [newDM, ...prev];
+            });
+            
+            setSelectedDM(dmId);
+            markDMAsRead(dmId, user.steamId);
+            fetchDMMessages(user.steamId, otherUserId);
+            toast.success('DM invite accepted!');
+          } catch (profileError) {
+            console.error('Failed to fetch user profile:', profileError);
+            // Still add DM even if profile fetch fails
+            const newDM = {
+              dmId,
+              otherUserId,
+              otherUserName: `User ${otherUserId.slice(-4)}`,
+              otherUserAvatar: '',
+              lastMessage: 'No messages yet',
+              lastMessageTime: new Date(),
+            };
+            
+            setDmList(prev => {
+              const exists = prev.some(dm => dm.dmId === dmId);
+              if (exists) return prev;
+              return [newDM, ...prev];
+            });
+            
+            setSelectedDM(dmId);
+            markDMAsRead(dmId, user.steamId);
+            fetchDMMessages(user.steamId, otherUserId);
+            toast.success('DM invite accepted!');
+          }
           
           // Force refresh DM list one more time to get correct data from server
           setTimeout(() => {
+            console.log(`[DM Accept] Refreshing DM list from server`);
             fetchDMList();
           }, 1000);
         }
