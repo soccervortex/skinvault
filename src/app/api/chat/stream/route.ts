@@ -45,6 +45,25 @@ export async function GET(request: Request) {
   const lastMessageId = searchParams.get('lastMessageId') || '';
   const currentUserId = searchParams.get('currentUserId') || '';
 
+  // If MongoDB is not configured, return empty stream
+  if (!MONGODB_URI) {
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', channel })}\n\n`));
+        // Close immediately since we can't provide updates
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
   // Create SSE stream
   const stream = new ReadableStream({
     async start(controller) {
@@ -52,7 +71,11 @@ export async function GET(request: Request) {
       
       // Send initial connection message
       const send = (data: any) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch (error) {
+          // Connection closed, ignore
+        }
       };
 
       send({ type: 'connected', channel });
@@ -63,14 +86,22 @@ export async function GET(request: Request) {
       // Cleanup on client disconnect
       request.signal.addEventListener('abort', () => {
         isActive = false;
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already closed
+        }
       });
 
       // Poll for new messages (SSE keeps connection alive)
       const pollInterval = setInterval(async () => {
-        if (!isActive || !MONGODB_URI) {
+        if (!isActive) {
           clearInterval(pollInterval);
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            // Already closed
+          }
           return;
         }
 
@@ -215,11 +246,15 @@ export async function GET(request: Request) {
           await client.close();
         } catch (error: any) {
           console.error('SSE poll error:', error);
-          // If MongoDB connection fails, send error but don't close connection
-          if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
-            send({ type: 'error', message: 'Chat service is currently unavailable' });
-          } else {
-            send({ type: 'error', message: 'Failed to fetch messages' });
+          // Silently handle errors - don't send error messages that would spam the client
+          // The client will use fallback polling if SSE fails
+          if (!isActive) {
+            clearInterval(pollInterval);
+            try {
+              controller.close();
+            } catch {
+              // Already closed
+            }
           }
         }
       }, 500); // Check every 500ms for near-instant updates

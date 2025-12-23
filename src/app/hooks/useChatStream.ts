@@ -99,18 +99,14 @@ export function useChatStream(
     };
 
     eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
+      // Silently handle errors - don't log to avoid console spam
       setIsConnected(false);
       
-      // Reconnect after 2 seconds
-      setTimeout(() => {
-        if (eventSourceRef.current?.readyState === EventSource.CLOSED) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-          // Trigger reconnection
-          setIsConnected(false);
-        }
-      }, 2000);
+      // Close and cleanup on error
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
     };
 
     return () => {

@@ -435,30 +435,32 @@ export default function ChatPage() {
     }
     
     // Fallback polling (SSE is primary, this is backup)
+    // Only poll if SSE is not connected OR filters/search are active
     const interval = setInterval(() => {
       if (activeTab === 'global') {
-        // Only poll if SSE is not connected or filters are active
-        if ((!globalStream.isConnected || searchQuery || filterUser || filterDateFrom || filterDateTo || filterPinnedOnly || filterProOnly) && !globalChatDisabled) {
+        const shouldPoll = !globalStream.isConnected || searchQuery || filterUser || filterDateFrom || filterDateTo || filterPinnedOnly || filterProOnly;
+        if (shouldPoll && !globalChatDisabled) {
           fetchMessages(messagePage, false);
         }
       } else {
-        if (!dmChatDisabled) {
-        fetchDMList();
-        fetchDMInvites();
-        // DM polling handled in separate useEffect
+        const shouldPoll = !dmStream.isConnected && selectedDM;
+        if (!dmChatDisabled && shouldPoll) {
+          fetchDMList();
+          fetchDMInvites();
         }
       }
     }, 5000); // Slower polling since SSE handles real-time
     
     return () => clearInterval(interval);
-  }, [activeTab, selectedDM, user?.steamId]);
+  }, [activeTab, selectedDM, user?.steamId, globalStream.isConnected, dmStream.isConnected, searchQuery, filterUser, filterDateFrom, filterDateTo, filterPinnedOnly, filterProOnly, globalChatDisabled, dmChatDisabled, messagePage]);
 
   // Merge SSE stream messages with existing messages (real-time updates)
+  // NOTE: useChatStream already handles deduplication, so we just need to update state
   useEffect(() => {
     if (globalStream.messages.length > 0 && activeTab === 'global') {
       setMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = globalStream.messages.filter(m => !existingIds.has(m.id));
+        const newMessages = globalStream.messages.filter(m => m.id && !existingIds.has(m.id));
         if (newMessages.length > 0) {
           // Auto-scroll to new messages
           setTimeout(() => {
@@ -475,54 +477,7 @@ export default function ChatPage() {
     if (dmStream.messages.length > 0 && activeTab === 'dms' && selectedDM) {
       setDmMessages(prev => {
         const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = dmStream.messages.filter(m => !existingIds.has(m.id));
-        if (newMessages.length > 0) {
-          // Track unread if message is from other user
-          newMessages.forEach(msg => {
-            if (msg.senderId !== user?.steamId) {
-              addUnreadDM(
-                msg.dmId,
-                user?.steamId || '',
-                msg.message,
-                msg.senderName,
-                msg.senderAvatar
-              );
-            }
-          });
-          // Auto-scroll to new messages
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-          return [...prev, ...newMessages];
-        }
-        return prev;
-      });
-    }
-  }, [dmStream.messages, user?.steamId, selectedDM, activeTab]);
-
-  // Merge SSE stream messages with existing messages (real-time updates)
-  useEffect(() => {
-    if (globalStream.messages.length > 0 && activeTab === 'global') {
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = globalStream.messages.filter(m => !existingIds.has(m.id));
-        if (newMessages.length > 0) {
-          // Auto-scroll to new messages
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-          return [...prev, ...newMessages];
-        }
-        return prev;
-      });
-    }
-  }, [globalStream.messages, activeTab]);
-
-  useEffect(() => {
-    if (dmStream.messages.length > 0 && activeTab === 'dms' && selectedDM) {
-      setDmMessages(prev => {
-        const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = dmStream.messages.filter(m => !existingIds.has(m.id));
+        const newMessages = dmStream.messages.filter(m => m.id && !existingIds.has(m.id));
         if (newMessages.length > 0) {
           // Track unread if message is from other user
           newMessages.forEach(msg => {
@@ -552,12 +507,13 @@ export default function ChatPage() {
       const [steamId1, steamId2] = selectedDM.split('_');
       fetchDMMessages(steamId1, steamId2);
       // Reduced polling since SSE handles real-time updates
-      const interval = setInterval(() => {
-        if (!dmChatDisabled && !dmStream.isConnected) {
-          // Only poll if SSE is not connected
+      // Only poll if SSE is not connected
+      if (!dmStream.isConnected && !dmChatDisabled) {
+        const interval = setInterval(() => {
           fetchDMMessages(steamId1, steamId2, true);
-        }
-      }, 5000); // Slower polling since SSE is primary
+        }, 5000); // Slower polling since SSE is primary
+        return () => clearInterval(interval);
+      }
       return () => clearInterval(interval);
     }
   }, [selectedDM, activeTab, user?.steamId, isAdmin, dmStream.isConnected]);
