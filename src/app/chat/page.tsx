@@ -806,37 +806,76 @@ export default function ChatPage() {
   const handleSaveEdit = async () => {
     if (!editingMessage || !editText.trim() || !user?.steamId || editing) return;
 
+    // Store values before clearing state
+    const messageType = editingMessage.type;
+    const messageId = editingMessage.id;
+    const updatedText = editText.trim();
+    
     setEditing(true);
+    
+    // Optimistically update the message in local state for instant UI feedback
+    if (messageType === 'global') {
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, message: updatedText, editedAt: new Date() }
+          : msg
+      ));
+    } else {
+      setDmMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, message: updatedText, editedAt: new Date() }
+          : msg
+      ));
+    }
+    
+    // Clear editing state immediately
+    setEditingMessage(null);
+    setEditText('');
+    setEditing(false);
+    
+    // Show success toast immediately
+    toast.success('Message edited');
+    
+    // Update in background (non-blocking)
     try {
-      const url = editingMessage.type === 'global'
-        ? `/api/chat/messages/${editingMessage.id}?userSteamId=${user.steamId}&type=global`
-        : `/api/chat/messages/${editingMessage.id}?userSteamId=${user.steamId}&type=dm&dmId=${selectedDM}`;
+      const url = messageType === 'global'
+        ? `/api/chat/messages/${messageId}?userSteamId=${user.steamId}&type=global`
+        : `/api/chat/messages/${messageId}?userSteamId=${user.steamId}&type=dm&dmId=${selectedDM}`;
       
       const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newMessage: editText.trim() }),
+        body: JSON.stringify({ newMessage: updatedText }),
       });
 
-      if (res.ok) {
-        toast.success('Message edited');
-        setEditingMessage(null);
-        setEditText('');
-        if (editingMessage.type === 'global') {
-          await fetchMessages(messagePage, false);
-        } else if (selectedDM) {
-          const [steamId1, steamId2] = selectedDM.split('_');
-          await fetchDMMessages(steamId1, steamId2);
-        }
-      } else {
+      if (!res.ok) {
+        // If update failed, revert optimistic update and refetch
         const data = await res.json();
         toast.error(data.error || 'Failed to edit message');
+        if (messageType === 'global') {
+          fetchMessages(messagePage, false);
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          fetchDMMessages(steamId1, steamId2);
+        }
+      } else {
+        // Silently refresh to get server timestamp
+        if (messageType === 'global') {
+          fetchMessages(messagePage, false).catch(() => {}); // Ignore errors in background refresh
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          fetchDMMessages(steamId1, steamId2).catch(() => {}); // Ignore errors in background refresh
+        }
       }
     } catch (error) {
       console.error('Failed to edit message:', error);
-      toast.error('Failed to edit message');
-    } finally {
-      setEditing(false);
+      // Revert optimistic update on error
+      if (messageType === 'global') {
+        fetchMessages(messagePage, false);
+      } else if (selectedDM) {
+        const [steamId1, steamId2] = selectedDM.split('_');
+        fetchDMMessages(steamId1, steamId2);
+      }
     }
   };
 
