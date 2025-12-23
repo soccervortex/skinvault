@@ -27,13 +27,38 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+const LONG_DESCRIPTION = 'SkinVault is the ultimate CS2 skin analytics and inventory management platform. Track your Steam inventory value in real-time, monitor skin prices with advanced analytics, set custom price alerts, compare skins side-by-side, and manage your wishlist. Get instant market prices, price history charts, and make informed trading decisions. Perfect for CS2 traders, collectors, and investors who want to maximize their skin portfolio value. Features include real-time price tracking, inventory valuation, price alerts, skin comparison tools, wishlist management, and comprehensive market analytics.';
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'),
+  metadataBase: new URL(BASE_URL),
   title: "SkinVault - CS2 Skin Analytics & Inventory Management",
-  description: "SkinVault is a comprehensive CS2 skin analytics platform that helps you track your inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist. View your Steam inventory, get real-time market prices, track price changes, and make informed trading decisions.",
+  description: LONG_DESCRIPTION,
+  keywords: [
+    'CS2 skins',
+    'CS2 skin tracker',
+    'CS2 inventory',
+    'CS2 price tracker',
+    'Steam inventory',
+    'CS2 skin analytics',
+    'CS2 skin prices',
+    'CS2 trading',
+    'CS2 skin comparison',
+    'CS2 wishlist',
+    'Counter-Strike 2 skins',
+    'CS2 skin value',
+    'CS2 market prices',
+    'CS2 price alerts',
+    'CS2 inventory management',
+    'CS2 skin portfolio',
+  ].join(', '),
+  authors: [{ name: 'SkinVault' }],
+  creator: 'SkinVault',
+  publisher: 'SkinVault',
+  robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   icons: {
     icon: [
-      { url: '/icons/favicon.ico', type: 'image/x-icon' },
+      { url: '/icons/favicon.ico', type: 'image/x-icon', sizes: 'any' },
       { url: '/icons/favicon.svg', type: 'image/svg+xml' },
       { url: '/icons/favicon-96x96.png', type: 'image/png', sizes: '96x96' },
       { url: '/icons/web-app-manifest-192x192.png', type: 'image/png', sizes: '192x192' },
@@ -61,24 +86,39 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
-    description: 'Track your CS2 inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist. Real-time market prices and comprehensive skin analytics for CS2 traders.',
+    description: LONG_DESCRIPTION,
     type: 'website',
-    url: process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online',
+    url: BASE_URL,
     siteName: 'SkinVault',
+    locale: 'en_US',
     images: [
       { 
-        url: '/icons/web-app-manifest-512x512.png', 
+        url: `${BASE_URL}/icons/web-app-manifest-512x512.png`, 
         width: 512, 
         height: 512,
-        alt: 'SkinVault - CS2 Skin Analytics',
-      }
+        alt: 'SkinVault - CS2 Skin Analytics Logo',
+      },
+      {
+        url: `${BASE_URL}/icons/web-app-manifest-192x192.png`,
+        width: 192,
+        height: 192,
+        alt: 'SkinVault Logo',
+      },
     ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'SkinVault - CS2 Skin Analytics & Inventory Management',
-    description: 'Track your CS2 inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist.',
-    images: ['/icons/web-app-manifest-512x512.png'],
+    description: LONG_DESCRIPTION,
+    images: [`${BASE_URL}/icons/web-app-manifest-512x512.png`],
+  },
+  alternates: {
+    canonical: BASE_URL,
+  },
+  other: {
+    'googlebot': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+    'bingbot': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+    'slurp': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1', // Yahoo
   },
 };
 
@@ -94,7 +134,7 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": "SkinVault",
-    "description": "SkinVault is a comprehensive CS2 skin analytics platform that helps you track your inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist. View your Steam inventory, get real-time market prices, track price changes, and make informed trading decisions.",
+    "description": LONG_DESCRIPTION,
     "url": baseUrl,
     "applicationCategory": "GameApplication",
     "operatingSystem": "Web",
@@ -114,8 +154,17 @@ export default function RootLayout({
       "Price Alerts",
       "Skin Comparison Tool",
       "Wishlist Management",
-      "Steam Integration"
-    ]
+      "Steam Integration",
+      "Market Analytics",
+      "Price History Charts",
+      "Portfolio Valuation"
+    ],
+    "logo": {
+      "@type": "ImageObject",
+      "url": `${baseUrl}/icons/web-app-manifest-512x512.png`,
+      "width": 512,
+      "height": 512
+    }
   };
 
   return (
