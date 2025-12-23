@@ -55,15 +55,15 @@ export async function POST(request: Request) {
       deletedCount += result.deletedCount;
     }
 
-    // Backup and clear DMs (7 days)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const dmCollectionNames = getDMCollectionNamesForDays(7);
+    // Backup and clear DMs (365 days)
+    const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const dmCollectionNames = getDMCollectionNamesForDays(365);
     
     const allDMMessages: any[] = [];
     for (const collectionName of dmCollectionNames) {
       const collection = db.collection(collectionName);
       const messages = await collection
-        .find({ timestamp: { $gte: sevenDaysAgo } })
+        .find({ timestamp: { $gte: threeHundredSixtyFiveDaysAgo } })
         .toArray();
       allDMMessages.push(...messages);
     }
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     let deletedDMCount = 0;
     for (const collectionName of dmCollectionNames) {
       const collection = db.collection(collectionName);
-      const result = await collection.deleteMany({ timestamp: { $lt: sevenDaysAgo } });
+      const result = await collection.deleteMany({ timestamp: { $lt: threeHundredSixtyFiveDaysAgo } });
       deletedDMCount += result.deletedCount;
     }
 

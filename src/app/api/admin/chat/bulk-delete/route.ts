@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         deletedCount += result.deletedCount;
       }
     } else if (messageType === 'dm' && dmId) {
-      const collectionNames = getDMCollectionNamesForDays(7);
+      const collectionNames = getDMCollectionNamesForDays(365);
       
       for (const collectionName of collectionNames) {
         const collection = db.collection(collectionName);

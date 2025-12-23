@@ -191,8 +191,8 @@ export async function GET(request: Request) {
             const [steamId1, steamId2] = channel.split('_');
             if (steamId1 && steamId2) {
               const dmId = channel;
-              const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-              const collectionNames = getDMCollectionNamesForDays(7);
+              const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+              const collectionNames = getDMCollectionNamesForDays(365);
 
               for (const collectionName of collectionNames) {
                 if (!isActive) break;
@@ -200,7 +200,7 @@ export async function GET(request: Request) {
                 const collection = db.collection<DMMessage>(collectionName);
                 const query: any = { 
                   dmId,
-                  timestamp: { $gte: sevenDaysAgo }
+                  timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
                 };
                 
                 if (lastCheckedId) {

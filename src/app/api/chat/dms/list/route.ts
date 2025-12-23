@@ -82,8 +82,8 @@ export async function GET(request: Request) {
     }).toArray();
 
     // Get latest message for each DM
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const collectionNames = getDMCollectionNamesForDays(7);
+    const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const collectionNames = getDMCollectionNamesForDays(365);
     
     const dmList: Array<{
       dmId: string;
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
         const messages = await collection
           .find({ 
             dmId,
-            timestamp: { $gte: sevenDaysAgo }
+            timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
           })
           .sort({ timestamp: -1 })
           .limit(1)

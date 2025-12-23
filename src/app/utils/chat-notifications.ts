@@ -33,9 +33,12 @@ export function getUnreadCounts(currentUserId: string): UnreadCounts {
     const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
     const unreadInvites = JSON.parse(localStorage.getItem(UNREAD_INVITES_KEY) || '[]');
     
-    // Count DMs for current user
-    const userDmCount = Object.values(unreadDms).reduce((count: number, dm: any) => {
-      if (dm.userId === currentUserId && dm.count > 0) {
+    // Count DMs for current user (check if user is participant in DM)
+    const userDmCount = Object.keys(unreadDms).reduce((count: number, dmId: string) => {
+      const dm = unreadDms[dmId];
+      // Extract participants from DM ID (format: steamId1_steamId2)
+      const participants = dmId.split('_');
+      if (participants.includes(currentUserId) && dm.count > 0) {
         return count + dm.count;
       }
       return count;
@@ -64,24 +67,33 @@ export function markDMAsRead(dmId: string, currentUserId: string): void {
     if (typeof window === 'undefined') return;
     
     const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
-    // Always create/update the entry to ensure it's marked as read
-    if (!unreadDms[dmId]) {
-      unreadDms[dmId] = {
-        userId: currentUserId,
-        count: 0,
-        lastMessage: '',
-        lastMessageTime: 0,
-        senderName: '',
-        senderAvatar: '',
-      };
-    }
-    // Reset count and update last read time
-    unreadDms[dmId].count = 0;
-    unreadDms[dmId].lastRead = Date.now();
-    localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
     
-    // Dispatch event for other components
-    window.dispatchEvent(new CustomEvent('chat-unread-updated'));
+    // Extract participants from DM ID (format: steamId1_steamId2)
+    const participants = dmId.split('_');
+    const isParticipant = participants.includes(currentUserId);
+    
+    // Only mark as read if current user is a participant in this DM
+    if (isParticipant) {
+      // Always create/update the entry to ensure it's marked as read
+      if (!unreadDms[dmId]) {
+        unreadDms[dmId] = {
+          userId: currentUserId,
+          count: 0,
+          lastMessage: '',
+          lastMessageTime: 0,
+          senderName: '',
+          senderAvatar: '',
+        };
+      }
+      // Reset count and update last read time (regardless of stored userId)
+      unreadDms[dmId].count = 0;
+      unreadDms[dmId].lastRead = Date.now();
+      unreadDms[dmId].userId = currentUserId; // Update userId to current user
+      localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
+      
+      // Dispatch event for other components
+      window.dispatchEvent(new CustomEvent('chat-unread-updated'));
+    }
   } catch {
     // Ignore errors
   }
@@ -244,11 +256,14 @@ export function markAllDMsAsRead(currentUserId: string): void {
     
     const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
     
-    // Mark all DMs for this user as read
+    // Mark all DMs where current user is a participant as read
     Object.keys(unreadDms).forEach(dmId => {
-      if (unreadDms[dmId].userId === currentUserId) {
+      // Extract participants from DM ID (format: steamId1_steamId2)
+      const participants = dmId.split('_');
+      if (participants.includes(currentUserId)) {
         unreadDms[dmId].count = 0;
         unreadDms[dmId].lastRead = Date.now();
+        unreadDms[dmId].userId = currentUserId; // Update userId to current user
       }
     });
     

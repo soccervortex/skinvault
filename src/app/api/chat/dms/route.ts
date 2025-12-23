@@ -76,16 +76,16 @@ export async function GET(request: Request) {
     const client = await getMongoClient();
     const db = client.db(MONGODB_DB_NAME);
 
-    // Get messages from last 7 days using date-based collections
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const collectionNames = getDMCollectionNamesForDays(7);
+    // Get messages from last 365 days using date-based collections
+    const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const collectionNames = getDMCollectionNamesForDays(365);
     
     const messagePromises = collectionNames.map(async (collectionName) => {
       const collection = db.collection<DMMessage>(collectionName);
       return collection
         .find({ 
           dmId,
-          timestamp: { $gte: sevenDaysAgo }
+          timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
         })
         .sort({ timestamp: 1 })
         .toArray();

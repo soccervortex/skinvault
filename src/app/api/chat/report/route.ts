@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       })));
     } else if (reportType === 'dm' && dmId) {
       // Get DM messages
-      const collectionNames = getDMCollectionNamesForDays(7);
+      const collectionNames = getDMCollectionNamesForDays(365);
       
       for (const collectionName of collectionNames) {
         const collection = db.collection(collectionName);

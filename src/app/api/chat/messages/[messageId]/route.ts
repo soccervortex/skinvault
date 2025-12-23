@@ -86,7 +86,7 @@ export async function PATCH(
         }
       }
     } else if (messageType === 'dm' && dmId) {
-      const collectionNames = getDMCollectionNamesForDays(7);
+      const collectionNames = getDMCollectionNamesForDays(365);
       
       for (const collectionName of collectionNames) {
         const collection = db.collection<DMMessage>(collectionName);
@@ -184,7 +184,7 @@ export async function DELETE(
       }
     } else if (messageType === 'dm' && dmId) {
       // Search in DM collections
-      const collectionNames = getDMCollectionNamesForDays(7);
+      const collectionNames = getDMCollectionNamesForDays(365);
       
       for (const collectionName of collectionNames) {
         const collection = db.collection<DMMessage>(collectionName);

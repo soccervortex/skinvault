@@ -158,15 +158,15 @@ export async function GET(
         const db = client.db(MONGODB_DB_NAME);
         
         // Get all DMs where this user is sender or receiver
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const dmCollectionNames = getDMCollectionNamesForDays(7);
+        const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+        const dmCollectionNames = getDMCollectionNamesForDays(365);
         
         const dmQuery: any = {
           $or: [
             { senderId: steamId },
             { receiverId: steamId }
           ],
-          timestamp: { $gte: sevenDaysAgo }
+          timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
         };
         
         if (searchQuery) {

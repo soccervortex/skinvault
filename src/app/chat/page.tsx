@@ -1422,7 +1422,7 @@ export default function ChatPage() {
             </div>
           </div>
           <p className="text-sm text-gray-400 mt-1">
-            {activeTab === 'global' ? 'Messages reset every 24 hours' : 'Messages reset after 7 days'}
+            {activeTab === 'global' ? 'Messages reset every 24 hours' : 'Messages reset after 365 days'}
           </p>
           {activeTab === 'global' && showFilters && (
             <div className="mt-4 p-4 bg-[#08090d] border border-white/10 rounded-lg space-y-3">
