@@ -8,7 +8,7 @@ import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
-import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead } from '@/app/utils/chat-notifications';
+import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead, getUnreadCounts } from '@/app/utils/chat-notifications';
 import { usePusherChat } from '@/app/hooks/usePusherChat';
 import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
 import { saveDMList, mergeDMList, loadDMList } from '@/app/utils/dm-list-persistence';
@@ -131,6 +131,7 @@ export default function ChatPage() {
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Array<{ id: string; message: string; timestamp: string; steamName: string; avatar: string; messageType: 'global' | 'dm'; dmId?: string }>>([]);
   const [viewingPinnedMessageId, setViewingPinnedMessageId] = useState<string | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState({ dms: 0, invites: 0, total: 0 });
   const toast = useToast();
 
   // Real-time SSE streams (after all state declarations)
@@ -647,16 +648,18 @@ export default function ChatPage() {
           // Only track unread if message is from other user AND user is NOT currently viewing this DM
           // If user is viewing the DM (selectedDM === msg.dmId), messages should NOT be marked as unread
           newMessages.forEach(msg => {
-            // Don't mark as unread if message is from current user or if user is viewing this DM
-            if (msg.senderId !== user?.steamId && msg.dmId !== selectedDM) {
-              // Only mark as unread if not viewing this DM
-              addUnreadDM(
-                msg.dmId,
-                user?.steamId || '',
-                msg.message,
-                msg.senderName,
-                msg.senderAvatar
-              );
+            // Don't mark as unread if message is from current user
+            if (msg.senderId !== user?.steamId) {
+              // Only mark as unread if user is NOT viewing this DM
+              if (selectedDM !== msg.dmId || activeTab !== 'dms') {
+                addUnreadDM(
+                  msg.dmId,
+                  user?.steamId || '',
+                  msg.message,
+                  msg.senderName,
+                  msg.senderAvatar
+                );
+              }
             }
           });
           // Always mark selected DM as read since user is viewing it
@@ -676,6 +679,60 @@ export default function ChatPage() {
       });
     }
   }, [dmStream.messages, user?.steamId, selectedDM, activeTab]);
+
+  // Update unread counts and show notifications
+  useEffect(() => {
+    if (!user?.steamId) return;
+
+    const updateCounts = () => {
+      const counts = getUnreadCounts(user.steamId);
+      setUnreadCounts(counts);
+    };
+
+    updateCounts();
+
+    // Listen for unread updates
+    const handleUnreadUpdate = () => updateCounts();
+    window.addEventListener('chat-unread-updated', handleUnreadUpdate);
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    // Listen for notification events
+    const handleNotification = (event: CustomEvent) => {
+      const notification = event.detail;
+      
+      // Show browser notification if permission granted and not on chat page
+      if ('Notification' in window && Notification.permission === 'granted') {
+        if (notification.type === 'dm_message') {
+          new Notification(`New message from ${notification.userName}`, {
+            body: notification.message?.substring(0, 100) || 'New message',
+            icon: notification.userAvatar || '/icons/web-app-manifest-192x192.png',
+            tag: `dm-${notification.dmId}`,
+            requireInteraction: false,
+          });
+        } else if (notification.type === 'dm_invite') {
+          new Notification(`New DM invite from ${notification.userName}`, {
+            body: `${notification.userName} wants to start a conversation`,
+            icon: notification.userAvatar || '/icons/web-app-manifest-192x192.png',
+            tag: `invite-${notification.steamId}`,
+            requireInteraction: false,
+          });
+        }
+      }
+      
+      updateCounts();
+    };
+
+    window.addEventListener('chat-notification', handleNotification as EventListener);
+
+    return () => {
+      window.removeEventListener('chat-unread-updated', handleUnreadUpdate);
+      window.removeEventListener('chat-notification', handleNotification as EventListener);
+    };
+  }, [user?.steamId]);
 
   // Handle real-time message deletions from Pusher
   useEffect(() => {
@@ -1668,7 +1725,7 @@ export default function ChatPage() {
                   setActiveTab('global');
                   setSelectedDM(null);
                 }}
-                className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+                className={`px-4 py-2 rounded-lg font-bold transition-colors relative ${
                   activeTab === 'global'
                     ? 'bg-blue-600 text-white'
                     : 'bg-[#08090d] text-gray-400 hover:text-white'
@@ -1682,7 +1739,7 @@ export default function ChatPage() {
                   setActiveTab('dms');
                   setSelectedDM(null);
                 }}
-                className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+                className={`px-4 py-2 rounded-lg font-bold transition-colors relative ${
                   activeTab === 'dms'
                     ? 'bg-blue-600 text-white'
                     : 'bg-[#08090d] text-gray-400 hover:text-white'
@@ -1690,6 +1747,11 @@ export default function ChatPage() {
               >
                 <Users size={16} className="inline mr-2" />
                 DMs
+                {unreadCounts.total > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-red-600 text-white text-[10px] font-black rounded-full">
+                    {unreadCounts.total > 99 ? '99+' : unreadCounts.total}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -1995,10 +2057,19 @@ export default function ChatPage() {
               {/* Pending Invites */}
               {dmInvites.length > 0 && (
                 <div className="p-4 border-b border-white/5">
-                  <p className="text-xs text-gray-500 mb-2 font-bold uppercase">Pending Invites</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-500 font-bold uppercase">Pending Invites</p>
+                    {unreadCounts.invites > 0 && (
+                      <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-black rounded-full">
+                        {unreadCounts.invites}
+                      </span>
+                    )}
+                  </div>
                   <div className="space-y-2">
-                    {dmInvites.map((invite) => (
-                      <div key={invite.id} className="bg-[#08090d] p-2 rounded-lg">
+                    {dmInvites.map((invite) => {
+                      const isUnread = !invite.isSent && unreadCounts.invites > 0;
+                      return (
+                      <div key={invite.id} className={`bg-[#08090d] p-2 rounded-lg border ${isUnread ? 'border-red-500/40' : 'border-transparent'}`}>
                         <div className="flex items-center gap-2 mb-2">
                           <img
                             src={invite.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
@@ -2006,7 +2077,12 @@ export default function ChatPage() {
                             className="w-8 h-8 rounded-lg"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold truncate">{invite.otherUserName}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold truncate">{invite.otherUserName}</p>
+                              {isUnread && (
+                                <span className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0"></span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-gray-500">{invite.isSent ? 'Sent' : 'Received'}</p>
                           </div>
                         </div>
@@ -2027,7 +2103,8 @@ export default function ChatPage() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -2040,12 +2117,20 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="p-2 space-y-1">
-                    {dmList.map((dm) => (
+                    {dmList.map((dm) => {
+                      // Get unread count for this DM
+                      const unreadDms = JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('sv_unread_dms') || '{}' : '{}');
+                      const dmUnread = unreadDms[dm.dmId]?.count || 0;
+                      const hasUnread = dmUnread > 0;
+                      
+                      return (
                       <div
                         key={dm.dmId}
                         className={`w-full p-3 rounded-lg transition-all flex items-start gap-3 border ${
                           selectedDM === dm.dmId
                             ? 'bg-blue-600/20 border-blue-500/40 shadow-lg shadow-blue-500/20'
+                            : hasUnread
+                            ? 'bg-[#08090d] hover:bg-[#11141d] border-red-500/40 hover:border-red-500/60'
                             : 'bg-[#08090d] hover:bg-[#11141d] border-transparent hover:border-white/5'
                         }`}
                       >
@@ -2053,15 +2138,27 @@ export default function ChatPage() {
                           onClick={() => setSelectedDM(dm.dmId)}
                           className="flex-1 text-left flex items-start gap-3 min-w-0"
                       >
-                        <img
-                          src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
-                          alt={dm.otherUserName || 'User'}
-                          className="w-10 h-10 rounded-lg border-2 border-blue-600 flex-shrink-0"
-                        />
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={dm.otherUserAvatar || '/icons/web-app-manifest-192x192.png'}
+                            alt={dm.otherUserName || 'User'}
+                            className="w-10 h-10 rounded-lg border-2 border-blue-600"
+                          />
+                          {hasUnread && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[8px] font-black rounded-full flex items-center justify-center">
+                              {dmUnread > 9 ? '9+' : dmUnread}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold mb-1 truncate text-white">
-                            {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
-                          </p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-xs font-bold truncate text-white">
+                              {dm.otherUserName || `User ${dm.otherUserId.slice(-4)}`}
+                            </p>
+                            {hasUnread && (
+                              <span className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0"></span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-gray-400 truncate">{dm.lastMessage}</p>
                           <p className="text-[9px] text-gray-500 mt-1">
                             {formatTime(dm.lastMessageTime)}
@@ -2069,7 +2166,8 @@ export default function ChatPage() {
                         </div>
                       </button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
