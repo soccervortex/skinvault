@@ -187,17 +187,23 @@ export async function GET(request: Request) {
           lastMessageTime = new Date();
         }
       } else {
+        // Use current time for DMs without invite or message
         lastMessageTime = new Date();
       }
       
-      dmList.push({
+      // Always add DM if there's an accepted invite, even without messages
+      // This ensures newly accepted invites always appear
+      const dmEntry = {
         dmId,
         otherUserId,
         otherUserName: profile.name,
         otherUserAvatar: profile.avatar,
         lastMessage: latestMessage?.message || 'No messages yet',
         lastMessageTime,
-      });
+      };
+      
+      console.log(`[DM List] Adding DM to list:`, dmEntry);
+      dmList.push(dmEntry);
     }
 
     // Don't close connection - it's pooled and reused

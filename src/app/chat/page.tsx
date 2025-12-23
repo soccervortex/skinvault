@@ -423,7 +423,7 @@ export default function ChatPage() {
     }
   };
 
-  const fetchDMList = async () => {
+  const fetchDMList = async (merge: boolean = false) => {
     if (!user?.steamId) return;
     try {
       const res = await fetch(`/api/chat/dms/list?steamId=${user.steamId}`, {
@@ -431,8 +431,21 @@ export default function ChatPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        console.log(`[DM List Frontend] Fetched ${data.dms?.length || 0} DMs from server:`, data.dms);
-        setDmList(data.dms || []);
+        const newDMs = data.dms || [];
+        console.log(`[DM List Frontend] Fetched ${newDMs.length} DMs from server:`, newDMs);
+        
+        if (merge) {
+          // Merge with existing DMs instead of replacing (preserve manually added DMs)
+          setDmList(prev => {
+            const existingIds = new Set(prev.map(dm => dm.dmId));
+            const newDMsToAdd = newDMs.filter((dm: any) => !existingIds.has(dm.dmId));
+            return [...prev, ...newDMsToAdd].sort((a, b) => 
+              new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+            );
+          });
+        } else {
+          setDmList(newDMs);
+        }
       } else {
         console.error('[DM List Frontend] Failed to fetch DM list:', res.status, res.statusText);
       }
@@ -509,9 +522,11 @@ export default function ChatPage() {
           fetchMessages(null, false); // Reset cursor, load from beginning
         }
       } else {
+        // Don't poll DM list if we already have DMs - only poll for new invites
+        // This prevents overwriting the DM list and losing DMs
         const shouldPoll = !dmStream.isConnected && selectedDM;
         if (!dmChatDisabled && shouldPoll) {
-          fetchDMList();
+          // Only fetch invites, not DM list (to avoid overwriting)
           fetchDMInvites();
         }
       }
@@ -935,9 +950,10 @@ export default function ChatPage() {
           }
           
           // Force refresh DM list one more time to get correct data from server
+          // Use merge=true to preserve manually added DM
           setTimeout(() => {
-            console.log(`[DM Accept] Refreshing DM list from server`);
-            fetchDMList();
+            console.log(`[DM Accept] Refreshing DM list from server (merge mode)`);
+            fetchDMList(true); // Merge instead of replace
           }, 1000);
         }
       } else {
