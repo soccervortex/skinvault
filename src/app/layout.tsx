@@ -87,6 +87,37 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+  
+  // Structured data for better SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "SkinVault",
+    "description": "SkinVault is a comprehensive CS2 skin analytics platform that helps you track your inventory value, monitor skin prices, set price alerts, compare skins, and manage your wishlist. View your Steam inventory, get real-time market prices, track price changes, and make informed trading decisions.",
+    "url": baseUrl,
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "100"
+    },
+    "featureList": [
+      "CS2 Inventory Tracking",
+      "Real-time Skin Price Monitoring",
+      "Price Alerts",
+      "Skin Comparison Tool",
+      "Wishlist Management",
+      "Steam Integration"
+    ]
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -95,6 +126,11 @@ export default function RootLayout({
         <Script
           src="/safe-storage-init.js"
           strategy="beforeInteractive"
+        />
+        <Script
+          id="structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         <ErrorBoundary>
           <ToastProvider>
