@@ -648,24 +648,44 @@ export default function ChatPage() {
                           Timeout
                         </span>
                       )}
-                      {isAdmin && (
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {(msg.steamId === user?.steamId || isAdmin) && msg.id && (
                           <button
-                            onClick={() => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName })}
+                            onClick={() => handleDeleteMessage(msg.id!, 'global')}
                             className="p-1 hover:bg-red-500/20 rounded"
-                            title="Timeout user"
+                            title="Delete message"
                           >
-                            <Clock size={14} className="text-red-400" />
+                            <Trash2 size={14} className="text-red-400" />
                           </button>
+                        )}
+                        {isAdmin && (
+                          <>
+                            <button
+                              onClick={() => setTimeoutUser({ steamId: msg.steamId, name: msg.steamName })}
+                              className="p-1 hover:bg-red-500/20 rounded"
+                              title="Timeout user"
+                            >
+                              <Clock size={14} className="text-red-400" />
+                            </button>
+                            <button
+                              onClick={() => setBanUser({ steamId: msg.steamId, name: msg.steamName })}
+                              className="p-1 hover:bg-red-500/20 rounded"
+                              title="Ban user"
+                            >
+                              <Ban size={14} className="text-red-500" />
+                            </button>
+                          </>
+                        )}
+                        {msg.steamId !== user?.steamId && (
                           <button
-                            onClick={() => setBanUser({ steamId: msg.steamId, name: msg.steamName })}
-                            className="p-1 hover:bg-red-500/20 rounded"
-                            title="Ban user"
+                            onClick={() => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' })}
+                            className="p-1 hover:bg-orange-500/20 rounded"
+                            title="Report user"
                           >
-                            <Ban size={14} className="text-red-500" />
+                            <Flag size={14} className="text-orange-400" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                       <span className="text-xs text-gray-500 ml-auto">
                         {formatTime(msg.timestamp)}
                       </span>
