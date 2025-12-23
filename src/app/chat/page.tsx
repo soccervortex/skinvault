@@ -3,14 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp, Phone } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
 import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime } from '@/app/utils/chat-notifications';
 import { useChatStream } from '@/app/hooks/useChatStream';
-import CallModal from '@/app/components/CallModal';
 
 interface ChatMessage {
   id?: string;
@@ -113,16 +112,6 @@ export default function ChatPage() {
   const [messagePage, setMessagePage] = useState(1);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const [activeCall, setActiveCall] = useState<{
-    callId: string;
-    callerId: string;
-    receiverId: string;
-    callType: 'voice';
-    isIncoming: boolean;
-    callerName?: string;
-    callerAvatar?: string;
-  } | null>(null);
-  const callPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Array<{ id: string; message: string; timestamp: string; steamName: string; avatar: string; messageType: 'global' | 'dm'; dmId?: string }>>([]);
   const [viewingPinnedMessageId, setViewingPinnedMessageId] = useState<string | null>(null);
@@ -1383,158 +1372,6 @@ export default function ChatPage() {
     }
   };
 
-  // Call handlers
-  const handleInitiateCall = async (userId: string, userName: string, userAvatar: string, callType: 'voice' = 'voice') => {
-    if (!user?.steamId || activeCall) return;
-
-    try {
-      const res = await fetch('/api/chat/call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callerId: user.steamId,
-          receiverId: userId,
-          callType,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setActiveCall({
-          callId: data.callId,
-          callerId: user.steamId,
-          receiverId: userId,
-          callType,
-          isIncoming: false,
-          callerName: user.name,
-          callerAvatar: user.avatar,
-        });
-        toast.success(`Calling ${userName}...`);
-      } else {
-        const errorData = await res.json();
-        toast.error(errorData.error || 'Failed to initiate call');
-      }
-    } catch (error) {
-      console.error('Failed to initiate call:', error);
-      toast.error('Failed to initiate call');
-    }
-  };
-
-  const handleAnswerCall = async () => {
-    if (!activeCall || !user?.steamId) return;
-
-    try {
-      const res = await fetch('/api/chat/call', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callId: activeCall.callId,
-          action: 'answer',
-          userId: user.steamId,
-        }),
-      });
-
-      if (res.ok) {
-        toast.success('Call answered');
-      } else {
-        const errorData = await res.json();
-        toast.error(errorData.error || 'Failed to answer call');
-      }
-    } catch (error) {
-      console.error('Failed to answer call:', error);
-      toast.error('Failed to answer call');
-    }
-  };
-
-  const handleDeclineCall = async () => {
-    if (!activeCall || !user?.steamId) return;
-
-    try {
-      const res = await fetch('/api/chat/call', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callId: activeCall.callId,
-          action: 'decline',
-          userId: user.steamId,
-        }),
-      });
-
-      if (res.ok) {
-        setActiveCall(null);
-        toast.info('Call declined');
-      }
-    } catch (error) {
-      console.error('Failed to decline call:', error);
-      setActiveCall(null);
-    }
-  };
-
-  const handleEndCall = async () => {
-    if (!activeCall || !user?.steamId) return;
-
-    try {
-      const res = await fetch(`/api/chat/call?callId=${activeCall.callId}&userId=${user.steamId}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        setActiveCall(null);
-        toast.info('Call ended');
-      }
-    } catch (error) {
-      console.error('Failed to end call:', error);
-      setActiveCall(null);
-    }
-  };
-
-  // Poll for incoming calls
-  useEffect(() => {
-    if (!user?.steamId) return;
-
-    const checkCalls = async () => {
-      try {
-        const res = await fetch(`/api/chat/call?userId=${user.steamId}`);
-        if (res.ok) {
-          const { calls } = await res.json();
-          if (calls.length > 0 && !activeCall) {
-            const incomingCall = calls.find((call: any) => 
-              call.receiverId === user.steamId && call.status === 'ringing'
-            );
-            
-            if (incomingCall) {
-              // Get caller info from DM list
-              const callerInfo = dmList.find(dm => 
-                dm.otherUserId === incomingCall.callerId
-              );
-              
-              setActiveCall({
-                callId: incomingCall.callId,
-                callerId: incomingCall.callerId,
-                receiverId: incomingCall.receiverId,
-                callType: incomingCall.type || 'voice',
-                isIncoming: true,
-                callerName: callerInfo?.otherUserName || 'Unknown User',
-                callerAvatar: callerInfo?.otherUserAvatar || '',
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to check calls:', error);
-      }
-    };
-
-    checkCalls();
-    callPollIntervalRef.current = setInterval(checkCalls, 2000);
-
-    return () => {
-      if (callPollIntervalRef.current) {
-        clearInterval(callPollIntervalRef.current);
-      }
-    };
-  }, [user?.steamId, dmList, activeCall]);
-
   // Check blocked users when messages change
   useEffect(() => {
     if (!user?.steamId) return;
@@ -2033,16 +1870,6 @@ export default function ChatPage() {
                           </p>
                         </div>
                       </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleInitiateCall(dm.otherUserId, dm.otherUserName || 'User', dm.otherUserAvatar || '', 'voice');
-                          }}
-                          className="p-1.5 bg-green-600 hover:bg-green-500 rounded transition-colors flex-shrink-0"
-                          title="Voice call"
-                        >
-                          <Phone size={14} className="text-white" />
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -2446,22 +2273,6 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Call Modal */}
-        {activeCall && (
-          <CallModal
-            callId={activeCall.callId}
-            callerId={activeCall.callerId}
-            receiverId={activeCall.receiverId}
-            callType={activeCall.callType}
-            isIncoming={activeCall.isIncoming}
-            callerName={activeCall.callerName}
-            callerAvatar={activeCall.callerAvatar}
-            onAnswer={handleAnswerCall}
-            onDecline={handleDeclineCall}
-            onEnd={handleEndCall}
-            currentUserId={user?.steamId || ''}
-          />
-        )}
       </main>
     </div>
   );

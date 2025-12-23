@@ -94,28 +94,6 @@ export default function GlobalChatService() {
           }
         }
 
-        // Poll for incoming calls
-        const callsRes = await fetch(`/api/chat/call?userId=${currentUserId}`);
-        if (callsRes.ok) {
-          const { calls } = await callsRes.json();
-          if (calls.length > 0) {
-            const incomingCall = calls.find((call: any) => 
-              call.receiverId === currentUserId && call.status === 'ringing'
-            );
-            
-            if (incomingCall) {
-              // Dispatch call notification event
-              window.dispatchEvent(new CustomEvent('chat-call-incoming', {
-                detail: {
-                  callId: incomingCall.callId,
-                  callerId: incomingCall.callerId,
-                  callType: incomingCall.type || 'voice',
-                }
-              }));
-            }
-          }
-        }
-
         // Update last check time
         updateLastCheckTime();
         lastCheck = Date.now();

@@ -33,53 +33,10 @@ export default function ChatNotificationListener() {
       }
     };
 
-    const handleCallNotification = (event: Event) => {
-      const customEvent = event as CustomEvent<{ callId: string; callerId: string; callType: string }>;
-      const { callerId } = customEvent.detail;
-      
-      // Don't show call notification if user is on chat page (call modal will show)
-      if (window.location.pathname === '/chat') {
-        return;
-      }
-
-      // Get caller name (async but don't await)
-      fetch(`/api/chat/dms/list?steamId=${window.localStorage.getItem('steam_user') ? JSON.parse(window.localStorage.getItem('steam_user')!).steamId : ''}`)
-        .then(dmListRes => {
-          if (dmListRes.ok) {
-            return dmListRes.json();
-          }
-          return null;
-        })
-        .then(dmListData => {
-          if (dmListData) {
-            const dms = dmListData.dms || [];
-            const callerDM = dms.find((dm: any) => dm.otherUserId === callerId);
-            const callerName = callerDM?.otherUserName || 'Unknown User';
-            toast.info(
-              `Incoming call from ${callerName}`,
-              10000
-            );
-          } else {
-            toast.info(
-              'Incoming call',
-              10000
-            );
-          }
-        })
-        .catch(() => {
-          toast.info(
-            'Incoming call',
-            10000
-          );
-        });
-    };
-
     window.addEventListener('chat-notification', handleNotification as EventListener);
-    window.addEventListener('chat-call-incoming', handleCallNotification);
     
     return () => {
       window.removeEventListener('chat-notification', handleNotification as EventListener);
-      window.removeEventListener('chat-call-incoming', handleCallNotification);
     };
   }, [toast]);
 
