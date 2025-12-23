@@ -274,13 +274,32 @@ export default function ChatPage() {
       if (filterPinnedOnly) params.set('pinnedOnly', 'true');
       if (filterProOnly) params.set('proOnly', 'true');
       
-      const res = await fetch(`/api/chat/messages?${params.toString()}`);
+      const res = await fetch(`/api/chat/messages?${params.toString()}`, {
+        cache: 'no-store', // Always fetch fresh data
+      });
       if (res.ok) {
         const data = await res.json();
+        const newMessages = data.messages || [];
+        
+        // Only update if messages actually changed (avoid unnecessary re-renders)
         if (append) {
-          setMessages(prev => [...prev, ...(data.messages || [])]);
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const uniqueNew = newMessages.filter((m: any) => !existingIds.has(m.id));
+            return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+          });
         } else {
-          setMessages(data.messages || []);
+          setMessages(prev => {
+            // Only update if messages are different
+            if (prev.length !== newMessages.length) return newMessages;
+            const prevIds = new Set(prev.map(m => m.id));
+            const newIds = new Set(newMessages.map((m: any) => m.id));
+            if (prevIds.size !== newIds.size) return newMessages;
+            for (const id of prevIds) {
+              if (!newIds.has(id)) return newMessages;
+            }
+            return prev; // No changes, keep previous state
+          });
         }
         setHasMoreMessages(data.hasMore || false);
       }
@@ -408,7 +427,7 @@ export default function ChatPage() {
         }
         }
       }
-    }, 2000);
+    }, 1000); // Reduced from 2000ms to 1000ms for faster updates
     
     return () => clearInterval(interval);
   }, [activeTab, selectedDM, user?.steamId]);
@@ -417,12 +436,12 @@ export default function ChatPage() {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');
       fetchDMMessages(steamId1, steamId2);
-      // Optimize: Poll every 1.5 seconds for active DM
+      // Optimize: Poll every 800ms for active DM (faster for real-time feel)
       const interval = setInterval(() => {
         if (!dmChatDisabled) {
           fetchDMMessages(steamId1, steamId2, true);
         }
-      }, 1500);
+      }, 800);
       return () => clearInterval(interval);
     }
   }, [selectedDM, activeTab, user?.steamId, isAdmin]);
@@ -477,7 +496,7 @@ export default function ChatPage() {
     };
     
     pollTyping();
-    const interval = setInterval(pollTyping, 2000);
+    const interval = setInterval(pollTyping, 1000); // Faster typing indicator updates
     return () => clearInterval(interval);
   }, [activeTab, selectedDM, user?.steamId]);
 
@@ -485,28 +504,82 @@ export default function ChatPage() {
     e.preventDefault();
     if (!message.trim() || !user || sending) return;
 
+    const messageText = message.trim();
+    const tempId = `temp_${Date.now()}_${Math.random()}`;
+    
+    // Optimistically add message to UI immediately
+    const optimisticMessage = {
+      id: tempId,
+      steamId: user.steamId,
+      steamName: user.name || 'You',
+      avatar: user.avatar || '',
+      message: messageText,
+      timestamp: new Date(),
+      isPro: user.isPro || false,
+      isBanned: false,
+      isTimedOut: false,
+      timeoutUntil: null,
+      isPinned: false,
+    };
+
+    if (activeTab === 'global') {
+      setMessages(prev => [...prev, optimisticMessage]);
+    } else if (activeTab === 'dms' && selectedDM) {
+      const [steamId1, steamId2] = selectedDM.split('_');
+      const optimisticDMMessage = {
+        id: tempId,
+        dmId: selectedDM,
+        senderId: user.steamId,
+        receiverId: steamId1 === user.steamId ? steamId2 : steamId1,
+        senderName: user.name || 'You',
+        senderAvatar: user.avatar || '',
+        senderIsPro: user.isPro || false,
+        message: messageText,
+        timestamp: new Date(),
+        isBanned: false,
+        isTimedOut: false,
+      };
+      setDmMessages(prev => [...prev, optimisticDMMessage]);
+      // Update DM list optimistically
+      setDmList(prev => prev.map(dm => 
+        dm.dmId === selectedDM 
+          ? { ...dm, lastMessage: messageText, lastMessageTime: new Date() }
+          : dm
+      ));
+    }
+
+    // Clear input immediately
+    setMessage('');
     setSending(true);
     setIsTyping(false);
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
+
+    // Scroll to bottom
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
     
+    // Send in background
     try {
       if (activeTab === 'global') {
-        // Server will fetch current user info (name, avatar, pro status)
         const res = await fetch('/api/chat/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             steamId: user.steamId,
-            message: message.trim(),
+            message: messageText,
           }),
         });
 
         if (res.ok) {
-          setMessage('');
-          await fetchMessages(messagePage, false);
+          // Remove temp message and refresh to get real one with server timestamp
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
+          fetchMessages(messagePage, false).catch(() => {});
         } else {
+          // Remove failed message
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
           const data = await res.json();
           toast.error(data.error || 'Failed to send message');
         }
@@ -520,21 +593,30 @@ export default function ChatPage() {
           body: JSON.stringify({
             senderId: user.steamId,
             receiverId,
-            message: message.trim(),
+            message: messageText,
           }),
         });
 
         if (res.ok) {
-          setMessage('');
-          await fetchDMMessages(steamId1, steamId2);
-          await fetchDMList();
+          // Remove temp message and refresh
+          setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
+          fetchDMMessages(steamId1, steamId2).catch(() => {});
+          fetchDMList().catch(() => {});
         } else {
+          // Remove failed message
+          setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
           const data = await res.json();
           toast.error(data.error || 'Failed to send message');
         }
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      // Remove failed message
+      if (activeTab === 'global') {
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      } else {
+        setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
+      }
       toast.error('Failed to send message');
     } finally {
       setSending(false);
@@ -681,6 +763,18 @@ export default function ChatPage() {
       return;
     }
 
+    // Optimistically remove message immediately
+    if (messageType === 'global') {
+      const deletedMessage = messages.find(msg => msg.id === messageId);
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      toast.success('Message deleted');
+    } else if (selectedDM) {
+      const deletedMessage = dmMessages.find(msg => msg.id === messageId);
+      setDmMessages(prev => prev.filter(msg => msg.id !== messageId));
+      toast.success('Message deleted');
+    }
+
+    // Delete in background
     try {
       const url = messageType === 'global'
         ? `/api/chat/messages/${messageId}?userSteamId=${user.steamId}&type=global`
@@ -690,22 +784,27 @@ export default function ChatPage() {
         method: 'DELETE',
       });
 
-      if (res.ok) {
-        toast.success('Message deleted');
-        // Refresh messages
-        if (messageType === 'global') {
-          await fetchMessages(messagePage, false);
-        } else if (selectedDM) {
-          const [steamId1, steamId2] = selectedDM.split('_');
-          await fetchDMMessages(steamId1, steamId2);
-        }
-      } else {
+      if (!res.ok) {
+        // Revert on error
         const data = await res.json();
         toast.error(data.error || 'Failed to delete message');
+        if (messageType === 'global') {
+          fetchMessages(messagePage, false);
+        } else if (selectedDM) {
+          const [steamId1, steamId2] = selectedDM.split('_');
+          fetchDMMessages(steamId1, steamId2);
+        }
       }
     } catch (error) {
       console.error('Failed to delete message:', error);
       toast.error('Failed to delete message');
+      // Revert on error
+      if (messageType === 'global') {
+        fetchMessages(messagePage, false);
+      } else if (selectedDM) {
+        const [steamId1, steamId2] = selectedDM.split('_');
+        fetchDMMessages(steamId1, steamId2);
+      }
     }
   };
 
@@ -985,68 +1084,83 @@ export default function ChatPage() {
   const handleBlockUser = async (steamId: string, userName: string) => {
     if (!user?.steamId || blocking) return;
 
-    setBlocking(true);
+    // Optimistically update UI immediately
+    setBlockedUsers(prev => new Set([...prev, steamId]));
+    toast.success(`Blocked ${userName}`);
+    
+    if (activeTab === 'dms' && selectedDM) {
+      const [steamId1, steamId2] = selectedDM.split('_');
+      if (steamId === steamId1 || steamId === steamId2) {
+        setSelectedDM(null);
+      }
+    }
+
+    // Update in background
     try {
       const res = await fetch('/api/user/block', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          steamId1: user.steamId,
-          steamId2: steamId,
+          blockerSteamId: user.steamId,
+          blockedSteamId: steamId,
         }),
       });
 
-      if (res.ok) {
-        toast.success(`Blocked ${userName}`);
-        setBlockedUsers(prev => new Set([...prev, steamId]));
-        if (activeTab === 'dms' && selectedDM) {
-          const [steamId1, steamId2] = selectedDM.split('_');
-          if (steamId === steamId1 || steamId === steamId2) {
-            setSelectedDM(null);
-          }
-        }
-      } else {
+      if (!res.ok) {
+        // Revert on error
+        setBlockedUsers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(steamId);
+          return newSet;
+        });
         const data = await res.json();
         toast.error(data.error || 'Failed to block user');
       }
     } catch (error) {
       console.error('Failed to block user:', error);
+      // Revert on error
+      setBlockedUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(steamId);
+        return newSet;
+      });
       toast.error('Failed to block user');
-    } finally {
-      setBlocking(false);
     }
   };
 
   const handleUnblockUser = async (steamId: string) => {
     if (!user?.steamId || blocking) return;
 
-    setBlocking(true);
+    // Optimistically update UI immediately
+    const wasBlocked = blockedUsers.has(steamId);
+    setBlockedUsers(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(steamId);
+      return newSet;
+    });
+    toast.success('User unblocked');
+
+    // Update in background
     try {
-      const res = await fetch('/api/user/block', {
+      const res = await fetch(`/api/user/block?blockerSteamId=${user.steamId}&blockedSteamId=${steamId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          steamId1: user.steamId,
-          steamId2: steamId,
-        }),
       });
 
-      if (res.ok) {
-        toast.success('User unblocked');
-        setBlockedUsers(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(steamId);
-          return newSet;
-        });
-      } else {
+      if (!res.ok) {
+        // Revert on error
+        if (wasBlocked) {
+          setBlockedUsers(prev => new Set([...prev, steamId]));
+        }
         const data = await res.json();
         toast.error(data.error || 'Failed to unblock user');
       }
     } catch (error) {
       console.error('Failed to unblock user:', error);
+      // Revert on error
+      if (wasBlocked) {
+        setBlockedUsers(prev => new Set([...prev, steamId]));
+      }
       toast.error('Failed to unblock user');
-    } finally {
-      setBlocking(false);
     }
   };
 
