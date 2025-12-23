@@ -339,11 +339,21 @@ export default function ChatPage() {
     }
   };
 
-  const fetchDMMessages = async (steamId1: string, steamId2: string, checkForNew = false) => {
+  const fetchDMMessages = async (steamId1: string, steamId2: string, checkForNew = false, loadAll = false) => {
     if (!user?.steamId) return;
     try {
       // Always pass current user's steamId so API can verify they're a participant
-      const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${user.steamId}${isAdmin ? `&adminSteamId=${user.steamId}` : ''}`);
+      // Limit to 30 days initially for faster loading, can load more with loadAll=true
+      const params = new URLSearchParams({
+        steamId1,
+        steamId2,
+        currentUserId: user.steamId,
+        limit: '100', // Load 100 messages initially
+      });
+      if (isAdmin) params.set('adminSteamId', user.steamId);
+      if (loadAll) params.set('loadAll', 'true');
+      
+      const res = await fetch(`/api/chat/dms?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         const newMessages = data.messages || [];

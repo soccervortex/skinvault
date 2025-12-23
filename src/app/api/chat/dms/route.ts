@@ -81,26 +81,35 @@ export async function GET(request: Request) {
     const client = await getMongoClient();
     const db = client.db(MONGODB_DB_NAME);
 
-    // Get messages from last 365 days using date-based collections
+    // Get messages from last 30 days initially (can load more with cursor)
+    // This is much faster than querying 365 days of collections
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const collectionNames = getDMCollectionNamesForDays(365);
     
     // Cursor-based pagination support
     const beforeTimestamp = searchParams.get('beforeTimestamp');
     const beforeTimestampDate = beforeTimestamp ? new Date(beforeTimestamp) : null;
-    const pageSize = parseInt(searchParams.get('limit') || '500'); // Default 500 for DMs
+    const loadAll = searchParams.get('loadAll') === 'true'; // Option to load all 365 days
+    const pageSize = parseInt(searchParams.get('limit') || '100'); // Default 100 for initial load
+    
+    // Use fewer collections for initial load (30 days), more if explicitly requested
+    const daysToLoad = loadAll ? 365 : 30;
+    const collectionNames = getDMCollectionNamesForDays(daysToLoad);
+    const minDate = loadAll ? threeHundredSixtyFiveDaysAgo : thirtyDaysAgo;
     
     // Build query with cursor
     const queryFilter: any = {
       dmId,
-      timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
+      timestamp: { $gte: minDate }
     };
     
     if (beforeTimestampDate) {
       queryFilter.timestamp.$lt = beforeTimestampDate; // Get messages older than cursor
     }
     
-    const messagePromises = collectionNames.map(async (collectionName) => {
+    // Query collections in reverse order (newest first) and stop when we have enough
+    let allMessages: DMMessage[] = [];
+    for (const collectionName of collectionNames.reverse()) {
       const collection = db.collection<DMMessage>(collectionName);
       // Use projection to only fetch needed fields
       const projection = {
@@ -113,15 +122,19 @@ export async function GET(request: Request) {
         editedAt: 1,
       };
       
-      return collection
+      const messages = await collection
         .find(queryFilter, { projection })
         .sort({ timestamp: -1 }) // Sort descending for cursor pagination
         .limit(pageSize + 1) // Fetch one extra to check if there are more
         .toArray();
-    });
-    
-    const messageArrays = await Promise.all(messagePromises);
-    let allMessages = messageArrays.flat();
+      
+      allMessages.push(...messages);
+      
+      // If we have enough messages, stop querying older collections
+      if (allMessages.length >= pageSize + 1) {
+        break;
+      }
+    }
     
     // Sort by timestamp descending
     allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

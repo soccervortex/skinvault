@@ -113,7 +113,7 @@ export async function GET(request: Request) {
     const filterDateTo = searchParams.get('dateTo') || '';
     const filterPinnedOnly = searchParams.get('pinnedOnly') === 'true';
     const filterProOnly = searchParams.get('proOnly') === 'true';
-    const pageSize = 100;
+    const pageSize = 50; // Reduced from 100 for faster loading
 
     // Get banned and timeout users (disable cache for real-time status)
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -168,11 +168,11 @@ export async function GET(request: Request) {
       queryFilter.message = { $regex: searchQuery, $options: 'i' };
     }
     
-    // Query all relevant collections in parallel with projections (only fetch needed fields)
-    const messagePromises = collectionNames.map(async (collectionName) => {
+    // Query collections in reverse order (newest first) and stop when we have enough
+    // This avoids querying old collections unnecessarily
+    const messagePromises = collectionNames.reverse().map(async (collectionName) => {
       const collection = db.collection<ChatMessage>(collectionName);
       // Use projection to only fetch needed fields (reduces network transfer)
-      // Keep steamName and avatar as fallback if Steam API fails
       const projection = {
         _id: 1,
         steamId: 1,
@@ -184,6 +184,7 @@ export async function GET(request: Request) {
         isPro: 1,
       };
       
+      // Limit per collection to avoid fetching too much
       return collection
         .find(queryFilter, { projection })
         .sort({ timestamp: -1 }) // Sort descending (newest first) for cursor pagination
@@ -191,8 +192,17 @@ export async function GET(request: Request) {
         .toArray();
     });
     
-    const messageArrays = await Promise.all(messagePromises);
-    let allMessages = messageArrays.flat();
+    // Process collections sequentially until we have enough messages
+    let allMessages: ChatMessage[] = [];
+    for (const promise of messagePromises) {
+      const messages = await promise;
+      allMessages.push(...messages);
+      
+      // If we have enough messages, stop querying older collections
+      if (allMessages.length >= pageSize + 1) {
+        break;
+      }
+    }
     
     // Sort by timestamp descending (newest first)
     allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
