@@ -22,6 +22,9 @@ export function useChatStream(
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isMountedRef = useRef(true);
+  const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isConnectingRef = useRef(false);
+  const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update lastMessageId ref when prop changes
   useEffect(() => {
@@ -40,34 +43,50 @@ export function useChatStream(
     }
   }, [channel, lastMessageId]);
 
-  // Cleanup function
+  // Cleanup function - ensure complete cleanup
   const cleanup = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    isConnectingRef.current = false;
+    // Clear any pending connect timeouts
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
     }
+    // Clear any pending reconnect timeouts
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+    // Close and cleanup EventSource
+    if (eventSourceRef.current) {
+      try {
+        // Remove all event listeners before closing
+        eventSourceRef.current.onopen = null;
+        eventSourceRef.current.onmessage = null;
+        eventSourceRef.current.onerror = null;
+        eventSourceRef.current.close();
+      } catch {
+        // Ignore cleanup errors
+      }
+      eventSourceRef.current = null;
     }
     setIsConnected(false);
   }, []);
 
   // Reconnect with faster exponential backoff
   const reconnect = useCallback(() => {
-    if (!isMountedRef.current || !enabled || !currentUserId || !channel) {
+    if (!isMountedRef.current || !enabled || !currentUserId || !channel || isConnectingRef.current) {
       return;
     }
 
-    const maxAttempts = 3; // Reduced to 3 attempts
+    const maxAttempts = 2; // Reduced to 2 attempts for faster recovery
     if (reconnectAttemptsRef.current >= maxAttempts) {
-      // Reset after a longer delay to allow server recovery
+      // Reset after a short delay to allow server recovery
       reconnectAttemptsRef.current = 0;
       return;
     }
 
-    // Faster exponential backoff: 0.5s, 1s, 2s (much faster)
-    const delay = Math.min(500 * Math.pow(2, reconnectAttemptsRef.current), 2000);
+    // Faster exponential backoff: 0.3s, 0.6s (very fast)
+    const delay = Math.min(300 * Math.pow(2, reconnectAttemptsRef.current), 600);
     reconnectAttemptsRef.current += 1;
 
     reconnectTimeoutRef.current = setTimeout(() => {
@@ -82,9 +101,16 @@ export function useChatStream(
         params.set('lastMessageId', lastMessageIdRef.current);
       }
 
+      // Prevent duplicate connections
+      if (eventSourceRef.current || isConnectingRef.current) {
+        return;
+      }
+      
+      isConnectingRef.current = true;
       try {
         const eventSource = new EventSource(`/api/chat/stream?${params.toString()}`);
         eventSourceRef.current = eventSource;
+        isConnectingRef.current = false;
 
         eventSource.onopen = () => {
           if (!isMountedRef.current) {
@@ -158,11 +184,26 @@ export function useChatStream(
       return;
     }
 
-    // Close existing connection before creating new one
+    // Close existing connection before creating new one - wait a bit to ensure cleanup
     cleanup();
-
-    // Initial connection - connect immediately
     reconnectAttemptsRef.current = 0;
+
+    // Add delay when channel changes to prevent rapid connection attempts
+    // Check if channel changed (more aggressive cleanup needed)
+    const channelChanged = channelRef.current !== channel;
+    const delay = channelChanged ? 300 : 50; // 300ms delay on channel change, 50ms otherwise
+    
+    connectTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current || !enabled || !currentUserId || !channel) {
+        return;
+      }
+
+      // Prevent duplicate connections
+      if (eventSourceRef.current || isConnectingRef.current) {
+        return;
+      }
+
+    // Initial connection
     
     // Build SSE URL
     const params = new URLSearchParams({
@@ -236,6 +277,7 @@ export function useChatStream(
       // If EventSource creation fails, try to reconnect
       reconnect();
     }
+    }, channel !== channelRef.current ? 200 : 0); // 200ms delay on channel change, immediate otherwise
 
     return () => {
       isMountedRef.current = false;
