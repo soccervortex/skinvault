@@ -960,6 +960,57 @@ export default function ChatPage() {
           </form>
         )}
 
+        {/* Report Modal */}
+        {reportUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[#11141d] p-6 rounded-2xl border border-orange-500/30 max-w-md w-full mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-orange-400">Report User</h3>
+                <button
+                  onClick={() => {
+                    setReportUser(null);
+                    setReportSteamId('');
+                  }}
+                  className="text-gray-500 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-gray-400 mb-4">
+                You are reporting <strong>{reportUser.name}</strong> ({reportUser.type === 'global' ? 'Global Chat' : 'Direct Message'}).
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Please enter the Steam ID of the user you are reporting to confirm:
+              </p>
+              <input
+                type="text"
+                value={reportSteamId}
+                onChange={(e) => setReportSteamId(e.target.value)}
+                placeholder="7656119..."
+                className="w-full bg-[#08090d] border border-white/10 rounded-lg px-4 py-2 mb-4 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={handleReport}
+                  disabled={!reportSteamId.trim() || reporting}
+                  className="flex-1 bg-orange-600 hover:bg-orange-500 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50"
+                >
+                  {reporting ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'Submit Report'}
+                </button>
+                <button
+                  onClick={() => {
+                    setReportUser(null);
+                    setReportSteamId('');
+                  }}
+                  className="flex-1 bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Add User Modal */}
         {showAddUser && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

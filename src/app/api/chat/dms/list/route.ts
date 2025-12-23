@@ -93,14 +93,13 @@ export async function GET(request: Request) {
         }
       }
 
-      if (latestMessage) {
-        dmList.push({
-          dmId,
-          otherUserId,
-          lastMessage: latestMessage.message,
-          lastMessageTime: latestMessage.timestamp,
-        });
-      }
+      // Add DM even if no messages yet (for newly accepted invites)
+      dmList.push({
+        dmId,
+        otherUserId,
+        lastMessage: latestMessage?.message || 'No messages yet',
+        lastMessageTime: latestMessage?.timestamp || invite.createdAt,
+      });
     }
 
     await client.close();

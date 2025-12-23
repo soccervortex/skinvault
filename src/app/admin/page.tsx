@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
+import { useToast } from "@/app/components/Toast";
 
 type ProEntry = {
   steamId: string;
@@ -29,68 +30,9 @@ type ProEntry = {
   daysRemaining: number;
 };
 
-// Collections List Component
-function CollectionsList({ user }: { user: any }) {
-  const [collections, setCollections] = useState<Array<{ name: string; count: number; type: string }>>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user?.steamId) return;
-    
-    const loadCollections = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/admin/collections?adminSteamId=${user.steamId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setCollections(data.collections || []);
-        }
-      } catch (error) {
-        console.error('Failed to load collections:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCollections();
-    const interval = setInterval(loadCollections, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, [user?.steamId]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="animate-spin text-purple-400" size={24} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 max-h-96 overflow-y-auto custom-scrollbar">
-      <div className="space-y-2">
-        {collections.map((coll) => (
-          <div key={coll.name} className="flex items-center justify-between p-2 bg-[#11141d] rounded-lg">
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] md:text-[11px] font-bold text-white truncate">{coll.name}</p>
-              <p className="text-[9px] text-gray-500">
-                {coll.type === 'chat' ? 'Global Chat' :
-                 coll.type === 'dm' ? 'Direct Messages' :
-                 coll.type === 'reports' ? 'Reports' :
-                 coll.type === 'dm_invites' ? 'DM Invites' :
-                 coll.type === 'backup' ? 'Chat Backup' :
-                 coll.type === 'dm_backup' ? 'DM Backup' :
-                 'Other'} • {coll.count} document{coll.count !== 1 ? 's' : ''}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function AdminPage() {
   const router = useRouter();
+  const toast = useToast();
   const [user, setUser] = useState<any>(null);
   const [steamId, setSteamId] = useState("");
   const [months, setMonths] = useState("1");
@@ -1342,27 +1284,6 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Database Collections Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-xl md:rounded-2xl bg-purple-500/10 border border-purple-500/40 shrink-0">
-              <Shield className="text-purple-400" size={16} />
-            </div>
-            <div>
-              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
-                Database
-              </p>
-              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
-                Collections
-              </h2>
-            </div>
-          </div>
-          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
-            View all MongoDB collections. Chat messages are stored in date-based collections (chats_YYYY-MM-DD).
-          </p>
-          <CollectionsList user={user} />
-        </div>
-
         {/* User Search Section */}
         <div className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
@@ -1385,8 +1306,12 @@ export default function AdminPage() {
 
           <form onSubmit={(e) => { 
             e.preventDefault(); 
-            if (searchSteamId && searchSteamId.trim()) {
-              router.push(`/admin/user/${searchSteamId.trim()}`);
+            e.stopPropagation();
+            const trimmedId = searchSteamId?.trim();
+            if (trimmedId && trimmedId.length >= 17) {
+              router.push(`/admin/user/${trimmedId}`);
+            } else {
+              toast.error('Please enter a valid Steam ID (17 digits)');
             }
           }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
@@ -1444,7 +1369,13 @@ export default function AdminPage() {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => router.push(`/admin/user/${timeout.steamId}`)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (timeout.steamId) {
+                          router.push(`/admin/user/${timeout.steamId}`);
+                        }
+                      }}
                       className="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-colors flex items-center gap-1"
                     >
                       <Search size={12} /> View
