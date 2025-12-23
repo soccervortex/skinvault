@@ -380,30 +380,43 @@ export default function ChatPage() {
       const dmId = [steamId1, steamId2].sort().join('_');
       
       // Check cache first (only for initial load, not when checking for new)
+      // But always fetch fresh data to ensure we have the latest messages
       if (!checkForNew && !loadAll) {
         const cached = getCachedMessages(dmId, 'dm');
         if (cached && cached.messages.length > 0) {
+          // Show cached messages immediately for instant display
           setDmMessages(cached.messages);
           setLoading(false);
-          // Still fetch in background to update cache
+          // Still fetch in background to update cache and get latest messages
         }
       }
       
       // Always pass current user's steamId so API can verify they're a participant
-      // Limit to 30 days initially for faster loading, can load more with loadAll=true
+      // Load all 365 days of messages to ensure we get everything
       const params = new URLSearchParams({
         steamId1,
         steamId2,
         currentUserId: user.steamId,
-        limit: '50', // Load 50 messages initially for faster loading
+        limit: '100', // Load more messages initially
       });
       if (isAdmin) params.set('adminSteamId', user.steamId);
-      if (loadAll) params.set('loadAll', 'true');
+      if (loadAll) {
+        params.set('loadAll', 'true');
+      } else {
+        // Always load all 365 days for DMs to ensure we get all messages
+        params.set('loadAll', 'true');
+      }
       
-      const res = await fetch(`/api/chat/dms?${params.toString()}`);
+      const res = await fetch(`/api/chat/dms?${params.toString()}`, {
+        cache: 'no-store', // Always fetch fresh data
+      });
+      
       if (res.ok) {
         const data = await res.json();
         const newMessages = data.messages || [];
+        
+        // Always update messages, even if we showed cached ones
+        setDmMessages(newMessages);
         
         // Cache messages for faster loading next time
         if (!checkForNew) {
@@ -426,15 +439,29 @@ export default function ChatPage() {
           }
         }
         
-        setDmMessages(newMessages);
-        
         // Mark DM as read when viewing (always mark as read when messages are loaded for selected DM)
         if (selectedDM === dmId) {
           markDMAsRead(dmId, user.steamId);
         }
+      } else {
+        console.error('Failed to fetch DM messages:', res.status, res.statusText);
+        // If fetch fails and we have cached messages, keep showing them
+        // Otherwise show error
+        if (dmMessages.length === 0) {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('DM fetch error:', errorData);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch DM messages:', error);
+      // If error and no messages, try to load from cache as fallback
+      if (dmMessages.length === 0) {
+        const dmId = [steamId1, steamId2].sort().join('_');
+        const cached = getCachedMessages(dmId, 'dm');
+        if (cached && cached.messages.length > 0) {
+          setDmMessages(cached.messages);
+        }
+      }
     } finally {
       setLoading(false);
     }
