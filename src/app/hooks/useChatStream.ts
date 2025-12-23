@@ -277,7 +277,7 @@ export function useChatStream(
       // If EventSource creation fails, try to reconnect
       reconnect();
     }
-    }, channel !== channelRef.current ? 200 : 0); // 200ms delay on channel change, immediate otherwise
+    }, channelChanged ? 300 : 50); // 300ms delay on channel change, 50ms otherwise
 
     return () => {
       isMountedRef.current = false;
