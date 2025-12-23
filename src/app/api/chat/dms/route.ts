@@ -123,6 +123,36 @@ export async function GET(request: Request) {
       }
     }
     
+    // Only query older collections if we need more messages and loadAll is true
+    if (loadAll && allMessages.length < pageSize) {
+      for (const collectionName of olderCollectionNames) {
+        if (allMessages.length >= pageSize + 1) break;
+        
+        const collection = db.collection<DMMessage>(collectionName);
+        const projection = {
+          _id: 1,
+          dmId: 1,
+          senderId: 1,
+          receiverId: 1,
+          message: 1,
+          timestamp: 1,
+          editedAt: 1,
+        };
+        
+        const messages = await collection
+          .find(queryFilter, { projection })
+          .sort({ timestamp: -1 })
+          .limit(pageSize + 1 - allMessages.length) // Only fetch what we need
+          .toArray();
+        
+        allMessages.push(...messages);
+        
+        if (allMessages.length >= pageSize + 1) {
+          break;
+        }
+      }
+    }
+    
     // Sort by timestamp descending
     allMessages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
