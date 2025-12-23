@@ -43,7 +43,10 @@ async function getMongoClient() {
   if (!MONGODB_URI) {
     throw new Error('MongoDB URI not configured');
   }
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000, // 5 second timeout
+    connectTimeoutMS: 5000,
+  });
   await client.connect();
   return client;
 }
@@ -159,8 +162,12 @@ export async function GET(request: Request) {
     dmList.sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
 
     return NextResponse.json({ dms: dmList });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to get DM list:', error);
+    // If MongoDB is not configured or connection fails, return empty list instead of error
+    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+      return NextResponse.json({ dms: [] });
+    }
     return NextResponse.json({ error: 'Failed to get DM list' }, { status: 500 });
   }
 }

@@ -8,9 +8,25 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const DISMISS_KEY = 'installPromptDismissed';
+
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+
+  // Check if dismissed on mount
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const dismissed = window.localStorage.getItem(DISMISS_KEY);
+        if (dismissed === 'true') {
+          return; // Don't show if dismissed
+        }
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
 
   useEffect(() => {
     // Check if already installed
@@ -18,11 +34,50 @@ export default function InstallPrompt() {
       return;
     }
 
+    // Check if dismissed before showing
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const dismissed = window.localStorage.getItem(DISMISS_KEY);
+        if (dismissed === 'true') {
+          return; // Don't show if dismissed
+        }
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+
     const handler = (e: Event) => {
       e.preventDefault();
+      
+      // Check again before setting prompt (user might have dismissed while waiting)
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const dismissed = window.localStorage.getItem(DISMISS_KEY);
+          if (dismissed === 'true') {
+            return; // Don't set prompt if dismissed
+          }
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+      
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       // Show prompt after a delay (better UX)
-      setTimeout(() => setShowPrompt(true), 3000);
+      setTimeout(() => {
+        // Final check before showing
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            const dismissed = window.localStorage.getItem(DISMISS_KEY);
+            if (dismissed !== 'true') {
+              setShowPrompt(true);
+            }
+          } else {
+            setShowPrompt(true);
+          }
+        } catch {
+          setShowPrompt(true);
+        }
+      }, 3000);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -35,47 +90,38 @@ export default function InstallPrompt() {
   const handleInstall = async () => {
     if (!deferredPrompt) return;
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
 
-    if (outcome === 'accepted') {
-      setShowPrompt(false);
-      setDeferredPrompt(null);
+      if (outcome === 'accepted') {
+        setShowPrompt(false);
+        setDeferredPrompt(null);
+        // Mark as dismissed even if installed (to prevent showing again)
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(DISMISS_KEY, 'true');
+          }
+        } catch {
+          // Ignore localStorage errors
+        }
+      }
+    } catch (error) {
+      console.error('Install prompt error:', error);
     }
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Don't show again for this session
+    // Store dismissal in localStorage so it persists across sessions
     try {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        // Test sessionStorage accessibility first
-        const testKey = '__sessionStorage_test__';
-        window.sessionStorage.setItem(testKey, 'test');
-        window.sessionStorage.removeItem(testKey);
-        window.sessionStorage.setItem('installPromptDismissed', 'true');
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(DISMISS_KEY, 'true');
       }
     } catch {
-      // Ignore sessionStorage errors
+      // Ignore localStorage errors
     }
   };
-
-  // Don't show if dismissed in this session
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        // Test sessionStorage accessibility first
-        const testKey = '__sessionStorage_test__';
-        window.sessionStorage.setItem(testKey, 'test');
-        window.sessionStorage.removeItem(testKey);
-        if (window.sessionStorage.getItem('installPromptDismissed')) {
-          setShowPrompt(false);
-        }
-      }
-    } catch {
-      // Ignore sessionStorage errors
-    }
-  }, []);
 
   if (!showPrompt || !deferredPrompt) return null;
 

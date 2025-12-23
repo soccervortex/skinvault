@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import InstallPrompt from '@/app/components/InstallPrompt';
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
@@ -494,6 +495,7 @@ export default function GlobalSkinSearch() {
         limit={getWishlistLimitSync(false)}
         currentCount={wishlist.length}
       />
+      <InstallPrompt />
     </div>
   );
 }

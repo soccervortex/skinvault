@@ -8,7 +8,6 @@ import "./easter-theme.css";
 import "./sinterklaas-theme.css";
 import "./newyear-theme.css";
 import "./oldyear-theme.css";
-import InstallPrompt from "./components/InstallPrompt";
 import ThemeProviderWrapper from "./components/ThemeProviderWrapper";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toast";
@@ -204,7 +203,6 @@ export default function RootLayout({
         {children}
             <ProExpirationWarning />
             <NetworkStatus />
-        <InstallPrompt />
         <ThemeProviderWrapper />
           </ToastProvider>
         </ErrorBoundary>

@@ -30,7 +30,10 @@ async function getMongoClient() {
   if (!MONGODB_URI) {
     throw new Error('MongoDB URI not configured');
   }
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000, // 5 second timeout
+    connectTimeoutMS: 5000,
+  });
   await client.connect();
   return client;
 }
@@ -210,9 +213,14 @@ export async function GET(request: Request) {
           }
 
           await client.close();
-        } catch (error) {
+        } catch (error: any) {
           console.error('SSE poll error:', error);
-          send({ type: 'error', message: 'Failed to fetch messages' });
+          // If MongoDB connection fails, send error but don't close connection
+          if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+            send({ type: 'error', message: 'Chat service is currently unavailable' });
+          } else {
+            send({ type: 'error', message: 'Failed to fetch messages' });
+          }
         }
       }, 500); // Check every 500ms for near-instant updates
 

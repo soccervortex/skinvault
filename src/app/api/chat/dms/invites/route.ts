@@ -17,7 +17,10 @@ async function getMongoClient() {
   if (!MONGODB_URI) {
     throw new Error('MongoDB URI not configured');
   }
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000, // 5 second timeout
+    connectTimeoutMS: 5000,
+  });
   await client.connect();
   return client;
 }
@@ -93,8 +96,12 @@ export async function GET(request: Request) {
     const filteredInvites = invitesWithInfo.filter(invite => invite !== null);
 
     return NextResponse.json({ invites: filteredInvites });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to get DM invites:', error);
+    // If MongoDB is not configured or connection fails, return empty invites instead of error
+    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+      return NextResponse.json({ invites: [] });
+    }
     return NextResponse.json({ error: 'Failed to get invites' }, { status: 500 });
   }
 }
@@ -170,8 +177,12 @@ export async function POST(request: Request) {
     await client.close();
 
     return NextResponse.json({ success: true, invite });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to send DM invite:', error);
+    // If MongoDB is not configured or connection fails, return error
+    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+      return NextResponse.json({ error: 'Chat service is currently unavailable' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Failed to send invite' }, { status: 500 });
   }
 }
@@ -233,8 +244,12 @@ export async function PATCH(request: Request) {
       success: true, 
       status: action === 'accept' ? 'accepted' : 'declined' 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to update DM invite:', error);
+    // If MongoDB is not configured or connection fails, return error
+    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+      return NextResponse.json({ error: 'Chat service is currently unavailable' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Failed to update invite' }, { status: 500 });
   }
 }

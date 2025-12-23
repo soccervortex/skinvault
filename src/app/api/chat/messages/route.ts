@@ -28,7 +28,10 @@ async function getMongoClient() {
   if (!MONGODB_URI) {
     throw new Error('MongoDB URI not configured');
   }
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000, // 5 second timeout
+    connectTimeoutMS: 5000,
+  });
   await client.connect();
   return client;
 }
@@ -221,8 +224,12 @@ export async function GET(request: Request) {
       total: totalMessages,
       page,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to get chat messages:', error);
+    // If MongoDB is not configured or connection fails, return empty messages instead of error
+    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+      return NextResponse.json({ messages: [], hasMore: false, total: 0, page: 1 });
+    }
     return NextResponse.json({ error: 'Failed to get messages' }, { status: 500 });
   }
 }
@@ -306,8 +313,12 @@ export async function POST(request: Request) {
     await client.close();
 
     return NextResponse.json({ success: true, message: chatMessage });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to send chat message:', error);
+    // If MongoDB is not configured or connection fails, return error
+    if (!MONGODB_URI || error?.message?.includes('MongoDB') || error?.message?.includes('connection')) {
+      return NextResponse.json({ error: 'Chat service is currently unavailable' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
   }
 }
