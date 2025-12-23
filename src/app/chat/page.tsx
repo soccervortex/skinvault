@@ -8,7 +8,7 @@ import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
-import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime } from '@/app/utils/chat-notifications';
+import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead } from '@/app/utils/chat-notifications';
 import { useChatStream } from '@/app/hooks/useChatStream';
 
 interface ChatMessage {
@@ -432,10 +432,19 @@ export default function ChatPage() {
       if (dmInvites.length === 0) {
         fetchDMInvites();
       }
-      // Mark selected DM as read when switching to DMs tab
-      if (selectedDM) {
+      // Mark ALL DMs as read when switching to DMs tab (user has viewed the tab)
+      if (user?.steamId) {
+        markAllDMsAsRead(user.steamId);
+      }
+      // Also mark selected DM as read if one is selected
+      if (selectedDM && user?.steamId) {
         markDMAsRead(selectedDM, user.steamId);
       }
+    }
+    
+    // When switching to global tab, also ensure all DMs are marked as read (user viewed them)
+    if (activeTab === 'global' && user?.steamId) {
+      markAllDMsAsRead(user.steamId);
     }
     
     // Fallback polling (SSE is primary, this is backup)

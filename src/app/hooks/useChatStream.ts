@@ -24,7 +24,6 @@ export function useChatStream(
   const isMountedRef = useRef(true);
   const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
-  const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update lastMessageId ref when prop changes
   useEffect(() => {

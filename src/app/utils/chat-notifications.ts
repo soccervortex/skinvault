@@ -235,3 +235,29 @@ export function updateLastCheckTime(): void {
   }
 }
 
+/**
+ * Mark all DMs as read (when user views DMs tab)
+ */
+export function markAllDMsAsRead(currentUserId: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    
+    const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
+    
+    // Mark all DMs for this user as read
+    Object.keys(unreadDms).forEach(dmId => {
+      if (unreadDms[dmId].userId === currentUserId) {
+        unreadDms[dmId].count = 0;
+        unreadDms[dmId].lastRead = Date.now();
+      }
+    });
+    
+    localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
+    
+    // Dispatch event for other components
+    window.dispatchEvent(new CustomEvent('chat-unread-updated'));
+  } catch {
+    // Ignore errors
+  }
+}
+
