@@ -35,8 +35,10 @@ interface DMMessage {
   senderIsPro: boolean;
   message: string;
   timestamp: Date | string;
+  editedAt?: Date | string;
   isBanned?: boolean;
   isTimedOut?: boolean;
+  isPinned?: boolean;
 }
 
 interface DM {
