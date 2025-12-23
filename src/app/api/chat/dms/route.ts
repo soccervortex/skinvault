@@ -34,6 +34,11 @@ async function getMongoClient() {
     connectTimeoutMS: 5000,
   });
   await client.connect();
+  
+  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
+  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
+  autoSetupIndexes().catch(() => {}); // Don't block on index setup
+  
   return client;
 }
 
@@ -276,6 +281,10 @@ export async function POST(request: Request) {
     // Use today's date-based collection
     const collectionName = getTodayDMCollectionName();
     const collection = db.collection<DMMessage>(collectionName);
+    
+    // Auto-setup index for new collection if needed
+    const { setupIndexesForCollection } = await import('@/app/utils/mongodb-auto-index');
+    setupIndexesForCollection(collectionName).catch(() => {});
 
     const dmMessage: DMMessage = {
       dmId,

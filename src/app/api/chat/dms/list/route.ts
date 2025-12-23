@@ -48,6 +48,11 @@ async function getMongoClient() {
     connectTimeoutMS: 5000,
   });
   await client.connect();
+  
+  // Auto-setup indexes on first connection (runs once, silently fails if already setup)
+  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
+  autoSetupIndexes().catch(() => {}); // Don't block on index setup
+  
   return client;
 }
 
