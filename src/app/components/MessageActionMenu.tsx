@@ -110,7 +110,7 @@ export default function MessageActionMenu({
             </button>
           )}
 
-          {isOwnMessage && messageId && onDelete && (
+          {((isOwnMessage || isAdmin) && messageId && onDelete) && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, CheckSquare, Square, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Loader2, Crown, Shield, Clock, Ban, MessageSquare, Users, UserPlus, X, Flag, Trash2, UserX, UserCheck, Edit, Pin, PinOff, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { useToast } from '@/app/components/Toast';
@@ -98,7 +98,6 @@ export default function ChatPage() {
   const [editingMessage, setEditingMessage] = useState<{ id: string; type: 'global' | 'dm'; currentText: string } | null>(null);
   const [editText, setEditText] = useState('');
   const [editing, setEditing] = useState(false);
-  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [typingUsers, setTypingUsers] = useState<Array<{ steamId: string; steamName: string }>>([]);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1240,54 +1239,6 @@ export default function ChatPage() {
     }
   }, [showPinnedMessages, messages, dmMessages]);
 
-  const handleBulkDelete = async () => {
-    if (!isAdmin || !user?.steamId || selectedMessages.size === 0) return;
-
-    if (!confirm(`Are you sure you want to delete ${selectedMessages.size} message(s)?`)) {
-      return;
-    }
-
-    try {
-      const messageType = activeTab === 'global' ? 'global' : 'dm';
-      const res = await fetch(`/api/admin/chat/bulk-delete?adminSteamId=${user.steamId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messageIds: Array.from(selectedMessages),
-          messageType,
-          dmId: activeTab === 'dms' ? selectedDM : undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(`Deleted ${data.deletedCount} message(s)`);
-        setSelectedMessages(new Set());
-        if (messageType === 'global') {
-          await fetchMessages(messagePage, false);
-        } else if (selectedDM) {
-          const [steamId1, steamId2] = selectedDM.split('_');
-          await fetchDMMessages(steamId1, steamId2);
-        }
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to delete messages');
-      }
-    } catch (error) {
-      console.error('Failed to bulk delete messages:', error);
-      toast.error('Failed to delete messages');
-    }
-  };
-
-  const toggleMessageSelection = (messageId: string) => {
-    const newSelected = new Set(selectedMessages);
-    if (newSelected.has(messageId)) {
-      newSelected.delete(messageId);
-    } else {
-      newSelected.add(messageId);
-    }
-    setSelectedMessages(newSelected);
-  };
 
   const handleBlockUser = async (steamId: string, userName: string) => {
     if (!user?.steamId || blocking) return;
@@ -1550,20 +1501,6 @@ export default function ChatPage() {
 
         {activeTab === 'global' ? (
           <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar relative">
-            {isAdmin && selectedMessages.size > 0 && (
-              <div className="sticky top-0 z-10 bg-[#08090d] border border-white/10 rounded-lg p-3 mb-4 flex items-center justify-between">
-                <span className="text-sm font-bold text-white">
-                  {selectedMessages.size} message(s) selected
-                </span>
-                <button
-                  onClick={handleBulkDelete}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                >
-                  <Trash2 size={16} />
-                  Delete Selected
-                </button>
-              </div>
-            )}
             {globalChatDisabled ? (
               <div className="flex items-center justify-center h-full text-gray-500">
                 <div className="text-center">
@@ -1634,7 +1571,7 @@ export default function ChatPage() {
                         isBlocked={blockedUsers.has(msg.steamId)}
                         isPinned={msg.isPinned}
                         onReport={msg.steamId !== user?.steamId ? () => setReportUser({ steamId: msg.steamId, name: msg.steamName, type: 'global' }) : undefined}
-                        onDelete={msg.steamId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'global') : undefined}
+                        onDelete={msg.id && (msg.steamId === user?.steamId || isAdmin) ? () => handleDeleteMessage(msg.id!, 'global') : undefined}
                         onEdit={msg.id ? () => handleEditMessage(msg.id!, msg.message, 'global') : undefined}
                         onPin={isAdmin && msg.id && !msg.isPinned ? () => handlePinMessage(msg.id!, 'global') : undefined}
                         onUnpin={isAdmin && msg.id && msg.isPinned ? () => handleUnpinMessage(msg.id!) : undefined}
@@ -1915,22 +1852,6 @@ export default function ChatPage() {
                                   </span>
                                 )}
                                 <div className="ml-auto flex items-center gap-2">
-                                  {isAdmin && msg.id && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleMessageSelection(msg.id!);
-                                      }}
-                                      className="p-1.5 hover:bg-white/10 rounded transition-colors"
-                                      title="Select message"
-                                    >
-                                      {selectedMessages.has(msg.id!) ? (
-                                        <CheckSquare size={16} className="text-blue-400" />
-                                      ) : (
-                                        <Square size={16} className="text-gray-400" />
-                                      )}
-                                    </button>
-                                  )}
                                   {msg.isPinned && (
                                     <Pin size={12} className="text-yellow-400" />
                                   )}
@@ -1949,7 +1870,7 @@ export default function ChatPage() {
                                         type: 'dm',
                                         dmId: selectedDM || undefined
                                     }) : undefined}
-                                    onDelete={msg.senderId === user?.steamId && msg.id ? () => handleDeleteMessage(msg.id!, 'dm') : undefined}
+                                    onDelete={msg.id && (msg.senderId === user?.steamId || isAdmin) ? () => handleDeleteMessage(msg.id!, 'dm') : undefined}
                                     onEdit={msg.id ? () => handleEditMessage(msg.id!, msg.message, 'dm') : undefined}
                                     onPin={isAdmin && msg.id && !msg.isPinned ? () => handlePinMessage(msg.id!, 'dm') : undefined}
                                     onUnpin={isAdmin && msg.id && msg.isPinned ? () => handleUnpinMessage(msg.id!) : undefined}
