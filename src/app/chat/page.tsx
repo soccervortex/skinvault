@@ -796,7 +796,7 @@ export default function ChatPage() {
       if (data.type === 'message_deleted' && data.messageId && data.messageType === 'dm' && data.dmId) {
         // Remove from all DMs, not just selected (in case user switches DMs)
         setDmMessages(prev => {
-          if (selectedDM === data.dmId) {
+          if (selectedDM && selectedDM === data.dmId) {
             const filtered = prev.filter(msg => msg.id !== data.messageId);
             clearCache(selectedDM, 'dm');
             setCachedMessages(selectedDM, filtered, null, 'dm');
