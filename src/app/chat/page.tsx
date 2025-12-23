@@ -820,16 +820,23 @@ export default function ChatPage() {
   useEffect(() => {
     if (activeTab === 'dms' && selectedDM && user?.steamId) {
       const [steamId1, steamId2] = selectedDM.split('_');
+      if (!steamId1 || !steamId2) return;
+      
       // Mark DM as read when selected/viewed (immediately clear unread counter)
       markDMAsRead(selectedDM, user.steamId);
-      fetchDMMessages(steamId1, steamId2);
+      
+      // Always fetch fresh messages when DM is selected (load all 365 days)
+      setLoading(true);
+      fetchDMMessages(steamId1, steamId2, false, true).finally(() => {
+        setLoading(false);
+      });
       
       // Reduced polling since SSE handles real-time updates
       // Only poll if SSE is not connected
       let interval: NodeJS.Timeout | undefined;
       if (!dmStream.isConnected && !dmChatDisabled) {
         interval = setInterval(() => {
-          fetchDMMessages(steamId1, steamId2, true);
+          fetchDMMessages(steamId1, steamId2, true, true);
         }, 5000); // Slower polling since SSE is primary
       }
       
@@ -838,6 +845,9 @@ export default function ChatPage() {
           clearInterval(interval);
         }
       };
+    } else if (activeTab === 'dms' && !selectedDM) {
+      // Clear messages when no DM is selected
+      setDmMessages([]);
     }
   }, [selectedDM, activeTab, user?.steamId, isAdmin, dmStream.isConnected, dmChatDisabled]);
 
