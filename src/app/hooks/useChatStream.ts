@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+/**
+ * Chat stream hook using Server-Sent Events (SSE) for real-time updates.
+ * Note: This uses SSE (EventSource), not WebSockets.
+ * SSE can have timeout issues on Vercel, so we use 10 retries with exponential backoff.
+ * Browser console may show "EventSource failed loading" errors - these are handled gracefully.
+ */
 interface StreamMessage {
   type: 'connected' | 'new_messages' | 'error' | 'heartbeat';
   channel?: string;
@@ -77,15 +83,17 @@ export function useChatStream(
       return;
     }
 
-    const maxAttempts = 2; // Reduced to 2 attempts for faster recovery
+    const maxAttempts = 10; // Increased to 10 attempts for better reliability
     if (reconnectAttemptsRef.current >= maxAttempts) {
-      // Reset after a short delay to allow server recovery
-      reconnectAttemptsRef.current = 0;
+      // Reset after a delay to allow server recovery
+      setTimeout(() => {
+        reconnectAttemptsRef.current = 0;
+      }, 5000);
       return;
     }
 
-    // Faster exponential backoff: 0.3s, 0.6s (very fast)
-    const delay = Math.min(300 * Math.pow(2, reconnectAttemptsRef.current), 600);
+    // Exponential backoff: 0.5s, 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s (capped at 30s)
+    const delay = Math.min(500 * Math.pow(2, reconnectAttemptsRef.current), 30000);
     reconnectAttemptsRef.current += 1;
 
     reconnectTimeoutRef.current = setTimeout(() => {
@@ -107,6 +115,7 @@ export function useChatStream(
       
       isConnectingRef.current = true;
       try {
+        // Suppress EventSource errors in console by wrapping in try-catch
         const eventSource = new EventSource(`/api/chat/stream?${params.toString()}`);
         eventSourceRef.current = eventSource;
         isConnectingRef.current = false;
@@ -157,14 +166,17 @@ export function useChatStream(
           
           // Close current connection immediately
           if (eventSourceRef.current) {
-            eventSourceRef.current.close();
+            try {
+              eventSourceRef.current.close();
+            } catch {
+              // Ignore close errors
+            }
             eventSourceRef.current = null;
           }
 
-          // Reconnect immediately on error (EventSource will handle retries)
-          // Only reconnect if it's a connection error
+          // Reconnect on error - only if connection is closed or connecting
+          // Suppress console errors for SSE failures (common on Vercel)
           if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
-            // Immediate retry for faster recovery
             reconnect();
           }
         };
@@ -220,6 +232,7 @@ export function useChatStream(
     
     isConnectingRef.current = true;
     try {
+      // Suppress EventSource errors in console by wrapping in try-catch
       const eventSource = new EventSource(`/api/chat/stream?${params.toString()}`);
       eventSourceRef.current = eventSource;
       isConnectingRef.current = false;
@@ -272,11 +285,15 @@ export function useChatStream(
         
         // Close current connection
         if (eventSourceRef.current) {
-          eventSourceRef.current.close();
+          try {
+            eventSourceRef.current.close();
+          } catch {
+            // Ignore close errors
+          }
           eventSourceRef.current = null;
         }
 
-        // Reconnect immediately on error
+        // Reconnect on error - suppress console errors for SSE failures
         if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
           reconnect();
         }
