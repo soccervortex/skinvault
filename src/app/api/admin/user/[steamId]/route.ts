@@ -66,14 +66,7 @@ export async function GET(
       }
     } catch (error) {
       console.warn('Failed to fetch Steam profile:', error);
-      // Try to get from message data if available
-      if (messages.length > 0) {
-        const userMessage = messages.find((msg: any) => msg.steamId === steamId);
-        if (userMessage) {
-          steamName = userMessage.steamName || steamName;
-          avatar = userMessage.avatar || avatar;
-        }
-      }
+      // Will use default 'Unknown User' and empty avatar
     }
 
     // Get chat messages using date-based collections
