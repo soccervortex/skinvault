@@ -53,13 +53,32 @@ export async function GET() {
 
         if (trustpilotRes.ok) {
           const trustpilotData = await trustpilotRes.json();
+          console.log('Trustpilot API response:', JSON.stringify(trustpilotData).substring(0, 500));
+          
           // Outscraper returns data in different formats, handle both
-          const reviewsData = trustpilotData?.data || trustpilotData?.result || trustpilotData;
-          const reviewsArray = Array.isArray(reviewsData) ? reviewsData : (reviewsData ? [reviewsData] : []);
+          // Format 1: { data: [...] }
+          // Format 2: { result: [...] }
+          // Format 3: Direct array
+          // Format 4: { data: [{ reviews: [...] }] }
+          let reviewsArray: any[] = [];
+          
+          if (Array.isArray(trustpilotData)) {
+            reviewsArray = trustpilotData;
+          } else if (trustpilotData?.data) {
+            if (Array.isArray(trustpilotData.data)) {
+              reviewsArray = trustpilotData.data;
+            } else if (trustpilotData.data[0]?.reviews && Array.isArray(trustpilotData.data[0].reviews)) {
+              reviewsArray = trustpilotData.data[0].reviews;
+            }
+          } else if (trustpilotData?.result && Array.isArray(trustpilotData.result)) {
+            reviewsArray = trustpilotData.result;
+          }
+          
+          console.log(`Found ${reviewsArray.length} Trustpilot reviews`);
           
           reviewsArray.forEach((review: any, index: number) => {
             // Handle different response formats
-            const rating = parseInt(review.rating || review.stars || review.reviewRating || '0');
+            const rating = parseInt(review.rating || review.stars || review.reviewRating || review.score || '0');
             if (rating >= 1 && rating <= 5) {
               trustpilotRating += rating;
               trustpilotCount++;
@@ -70,17 +89,20 @@ export async function GET() {
                 source: 'Trustpilot',
                 sourceUrl: review.reviewUrl || review.url || REVIEW_SOURCES[0].url,
                 rating: rating,
-                reviewerName: review.reviewerName || review.authorName || review.name || 'Anonymous',
-                reviewerAvatar: review.reviewerAvatar || review.authorAvatar || review.avatar,
-                reviewText: review.reviewText || review.review || review.content || review.text || '',
-                date: review.reviewDate || review.date || review.createdDate || new Date().toISOString(),
+                reviewerName: review.reviewerName || review.authorName || review.name || review.reviewer?.name || 'Anonymous',
+                reviewerAvatar: review.reviewerAvatar || review.authorAvatar || review.avatar || review.reviewer?.avatar,
+                reviewText: review.reviewText || review.review || review.content || review.text || review.reviewBody || '',
+                date: review.reviewDate || review.date || review.createdDate || review.publishedDate || new Date().toISOString(),
                 verified: review.verified || review.isVerified || false,
               });
             }
           });
+        } else {
+          const errorText = await trustpilotRes.text();
+          console.error('Trustpilot API error:', trustpilotRes.status, errorText.substring(0, 500));
         }
       } catch (error) {
-        console.warn('Trustpilot API error (non-critical):', error);
+        console.error('Trustpilot API error (non-critical):', error);
       }
     }
 
@@ -100,11 +122,21 @@ export async function GET() {
 
         if (sitejabberRes.ok) {
           const sitejabberData = await sitejabberRes.json();
+          console.log('Sitejabber API response:', JSON.stringify(sitejabberData).substring(0, 500));
+          
           if (sitejabberData?.reviews && Array.isArray(sitejabberData.reviews)) {
+            console.log(`Found ${sitejabberData.reviews.length} Sitejabber reviews`);
+            
             sitejabberData.reviews.forEach((review: any, index: number) => {
-              // Sitejabber rating is in rating array
-              const ratingObj = Array.isArray(review.rating) ? review.rating[0] : review.rating;
-              const rating = ratingObj?.rating || parseInt(review.rating || '0');
+              // Sitejabber rating is in rating array - extract numeric value
+              let rating = 0;
+              if (Array.isArray(review.rating) && review.rating.length > 0) {
+                rating = parseInt(review.rating[0]?.rating || review.rating[0] || '0');
+              } else if (typeof review.rating === 'object' && review.rating?.rating) {
+                rating = parseInt(review.rating.rating);
+              } else {
+                rating = parseInt(review.rating || '0');
+              }
               
               if (rating >= 1 && rating <= 5) {
                 sitejabberRating += rating;
@@ -112,22 +144,27 @@ export async function GET() {
                 ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
 
                 reviews.push({
-                  id: `sitejabber-${review.reviewNo || index}`,
+                  id: `sitejabber-${review.reviewNo || review.id || index}`,
                   source: 'Sitejabber',
                   sourceUrl: review.reviewUrl || REVIEW_SOURCES[1].url,
                   rating: rating,
                   reviewerName: review.author?.name || review.authorName || 'Anonymous',
                   reviewerAvatar: review.author?.avatar,
-                  reviewText: review.content || review.reviewText || '',
-                  date: review.created || review.createdRFC || new Date().toISOString(),
+                  reviewText: review.content || review.reviewText || review.text || '',
+                  date: review.created || review.createdRFC || review.date || new Date().toISOString(),
                   verified: review.verified || false,
                 });
               }
             });
+          } else {
+            console.log('Sitejabber response structure:', Object.keys(sitejabberData || {}));
           }
+        } else {
+          const errorText = await sitejabberRes.text();
+          console.error('Sitejabber API error:', sitejabberRes.status, errorText.substring(0, 500));
         }
       } catch (error) {
-        console.warn('Sitejabber API error (non-critical):', error);
+        console.error('Sitejabber API error (non-critical):', error);
       }
     }
 
@@ -135,6 +172,8 @@ export async function GET() {
     const totalRating = trustpilotRating + sitejabberRating;
     const totalCount = trustpilotCount + sitejabberCount;
     const aggregateRating = totalCount > 0 ? totalRating / totalCount : null;
+
+    console.log(`Reviews API: Found ${totalCount} reviews (Trustpilot: ${trustpilotCount}, Sitejabber: ${sitejabberCount}), Aggregate: ${aggregateRating}`);
 
     return NextResponse.json({
       reviews: reviews,
