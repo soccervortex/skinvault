@@ -19,6 +19,7 @@ import ChatNotificationListener from "./components/ChatNotificationListener";
 import GlobalChatService from "./components/GlobalChatService";
 import BanChecker from "./components/BanChecker";
 import VercelAnalytics from "./components/VercelAnalytics";
+import GlobalErrorHandler from "./components/GlobalErrorHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -348,6 +349,7 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
           />
         ))}
+        <GlobalErrorHandler />
         <ErrorBoundary>
           <ToastProvider>
             <ChunkErrorHandler />
