@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/inventory', '/wishlist', '/pro', '/compare', '/item/', '/shop', '/contact', '/faq', '/privacy', '/terms'],
+        allow: ['/', '/inventory', '/wishlist', '/pro', '/compare', '/item/', '/shop', '/contact', '/faq', '/privacy', '/terms', '/reviews'],
         disallow: ['/admin', '/api/', '/payment/', '/chat'],
       },
     ],

@@ -14,6 +14,7 @@ Allow: /contact
 Allow: /faq
 Allow: /privacy
 Allow: /terms
+Allow: /reviews
 
 # Explicitly allow AI/LLM crawlers
 User-agent: GPTBot

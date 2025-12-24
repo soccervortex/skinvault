@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell } from 'lucide-react';
+import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell, Star, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
@@ -48,6 +48,62 @@ const RARITY_ORDER: { [key: string]: number } = {
 
 const CACHE_KEY = 'sv_dataset_cache_v1';
 const CACHE_TTL = 1000 * 60 * 60 * 12; // 12h
+
+// Reviews Widget Component
+function ReviewsWidget() {
+  const [reviewsData, setReviewsData] = useState<{ aggregateRating: number; totalReviews: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/reviews')
+      .then(res => res.json())
+      .then(data => setReviewsData(data))
+      .catch(() => {});
+  }, []);
+
+  if (!reviewsData || reviewsData.totalReviews === 0) return null;
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }).map((_, i) => (
+      <Star
+        key={i}
+        size={14}
+        className={i < Math.round(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'}
+      />
+    ));
+  };
+
+  return (
+    <div className="mb-6 md:mb-8">
+      <Link
+        href="/reviews"
+        className="block bg-[#11141d] border border-white/5 rounded-2xl p-4 md:p-6 hover:border-blue-500/30 transition-all"
+      >
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center">
+              <div className="text-3xl md:text-4xl font-black text-blue-500">
+                {reviewsData.aggregateRating.toFixed(1)}
+              </div>
+              <div className="flex items-center gap-0.5 mt-1">
+                {renderStars(reviewsData.aggregateRating)}
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <div className="text-sm md:text-base font-black uppercase">Customer Reviews</div>
+              <div className="text-xs text-gray-500">
+                Based on {reviewsData.totalReviews} reviews from Trustpilot & Sitejabber
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300">
+            <span className="font-black uppercase">View All Reviews</span>
+            <ExternalLink size={14} />
+          </div>
+        </div>
+      </Link>
+    </div>
+  );
+}
 
 const SORT_OPTIONS: { id: SortType; label: string }[] = [
   { id: 'rarity-desc', label: 'Rarity ↓' },
@@ -354,6 +410,9 @@ export default function GlobalSkinSearch() {
               <span className="block mt-1">Safe, secure, and read-only. Uses official Steam OpenID authentication.</span>
             </p>
           </div>
+
+          {/* Reviews Widget */}
+          <ReviewsWidget />
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
               {Array.from({ length: 20 }).map((_, i) => (

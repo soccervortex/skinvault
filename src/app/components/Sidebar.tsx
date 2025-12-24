@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, Twitter } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -483,7 +483,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <button 
                   onClick={handleLogout} 
                   className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
@@ -504,6 +504,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                       {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                     </button>
                   )}
+                </div>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                  <a
+                    href="https://x.com/Skinvaults"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+                    title="Follow us on X (Twitter)"
+                  >
+                    <Twitter size={10} />
+                    X
+                  </a>
                 </div>
               </div>
             </div>
@@ -558,6 +570,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               >
                 <HelpCircle size={10} />
                 FAQ
+              </Link>
+              <Link 
+                href="/reviews" 
+                className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                <Star size={10} />
+                Reviews
               </Link>
             </div>
             <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">

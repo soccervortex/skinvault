@@ -1078,9 +1078,9 @@ function InventoryContent() {
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                    <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
-                      {formatProfileName(viewedUser?.name || "User")}
-                    </h2>
+                    <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
+                      {formatProfileName(viewedUser?.name || "User")} - CS2 Inventory & Stats
+                    </h1>
                     {isPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
