@@ -177,8 +177,11 @@ function InventoryContent() {
       const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
       const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
       return { steamId: id, name, avatar };
-    } catch (e) { 
-      console.warn('Profile fetch failed:', e);
+    } catch (e: any) { 
+      // Don't log AbortErrors (intentional timeouts)
+      if (e?.name !== 'AbortError') {
+        console.warn('Profile fetch failed:', e);
+      }
       return null; 
     }
   };
@@ -252,7 +255,12 @@ function InventoryContent() {
           setStatsPrivate(false);
         }
       }
-    } catch (e) { console.error("Stats failed", e); }
+    } catch (e: any) { 
+      // Don't log AbortErrors (intentional timeouts)
+      if (e?.name !== 'AbortError') {
+        console.error("Stats failed", e);
+      }
+    }
   };
 
   const fetchFaceitStats = async (id: string) => {
@@ -350,8 +358,11 @@ function InventoryContent() {
           nickname: player?.nickname,
         });
       }
-    } catch (e) { 
-      console.error("Faceit stats failed", e);
+    } catch (e: any) { 
+      // Don't log AbortErrors (intentional timeouts) or 404s (player not on Faceit)
+      if (e?.name !== 'AbortError') {
+        console.error("Faceit stats failed", e);
+      }
       setFaceitStats(null);
     }
   };
@@ -531,15 +542,21 @@ function InventoryContent() {
           } else {
             hasMore = false;
           }
-        } catch (e) {
-          console.error(`Inventory fetch attempt ${attempts} failed:`, e);
+        } catch (e: any) {
+          // Don't log AbortErrors (intentional timeouts)
+          if (e?.name !== 'AbortError') {
+            console.error(`Inventory fetch attempt ${attempts} failed:`, e);
+          }
           hasMore = false; // Stop trying if we get an error
         }
       }
 
       setInventory(allItems);
-    } catch (e) { 
-      console.error("Inventory failed", e);
+    } catch (e: any) { 
+      // Don't log AbortErrors (intentional timeouts)
+      if (e?.name !== 'AbortError') {
+        console.error("Inventory failed", e);
+      }
       setInventory([]); // Set empty array so page can still render
     }
   };
