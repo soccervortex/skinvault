@@ -141,17 +141,35 @@ export async function GET() {
             console.log(`Found ${sitejabberData.reviews.length} Sitejabber reviews`);
             
             sitejabberData.reviews.forEach((review: any, index: number) => {
-              // Sitejabber rating is in rating array - extract numeric value
+              // Sitejabber rating can be in different formats
+              // Format 1: Array of rating objects [{ rating: 5 }]
+              // Format 2: Object { rating: 5 }
+              // Format 3: Direct number 5
+              // Format 4: String "5"
               let rating = 0;
+              
               if (Array.isArray(review.rating) && review.rating.length > 0) {
-                rating = parseInt(review.rating[0]?.rating || review.rating[0] || '0');
+                // If it's an array, get the first element
+                const firstRating = review.rating[0];
+                if (typeof firstRating === 'object' && firstRating?.rating) {
+                  rating = parseInt(firstRating.rating);
+                } else if (typeof firstRating === 'number') {
+                  rating = firstRating;
+                } else {
+                  rating = parseInt(String(firstRating));
+                }
               } else if (typeof review.rating === 'object' && review.rating?.rating) {
                 rating = parseInt(review.rating.rating);
+              } else if (typeof review.rating === 'number') {
+                rating = review.rating;
               } else {
-                rating = parseInt(review.rating || '0');
+                rating = parseInt(String(review.rating || '0'));
               }
               
-              if (rating >= 1 && rating <= 5) {
+              // Also check for title/content fields
+              const reviewText = review.content || review.reviewText || review.text || review.body || review.title || '';
+              
+              if (rating >= 1 && rating <= 5 && reviewText) {
                 sitejabberRating += rating;
                 sitejabberCount++;
                 ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
@@ -164,9 +182,9 @@ export async function GET() {
                   source: 'Sitejabber',
                   sourceUrl: review.reviewUrl || REVIEW_SOURCES[1].url,
                   rating: rating,
-                  reviewerName: review.author?.name || review.authorName || review.customer?.name || 'Anonymous',
-                  reviewerAvatar: review.author?.avatar || review.customer?.avatar,
-                  reviewText: review.content || review.reviewText || review.text || review.body || '',
+                  reviewerName: review.author?.name || review.authorName || review.customer?.name || review.customerName || 'Anonymous',
+                  reviewerAvatar: review.author?.avatar || review.customer?.avatar || review.avatar,
+                  reviewText: reviewText,
                   date: formattedDate,
                   verified: review.verified || false,
                 });
