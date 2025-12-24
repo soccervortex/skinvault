@@ -17,6 +17,7 @@ import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import ChunkErrorHandler from "./components/ChunkErrorHandler";
 import ChatNotificationListener from "./components/ChatNotificationListener";
 import GlobalChatService from "./components/GlobalChatService";
+import BanChecker from "./components/BanChecker";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -65,14 +66,23 @@ export const metadata: Metadata = {
     icon: [
       { url: '/icons/favicon.ico', type: 'image/x-icon', sizes: 'any' },
       { url: '/icons/favicon.svg', type: 'image/svg+xml' },
+      // Google Search requires favicons to be multiples of 48px
+      // All required sizes are now present: 48x48, 96x96, 144x144, 192x192, 240x240, 288x288, 384x384, 480x480
+      { url: '/icons/favicon-48x48.png', type: 'image/png', sizes: '48x48' },
       { url: '/icons/favicon-96x96.png', type: 'image/png', sizes: '96x96' },
+      { url: '/icons/favicon-144x144.png', type: 'image/png', sizes: '144x144' },
       { url: '/icons/web-app-manifest-192x192.png', type: 'image/png', sizes: '192x192' },
-      { url: '/icons/web-app-manifest-512x512.png', type: 'image/png', sizes: '512x512' },
+      { url: '/icons/favicon-240x240.png', type: 'image/png', sizes: '240x240' },
+      { url: '/icons/favicon-288x288.png', type: 'image/png', sizes: '288x288' },
+      { url: '/icons/favicon-384x384.png', type: 'image/png', sizes: '384x384' },
+      { url: '/icons/favicon-480x480.png', type: 'image/png', sizes: '480x480' },
     ],
     shortcut: [
       { url: '/icons/favicon.ico', type: 'image/x-icon' },
     ],
     apple: [
+      // Note: 180x180 is not a multiple of 48, but required for iOS
+      // iOS handles this separately from Google Search favicons
       { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
@@ -345,6 +355,7 @@ export default function RootLayout({
             <KeyboardShortcuts />
             <ChatNotificationListener />
             <GlobalChatService />
+            <BanChecker />
         {children}
             <ProExpirationWarning />
             <NetworkStatus />

@@ -186,7 +186,7 @@ export default function TermsPage() {
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Pricing:</strong> €9.99/month, €24.99/3 months (save €5), €44.99/6 months (save €15)</li>
                 <li><strong>Payment:</strong> Processed securely through Stripe. All payments are final unless otherwise stated. We do not store credit card details on our servers.</li>
-                <li><strong>Free Trial:</strong> New users may be eligible for a 1-month free trial within 7 days of first login. This offer is one-time only and must be claimed manually. The offer expires after 7 days if not claimed.</li>
+                <li><strong>Free Trial:</strong> New users may be eligible for a 2-week free trial within 7 days of first login. This offer is one-time only and must be claimed manually. The offer expires after 7 days if not claimed.</li>
                 <li><strong>Auto-Renewal:</strong> Subscriptions do not auto-renew. You must manually renew your subscription before expiration.</li>
                 <li><strong>Refunds:</strong> Refund requests are handled on a case-by-case basis. Contact support for assistance.</li>
                 <li><strong>Cancellation:</strong> You may cancel your subscription at any time. Access continues until the end of your paid period.</li>

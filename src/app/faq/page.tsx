@@ -137,7 +137,7 @@ export default function FAQPage() {
         },
         {
           question: "Is there a free trial?",
-          answer: "Yes! New users may be eligible for a 1-month free trial within 7 days of first login. This offer is one-time only and must be claimed manually. The offer expires after 7 days if not claimed. Check your account page to see if you're eligible."
+          answer: "Yes! New users may be eligible for a 2-week free trial within 7 days of first login. This offer is one-time only and must be claimed manually. The offer expires after 7 days if not claimed. Check your account page to see if you're eligible."
         },
         {
           question: "Does Pro auto-renew?",
@@ -221,7 +221,7 @@ export default function FAQPage() {
         },
         {
           question: "What happens if I'm banned?",
-          answer: "If you're banned from SkinVaults, you'll be immediately logged out and redirected to the contact page. Banned users cannot access the Service or create new accounts using the same Steam ID. Ban decisions are final, but you may contact support to appeal. If you are unbanned, your account access will be restored immediately."
+          answer: "If you're banned from SkinVaults, you'll be immediately logged out and redirected to the contact page in real-time. Our system continuously monitors ban status every 3 seconds, so bans take effect instantly without requiring a page refresh or browser tab switch. Banned users cannot access the Service or create new accounts using the same Steam ID. Ban decisions are final, but you may contact support to appeal. If you are unbanned, your account access will be restored immediately."
         }
       ]
     },
