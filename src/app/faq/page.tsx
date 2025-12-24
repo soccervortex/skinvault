@@ -6,7 +6,7 @@ import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FAQItem {
   question: string;
-  answer: string | JSX.Element;
+  answer: string | React.ReactNode;
 }
 
 export default function FAQPage() {
