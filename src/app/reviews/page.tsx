@@ -36,7 +36,6 @@ export default function ReviewsPage() {
         const res = await fetch('/api/reviews');
         if (res.ok) {
           const reviewsData = await res.json();
-          console.log('Reviews data received:', reviewsData);
           setData(reviewsData);
         }
       } catch (error) {
@@ -63,23 +62,6 @@ export default function ReviewsPage() {
     ));
   };
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
-        });
-      }
-    } catch (e) {
-      // Keep original if parsing fails
-    }
-    return dateString;
-  };
-
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -89,7 +71,7 @@ export default function ReviewsPage() {
             <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4">
               Customer Reviews
             </h1>
-            {data && data.aggregateRating && data.totalReviews > 0 ? (
+            {data && (
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
                   <span className="text-4xl md:text-5xl font-black text-blue-500">
@@ -120,12 +102,6 @@ export default function ReviewsPage() {
                   ))}
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-gray-400 text-sm">
-                  {loading ? 'Loading reviews...' : 'No reviews available yet. Reviews will appear here once they are fetched from Trustpilot and Sitejabber.'}
-                </p>
-              </div>
             )}
           </header>
 
@@ -138,9 +114,6 @@ export default function ReviewsPage() {
               {data && data.sources.length > 0 && (
                 <div className="bg-[#11141d] p-6 rounded-2xl border border-white/5">
                   <h2 className="text-lg font-black uppercase mb-4">Review Sources</h2>
-                  <p className="text-sm text-gray-400 mb-4">
-                    Reviews are displayed on Trustpilot and Sitejabber. Visit the links below to see reviews and write your own.
-                  </p>
                   <div className="flex flex-wrap gap-4">
                     {data.sources.map((source) => (
                       <a
@@ -160,27 +133,11 @@ export default function ReviewsPage() {
 
               {filteredReviews.length === 0 ? (
                 <div className="bg-[#11141d] p-10 rounded-2xl border border-white/5 text-center">
-                  <p className="text-gray-400 mb-4">
+                  <p className="text-gray-500">
                     {filterRating
                       ? `No ${filterRating}-star reviews found.`
-                      : 'Reviews are displayed on Trustpilot and Sitejabber. Visit the links above to see reviews and write your own.'}
+                      : 'No reviews available yet. Check back soon!'}
                   </p>
-                  {!filterRating && data && data.sources.length > 0 && (
-                    <div className="flex flex-wrap justify-center gap-4 mt-6">
-                      {data.sources.map((source) => (
-                        <a
-                          key={source.name}
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-black uppercase transition-all"
-                        >
-                          View on {source.name}
-                          <ExternalLink size={16} />
-                        </a>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -195,15 +152,11 @@ export default function ReviewsPage() {
                             <img
                               src={review.reviewerAvatar}
                               alt={review.reviewerName}
-                              className="w-12 h-12 rounded-full border border-blue-500/50"
-                              onError={(e) => {
-                                // Hide image if it fails to load
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
+                              className="w-12 h-12 rounded-full"
                             />
                           ) : (
-                            <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center border border-blue-500/50">
-                              <span className="text-lg font-black text-blue-400">
+                            <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center">
+                              <span className="text-lg font-black">
                                 {review.reviewerName.charAt(0).toUpperCase()}
                               </span>
                             </div>
@@ -214,11 +167,10 @@ export default function ReviewsPage() {
                               {review.verified && (
                                 <span className="text-xs text-emerald-400">✓ Verified</span>
                               )}
-                              <span className="text-xs text-gray-500">from {review.source}</span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               {renderStars(review.rating)}
-                              <span className="text-xs text-gray-500">{formatDate(review.date)}</span>
+                              <span className="text-xs text-gray-500">{review.date}</span>
                             </div>
                           </div>
                         </div>
@@ -226,15 +178,13 @@ export default function ReviewsPage() {
                           href={review.sourceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 shrink-0"
+                          className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
                         >
-                          View original
+                          {review.source}
                           <ExternalLink size={12} />
                         </a>
                       </div>
-                      {review.reviewText && (
-                        <p className="text-sm text-gray-300 leading-relaxed">{review.reviewText}</p>
-                      )}
+                      <p className="text-sm text-gray-300 leading-relaxed">{review.reviewText}</p>
                     </div>
                   ))}
                 </div>
