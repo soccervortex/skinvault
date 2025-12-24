@@ -62,17 +62,28 @@ export default function VercelAnalytics() {
           return await originalFetch(input, init);
         } catch (error: any) {
           // Suppress network errors for Vercel Analytics (expected with ad blockers)
-          if (error?.message?.includes('ERR_BLOCKED_BY_CLIENT') || 
-              error?.message?.includes('Failed to fetch') ||
-              error?.name === 'TypeError' ||
-              error?.message?.includes('net::ERR_BLOCKED_BY_CLIENT')) {
-            // Return a mock response to prevent errors from propagating
-            return new Response(null, { status: 0, statusText: 'Blocked by client' });
-          }
-          throw error;
+          // Return a mock response to prevent errors from propagating
+          return new Response(null, { status: 0, statusText: 'Blocked by client' });
         }
       }
       return originalFetch(input, init);
+    };
+    
+    // Also intercept script loading errors
+    const originalErrorHandler = window.onerror;
+    window.onerror = function(message, source, lineno, colno, error) {
+      if (typeof message === 'string' && (
+        message.includes('_vercel/insights') ||
+        message.includes('_vercel/speed-insights') ||
+        message.includes('ERR_BLOCKED_BY_CLIENT') ||
+        message.includes('net::ERR_BLOCKED_BY_CLIENT')
+      )) {
+        return true; // Suppress the error
+      }
+      if (originalErrorHandler) {
+        return originalErrorHandler.call(window, message, source, lineno, colno, error);
+      }
+      return false;
     };
     
     // Also suppress errors from XMLHttpRequest (used by some libraries)
@@ -103,6 +114,7 @@ export default function VercelAnalytics() {
       console.error = originalError;
       console.log = originalLog;
       window.fetch = originalFetch;
+      window.onerror = originalErrorHandler;
       XMLHttpRequest.prototype.open = originalXHROpen;
       XMLHttpRequest.prototype.send = originalXHRSend;
     };

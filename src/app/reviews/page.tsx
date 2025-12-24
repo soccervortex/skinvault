@@ -71,7 +71,7 @@ export default function ReviewsPage() {
             <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4">
               Customer Reviews
             </h1>
-            {data && (
+            {data && data.aggregateRating !== null && data.aggregateRating !== undefined ? (
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
                   <span className="text-4xl md:text-5xl font-black text-blue-500">
@@ -101,6 +101,12 @@ export default function ReviewsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-400 text-sm">
+                  {loading ? 'Loading reviews...' : 'No reviews available yet. Check back soon!'}
+                </p>
               </div>
             )}
           </header>
