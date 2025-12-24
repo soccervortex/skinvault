@@ -41,15 +41,21 @@ export async function GET() {
     if (OUTSCRAPER_API_TOKEN) {
       try {
         // Outscraper Trustpilot Reviews API
+        // Documentation: https://app.outscraper.cloud/api-docs
         // Query format: domain or full URL
+        // Try both API endpoint formats
         const trustpilotUrl = `https://api.outscraper.com/trustpilot-reviews?query=skinvaults.online&limit=100&language=nl`;
         const trustpilotRes = await fetch(trustpilotUrl, {
           headers: {
             'X-API-KEY': OUTSCRAPER_API_TOKEN,
+            'Content-Type': 'application/json',
           },
           // Cache for 1 hour to avoid rate limits
           next: { revalidate: 3600 },
         });
+        
+        console.log('Trustpilot API request:', trustpilotUrl);
+        console.log('Trustpilot API status:', trustpilotRes.status);
 
         if (trustpilotRes.ok) {
           const trustpilotData = await trustpilotRes.json();
