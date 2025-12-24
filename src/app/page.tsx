@@ -343,6 +343,17 @@ export default function GlobalSkinSearch() {
         </header>
 
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
+          {/* SEO-optimized heading structure for AI crawlers */}
+          <h1 className="sr-only">The Safest CS2 Inventory Analytics Tool - Track Your Skin Collection Securely</h1>
+          <div className="mb-6 md:mb-8 text-center">
+            <h2 className="text-[11px] md:text-xs lg:text-sm font-black uppercase tracking-[0.3em] text-gray-400 mb-2">
+              CS2 Skin Analytics & Inventory Management
+            </h2>
+            <p className="text-[9px] md:text-[10px] text-gray-500 max-w-2xl mx-auto">
+              Track your CS2 skin collection, monitor prices, and analyze your inventory value. 
+              <span className="block mt-1">Safe, secure, and read-only. Uses official Steam OpenID authentication.</span>
+            </p>
+          </div>
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
               {Array.from({ length: 20 }).map((_, i) => (

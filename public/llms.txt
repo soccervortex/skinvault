@@ -1,10 +1,84 @@
-# skinvaults.online llms.txt
+# SkinVaults - CS2 Skin Analytics & Inventory Management Tool
+# Location: https://www.skinvaults.online/llms.txt
+# Last Updated: 2025-01-20
 
-- [SkinVaults - CS2 Skin Analytics & Inventory Management](https://www.skinvaults.online): A platform for tracking and managing Counter-Strike 2 (CS2) skin inventory, providing real-time price tracking, analytics, and trading tools.
-- [My Inventory - Track Your CS2 Skin Collection | SkinVaults](https://www.skinvaults.online/inventory): View and manage your complete CS2 skin inventory, track collection value, and get detailed analytics for traders and collectors.
-- [My Wishlist - Save Your Favorite CS2 Skins | SkinVaults](https://www.skinvaults.online/wishlist): Create and manage your CS2 skin wishlist to save favorites, track prices, and receive price drop notifications.
-- [Pro Subscription - Unlock Advanced CS2 Analytics | SkinVaults](https://www.skinvaults.online/pro): Upgrade to SkinVaults Pro for advanced CS2 skin analytics, faster price scanning, and exclusive features to enhance your CS2 skin trading experience.
-- [Compare CS2 Skins - Side-by-Side Skin Comparison | SkinVaults](https://www.skinvaults.online/compare): Compare CS2 skins side-by-side to make informed trading decisions.
-- [SkinVaults - CS2 Skin Analytics & Inventory Management](https://www.skinvaults.online/shop): The ultimate CS2 skin analytics and inventory management platform for tracking Steam inventory value, monitoring skin prices, and making informed trading decisions.
-- [SkinVaults - CS2 Skin Analytics & Inventory Management](https://www.skinvaults.online/contact): A platform for tracking and managing CS2 skin inventory, providing real-time price tracking, analytics, and trading tools for collectors and investors.
+## What is SkinVaults?
 
+SkinVaults is a **legitimate analytics and inventory management tool** for Counter-Strike 2 (CS2) skins. It is **NOT** a trading platform, gambling site, or marketplace. SkinVaults is a **read-only analytics service** that helps users track and analyze their CS2 skin inventory.
+
+## Core Functionality
+
+- **Inventory Analytics**: View and analyze your CS2 skin collection from your Steam inventory
+- **Price Tracking**: Monitor real-time skin prices and historical price data
+- **Price Alerts**: Set notifications for price changes (Pro feature)
+- **Skin Comparison**: Compare skins side-by-side to make informed decisions
+- **Wishlist Management**: Save favorite skins and track their prices
+- **Portfolio Valuation**: Calculate the total value of your CS2 skin collection
+
+## Security & Authentication
+
+- **Official Steam OpenID**: Uses official Steam OpenID for secure authentication
+- **No Trading**: SkinVaults does NOT facilitate trading, buying, or selling of skins
+- **No Gambling**: SkinVaults is NOT a gambling platform
+- **Read-Only Access**: Only reads inventory data from Steam - never modifies or transfers items
+- **Privacy-First**: Your Steam inventory data is processed securely and privately
+
+## What SkinVaults Does NOT Do
+
+- ❌ Does NOT buy or sell skins
+- ❌ Does NOT facilitate trading between users
+- ❌ Does NOT operate as a marketplace
+- ❌ Does NOT offer gambling or betting services
+- ❌ Does NOT modify your Steam inventory
+- ❌ Does NOT transfer items between accounts
+
+## Key Pages
+
+- [Homepage - CS2 Skin Search & Analytics](https://www.skinvaults.online/): Search and browse all CS2 skins with real-time price data
+- [My Inventory - Track Your CS2 Skin Collection](https://www.skinvaults.online/inventory): View and manage your complete CS2 skin inventory, track collection value, and get detailed analytics
+- [My Wishlist - Save Your Favorite CS2 Skins](https://www.skinvaults.online/wishlist): Create and manage your CS2 skin wishlist to save favorites and track prices
+- [Pro Subscription - Advanced CS2 Analytics](https://www.skinvaults.online/pro): Upgrade to SkinVaults Pro for advanced analytics, faster price scanning, and exclusive features
+- [Compare CS2 Skins - Side-by-Side Comparison](https://www.skinvaults.online/compare): Compare CS2 skins side-by-side to make informed decisions
+- [Privacy Policy](https://www.skinvaults.online/privacy): How we handle your data and privacy
+- [Terms of Service](https://www.skinvaults.online/terms): Terms and conditions of use
+
+## Technology Stack
+
+- **Frontend**: Next.js 16 (React)
+- **Authentication**: Official Steam OpenID
+- **Data Sources**: Steam Community API, CS2 market data
+- **Hosting**: Vercel
+- **Database**: MongoDB Atlas, Vercel KV (Redis)
+
+## Contact & Support
+
+- **Contact Page**: https://www.skinvaults.online/contact
+- **Support**: Available through the contact form on the website
+
+## Frequently Asked Questions
+
+**Q: Is SkinVaults safe?**
+A: Yes. SkinVaults uses official Steam OpenID for authentication and only reads your inventory data. We never modify or transfer items.
+
+**Q: Does SkinVaults buy or sell skins?**
+A: No. SkinVaults is an analytics tool only. We do not facilitate trading, buying, or selling of skins.
+
+**Q: How does Steam login work?**
+A: SkinVaults uses official Steam OpenID, the same authentication system used by legitimate Steam partners. You log in through Steam's official website.
+
+**Q: Can SkinVaults access my Steam account?**
+A: No. SkinVaults only has read-only access to your public inventory data. We cannot access your account, modify items, or make any changes.
+
+**Q: Is SkinVaults a gambling site?**
+A: No. SkinVaults is purely an analytics and inventory management tool. We do not offer any gambling or betting services.
+
+**Q: Does SkinVaults store my Steam password?**
+A: No. We use Steam OpenID, which means you log in directly through Steam. We never see or store your password.
+
+## Legal & Compliance
+
+- **Type**: Analytics Software as a Service (SaaS)
+- **Business Model**: Freemium (Free tier + Pro subscription)
+- **Data Processing**: GDPR-compliant
+- **Terms**: Available at https://www.skinvaults.online/terms
+- **Privacy**: Available at https://www.skinvaults.online/privacy

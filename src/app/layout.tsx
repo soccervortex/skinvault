@@ -142,10 +142,32 @@ export default function RootLayout({
 }>) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
   
-  // Structured data for better SEO
-  const structuredData = {
+  // Comprehensive structured data for GEO (Generative Engine Optimization)
+  const organizationSchema = {
     "@context": "https://schema.org",
-    "@type": "WebApplication",
+    "@type": "Organization",
+    "name": "SkinVaults",
+    "url": baseUrl,
+    "logo": {
+      "@type": "ImageObject",
+      "url": `${baseUrl}/icons/Open Graph Image.jpg`,
+      "width": 1200,
+      "height": 630
+    },
+    "description": "Legitimate CS2 skin analytics and inventory management tool. Read-only analytics service - NOT a trading platform or gambling site.",
+    "sameAs": [
+      // Add social media links when available
+    ],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "Customer Support",
+      "url": `${baseUrl}/contact`
+    }
+  };
+
+  const softwareApplicationSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
     "name": "SkinVaults",
     "description": SHORT_DESCRIPTION,
     "url": baseUrl,
@@ -154,12 +176,15 @@ export default function RootLayout({
     "offers": {
       "@type": "Offer",
       "price": "0",
-      "priceCurrency": "USD"
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
     },
     "aggregateRating": {
       "@type": "AggregateRating",
       "ratingValue": "4.8",
-      "ratingCount": "100"
+      "ratingCount": "100",
+      "bestRating": "5",
+      "worstRating": "1"
     },
     "featureList": [
       "CS2 Inventory Tracking",
@@ -167,11 +192,18 @@ export default function RootLayout({
       "Price Alerts",
       "Skin Comparison Tool",
       "Wishlist Management",
-      "Steam Integration",
+      "Steam OpenID Authentication",
       "Market Analytics",
       "Price History Charts",
-      "Portfolio Valuation"
+      "Portfolio Valuation",
+      "Faceit Statistics Integration"
     ],
+    "screenshot": {
+      "@type": "ImageObject",
+      "url": `${baseUrl}/icons/Open Graph Image.jpg`,
+      "width": 1200,
+      "height": 630
+    },
     "logo": {
       "@type": "ImageObject",
       "url": `${baseUrl}/icons/Open Graph Image.jpg`,
@@ -183,8 +215,93 @@ export default function RootLayout({
       "url": `${baseUrl}/icons/Open Graph Image.jpg`,
       "width": 1200,
       "height": 630
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "SkinVaults"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "SkinVaults",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${baseUrl}/icons/Open Graph Image.jpg`
+      }
     }
   };
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is SkinVaults safe?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, SkinVaults is completely safe. We use official Steam OpenID for authentication, which is the same secure system used by legitimate Steam partners. SkinVaults only reads your public inventory data - we never modify, transfer, or access your Steam account. We are a read-only analytics tool, not a trading platform."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does the Steam login work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SkinVaults uses official Steam OpenID for authentication. When you click 'Sign in with Steam', you are redirected to Steam's official website to log in. After authentication, Steam provides us with a secure token that allows us to read your public inventory data. We never see or store your Steam password."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does SkinVaults buy or sell skins?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No, SkinVaults does NOT buy or sell skins. We are purely an analytics and inventory management tool. We do not facilitate trading, buying, or selling of skins. SkinVaults is a read-only service that helps you track and analyze your CS2 skin collection."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is SkinVaults a gambling site?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No, SkinVaults is NOT a gambling site. We are a legitimate analytics and inventory management tool for CS2 skins. We do not offer any gambling, betting, or casino services. SkinVaults helps users track their inventory value and monitor skin prices."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can SkinVaults access my Steam account?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No, SkinVaults cannot access your Steam account. We only have read-only access to your public inventory data through Steam's official API. We cannot modify items, transfer skins, access your account settings, or make any changes to your Steam account. We are a read-only analytics service."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What data does SkinVaults collect?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SkinVaults collects only your public Steam inventory data (skin names, quantities, and market values) and basic account information (Steam ID, username, avatar) provided by Steam OpenID. We do not collect passwords, payment information, or private account data. All data is processed securely and in accordance with our Privacy Policy."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does SkinVaults store my Steam password?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No, SkinVaults never sees or stores your Steam password. We use Steam OpenID, which means you log in directly through Steam's official website. Steam then provides us with a secure authentication token. Your password never leaves Steam's servers."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is SkinVaults a trading platform?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No, SkinVaults is NOT a trading platform. We are an analytics and inventory management tool. We do not facilitate trading between users, operate as a marketplace, or handle any transactions. SkinVaults is a read-only service that helps you track and analyze your CS2 skin collection."
+        }
+      }
+    ]
+  };
+
+  const structuredDataArray = [organizationSchema, softwareApplicationSchema, faqSchema];
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -208,10 +325,14 @@ export default function RootLayout({
           src="/safe-storage-init.js"
           strategy="afterInteractive"
         />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
+        {/* Multiple structured data schemas for GEO optimization */}
+        {structuredDataArray.map((schema, index) => (
+          <script
+            key={index}
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+          />
+        ))}
         <ErrorBoundary>
           <ToastProvider>
             <ChunkErrorHandler />
