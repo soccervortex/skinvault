@@ -4,6 +4,14 @@
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   
+  <!-- LLMs.txt - AI Model Documentation (High Priority for AI Crawlers) -->
+  <url>
+    <loc>https://skinvaults.online/llms.txt</loc>
+    <lastmod>2025-01-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
   <!-- Home / Market Page - Main entry point -->
   <url>
     <loc>https://skinvault.app/</loc>

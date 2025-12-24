@@ -11,6 +11,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     {
+      url: `${baseUrl}/llms.txt`,
+      lastModified: currentDate,
+      changeFrequency: 'weekly',
+      priority: 1.0, // High priority for AI crawlers
+    },
+    {
       url: baseUrl,
       lastModified: currentDate,
       changeFrequency: 'daily',

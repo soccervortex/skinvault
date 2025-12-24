@@ -311,6 +311,10 @@ export default function RootLayout({
         <link rel="preconnect" href="https://community.cloudflare.steamstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://raw.githubusercontent.com" />
         <link rel="dns-prefetch" href="https://community.cloudflare.steamstatic.com" />
+        
+        {/* LLMs.txt discovery - Help AI models find the documentation */}
+        <link rel="llms" href={`${baseUrl}/llms.txt`} type="text/plain" />
+        <meta name="llms-txt" content={`${baseUrl}/llms.txt`} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

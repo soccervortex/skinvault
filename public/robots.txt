@@ -50,5 +50,10 @@ Disallow: /payment/
 # Sitemap location
 Sitemap: https://skinvaults.online/sitemap.xml
 
+# LLMs.txt location - AI model documentation
+# Reference: https://llmstxt.org/
+# AI crawlers should read this file for site understanding
+# Location: https://skinvaults.online/llms.txt
+
 # Crawl delay (optional, helps prevent server overload)
 Crawl-delay: 1
