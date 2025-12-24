@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -381,6 +381,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     <Shield size={10} />
                     Privacy
                   </Link>
+                  <Link 
+                    href="/faq" 
+                    className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <HelpCircle size={10} />
+                    FAQ
+                  </Link>
                 </div>
                 <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
                   © {new Date().getFullYear()} SkinVaults. All rights reserved.
@@ -544,6 +551,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               >
                 <Shield size={10} />
                 Privacy
+              </Link>
+              <Link 
+                href="/faq" 
+                className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                <HelpCircle size={10} />
+                FAQ
               </Link>
             </div>
             <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">

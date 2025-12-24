@@ -17,6 +17,8 @@ import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import ChunkErrorHandler from "./components/ChunkErrorHandler";
 import ChatNotificationListener from "./components/ChatNotificationListener";
 import GlobalChatService from "./components/GlobalChatService";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -349,6 +351,8 @@ export default function RootLayout({
         <ThemeProviderWrapper />
           </ToastProvider>
         </ErrorBoundary>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
