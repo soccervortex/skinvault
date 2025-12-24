@@ -71,7 +71,7 @@ export default function ReviewsPage() {
             <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4">
               Customer Reviews
             </h1>
-            {data && data.totalReviews > 0 ? (
+            {data && data.aggregateRating && data.totalReviews > 0 ? (
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
                   <span className="text-4xl md:text-5xl font-black text-blue-500">
@@ -105,7 +105,7 @@ export default function ReviewsPage() {
             ) : (
               <div className="text-center py-4">
                 <p className="text-gray-400 text-sm">
-                  Reviews are displayed on Trustpilot and Sitejabber. Visit the links below to see and write reviews.
+                  {loading ? 'Loading reviews...' : 'No reviews available yet. Reviews will appear here once they are fetched from Trustpilot and Sitejabber.'}
                 </p>
               </div>
             )}
@@ -145,7 +145,9 @@ export default function ReviewsPage() {
                   <p className="text-gray-400 mb-4">
                     {filterRating
                       ? `No ${filterRating}-star reviews found.`
-                      : 'Reviews are displayed on Trustpilot and Sitejabber. Visit the links above to see reviews and write your own.'}
+                      : data && data.reviews && data.reviews.length === 0
+                      ? 'No reviews available yet. Reviews will appear here once they are fetched from Trustpilot and Sitejabber.'
+                      : 'No reviews match the current filter.'}
                   </p>
                   {!filterRating && data && data.sources.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-4 mt-6">
@@ -166,52 +168,76 @@ export default function ReviewsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {filteredReviews.map((review) => (
-                    <div
-                      key={review.id}
-                      className="bg-[#11141d] p-6 rounded-2xl border border-white/5"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          {review.reviewerAvatar ? (
-                            <img
-                              src={review.reviewerAvatar}
-                              alt={review.reviewerName}
-                              className="w-12 h-12 rounded-full"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center">
-                              <span className="text-lg font-black">
-                                {review.reviewerName.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-black uppercase">{review.reviewerName}</h3>
-                              {review.verified && (
-                                <span className="text-xs text-emerald-400">✓ Verified</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              {renderStars(review.rating)}
-                              <span className="text-xs text-gray-500">{review.date}</span>
+                  {filteredReviews.map((review) => {
+                    // Format date for display
+                    let formattedDate = review.date;
+                    try {
+                      const date = new Date(review.date);
+                      if (!isNaN(date.getTime())) {
+                        formattedDate = date.toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        });
+                      }
+                    } catch (e) {
+                      // Keep original date if parsing fails
+                    }
+
+                    return (
+                      <div
+                        key={review.id}
+                        className="bg-[#11141d] p-6 rounded-2xl border border-white/5"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-4">
+                            {review.reviewerAvatar ? (
+                              <img
+                                src={review.reviewerAvatar}
+                                alt={review.reviewerName}
+                                className="w-12 h-12 rounded-full border border-blue-500/50"
+                                onError={(e) => {
+                                  // Hide image if it fails to load
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center border border-blue-500/50">
+                                <span className="text-lg font-black text-blue-400">
+                                  {review.reviewerName.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-black uppercase">{review.reviewerName}</h3>
+                                {review.verified && (
+                                  <span className="text-xs text-emerald-400">✓ Verified</span>
+                                )}
+                                <span className="text-xs text-gray-500">from {review.source}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {renderStars(review.rating)}
+                                <span className="text-xs text-gray-500">{formattedDate}</span>
+                              </div>
                             </div>
                           </div>
+                          <a
+                            href={review.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 shrink-0"
+                          >
+                            View original
+                            <ExternalLink size={12} />
+                          </a>
                         </div>
-                        <a
-                          href={review.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
-                        >
-                          {review.source}
-                          <ExternalLink size={12} />
-                        </a>
+                        {review.reviewText && (
+                          <p className="text-sm text-gray-300 leading-relaxed">{review.reviewText}</p>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-300 leading-relaxed">{review.reviewText}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>

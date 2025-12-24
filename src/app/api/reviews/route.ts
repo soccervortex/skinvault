@@ -153,15 +153,18 @@ export async function GET() {
                 sitejabberCount++;
                 ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
 
+                const reviewDate = review.created || review.createdRFC || review.date || review.published || review.publishedRFC;
+                const formattedDate = reviewDate ? new Date(reviewDate).toISOString() : new Date().toISOString();
+                
                 reviews.push({
                   id: `sitejabber-${review.reviewNo || review.id || index}`,
                   source: 'Sitejabber',
                   sourceUrl: review.reviewUrl || REVIEW_SOURCES[1].url,
                   rating: rating,
-                  reviewerName: review.author?.name || review.authorName || 'Anonymous',
-                  reviewerAvatar: review.author?.avatar,
-                  reviewText: review.content || review.reviewText || review.text || '',
-                  date: review.created || review.createdRFC || review.date || new Date().toISOString(),
+                  reviewerName: review.author?.name || review.authorName || review.customer?.name || 'Anonymous',
+                  reviewerAvatar: review.author?.avatar || review.customer?.avatar,
+                  reviewText: review.content || review.reviewText || review.text || review.body || '',
+                  date: formattedDate,
                   verified: review.verified || false,
                 });
               }
