@@ -21,20 +21,22 @@ import GlobalChatService from "./components/GlobalChatService";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: 'swap',
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: 'swap',
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-const LONG_DESCRIPTION = 'SkinVaults is the ultimate CS2 skin analytics and inventory management platform. Track your Steam inventory value in real-time, monitor skin prices with advanced analytics, set custom price alerts, compare skins side-by-side, and manage your wishlist. Get instant market prices, price history charts, and make informed trading decisions. Perfect for CS2 traders, collectors, and investors who want to maximize their skin portfolio value. Features include real-time price tracking, inventory valuation, price alerts, skin comparison tools, wishlist management, and comprehensive market analytics.';
+const SHORT_DESCRIPTION = 'Track CS2 skin prices, manage your Steam inventory, set price alerts, and compare skins. Real-time analytics for CS2 traders and collectors.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: "SkinVaults - CS2 Skin Analytics & Inventory Management",
-  description: LONG_DESCRIPTION,
+  description: SHORT_DESCRIPTION,
   keywords: [
     'CS2 skins',
     'CS2 skin tracker',
@@ -87,7 +89,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'SkinVaults - CS2 Skin Analytics & Inventory Management',
-    description: LONG_DESCRIPTION,
+    description: SHORT_DESCRIPTION,
     type: 'website',
     url: BASE_URL,
     siteName: 'SkinVaults',
@@ -116,7 +118,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'SkinVaults - CS2 Skin Analytics & Inventory Management',
-    description: LONG_DESCRIPTION,
+    description: SHORT_DESCRIPTION,
     images: [`${BASE_URL}/icons/Open Graph Image.jpg`],
   },
   alternates: {
@@ -126,6 +128,10 @@ export const metadata: Metadata = {
     'googlebot': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
     'bingbot': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
     'slurp': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1', // Yahoo
+  },
+  // Performance optimizations
+  verification: {
+    google: 'googleb716dc02fc690049',
   },
 };
 
@@ -141,7 +147,7 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": "SkinVaults",
-    "description": LONG_DESCRIPTION,
+    "description": SHORT_DESCRIPTION,
     "url": baseUrl,
     "applicationCategory": "GameApplication",
     "operatingSystem": "Web",
@@ -182,15 +188,27 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to external resources for faster loading */}
+        <link rel="preconnect" href="https://raw.githubusercontent.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://community.cloudflare.steamstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://raw.githubusercontent.com" />
+        <link rel="dns-prefetch" href="https://community.cloudflare.steamstatic.com" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:font-black focus:uppercase focus:tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-black"
+        >
+          Skip to main content
+        </a>
         <Script
           src="/safe-storage-init.js"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
-        <Script
-          id="structured-data"
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />

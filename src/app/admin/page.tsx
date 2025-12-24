@@ -769,10 +769,11 @@ export default function AdminPage() {
               Grant / extend Pro
             </p>
             <div>
-              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+              <label htmlFor="admin-pro-steam-id" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 SteamID64
               </label>
               <input
+                id="admin-pro-steam-id"
                 value={steamId}
                 onChange={(e) => setSteamId(e.target.value)}
                 placeholder="7656119..."
@@ -780,10 +781,11 @@ export default function AdminPage() {
               />
             </div>
             <div>
-              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+              <label htmlFor="admin-pro-months" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 Months to add
               </label>
               <input
+                id="admin-pro-months"
                 type="number"
                 min={1}
                 value={months}
@@ -847,12 +849,16 @@ export default function AdminPage() {
                           </td>
                           <td className="py-2 pr-2 text-[9px]">
                             {editingEntry === e.steamId ? (
-                              <input
-                                type="datetime-local"
-                                value={editDate}
-                                onChange={(ev) => setEditDate(ev.target.value)}
-                                className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[9px] text-blue-500"
-                              />
+                              <>
+                                <label htmlFor={`edit-pro-date-${e.steamId}`} className="sr-only">Edit pro expiration date</label>
+                                <input
+                                  id={`edit-pro-date-${e.steamId}`}
+                                  type="datetime-local"
+                                  value={editDate}
+                                  onChange={(ev) => setEditDate(ev.target.value)}
+                                  className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[9px] text-blue-500"
+                                />
+                              </>
                             ) : (
                               <>
                             {new Date(e.proUntil).toLocaleDateString()}{" "}
@@ -1111,10 +1117,11 @@ export default function AdminPage() {
 
           <form onSubmit={handleLoadUserPurchases} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
-              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+              <label htmlFor="admin-fix-steam-id" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 SteamID64
               </label>
               <input
+                id="admin-fix-steam-id"
                 value={fixSteamId}
                 onChange={(e) => setFixSteamId(e.target.value)}
                 placeholder="7656119..."
@@ -1227,10 +1234,11 @@ export default function AdminPage() {
 
           <form onSubmit={handleCheckBanStatus} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
-              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+              <label htmlFor="admin-ban-steam-id" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 SteamID64 to check
               </label>
               <input
+                id="admin-ban-steam-id"
                 value={banSteamId}
                 onChange={(e) => {
                   setBanSteamId(e.target.value);
@@ -1369,10 +1377,11 @@ export default function AdminPage() {
             }
           }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
-              <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+              <label htmlFor="admin-search-steam-id" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 SteamID64
               </label>
               <input
+                id="admin-search-steam-id"
                 value={searchSteamId}
                 onChange={(e) => setSearchSteamId(e.target.value)}
                 placeholder="7656119..."

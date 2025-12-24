@@ -159,7 +159,9 @@ export default function ReportsPage() {
               <p className="text-sm text-gray-400 mt-1">Review and manage user reports</p>
             </div>
             <div className="flex gap-2">
+              <label htmlFor="reports-status-filter" className="sr-only">Filter by status</label>
               <select
+                id="reports-status-filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="bg-[#11141d] border border-white/10 rounded-lg px-4 py-2 text-white"
@@ -335,7 +337,9 @@ export default function ReportsPage() {
                     Save Notes
                   </button>
                 </div>
+                <label htmlFor="admin-report-notes" className="sr-only">Admin notes</label>
                 <textarea
+                  id="admin-report-notes"
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   placeholder="Add notes about this report..."

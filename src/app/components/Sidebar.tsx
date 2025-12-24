@@ -216,6 +216,8 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           onClick={() => setIsMobileMenuOpen(false)}
         >
           <aside 
+            role="navigation"
+            aria-label="Main navigation"
             className="w-80 bg-[#0f111a] border-r border-white/5 flex flex-col p-6 overflow-y-auto h-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -227,6 +229,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="p-2 text-gray-500 hover:text-white"
+                aria-label="Close menu"
               >
                 <X size={20} />
               </button>
@@ -389,7 +392,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
       )}
 
       {/* Desktop Sidebar */}
-      <aside className="w-80 bg-[#0f111a] border-r border-white/5 hidden lg:flex flex-col p-8 overflow-y-auto shrink-0">
+      <aside role="navigation" aria-label="Main navigation" className="w-80 bg-[#0f111a] border-r border-white/5 hidden lg:flex flex-col p-8 overflow-y-auto shrink-0">
         <div className="mb-12 px-4">
           <h1 className="text-3xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVaults</h1>
           <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
@@ -558,7 +561,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <h2 className="text-2xl md:text-3xl font-black italic uppercase mb-2 tracking-tighter">Stalk Profile</h2>
             <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mb-6 md:mb-8 tracking-[0.2em]">Enter a SteamID64 to see stats and vault</p>
             <form onSubmit={handleSearch} className="space-y-3 md:space-y-4">
+              <label htmlFor="sidebar-steam-search" className="sr-only">Steam ID search</label>
               <input 
+                id="sidebar-steam-search"
                 autoFocus
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { X, Crown, Lock, ArrowRight } from 'lucide-react';
 
@@ -23,14 +23,93 @@ export default function ProUpgradeModal({
   limit,
   currentCount,
 }: ProUpgradeModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus management for modal
+  useEffect(() => {
+    if (isOpen) {
+      // Hide body content from screen readers when modal is open
+      const mainContent = document.getElementById('main-content');
+      if (mainContent) {
+        mainContent.setAttribute('aria-hidden', 'true');
+      }
+      
+      // Focus the close button when modal opens
+      setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 100);
+      
+      // Trap focus within modal
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab') return;
+        
+        const modal = modalRef.current;
+        if (!modal) return;
+        
+        const focusableElements = modal.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement?.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement?.focus();
+          }
+        }
+      };
+      
+      document.addEventListener('keydown', handleTabKey);
+      
+      // Handle Escape key
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      
+      return () => {
+        document.removeEventListener('keydown', handleTabKey);
+        document.removeEventListener('keydown', handleEscape);
+        // Restore main content accessibility
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+          mainContent.removeAttribute('aria-hidden');
+        }
+      };
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative">
+    <div 
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm" 
+      role="dialog" 
+      aria-modal="true" 
+      aria-labelledby="pro-upgrade-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div 
+        ref={modalRef}
+        className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
+          ref={closeButtonRef}
           onClick={onClose}
           className="absolute top-4 md:top-8 right-4 md:right-8 text-gray-500 hover:text-white transition-colors"
+          aria-label="Close upgrade modal"
         >
           <X size={20} />
         </button>
@@ -40,7 +119,7 @@ export default function ProUpgradeModal({
             <Lock className="text-blue-400" size={24} />
           </div>
           <div>
-            <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">
+            <h2 id="pro-upgrade-title" className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">
               {title}
             </h2>
             {feature && (
@@ -87,6 +166,7 @@ export default function ProUpgradeModal({
           <button
             onClick={onClose}
             className="w-full bg-black/40 border border-white/10 text-gray-400 hover:text-white py-3 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] tracking-widest transition-all"
+            aria-label="Close upgrade modal"
           >
             Maybe Later
           </button>
@@ -101,6 +181,8 @@ export default function ProUpgradeModal({
     </div>
   );
 }
+
+
 
 
 

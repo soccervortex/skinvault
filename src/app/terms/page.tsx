@@ -50,9 +50,11 @@ export default function TermsPage() {
                 <li>Skin price monitoring and analytics with market data</li>
                 <li>Wishlist functionality (Free: 10 items, Pro: unlimited)</li>
                 <li>Price alerts and trackers via Discord integration (Pro only: unlimited trackers)</li>
-                <li>Player statistics and portfolio analytics (CS2 game stats)</li>
-                <li>Skin comparison tool (compare up to 3 items side by side)</li>
+                <li>Player statistics and portfolio analytics (CS2 game stats from Steam)</li>
+                <li>Faceit statistics integration (ELO, level, K/D ratio, win rate, headshot percentage, KAST, and advanced stats for Pro users)</li>
+                <li>Skin comparison tool (compare up to 2 items side by side)</li>
                 <li>Player search functionality (by Steam64 ID, Steam username, Discord username, or Discord ID)</li>
+                <li>Community chat system with global chat, direct messages (DMs), and DM invites</li>
                 <li>Pro subscription features (unlimited wishlist, unlimited price trackers, advanced stats, faster performance, priority API requests)</li>
                 <li>Discord bot with comprehensive commands (/wishlist, /alerts, /inventory, /price, /vault, /stats, /player, /compare, /help)</li>
                 <li>Fuzzy search for items and players</li>
@@ -77,7 +79,69 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                4. Discord Integration and Bot Commands
+                4. Faceit Statistics Integration
+              </h2>
+              <p className="text-gray-300 mb-4">
+                SkinVaults integrates with Faceit to display player statistics:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li>Faceit statistics are displayed on user inventory pages when available</li>
+                <li>Basic stats (ELO, level, K/D ratio, win rate, headshot percentage, KAST) are available to all users</li>
+                <li>Advanced stats (matches, wins, losses, total kills/deaths/assists, headshots, MVPs, averages, multi-kills) are available to Pro users only</li>
+                <li>Statistics are fetched from the Faceit API using your Steam ID or Faceit nickname</li>
+                <li>If a player is not found on Faceit, no statistics will be displayed (this is normal and not an error)</li>
+                <li>Faceit data is cached for performance and may not reflect real-time values</li>
+                <li>We use the Faceit Open API and may use an API key for higher rate limits</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
+                5. Community Chat System
+              </h2>
+              <p className="text-gray-300 mb-4">
+                SkinVaults provides a community chat system with the following features:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                <li><strong>Global Chat:</strong> Public chat room where all users can communicate</li>
+                <li><strong>Direct Messages (DMs):</strong> Private one-on-one messaging between users</li>
+                <li><strong>DM Invites:</strong> Users can send and accept invitations to start direct message conversations</li>
+                <li><strong>Message Features:</strong>
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li>Edit messages (within a time limit)</li>
+                    <li>Pin messages (admin/owner only for global chat, both users for DMs)</li>
+                    <li>Delete messages (admin/owner only for global chat, both users for DMs)</li>
+                    <li>Report messages (flag inappropriate content)</li>
+                    <li>Real-time updates via Pusher WebSocket connection</li>
+                  </ul>
+                </li>
+                <li><strong>Admin Features:</strong>
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li>Timeout users (temporary ban from chat)</li>
+                    <li>Ban users (permanent ban from chat)</li>
+                    <li>Delete any message</li>
+                    <li>Pin/unpin messages</li>
+                    <li>View and manage reports</li>
+                    <li>Manage admin notes on reports</li>
+                  </ul>
+                </li>
+                <li><strong>User Responsibilities:</strong>
+                  <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
+                    <li>Do not spam, harass, or abuse other users</li>
+                    <li>Do not share inappropriate content</li>
+                    <li>Respect other users' privacy</li>
+                    <li>Follow community guidelines</li>
+                  </ul>
+                </li>
+                <li><strong>Moderation:</strong> We reserve the right to timeout, ban, or remove users who violate our Terms of Service or community guidelines</li>
+                <li><strong>Data Storage:</strong> Chat messages are stored in our database (Vercel KV and MongoDB) and may be retained for moderation and legal purposes</li>
+                <li><strong>Privacy:</strong> Global chat messages are visible to all users. Direct messages are private between the two participants only</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
+                6. Discord Integration and Bot Commands
               </h2>
               <p className="text-gray-300 mb-4">
                 SkinVaults offers optional Discord integration with a comprehensive bot:
@@ -110,7 +174,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                5. Pro Subscription and Consumables
+                7. Pro Subscription and Consumables
               </h2>
               <p className="text-gray-300 mb-4">
                 SkinVaults offers a Pro subscription service and consumable items with the following terms:
@@ -161,7 +225,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                6. User Responsibilities
+                8. User Responsibilities
               </h2>
               <p className="text-gray-300 mb-4">
                 You agree to:
@@ -178,7 +242,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                7. Account Termination and Bans
+                9. Account Termination and Bans
               </h2>
               <p className="text-gray-300 mb-4">
                 We reserve the right to ban or terminate accounts that violate our Terms of Service:
@@ -194,7 +258,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                8. Data and Content
+                10. Data and Content
               </h2>
               <p className="text-gray-300 mb-4">
                 The Service displays data from:
@@ -203,10 +267,12 @@ export default function TermsPage() {
                 <li>Steam Community Market (price data via proxy services)</li>
                 <li>Steam Web API (inventory, profile data, and player statistics)</li>
                 <li>Steam Community profiles (profile information, avatars)</li>
+                <li>Faceit Open API (player statistics, ELO, match data)</li>
                 <li>steamid.io (for Steam username resolution)</li>
                 <li>CS:GO API dataset (item information, images, rarity data)</li>
                 <li>Your local browser storage (wishlist, preferences, price cache, compare list)</li>
-                <li>Vercel KV database (primary) and MongoDB (backup/fallback) - Pro subscriptions, Discord connections, price alerts, purchase history, user rewards, banned users</li>
+                <li>Vercel KV database (primary) and MongoDB (backup/fallback) - Pro subscriptions, Discord connections, price alerts, purchase history, user rewards, banned users, chat messages, DM conversations, DM invites, reports, admin actions</li>
+                <li>Pusher (real-time chat updates via WebSocket)</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 We do not guarantee the accuracy, completeness, or timeliness of price data. Market prices are subject to change and may not reflect real-time values. Price data is cached for performance optimization (Free: 30 minutes, Pro: 2 hours, or 1 hour with Cache Boost consumable).
@@ -222,11 +288,14 @@ export default function TermsPage() {
               <p className="text-gray-300 mt-4">
                 <strong>Proxy Services:</strong> We use multiple proxy services (ScraperAPI, ZenRows, ScrapingAnt, and fallback proxies) to access Steam Community Market data. These services help bypass rate limits and improve reliability. Pro users get direct Steam API access with priority requests, falling back to proxies only if needed.
               </p>
+              <p className="text-gray-300 mt-4">
+                <strong>Faceit API:</strong> We use the Faceit Open API to fetch player statistics. An optional API key may be used for higher rate limits. Faceit data is cached for performance and may not reflect real-time values.
+              </p>
             </section>
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                9. Intellectual Property
+                11. Intellectual Property
               </h2>
               <p className="text-gray-300 mb-4">
                 All content, features, and functionality of the Service are owned by SkinVaults and are protected by international copyright, trademark, and other intellectual property laws. You may not:
@@ -241,7 +310,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                10. Limitation of Liability
+                12. Limitation of Liability
               </h2>
               <p className="text-gray-300 mb-4">
                 SkinVaults is provided "as is" without warranties of any kind. We are not liable for:
@@ -257,14 +326,16 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                11. Third-Party Services
+                13. Third-Party Services
               </h2>
               <p className="text-gray-300 mb-4">
                 The Service integrates with third-party services that have their own privacy policies:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Steam:</strong> For authentication, inventory data, player statistics, and profile information</li>
+                <li><strong>Faceit:</strong> For player statistics, ELO, match data, and CS2 performance metrics</li>
                 <li><strong>Discord:</strong> For price alert notifications, bot commands, and OAuth authentication</li>
+                <li><strong>Pusher:</strong> For real-time chat updates via WebSocket connections</li>
                 <li><strong>Stripe:</strong> For secure payment processing (we do not store credit card details). Supports both production and test mode for payment testing.</li>
                 <li><strong>Vercel:</strong> For hosting, data storage (Vercel KV), and infrastructure</li>
                 <li><strong>MongoDB:</strong> For database backup and fallback storage (MongoDB Atlas)</li>
@@ -280,7 +351,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                12. Changes to Terms
+                14. Changes to Terms
               </h2>
               <p className="text-gray-300 mb-4">
                 We reserve the right to modify these terms at any time. Continued use of the Service after changes constitutes acceptance of the new terms. We will notify users of significant changes via email or through the Service.
@@ -289,7 +360,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                13. Contact Information
+                15. Contact Information
               </h2>
               <p className="text-gray-300 mb-4">
                 For questions about these Terms of Service, please contact us through our <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact Page</a>.
@@ -298,7 +369,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
-                14. Governing Law
+                16. Governing Law
               </h2>
               <p className="text-gray-300 mb-4">
                 These Terms shall be governed by and construed in accordance with applicable laws. Any disputes arising from these terms or use of the Service shall be resolved through appropriate legal channels.

@@ -54,6 +54,8 @@ export default function PrivacyPage() {
                 <li>Steam avatar image</li>
                 <li>Public inventory data (skins, items)</li>
                 <li>Public game statistics (if profile is public)</li>
+                <li>Faceit player data (when available) - ELO, level, nickname, player ID</li>
+                <li>Faceit CS2 statistics (when available) - K/D ratio, win rate, headshot percentage, KAST, matches, kills, deaths, assists, MVPs, and other performance metrics</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 <strong>Note:</strong> We only access publicly available information from your Steam profile. We do not access private inventory or profile data.
@@ -89,6 +91,11 @@ export default function PrivacyPage() {
                 <li>Compare list items (stored locally in browser, max 2 items)</li>
                 <li>Purchase history (Pro subscriptions and consumable purchases - stored in Vercel KV and MongoDB)</li>
                 <li>Consumable purchases (wishlist slots, Discord access, price scan boost, cache boost - stored in user_rewards database key)</li>
+                <li>Chat messages (global chat messages and direct messages - stored in Vercel KV and MongoDB)</li>
+                <li>DM conversations (direct message threads between users - stored in Vercel KV and MongoDB)</li>
+                <li>DM invites (invitations to start direct message conversations - stored in Vercel KV and MongoDB)</li>
+                <li>Chat reports (reported messages with admin notes - stored in Vercel KV and MongoDB)</li>
+                <li>Admin actions (timeouts, bans, message deletions, pins - stored in Vercel KV and MongoDB)</li>
               </ul>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
@@ -104,11 +111,14 @@ export default function PrivacyPage() {
                 <li>User rewards (consumable purchases like wishlist slots, Discord access, boosts - stored in Vercel KV and MongoDB)</li>
                 <li>Banned user list (Steam IDs that are banned from the Service - stored in Vercel KV and MongoDB)</li>
                 <li>Stripe test mode status (for payment testing - stored in Vercel KV and MongoDB)</li>
+                <li>Chat notification preferences (unread message counts, last check timestamps - stored in browser localStorage)</li>
                 <li>Browser type and device information</li>
                 <li>IP address (for security and analytics)</li>
-                <li>Usage data (pages visited, features used, commands executed)</li>
+                <li>Usage data (pages visited, features used, commands executed, chat activity)</li>
                 <li>Price cache data (stored locally in browser for performance - Free: 30 min, Pro: 2 hours, Cache Boost: 1 hour)</li>
                 <li>Dataset cache (item information from CS:GO API, stored locally in browser for 12-24 hours)</li>
+                <li>Chat message cache (recent messages cached locally for faster loading - stored in browser localStorage)</li>
+                <li>DM list cache (list of direct message conversations - stored in browser localStorage)</li>
               </ul>
             </section>
 
@@ -121,11 +131,13 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Providing and maintaining the Service</li>
-                <li>Displaying your inventory and statistics</li>
+                <li>Displaying your inventory and statistics (Steam and Faceit)</li>
                 <li>Processing Pro subscription payments</li>
                 <li>Managing your account and preferences</li>
+                <li>Enabling community chat and direct messaging</li>
                 <li>Sending service-related communications</li>
                 <li>Responding to your contact form submissions</li>
+                <li>Moderating chat content and enforcing community guidelines</li>
                 <li>Improving and optimizing the Service</li>
                 <li>Detecting and preventing fraud or abuse</li>
                 <li>Complying with legal obligations</li>
@@ -149,6 +161,9 @@ export default function PrivacyPage() {
                     <li>Price cache (key: <code>sv_price_cache_v1</code>)</li>
                     <li>Dataset cache (key: <code>sv_dataset_cache_v1</code>)</li>
                     <li>Compare list (key: <code>sv_compare_list</code>)</li>
+                    <li>Chat message cache (key: <code>sv_chat_cache</code>)</li>
+                    <li>DM list (key: <code>sv_dm_list</code>)</li>
+                    <li>Chat notification data (key: <code>sv_chat_notifications</code>) - unread counts, last check times</li>
                   </ul>
                 </li>
                 <li><strong>Vercel KV Database (Primary) and MongoDB (Backup/Fallback):</strong> 
@@ -164,6 +179,12 @@ export default function PrivacyPage() {
                     <li>User rewards (key: <code>user_rewards</code>) - consumable purchases (wishlist slots, Discord access, boosts) with grant timestamps and session IDs</li>
                     <li>Banned Steam IDs (key: <code>banned_steam_ids</code>) - list of banned users</li>
                     <li>Stripe test mode status (key: <code>stripe_test_mode</code>) - toggle for payment testing</li>
+                    <li>Global chat messages (key: <code>global_chat</code>) - all public chat messages</li>
+                    <li>Direct messages (key: <code>dm_messages</code>) - private messages between users</li>
+                    <li>DM conversations (key: <code>dm_conversations</code>) - DM thread metadata</li>
+                    <li>DM invites (key: <code>dm_invites</code>) - pending DM invitations</li>
+                    <li>Chat reports (key: <code>chat_reports</code>) - reported messages with admin notes</li>
+                    <li>Chat timeouts (key: <code>chat_timeouts</code>) - temporary chat bans</li>
                   </ul>
                   <p className="text-gray-300 mt-2 ml-4">
                     <strong>Database System:</strong> We use a dual-database system for reliability. Vercel KV is the primary database for fast access. MongoDB automatically backs up all data and serves as a fallback when KV is unavailable or hits rate limits. Both databases are kept in sync automatically. Data is written to both databases simultaneously, and if KV fails, the system seamlessly switches to MongoDB.
@@ -196,7 +217,9 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Steam:</strong> For authentication and accessing your public profile data, inventory, and statistics</li>
+                <li><strong>Faceit:</strong> For fetching player statistics, ELO, and CS2 performance data (subject to Faceit's privacy policy)</li>
                 <li><strong>Discord:</strong> For sending price alert notifications via direct messages and enabling bot commands (subject to Discord's privacy policy)</li>
+                <li><strong>Pusher:</strong> For real-time chat updates via WebSocket connections (subject to Pusher's privacy policy)</li>
                 <li><strong>Stripe:</strong> For payment processing (subject to Stripe's privacy policy)</li>
                 <li><strong>Vercel:</strong> For hosting and data storage via Vercel KV (subject to Vercel's privacy policy)</li>
                 <li><strong>MongoDB:</strong> For database backup and fallback storage via MongoDB Atlas (subject to MongoDB's privacy policy)</li>
@@ -224,6 +247,9 @@ export default function PrivacyPage() {
                 <li>Price cache data (cached market prices for performance - Free: 30 min, Pro: 2 hours)</li>
                 <li>Dataset cache (item information from CS:GO API - cached for 12-24 hours)</li>
                 <li>Compare list (items selected for comparison, max 2 items)</li>
+                <li>Chat message cache (recent messages for faster loading)</li>
+                <li>DM list (list of direct message conversations)</li>
+                <li>Chat notification data (unread message counts, last check timestamps)</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 This data is stored locally in your browser and is not transmitted to our servers except when necessary for the Service to function (e.g., wishlist sync, price alerts). You can clear this data at any time by clearing your browser's localStorage.
@@ -239,7 +265,9 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li><strong>Steam:</strong> <a href="https://store.steampowered.com/privacy_agreement/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Steam Privacy Policy</a></li>
+                <li><strong>Faceit:</strong> <a href="https://www.faceit.com/en/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Faceit Terms of Service</a></li>
                 <li><strong>Discord:</strong> <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Discord Privacy Policy</a></li>
+                <li><strong>Pusher:</strong> <a href="https://pusher.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Pusher Privacy Policy</a></li>
                 <li><strong>Stripe:</strong> <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Stripe Privacy Policy</a></li>
                 <li><strong>Vercel:</strong> <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Vercel Privacy Policy</a></li>
                 <li><strong>MongoDB:</strong> <a href="https://www.mongodb.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">MongoDB Privacy Policy</a></li>
@@ -282,7 +310,13 @@ export default function PrivacyPage() {
                 <li><strong>Price Alert Data:</strong> Retained until you delete the alert or disconnect your Discord account</li>
                 <li><strong>Contact Form Data:</strong> Retained for customer support purposes</li>
                 <li><strong>Banned User Data:</strong> Retained until the ban is lifted. If you are unbanned, your access is restored immediately.</li>
-                <li><strong>LocalStorage Data:</strong> Stored in your browser until you clear it. Wishlist data may be synced to server for cross-device access.</li>
+                <li><strong>Chat Messages:</strong> Retained for moderation and legal purposes. Global chat messages are visible to all users. Direct messages are private between participants.</li>
+                <li><strong>DM Conversations:</strong> Retained until both participants delete the conversation or one participant is banned</li>
+                <li><strong>DM Invites:</strong> Retained until accepted, declined, or expired</li>
+                <li><strong>Chat Reports:</strong> Retained for moderation purposes and may be kept for legal compliance</li>
+                <li><strong>Admin Actions:</strong> Retained for audit and moderation purposes</li>
+                <li><strong>Faceit Data:</strong> Not stored permanently - fetched on-demand and cached temporarily for performance</li>
+                <li><strong>LocalStorage Data:</strong> Stored in your browser until you clear it. Wishlist data may be synced to server for cross-device access. Chat cache and DM list are stored locally for faster loading.</li>
                 <li><strong>Discord DM Queue:</strong> Temporary queue cleared after messages are sent by the bot</li>
                 <li><strong>Failed Purchase Records:</strong> Retained for admin review and manual fulfillment. May be cleared after successful fulfillment.</li>
               </ul>

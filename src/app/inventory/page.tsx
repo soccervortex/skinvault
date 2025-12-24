@@ -7,10 +7,21 @@ import Sidebar from '@/app/components/Sidebar';
 import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy } from 'lucide-react';
 import { getPriceScanConcurrencySync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
-import ManagePriceTrackers from '@/app/components/ManagePriceTrackers';
-import PriceTrackerModal from '@/app/components/PriceTrackerModal';
-import ProUpgradeModal from '@/app/components/ProUpgradeModal';
-import CompareModal from '@/app/components/CompareModal';
+import dynamic from 'next/dynamic';
+
+// Dynamic imports for modals to reduce initial bundle size
+const ManagePriceTrackers = dynamic(() => import('@/app/components/ManagePriceTrackers'), {
+  ssr: false,
+});
+const PriceTrackerModal = dynamic(() => import('@/app/components/PriceTrackerModal'), {
+  ssr: false,
+});
+const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal'), {
+  ssr: false,
+});
+const CompareModal = dynamic(() => import('@/app/components/CompareModal'), {
+  ssr: false,
+});
 import { InventoryItemSkeleton, ProfileHeaderSkeleton, StatCardSkeleton } from '@/app/components/LoadingSkeleton';
 import ShareButton from '@/app/components/ShareButton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
@@ -1000,7 +1011,7 @@ function InventoryContent() {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
             <ProfileHeaderSkeleton />
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
@@ -1023,7 +1034,7 @@ function InventoryContent() {
     <>
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
         {viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
             <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
@@ -1398,13 +1409,17 @@ function InventoryContent() {
                   <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic">Secured Items</h3>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                  <label htmlFor="inventory-search" className="sr-only">Search vault</label>
                   <input 
+                    id="inventory-search"
                     value={searchQuery} 
                     onChange={(e) => setSearchQuery(e.target.value)} 
                     className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-4 md:px-6 text-[10px] md:text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl" 
                     placeholder="SEARCH VAULT..." 
                   />
+                  <label htmlFor="inventory-sort" className="sr-only">Sort items</label>
                   <select
+                    id="inventory-sort"
                     value={sortMode}
                     onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
                     className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"

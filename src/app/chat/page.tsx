@@ -1936,8 +1936,9 @@ export default function ChatPage() {
             <div className="mt-4 p-4 bg-[#08090d] border border-white/10 rounded-lg space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Filter by User (Steam ID)</label>
+                  <label htmlFor="filter-user" className="text-xs text-gray-400 mb-1 block">Filter by User (Steam ID)</label>
                   <input
+                    id="filter-user"
                     type="text"
                     value={filterUser}
                     onChange={(e) => setFilterUser(e.target.value)}
@@ -1946,8 +1947,9 @@ export default function ChatPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Date From</label>
+                  <label htmlFor="filter-date-from" className="text-xs text-gray-400 mb-1 block">Date From</label>
                   <input
+                    id="filter-date-from"
                     type="datetime-local"
                     value={filterDateFrom}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
@@ -1955,8 +1957,9 @@ export default function ChatPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Date To</label>
+                  <label htmlFor="filter-date-to" className="text-xs text-gray-400 mb-1 block">Date To</label>
                   <input
+                    id="filter-date-to"
                     type="datetime-local"
                     value={filterDateTo}
                     onChange={(e) => setFilterDateTo(e.target.value)}
@@ -1965,8 +1968,9 @@ export default function ChatPage() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label htmlFor="filter-pinned" className="flex items-center gap-2 cursor-pointer">
                   <input
+                    id="filter-pinned"
                     type="checkbox"
                     checked={filterPinnedOnly}
                     onChange={(e) => setFilterPinnedOnly(e.target.checked)}
@@ -1974,8 +1978,9 @@ export default function ChatPage() {
                   />
                   <span className="text-sm text-gray-300">Pinned messages only</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label htmlFor="filter-pro" className="flex items-center gap-2 cursor-pointer">
                   <input
+                    id="filter-pro"
                     type="checkbox"
                     checked={filterProOnly}
                     onChange={(e) => setFilterProOnly(e.target.checked)}
@@ -2085,7 +2090,9 @@ export default function ChatPage() {
                     </div>
                     {editingMessage?.id === msg.id && editingMessage?.type === 'global' ? (
                       <div className="space-y-2">
+                        <label htmlFor={`edit-message-global-${msg.id}`} className="sr-only">Edit message</label>
                         <textarea
+                          id={`edit-message-global-${msg.id}`}
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           className="w-full bg-[#08090d] border border-white/10 rounded-lg p-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500"
@@ -2420,7 +2427,9 @@ export default function ChatPage() {
                               </div>
                               {editingMessage?.id === msg.id && editingMessage?.type === 'dm' ? (
                                 <div className="space-y-2">
+                                  <label htmlFor={`edit-message-dm-${msg.id}`} className="sr-only">Edit message</label>
                                   <textarea
+                                    id={`edit-message-dm-${msg.id}`}
                                     value={editText}
                                     onChange={(e) => setEditText(e.target.value)}
                                     className="w-full bg-[#08090d] border border-white/10 rounded-lg p-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500"
@@ -2491,7 +2500,9 @@ export default function ChatPage() {
             <div className="bg-[#11141d] p-6 rounded-2xl border border-white/10 max-w-md w-full mx-4">
               <h3 className="text-xl font-bold mb-4">Timeout User</h3>
               <p className="text-gray-400 mb-4">Timeout {timeoutUser.name} for:</p>
+              <label htmlFor="timeout-duration" className="sr-only">Timeout duration</label>
               <select
+                id="timeout-duration"
                 value={timeoutDuration}
                 onChange={(e) => setTimeoutDuration(e.target.value)}
                 className="w-full bg-[#08090d] border border-white/10 rounded-lg p-3 mb-4 text-white"
@@ -2591,7 +2602,9 @@ export default function ChatPage() {
             )}
           <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
             <div className="flex gap-3">
+              <label htmlFor="chat-message-input" className="sr-only">{activeTab === 'global' ? 'Type a message' : 'Type a DM'}</label>
               <input
+                id="chat-message-input"
                 type="text"
                 value={message}
                 onChange={(e) => {
@@ -2650,7 +2663,9 @@ export default function ChatPage() {
               <p className="text-sm text-gray-500 mb-4">
                 Please enter the Steam ID of the user you are reporting to confirm:
               </p>
+              <label htmlFor="report-steam-id" className="sr-only">Steam ID for report confirmation</label>
               <input
+                id="report-steam-id"
                 type="text"
                 value={reportSteamId}
                 onChange={(e) => setReportSteamId(e.target.value)}
@@ -2698,7 +2713,9 @@ export default function ChatPage() {
               <p className="text-sm text-gray-400 mb-4">
                 Enter the Steam ID of the user you want to message
               </p>
+              <label htmlFor="new-dm-steam-id" className="sr-only">Steam ID for new DM</label>
               <input
+                id="new-dm-steam-id"
                 type="text"
                 value={newUserSteamId}
                 onChange={(e) => setNewUserSteamId(e.target.value)}

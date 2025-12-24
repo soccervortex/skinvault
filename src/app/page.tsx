@@ -4,9 +4,16 @@ import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Targ
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
-import PriceTrackerModal from '@/app/components/PriceTrackerModal';
-import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import dynamic from 'next/dynamic';
 import InstallPrompt from '@/app/components/InstallPrompt';
+
+// Dynamic imports for modals to reduce initial bundle size
+const PriceTrackerModal = dynamic(() => import('@/app/components/PriceTrackerModal'), {
+  ssr: false,
+});
+const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal'), {
+  ssr: false,
+});
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
@@ -289,22 +296,23 @@ export default function GlobalSkinSearch() {
             <div className="flex gap-2 md:gap-4">
               {compareList.map(i => (
                 <div key={i.id} className="relative bg-black/40 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/5">
-                   <img src={i.image} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt="" />
-                   <button onClick={() => toggleCompare(i)} className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-red-500 rounded-full p-0.5 md:p-1"><X size={8} /></button>
+                   <img src={i.image} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name || "Category icon"} />
+                   <button onClick={() => toggleCompare(i)} className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-red-500 rounded-full p-0.5 md:p-1" aria-label={`Remove ${i.name} from compare`}><X size={8} /></button>
                 </div>
               ))}
             </div>
             {compareList.length === 2 && (
               <Link href={`/compare?id1=${compareList[0].id}&id2=${compareList[1].id}`} className="bg-blue-600 px-4 md:px-8 py-2.5 md:py-4 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all whitespace-nowrap">Duel Skins</Link>
             )}
-            <button onClick={() => setCompareList([])} className="text-gray-500 hover:text-white shrink-0"><Trash2 size={16} /></button>
+            <button onClick={() => setCompareList([])} className="text-gray-500 hover:text-white shrink-0" aria-label="Clear compare list"><Trash2 size={16} /></button>
           </div>
         )}
 
         <header className="p-3 md:p-4 lg:p-8 border-b border-white/5 bg-[#08090d] flex flex-col xl:flex-row gap-3 md:gap-4 lg:gap-6 items-center">
           <div className="relative flex-1 w-full group">
             <Search className="absolute left-4 md:left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={14} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-[#11141d] border border-white/5 rounded-xl md:rounded-2xl py-3 md:py-4 pl-12 md:pl-14 pr-4 md:pr-6 text-[10px] md:text-xs outline-none focus:border-blue-500 transition-all" placeholder="Search all skins..." />
+            <label htmlFor="main-search" className="sr-only">Search all skins</label>
+            <input id="main-search" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-[#11141d] border border-white/5 rounded-xl md:rounded-2xl py-3 md:py-4 pl-12 md:pl-14 pr-4 md:pr-6 text-[10px] md:text-xs outline-none focus:border-blue-500 transition-all" placeholder="Search all skins..." />
           </div>
           
           <div className="flex items-center gap-2 md:gap-3 w-full xl:w-auto justify-between xl:justify-end">
@@ -334,7 +342,7 @@ export default function GlobalSkinSearch() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
               {Array.from({ length: 20 }).map((_, i) => (
@@ -374,7 +382,7 @@ export default function GlobalSkinSearch() {
                 const rarityColor = item.rarity?.color || "#4b5563";
 
                 return (
-                  <div key={item.id} className={`bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-all duration-300 group relative flex flex-col border ${isOwned ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'border-white/5 hover:border-blue-500/40'}`}>
+                  <div key={item.id} className={`bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-[border-color,transform] duration-300 group relative flex flex-col border ${isOwned ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'border-white/5 hover:border-blue-500/40'}`}>
                     {isOwned && (
                       <div className="absolute top-2 md:top-3 lg:top-4 left-2 md:left-3 lg:left-4 z-50 flex items-center gap-1 md:gap-1.5 bg-emerald-500 px-2 md:px-3 py-1 md:py-1.5 rounded-full shadow-lg">
                         <CheckCircle2 size={8} className="text-white" />
@@ -385,7 +393,7 @@ export default function GlobalSkinSearch() {
                       {/* Compare Button */}
                       <button 
                         onClick={() => toggleCompare(item)} 
-                        className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all flex items-center justify-center ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} 
+                        className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-[color,border-color,transform] flex items-center justify-center ${compareList.find(i => i.id === item.id) ? 'text-blue-500 border-blue-500' : 'text-white border-white/10 hover:text-blue-500'}`} 
                         title="Add to Compare"
                         aria-label={compareList.find(i => i.id === item.id) ? 'Remove from compare' : 'Add to compare'}
                       >
@@ -458,7 +466,7 @@ export default function GlobalSkinSearch() {
                     <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
-                        <img loading="lazy" src={item.image} className="w-full h-full object-contain relative z-10 transition-transform group-hover:scale-110 duration-500" alt={item.name} />
+                        <img loading="lazy" src={item.image} className="w-full h-full object-contain relative z-10 will-change-transform group-hover:scale-110 transition-transform duration-500" alt={item.name} />
                       </div>
                       <p className="text-[9px] md:text-[10px] font-black uppercase truncate tracking-widest text-white/90">{item.name}</p>
                       <p className="text-[7px] md:text-[8px] font-black mt-1 md:mt-2 opacity-80 uppercase" style={{color: rarityColor}}>{item.rarity?.name || 'Standard'}</p>

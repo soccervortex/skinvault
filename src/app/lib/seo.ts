@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
 const SITE_NAME = 'SkinVaults';
-const DEFAULT_DESCRIPTION = 'SkinVaults is the ultimate CS2 skin analytics and inventory management platform. Track your Steam inventory value in real-time, monitor skin prices with advanced analytics, set custom price alerts, compare skins side-by-side, and manage your wishlist. Get instant market prices, price history charts, and make informed trading decisions. Perfect for CS2 traders, collectors, and investors who want to maximize their skin portfolio value.';
+const DEFAULT_DESCRIPTION = 'Track CS2 skin prices, manage your Steam inventory, set price alerts, and compare skins. Real-time analytics for CS2 traders and collectors.';
 
 export interface SEOConfig {
   title?: string;
@@ -146,7 +146,7 @@ export const pageSEO = {
   },
   inventory: {
     title: 'My Inventory - Track Your CS2 Skin Collection',
-    description: 'View and manage your complete CS2 skin inventory. Track your collection value in real-time, see price changes, organize your skins, and get detailed analytics on your CS2 skin portfolio. Perfect for traders and collectors.',
+    description: 'View and manage your CS2 skin inventory. Track collection value, price changes, and get detailed analytics on your skin portfolio.',
     path: '/inventory',
     keywords: [
       'CS2 inventory',
@@ -181,7 +181,7 @@ export const pageSEO = {
   },
   wishlist: {
     title: 'My Wishlist - Save Your Favorite CS2 Skins',
-    description: 'Create and manage your CS2 skin wishlist. Save your favorite skins, track their prices, and get notified when prices drop. Never miss a deal on the CS2 skins you want.',
+    description: 'Create and manage your CS2 skin wishlist. Save favorite skins, track prices, and get notified when prices drop.',
     path: '/wishlist',
     keywords: [
       'CS2 wishlist',
@@ -215,7 +215,7 @@ export const pageSEO = {
   },
   compare: {
     title: 'Compare CS2 Skins - Side-by-Side Skin Comparison',
-    description: 'Compare CS2 skins side-by-side to make the best trading decisions. Compare prices, rarity, wear conditions, and market trends for any CS2 skin. Find the perfect skin for your collection.',
+    description: 'Compare CS2 skins side-by-side. Compare prices, rarity, wear conditions, and market trends to make better trading decisions.',
     path: '/compare',
     keywords: [
       'CS2 skin comparison',
@@ -249,7 +249,7 @@ export const pageSEO = {
   },
   pro: {
     title: 'Pro Subscription - Unlock Advanced CS2 Analytics',
-    description: 'Upgrade to SkinVaults Pro for advanced CS2 skin analytics, faster price scanning, unlimited wishlist items, price alerts, Discord integration, and exclusive features. Get the most out of your CS2 skin trading.',
+    description: 'Upgrade to SkinVaults Pro for advanced analytics, faster scanning, unlimited wishlist, price alerts, and Discord integration.',
     path: '/pro',
     keywords: [
       'CS2 skin analytics pro',
@@ -283,7 +283,7 @@ export const pageSEO = {
   },
   item: (itemName: string) => ({
     title: `${itemName} - CS2 Skin Price & Details`,
-    description: `View detailed information, current prices, price history, and market trends for ${itemName}. Get real-time CS2 skin prices, compare wear conditions, and make informed trading decisions.`,
+    description: `View prices, price history, and market trends for ${itemName}. Compare wear conditions and make informed CS2 trading decisions.`,
     path: `/item/${encodeURIComponent(itemName)}`,
     type: 'product' as const,
     keywords: [

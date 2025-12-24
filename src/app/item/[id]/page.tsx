@@ -3,9 +3,18 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import ProUpgradeModal from '@/app/components/ProUpgradeModal';
-import PriceTrackerModal from '@/app/components/PriceTrackerModal';
-import CompareModal from '@/app/components/CompareModal';
+import dynamic from 'next/dynamic';
+
+// Dynamic imports for modals to reduce initial bundle size
+const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal'), {
+  ssr: false,
+});
+const PriceTrackerModal = dynamic(() => import('@/app/components/PriceTrackerModal'), {
+  ssr: false,
+});
+const CompareModal = dynamic(() => import('@/app/components/CompareModal'), {
+  ssr: false,
+});
 import ShareButton from '@/app/components/ShareButton';
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';

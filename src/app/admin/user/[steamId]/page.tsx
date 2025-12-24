@@ -403,7 +403,9 @@ export default function UserManagementPage() {
                       )}
                       {!userInfo.isTimedOut ? (
                         <div className="flex gap-2">
+                          <label htmlFor="user-timeout-duration" className="sr-only">Timeout duration</label>
                           <select
+                            id="user-timeout-duration"
                             value={timeoutDuration}
                             onChange={(e) => setTimeoutDuration(e.target.value)}
                             className="bg-[#08090d] border border-white/10 rounded-lg px-3 py-2 text-sm"
@@ -446,7 +448,9 @@ export default function UserManagementPage() {
               {/* Filters */}
               <div className="bg-[#11141d] p-4 rounded-xl border border-white/10 flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
+                  <label htmlFor="user-message-search" className="sr-only">Search messages</label>
                   <input
+                    id="user-message-search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -454,7 +458,9 @@ export default function UserManagementPage() {
                     className="w-full bg-[#08090d] border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
+                <label htmlFor="user-time-filter" className="sr-only">Time filter</label>
                 <select
+                  id="user-time-filter"
                   value={timeFilter}
                   onChange={(e) => setTimeFilter(e.target.value)}
                   className="bg-[#08090d] border border-white/10 rounded-lg px-4 py-2 text-white"

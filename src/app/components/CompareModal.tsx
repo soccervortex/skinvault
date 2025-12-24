@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, Trash2, Scale, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -26,6 +26,8 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [datasetCache, setDatasetCache] = useState<Record<string, any[]>>({});
+  const modalRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -223,17 +225,91 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
     localStorage.setItem('sv_compare_list', JSON.stringify([]));
   };
 
+  // Focus management for modal
+  useEffect(() => {
+    if (isOpen) {
+      // Hide body content from screen readers when modal is open
+      const mainContent = document.getElementById('main-content');
+      if (mainContent) {
+        mainContent.setAttribute('aria-hidden', 'true');
+      }
+      
+      // Focus the close button when modal opens
+      setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 100);
+      
+      // Trap focus within modal
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab') return;
+        
+        const modal = modalRef.current;
+        if (!modal) return;
+        
+        const focusableElements = modal.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement?.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement?.focus();
+          }
+        }
+      };
+      
+      document.addEventListener('keydown', handleTabKey);
+      
+      // Handle Escape key
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      
+      return () => {
+        document.removeEventListener('keydown', handleTabKey);
+        document.removeEventListener('keydown', handleEscape);
+        // Restore main content accessibility
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+          mainContent.removeAttribute('aria-hidden');
+        }
+      };
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" 
+      role="dialog" 
+      aria-modal="true" 
+      aria-labelledby="compare-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div 
+        ref={modalRef}
+        className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 md:p-8 border-b border-white/5">
           <div className="flex items-center gap-4">
             <Scale className="text-blue-400" size={24} />
             <div>
-              <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+              <h2 id="compare-modal-title" className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
                 Compare Items
               </h2>
               <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">
@@ -242,9 +318,10 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
             </div>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className="p-2 rounded-xl hover:bg-white/5 transition-colors"
-            aria-label="Close"
+            aria-label="Close compare modal"
           >
             <X size={20} className="text-gray-400" />
           </button>
@@ -307,7 +384,9 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
             </h3>
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <label htmlFor="compare-search" className="sr-only">Search for items to compare</label>
               <input
+                id="compare-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
