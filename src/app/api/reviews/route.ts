@@ -114,8 +114,11 @@ export async function GET() {
     }
 
     // Fetch Sitejabber reviews using Sitejabber API (free tier)
+    // Documentation: https://apidocs.sitejabber.com/#reviews
     const SITEJABBER_CLIENT_TOKEN = process.env.SITEJABBER_CLIENT_TOKEN;
     const SITEJABBER_USER_TOKEN = process.env.SITEJABBER_USER_TOKEN;
+    console.log('SITEJABBER_CLIENT_TOKEN present:', !!SITEJABBER_CLIENT_TOKEN);
+    console.log('SITEJABBER_USER_TOKEN present:', !!SITEJABBER_USER_TOKEN);
     
     if (SITEJABBER_CLIENT_TOKEN && SITEJABBER_USER_TOKEN) {
       try {
