@@ -33,16 +33,25 @@ export async function GET(req: Request) {
         cache: 'no-store' 
       });
     } else if (steamId) {
+      // Faceit API requires both 'game' and 'game_player_id' parameters together
       // Try with CS2 game parameter first
-      playerUrl = `https://open.faceit.com/data/v4/players?game=cs2&game_player_id=${steamId}`;
+      const params = new URLSearchParams({
+        game: 'cs2',
+        game_player_id: steamId
+      });
+      playerUrl = `https://open.faceit.com/data/v4/players?${params.toString()}`;
       playerRes = await fetch(playerUrl, { 
         headers,
         cache: 'no-store' 
       });
 
-      // If not found with CS2, try without game parameter (for CS:GO/CS2 compatibility)
+      // If not found with CS2, try with CSGO (for backwards compatibility)
       if (!playerRes.ok && playerRes.status === 404) {
-        playerUrl = `https://open.faceit.com/data/v4/players?game_player_id=${steamId}`;
+        const paramsCSGO = new URLSearchParams({
+          game: 'csgo',
+          game_player_id: steamId
+        });
+        playerUrl = `https://open.faceit.com/data/v4/players?${paramsCSGO.toString()}`;
         playerRes = await fetch(playerUrl, { 
           headers,
           cache: 'no-store' 
@@ -53,20 +62,40 @@ export async function GET(req: Request) {
     }
 
     if (!playerRes.ok) {
+      const errorText = await playerRes.text();
+      
       if (playerRes.status === 404) {
-        // Try to get more info from the response
-        const errorText = await playerRes.text();
+        // Player not found - this is normal, not an error
         console.log('Faceit API 404 response:', errorText);
         return NextResponse.json({ 
           error: 'Player not found on Faceit',
           message: 'This Steam account may not be linked to a Faceit account, or the account may not exist on Faceit.'
         }, { status: 404 });
       }
-      const errorText = await playerRes.text();
+      
+      if (playerRes.status === 400) {
+        // Bad request - likely parameter issue
+        console.error('Faceit API 400 error:', errorText);
+        // Try to parse error details
+        try {
+          const errorData = JSON.parse(errorText);
+          return NextResponse.json(
+            { error: 'Faceit API error', status: 400, details: errorData },
+            { status: 400 }
+          );
+        } catch {
+          return NextResponse.json(
+            { error: 'Faceit API error', status: 400, details: errorText },
+            { status: 400 }
+          );
+        }
+      }
+      
+      // Other errors (500, 503, etc.)
       console.error('Faceit API error:', playerRes.status, errorText);
       return NextResponse.json(
         { error: 'Faceit API error', status: playerRes.status, details: errorText },
-        { status: 502 }
+        { status: playerRes.status >= 500 ? 502 : playerRes.status }
       );
     }
 
