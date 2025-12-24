@@ -91,6 +91,9 @@ export async function GET() {
               trustpilotCount++;
               ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
 
+              const reviewDate = review.reviewDate || review.date || review.createdDate || review.publishedDate;
+              const formattedDate = reviewDate ? new Date(reviewDate).toISOString() : new Date().toISOString();
+              
               reviews.push({
                 id: `trustpilot-${review.reviewId || review.id || index}`,
                 source: 'Trustpilot',
@@ -98,8 +101,8 @@ export async function GET() {
                 rating: rating,
                 reviewerName: review.reviewerName || review.authorName || review.name || review.reviewer?.name || 'Anonymous',
                 reviewerAvatar: review.reviewerAvatar || review.authorAvatar || review.avatar || review.reviewer?.avatar,
-                reviewText: review.reviewText || review.review || review.content || review.text || review.reviewBody || '',
-                date: review.reviewDate || review.date || review.createdDate || review.publishedDate || new Date().toISOString(),
+                reviewText: review.reviewText || review.review || review.content || review.text || review.reviewBody || review.body || '',
+                date: formattedDate,
                 verified: review.verified || review.isVerified || false,
               });
             }
