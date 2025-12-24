@@ -11,6 +11,7 @@ Allow: /compare
 Allow: /item/
 Allow: /shop
 Allow: /contact
+Allow: /faq
 Allow: /privacy
 Allow: /terms
 
