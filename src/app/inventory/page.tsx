@@ -708,9 +708,8 @@ function InventoryContent() {
         fetchPlayerStats(viewedSteamId).catch(() => {}),
         fetchFaceitStats(viewedSteamId).catch(() => {}),
         fetchInventory(viewedSteamId, proStatusForInventory).catch(() => {}),
-      ]).then(() => {
-        // All background requests completed
-        setLoading(false);
+      ]).catch(() => {
+        // Ignore errors - already handled in individual functions
       });
 
       // Wait for profile with timeout - Pro info already fetched above
