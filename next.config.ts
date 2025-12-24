@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // Rewrites
+  async rewrites() {
+    return [
+      {
+        source: '/sitemap',
+        destination: '/sitemap.xml',
+      },
+    ];
+  },
 };
 
 // Wrap with Sentry if DSN is configured
