@@ -178,8 +178,11 @@ function InventoryContent() {
       const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
       return { steamId: id, name, avatar };
     } catch (e: any) { 
-      // Don't log AbortErrors (intentional timeouts)
-      if (e?.name !== 'AbortError') {
+      // Don't log AbortErrors (intentional timeouts) or network errors (502, CORS issues, etc.)
+      if (e?.name !== 'AbortError' && 
+          !e?.message?.includes('502') && 
+          !e?.message?.includes('Bad Gateway') &&
+          !e?.message?.includes('Failed to fetch')) {
         console.warn('Profile fetch failed:', e);
       }
       return null; 
@@ -197,7 +200,10 @@ function InventoryContent() {
       clearTimeout(timeoutId);
       
       if (!res.ok) {
-        console.warn("Stats API error", await res.text());
+        // Don't log 404s or 502s (expected errors - stats might not be available or API might be down)
+        if (res.status !== 404 && res.status !== 502) {
+          console.warn("Stats API error", await res.text());
+        }
         return;
       }
       const data = await res.json();
@@ -462,9 +468,12 @@ function InventoryContent() {
           clearTimeout(timeoutId);
           
           if (!res.ok) {
-            const errorText = await res.text();
-            console.error(`Inventory API error (${res.status}):`, errorText);
-            throw new Error(`API returned ${res.status}: ${errorText}`);
+            // Don't log 404s, 502s, or 503s (expected errors - inventory might not be available or API might be down)
+            if (res.status !== 404 && res.status !== 502 && res.status !== 503) {
+              const errorText = await res.text();
+              console.error(`Inventory API error (${res.status}):`, errorText);
+            }
+            throw new Error(`API returned ${res.status}`);
           }
           
           const data: any = await res.json();
@@ -543,8 +552,13 @@ function InventoryContent() {
             hasMore = false;
           }
         } catch (e: any) {
-          // Don't log AbortErrors (intentional timeouts)
-          if (e?.name !== 'AbortError') {
+          // Don't log AbortErrors (intentional timeouts) or expected network errors
+          if (e?.name !== 'AbortError' && 
+              !e?.message?.includes('502') && 
+              !e?.message?.includes('503') &&
+              !e?.message?.includes('404') &&
+              !e?.message?.includes('Bad Gateway') &&
+              !e?.message?.includes('Failed to fetch')) {
             console.error(`Inventory fetch attempt ${attempts} failed:`, e);
           }
           hasMore = false; // Stop trying if we get an error
@@ -553,8 +567,13 @@ function InventoryContent() {
 
       setInventory(allItems);
     } catch (e: any) { 
-      // Don't log AbortErrors (intentional timeouts)
-      if (e?.name !== 'AbortError') {
+      // Don't log AbortErrors (intentional timeouts) or expected network errors
+      if (e?.name !== 'AbortError' && 
+          !e?.message?.includes('502') && 
+          !e?.message?.includes('503') &&
+          !e?.message?.includes('404') &&
+          !e?.message?.includes('Bad Gateway') &&
+          !e?.message?.includes('Failed to fetch')) {
         console.error("Inventory failed", e);
       }
       setInventory([]); // Set empty array so page can still render
