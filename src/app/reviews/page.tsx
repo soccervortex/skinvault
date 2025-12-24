@@ -71,7 +71,7 @@ export default function ReviewsPage() {
             <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4">
               Customer Reviews
             </h1>
-            {data && (
+            {data && data.totalReviews > 0 ? (
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
                   <span className="text-4xl md:text-5xl font-black text-blue-500">
@@ -102,6 +102,12 @@ export default function ReviewsPage() {
                   ))}
                 </div>
               </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-400 text-sm">
+                  Reviews are displayed on Trustpilot and Sitejabber. Visit the links below to see and write reviews.
+                </p>
+              </div>
             )}
           </header>
 
@@ -114,6 +120,9 @@ export default function ReviewsPage() {
               {data && data.sources.length > 0 && (
                 <div className="bg-[#11141d] p-6 rounded-2xl border border-white/5">
                   <h2 className="text-lg font-black uppercase mb-4">Review Sources</h2>
+                  <p className="text-sm text-gray-400 mb-4">
+                    Reviews are displayed on Trustpilot and Sitejabber. Visit the links below to see reviews and write your own.
+                  </p>
                   <div className="flex flex-wrap gap-4">
                     {data.sources.map((source) => (
                       <a
@@ -133,11 +142,27 @@ export default function ReviewsPage() {
 
               {filteredReviews.length === 0 ? (
                 <div className="bg-[#11141d] p-10 rounded-2xl border border-white/5 text-center">
-                  <p className="text-gray-500">
+                  <p className="text-gray-400 mb-4">
                     {filterRating
                       ? `No ${filterRating}-star reviews found.`
-                      : 'No reviews available yet. Check back soon!'}
+                      : 'Reviews are displayed on Trustpilot and Sitejabber. Visit the links above to see reviews and write your own.'}
                   </p>
+                  {!filterRating && data && data.sources.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-4 mt-6">
+                      {data.sources.map((source) => (
+                        <a
+                          key={source.name}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-black uppercase transition-all"
+                        >
+                          View on {source.name}
+                          <ExternalLink size={16} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">

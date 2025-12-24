@@ -168,7 +168,9 @@ export default function RootLayout({
     },
     "description": "Legitimate CS2 skin analytics and inventory management tool. Read-only analytics service - NOT a trading platform or gambling site.",
     "sameAs": [
-      // Add social media links when available
+      "https://x.com/Skinvaults",
+      "https://nl.trustpilot.com/review/skinvaults.online",
+      "https://www.sitejabber.com/reviews/skinvaults.online"
     ],
     "contactPoint": {
       "@type": "ContactPoint",
@@ -193,8 +195,8 @@ export default function RootLayout({
     },
     "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "ratingCount": "100",
+      "ratingValue": "0",
+      "ratingCount": "0",
       "bestRating": "5",
       "worstRating": "1"
     },
@@ -313,7 +315,49 @@ export default function RootLayout({
     ]
   };
 
-  const structuredDataArray = [organizationSchema, softwareApplicationSchema, faqSchema];
+  // Review aggregation schema - references Trustpilot and Sitejabber
+  const reviewSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "SkinVaults",
+    "url": baseUrl,
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "0",
+      "ratingCount": "0",
+      "bestRating": "5",
+      "worstRating": "1",
+      "reviewCount": "0"
+    },
+    "review": [
+      {
+        "@type": "Review",
+        "author": {
+          "@type": "Organization",
+          "name": "Trustpilot"
+        },
+        "url": "https://nl.trustpilot.com/review/skinvaults.online",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Trustpilot"
+        }
+      },
+      {
+        "@type": "Review",
+        "author": {
+          "@type": "Organization",
+          "name": "Sitejabber"
+        },
+        "url": "https://www.sitejabber.com/reviews/skinvaults.online",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Sitejabber"
+        }
+      }
+    ]
+  };
+
+  const structuredDataArray = [organizationSchema, softwareApplicationSchema, faqSchema, reviewSchema];
 
   return (
     <html lang="en" suppressHydrationWarning>

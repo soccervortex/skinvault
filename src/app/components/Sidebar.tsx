@@ -505,18 +505,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
-                  <a
-                    href="https://x.com/Skinvaults"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
-                    title="Follow us on X (Twitter)"
-                  >
-                    <Twitter size={10} />
-                    X
-                  </a>
-                </div>
               </div>
             </div>
           ) : (
@@ -546,6 +534,20 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             </button>
             </div>
           )}
+          
+          {/* Social Media Links - Show for all users */}
+          <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+            <a
+              href="https://x.com/Skinvaults"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+              title="Follow us on X (Twitter)"
+            >
+              <Twitter size={10} />
+              X
+            </a>
+          </div>
           
           {/* Footer Links */}
           <div className="space-y-2 pt-4 border-t border-white/5">

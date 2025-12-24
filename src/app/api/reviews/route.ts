@@ -5,17 +5,13 @@ const REVIEW_SOURCES = [
   {
     name: 'Trustpilot',
     url: 'https://nl.trustpilot.com/review/skinvaults.online',
-    apiUrl: null, // Trustpilot doesn't have a public API, would need scraping
   },
   {
     name: 'Sitejabber',
     url: 'https://www.sitejabber.com/reviews/skinvaults.online',
-    apiUrl: null, // Sitejabber doesn't have a public API, would need scraping
   },
 ];
 
-// Mock data structure - in production, you'd fetch from APIs or scrape
-// For now, return structure that matches what the frontend expects
 interface Review {
   id: string;
   source: string;
@@ -28,31 +24,26 @@ interface Review {
   verified?: boolean;
 }
 
-// Mock reviews data - Replace with actual API calls or scraping
-const MOCK_REVIEWS: Review[] = [
-  // These would be fetched from actual review services
-  // For now, return empty array and let frontend handle it
-];
-
+// Trustpilot and Sitejabber don't have public APIs
+// We'll return empty reviews and let users visit the actual review sites
+// The aggregate rating will be calculated from actual reviews on those platforms
 export async function GET() {
   try {
-    // In production, you would:
-    // 1. Fetch from Trustpilot API (if available) or scrape
-    // 2. Fetch from Sitejabber API (if available) or scrape
-    // 3. Combine and return all reviews
+    // Since Trustpilot and Sitejabber don't have public APIs,
+    // we return empty reviews array and let the frontend link to the actual review sites
+    // The actual ratings will be shown via structured data and Trustpilot/Sitejabber widgets
     
-    // For now, return structure with sources info
     return NextResponse.json({
-      reviews: MOCK_REVIEWS,
+      reviews: [], // Empty - reviews are on Trustpilot and Sitejabber sites
       sources: REVIEW_SOURCES,
-      aggregateRating: 4.8,
-      totalReviews: 100,
+      aggregateRating: null, // Will be calculated from actual reviews on Trustpilot/Sitejabber
+      totalReviews: 0, // Will be updated when reviews are available
       ratingBreakdown: {
-        5: 80,
-        4: 15,
-        3: 3,
-        2: 1,
-        1: 1,
+        5: 0,
+        4: 0,
+        3: 0,
+        2: 0,
+        1: 0,
       },
     });
   } catch (error) {
