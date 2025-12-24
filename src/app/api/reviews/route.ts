@@ -38,6 +38,7 @@ export async function GET() {
     // Fetch Trustpilot reviews using Outscraper API (free tier)
     // Documentation: https://app.outscraper.cloud/api-docs?ln=nl#tag/trustpilot/GET/trustpilot-reviews
     const OUTSCRAPER_API_TOKEN = process.env.OUTSCRAPER_API_TOKEN;
+    console.log('OUTSCRAPER_API_TOKEN present:', !!OUTSCRAPER_API_TOKEN);
     if (OUTSCRAPER_API_TOKEN) {
       try {
         // Outscraper Trustpilot Reviews API
