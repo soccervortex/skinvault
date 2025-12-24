@@ -166,10 +166,13 @@ export async function GET() {
                 rating = parseInt(String(review.rating || '0'));
               }
               
-              // Also check for title/content fields
+              // Also check for title/content fields - Sitejabber may have title and content separately
               const reviewText = review.content || review.reviewText || review.text || review.body || review.title || '';
+              // If we have a title but no content, use title as the review text
+              const finalReviewText = reviewText || (review.title ? review.title : '');
               
-              if (rating >= 1 && rating <= 5 && reviewText) {
+              // Allow reviews even without text (just rating) - but prefer reviews with text
+              if (rating >= 1 && rating <= 5) {
                 sitejabberRating += rating;
                 sitejabberCount++;
                 ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
@@ -184,7 +187,7 @@ export async function GET() {
                   rating: rating,
                   reviewerName: review.author?.name || review.authorName || review.customer?.name || review.customerName || 'Anonymous',
                   reviewerAvatar: review.author?.avatar || review.customer?.avatar || review.avatar,
-                  reviewText: reviewText,
+                  reviewText: finalReviewText,
                   date: formattedDate,
                   verified: review.verified || false,
                 });
