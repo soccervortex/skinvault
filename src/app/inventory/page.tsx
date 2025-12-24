@@ -166,10 +166,11 @@ function InventoryContent() {
     try {
       const steamUrl = `https://steamcommunity.com/profiles/${id}/?xml=1`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 6000); // Reduced to 6 seconds for faster loading
       
       const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
-        signal: controller.signal
+        signal: controller.signal,
+        cache: 'force-cache', // Cache profile data for faster subsequent loads
       });
       clearTimeout(timeoutId);
       
@@ -285,7 +286,7 @@ function InventoryContent() {
           setFaceitStats(null);
           return;
         }
-        console.warn("Faceit stats API error", await res.text());
+        // Suppress Faceit errors - they're not critical
         return;
       }
       
@@ -366,9 +367,8 @@ function InventoryContent() {
       }
     } catch (e: any) { 
       // Don't log AbortErrors (intentional timeouts) or 404s (player not on Faceit)
-      if (e?.name !== 'AbortError') {
-        console.error("Faceit stats failed", e);
-      }
+      // Suppress all Faceit errors - they're not critical
+      setFaceitStats(null);
       setFaceitStats(null);
     }
   };
@@ -458,7 +458,7 @@ function InventoryContent() {
           // Use server-side API route to avoid CORS issues
           const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced to 15 seconds for faster loading
           
           const res: Response = await fetch(apiUrl, {
             signal: controller.signal,
@@ -699,20 +699,27 @@ function InventoryContent() {
       // Calculate Pro status for inventory fetch
       const proStatusForInventory = !!(proInfo?.proUntil && new Date(proInfo.proUntil) > new Date());
       
-      // Start all requests but don't wait for all - show content progressively
+      // Start all requests in parallel - show content progressively
       const profilePromise = fetchViewedProfile(viewedSteamId);
       
       // These can load in background - use correct Pro status for inventory
-      fetchPlayerStats(viewedSteamId).catch(() => {});
-      fetchFaceitStats(viewedSteamId).catch(() => {});
-      fetchInventory(viewedSteamId, proStatusForInventory).catch(() => {});
+      // Don't wait for these - they'll update when ready
+      Promise.all([
+        fetchPlayerStats(viewedSteamId).catch(() => {}),
+        fetchFaceitStats(viewedSteamId).catch(() => {}),
+        fetchInventory(viewedSteamId, proStatusForInventory).catch(() => {}),
+      ]).then(() => {
+        // All background requests completed
+        setLoading(false);
+      });
 
       // Wait for profile with timeout - Pro info already fetched above
+      // Reduced timeout to 5 seconds for faster initial load
       try {
         const profile = await Promise.race([
           profilePromise,
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 12000)
+            setTimeout(() => reject(new Error('Timeout')), 5000)
           )
         ]) as any;
 
@@ -721,6 +728,8 @@ function InventoryContent() {
           : null;
 
         setViewedUser(combinedUser);
+        // Set loading to false once profile is loaded - don't wait for inventory
+        setLoading(false);
         
         // Also update Pro status for logged-in user if viewing own profile
         if (isViewingOwnProfile && storedLoggedInUser?.steamId) {

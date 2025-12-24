@@ -64,7 +64,8 @@ export default function VercelAnalytics() {
           // Suppress network errors for Vercel Analytics (expected with ad blockers)
           if (error?.message?.includes('ERR_BLOCKED_BY_CLIENT') || 
               error?.message?.includes('Failed to fetch') ||
-              error?.name === 'TypeError') {
+              error?.name === 'TypeError' ||
+              error?.message?.includes('net::ERR_BLOCKED_BY_CLIENT')) {
             // Return a mock response to prevent errors from propagating
             return new Response(null, { status: 0, statusText: 'Blocked by client' });
           }
@@ -74,11 +75,36 @@ export default function VercelAnalytics() {
       return originalFetch(input, init);
     };
     
+    // Also suppress errors from XMLHttpRequest (used by some libraries)
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    const originalXHRSend = XMLHttpRequest.prototype.send;
+    
+    XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...args: any[]) {
+      const urlStr = url.toString();
+      if (urlStr.includes('_vercel/insights') || urlStr.includes('_vercel/speed-insights')) {
+        // Store URL for later check
+        (this as any)._isVercelRequest = true;
+      }
+      return originalXHROpen.apply(this, [method, url, ...args] as any);
+    };
+    
+    XMLHttpRequest.prototype.send = function(...args: any[]) {
+      if ((this as any)._isVercelRequest) {
+        this.addEventListener('error', (e) => {
+          // Suppress Vercel Analytics errors
+          e.stopPropagation();
+        }, { once: true });
+      }
+      return originalXHRSend.apply(this, args as any);
+    };
+    
     return () => {
       console.warn = originalWarn;
       console.error = originalError;
       console.log = originalLog;
       window.fetch = originalFetch;
+      XMLHttpRequest.prototype.open = originalXHROpen;
+      XMLHttpRequest.prototype.send = originalXHRSend;
     };
   }, []);
 
