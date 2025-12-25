@@ -156,14 +156,14 @@ export async function createNewUserWelcomePost(users: NewUser | NewUser[]): Prom
       ];
       message = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
     } else {
-      // Multiple users - combine in one post
+      // Multiple users - combine in one post with all names
       const userNames = usersArray.map(u => u.steamName).join(', ');
       const userCount = usersArray.length;
       
       const multiUserMessages = [
-        `Welcome ${userNames}! 👋🎉\n\n${userCount} new ${userCount === 1 ? 'user' : 'users'} joined SkinVaults! 🎮\n\nThanks for joining our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-        `Hey ${userNames}! 👋\n\n${userCount} new ${userCount === 1 ? 'member' : 'members'} joined SkinVaults! 🚀\n\nWe're excited to have you in our CS2 community! What features are you most excited about?\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-        `Welcome ${userNames}! 🎉\n\n${userCount} new ${userCount === 1 ? 'user' : 'users'} just joined the SkinVaults family! 🎮\n\nAre you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Welcome ${userNames}! 👋🎉\n\n${userCount} new users joined SkinVaults! 🎮\n\nThanks for joining our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Hey ${userNames}! 👋\n\n${userCount} new members joined SkinVaults! 🚀\n\nWe're excited to have you in our CS2 community! What features are you most excited about?\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Welcome ${userNames}! 🎉\n\n${userCount} new users just joined the SkinVaults family! 🎮\n\nAre you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
       ];
       message = multiUserMessages[Math.floor(Math.random() * multiUserMessages.length)];
     }
