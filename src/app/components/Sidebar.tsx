@@ -30,7 +30,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         const testKey = '__localStorage_test__';
         window.localStorage.setItem(testKey, 'test');
         window.localStorage.removeItem(testKey);
-        
+
         const savedUser = window.localStorage.getItem('steam_user');
         setUser(savedUser ? JSON.parse(savedUser) : null);
       } catch {
@@ -49,7 +49,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     const loadThemeState = async () => {
       try {
         const steamId = user?.steamId || null;
-        
+
         // Check if there's an active theme from admin (works without login)
         // We check without user preference to see if admin has enabled a theme
         const adminThemeResponse = await fetch('/api/themes/active');
@@ -57,7 +57,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           const adminThemeData = await adminThemeResponse.json();
           const themeExists = !!adminThemeData.theme;
           setHasActiveTheme(themeExists);
-          
+
           if (themeExists) {
             // Check if user has disabled themes
             let userDisabled = false;
@@ -82,7 +82,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 userDisabled = false;
               }
             }
-            
+
             setThemesDisabled(userDisabled);
           } else {
             setThemesDisabled(false);
@@ -100,10 +100,10 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     };
 
     window.addEventListener('themeChanged', handleThemeChange);
-    
+
     // Poll periodically to catch admin changes
     const interval = setInterval(loadThemeState, 3000);
-    
+
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
       clearInterval(interval);
@@ -122,13 +122,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     };
 
     updateUnreadCount();
-    
+
     // Listen for unread updates
     window.addEventListener('chat-unread-updated', updateUnreadCount);
-    
+
     // Poll for updates every 2 seconds
     const interval = setInterval(updateUnreadCount, 2000);
-    
+
     return () => {
       window.removeEventListener('chat-unread-updated', updateUnreadCount);
       clearInterval(interval);
@@ -138,7 +138,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const handleToggleTheme = async () => {
     const newValue = !themesDisabled;
     const steamId = user?.steamId;
-    
+
     try {
       if (steamId) {
         // Logged in user - save to backend
@@ -147,7 +147,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ steamId, disabled: newValue }),
         });
-        
+
         if (response.ok) {
           setThemesDisabled(newValue);
           // Trigger theme update
@@ -214,11 +214,11 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         >
-          <aside 
+          <aside
             role="navigation"
             aria-label="Main navigation"
             className="w-80 bg-[#0f111a] border-r border-white/5 flex flex-col p-6 overflow-y-auto h-full"
@@ -237,26 +237,26 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="space-y-2 mb-10 flex-1">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Market">
-                <Tag size={16}/> Market
+                <Tag size={16} /> Market
               </Link>
               <Link href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="My Vault">
-                <Wallet size={16}/> My Vault
+                <Wallet size={16} /> My Vault
               </Link>
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
-                <Heart size={16}/> Wishlist
+                <Heart size={16} /> Wishlist
               </Link>
               <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)} className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
-                <MessageSquare size={16}/> Chat
+                <MessageSquare size={16} /> Chat
                 {unreadCount > 0 && (
                   <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </Link>
-              <button 
+              <button
                 onClick={() => {
                   setIsSearchOpen(true);
                   setIsMobileMenuOpen(false);
@@ -264,20 +264,20 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
                 aria-label="Search Player"
               >
-                <Search size={16}/> Search Player
+                <Search size={16} /> Search Player
               </button>
               <Link href="/pro" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`} aria-label="Pro Subscription">
-                <Shield size={16}/> Pro
+                <Shield size={16} /> Pro
               </Link>
               <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
-                <ShoppingCart size={16}/> Shop
+                <ShoppingCart size={16} /> Shop
               </Link>
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
-                <Mail size={16}/> Contact
+                <Mail size={16} /> Contact
               </Link>
               {isOwner(user?.steamId) && (
                 <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
-                  <Shield size={16}/> Admin Panel
+                  <Shield size={16} /> Admin Panel
                 </Link>
               )}
 
@@ -286,9 +286,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-4">Weapon Categories</h3>
                   <nav className="space-y-1">
                     {categories.map((cat: any) => (
-                      <button 
-                        key={cat.name} 
-                        onClick={() => { setActiveCat(cat); setIsMobileMenuOpen(false); }} 
+                      <button
+                        key={cat.name}
+                        onClick={() => { setActiveCat(cat); setIsMobileMenuOpen(false); }}
                         className={`w-full flex items-center gap-4 px-5 py-3 min-h-[44px] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}
                         aria-label={`Filter by ${cat.name}`}
                       >
@@ -316,23 +316,22 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-2">
-                    <button 
-                      onClick={handleLogout} 
-                      className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                    >
-                      <LogOut size={8} /> Logout Session
-                    </button>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
+                      >
+                        <LogOut size={8} /> Logout Session
+                      </button>
                       {hasActiveTheme && (
-                        <button 
+                        <button
                           onClick={handleToggleTheme}
-                          className={`flex items-center gap-1 text-[8px] font-black uppercase transition-colors ${
-                            !themesDisabled 
-                              ? 'text-purple-400 hover:text-purple-300' 
+                          className={`flex items-center gap-1 text-[8px] font-black uppercase transition-colors ${!themesDisabled
+                              ? 'text-purple-400 hover:text-purple-300'
                               : 'text-gray-500 hover:text-gray-400'
-                          }`}
+                            }`}
                           title={!themesDisabled ? 'Disable Theme' : 'Enable Theme'}
                         >
-                          <Sparkles size={8} className={!themesDisabled ? 'fill-purple-400' : ''} /> 
+                          <Sparkles size={8} className={!themesDisabled ? 'fill-purple-400' : ''} />
                           {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                         </button>
                       )}
@@ -342,58 +341,96 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               ) : (
                 <div className="space-y-3">
                   {hasActiveTheme && (
-                    <button 
+                    <button
                       onClick={handleToggleTheme}
-                      className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${
-                        !themesDisabled
+                      className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${!themesDisabled
                           ? 'bg-purple-600/20 border border-purple-500/40 text-purple-400 hover:bg-purple-600/30'
                           : 'bg-[#11141d] border border-white/5 text-gray-500 hover:text-white'
-                      }`}
+                        }`}
                       title={!themesDisabled ? 'Disable Theme' : 'Enable Theme'}
                     >
                       <Sparkles size={16} className={!themesDisabled ? 'fill-purple-400' : ''} />
                       {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                     </button>
                   )}
-                <button 
-                  onClick={handleSteamLogin}
-                  className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
-                >
-                  <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                    <User size={18} />
-                  </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
-                </button>
+                  <button
+                    onClick={handleSteamLogin}
+                    className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
+                  >
+                    <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                      <User size={18} />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
+                  </button>
                 </div>
               )}
-              
+
+              {/* Footer Links */}
+              {/* Social Media Links */}
+              <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                <a
+                  href="https://x.com/Skinvaults"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+                >
+                  <FaTwitter size={10} />
+                  X
+                </a>
+                <a
+                  href="https://discord.gg/bGqf8bBhy5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+                >
+                  <FaDiscord size={10} />
+                  Discord
+                </a>
+                <a
+                  href="https://www.instagram.com/skinvaults"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+                >
+                  <FaInstagram size={10} />
+                  Instagram
+                </a>
+              </div>
+
               {/* Footer Links */}
               <div className="space-y-2 pt-4 border-t border-white/5">
                 <div className="flex flex-wrap items-center gap-3 px-2">
-                  <Link 
-                    href="/terms" 
+                  <Link
+                    href="/terms"
                     className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
                   >
                     <FileText size={10} />
                     Terms
                   </Link>
-                  <Link 
-                    href="/privacy" 
+                  <Link
+                    href="/privacy"
                     className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
                   >
                     <Shield size={10} />
                     Privacy
                   </Link>
-                  <Link 
-                    href="/faq" 
+                  <Link
+                    href="/faq"
                     className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
                   >
                     <HelpCircle size={10} />
                     FAQ
                   </Link>
+                  <Link
+                    href="/reviews"
+                    className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <Star size={10} />
+                    Reviews
+                  </Link>
                 </div>
                 <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
-                  © {new Date().getFullYear()} SkinVaults. All rights reserved.
+                  © {new Date().getFullYear()} SkinVault. All rights reserved.
                 </div>
               </div>
             </div>
@@ -407,48 +444,48 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <h1 className="text-3xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVaults</h1>
           <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
         </div>
-        
+
         <div className="space-y-2 mb-10 flex-1">
           <Link href="/" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Market">
-            <Tag size={16}/> Market
+            <Tag size={16} /> Market
           </Link>
-          <Link 
-            href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} 
+          <Link
+            href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'}
             className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}
             aria-label="My Vault"
           >
-            <Wallet size={16}/> My Vault
+            <Wallet size={16} /> My Vault
           </Link>
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
-            <Heart size={16}/> Wishlist
+            <Heart size={16} /> Wishlist
           </Link>
           <Link href="/chat" className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
-            <MessageSquare size={16}/> Chat
+            <MessageSquare size={16} /> Chat
             {unreadCount > 0 && (
               <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </Link>
-          <button 
+          <button
             onClick={() => setIsSearchOpen(true)}
             className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
             aria-label="Search Player"
           >
-            <Search size={16}/> Search Player
+            <Search size={16} /> Search Player
           </button>
           <Link href="/pro" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/pro' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-indigo-400 hover:text-indigo-300'}`} aria-label="Pro Subscription">
-            <Shield size={16}/> Pro
+            <Shield size={16} /> Pro
           </Link>
           <Link href="/shop" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
-            <ShoppingCart size={16}/> Shop
+            <ShoppingCart size={16} /> Shop
           </Link>
           <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
-            <Mail size={16}/> Contact
+            <Mail size={16} /> Contact
           </Link>
           {isOwner(user?.steamId) && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
-              <Shield size={16}/> Admin Panel
+              <Shield size={16} /> Admin Panel
             </Link>
           )}
 
@@ -457,9 +494,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-4">Weapon Categories</h3>
               <nav className="space-y-1">
                 {categories.map((cat: any) => (
-                  <button 
-                    key={cat.name} 
-                    onClick={() => setActiveCat(cat)} 
+                  <button
+                    key={cat.name}
+                    onClick={() => setActiveCat(cat)}
                     className={`w-full flex items-center gap-4 px-5 py-3 min-h-[44px] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}
                     aria-label={`Filter by ${cat.name}`}
                   >
@@ -487,23 +524,22 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <button 
-                  onClick={handleLogout} 
-                  className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
-                >
-                  <LogOut size={8} /> Logout Session
-                </button>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase hover:text-white transition-colors"
+                  >
+                    <LogOut size={8} /> Logout Session
+                  </button>
                   {hasActiveTheme && (
-                    <button 
+                    <button
                       onClick={handleToggleTheme}
-                      className={`flex items-center gap-1 text-[8px] font-black uppercase transition-colors ${
-                        !themesDisabled 
-                          ? 'text-purple-400 hover:text-purple-300' 
+                      className={`flex items-center gap-1 text-[8px] font-black uppercase transition-colors ${!themesDisabled
+                          ? 'text-purple-400 hover:text-purple-300'
                           : 'text-gray-500 hover:text-gray-400'
-                      }`}
+                        }`}
                       title={!themesDisabled ? 'Disable Theme' : 'Enable Theme'}
                     >
-                      <Sparkles size={8} className={!themesDisabled ? 'fill-purple-400' : ''} /> 
+                      <Sparkles size={8} className={!themesDisabled ? 'fill-purple-400' : ''} />
                       {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                     </button>
                   )}
@@ -513,31 +549,30 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           ) : (
             <div className="space-y-3">
               {hasActiveTheme && (
-                <button 
+                <button
                   onClick={handleToggleTheme}
-                  className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${
-                    !themesDisabled
+                  className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${!themesDisabled
                       ? 'bg-purple-600/20 border border-purple-500/40 text-purple-400 hover:bg-purple-600/30'
                       : 'bg-[#11141d] border border-white/5 text-gray-500 hover:text-white'
-                  }`}
+                    }`}
                   title={!themesDisabled ? 'Disable Theme' : 'Enable Theme'}
                 >
                   <Sparkles size={16} className={!themesDisabled ? 'fill-purple-400' : ''} />
                   {!themesDisabled ? 'Theme ON' : 'Theme OFF'}
                 </button>
               )}
-            <button 
-              onClick={handleSteamLogin}
-              className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
-            >
-              <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                <User size={18} />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
-            </button>
+              <button
+                onClick={handleSteamLogin}
+                className="w-full flex items-center gap-4 p-5 bg-[#11141d] rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all text-gray-500 hover:text-white group"
+              >
+                <div className="bg-white/5 p-2 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                  <User size={18} />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest">Sign In with Steam</p>
+              </button>
             </div>
           )}
-          
+
           {/* Social Media Links - Show for all users */}
           <div className="flex items-center gap-2 pt-3 border-t border-white/5">
             <a
@@ -556,7 +591,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
             >
-              <FaDiscord size={10} /> 
+              <FaDiscord size={10} />
               Discord
             </a>
             <a
@@ -565,37 +600,37 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
             >
-              <FaInstagram size={10} /> 
+              <FaInstagram size={10} />
               Instagram
             </a>
           </div>
-          
+
           {/* Footer Links */}
           <div className="space-y-2 pt-4 border-t border-white/5">
             <div className="flex flex-wrap items-center gap-3 px-2">
-              <Link 
-                href="/terms" 
+              <Link
+                href="/terms"
                 className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
               >
                 <FileText size={10} />
                 Terms
               </Link>
-              <Link 
-                href="/privacy" 
+              <Link
+                href="/privacy"
                 className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
               >
                 <Shield size={10} />
                 Privacy
               </Link>
-              <Link 
-                href="/faq" 
+              <Link
+                href="/faq"
                 className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
               >
                 <HelpCircle size={10} />
                 FAQ
               </Link>
-              <Link 
-                href="/reviews" 
+              <Link
+                href="/reviews"
                 className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
               >
                 <Star size={10} />
@@ -618,7 +653,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mb-6 md:mb-8 tracking-[0.2em]">Enter a SteamID64 to see stats and vault</p>
             <form onSubmit={handleSearch} className="space-y-3 md:space-y-4">
               <label htmlFor="sidebar-steam-search" className="sr-only">Steam ID search</label>
-              <input 
+              <input
                 id="sidebar-steam-search"
                 autoFocus
                 value={searchId}
