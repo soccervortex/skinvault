@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { recordFirstLogin } from '@/app/utils/pro-storage';
+import { updateUserCount } from '@/app/lib/user-milestones';
 
 // Record first login date when user logs in via Steam
 export async function POST(request: Request) {
@@ -17,7 +18,12 @@ export async function POST(request: Request) {
     }
 
     // Record first login (only records if not already recorded)
-    await recordFirstLogin(steamId);
+    const isNewUser = await recordFirstLogin(steamId);
+    
+    // Update user count if this is a new user
+    if (isNewUser) {
+      await updateUserCount();
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

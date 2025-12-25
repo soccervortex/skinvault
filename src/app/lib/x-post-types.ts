@@ -6,6 +6,7 @@
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getNextItemFromAllDatasets, getItemPrice, createAutomatedXPostWithImage } from '@/app/lib/inngest-functions';
 import { getTopMovers, getTrendingItems, PriceChange } from '@/app/lib/price-tracking';
+import { checkUserCountMilestone, getUnpostedMilestones, markMilestonePosted, UserMilestone } from '@/app/lib/user-milestones';
 import crypto from 'crypto';
 
 export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert';
@@ -346,6 +347,103 @@ export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: bool
   } catch (error) {
     console.error('Failed to check for milestones/alerts:', error);
     return { hasMilestone: false };
+  }
+}
+
+/**
+ * Create user milestone post
+ */
+export async function createUserMilestonePost(milestone: UserMilestone): Promise<{ success: boolean; postId?: string; error?: string }> {
+  try {
+    let milestoneText = '';
+    
+    if (milestone.type === 'user_count') {
+      milestoneText = `🎉 Milestone Reached!\n\n` +
+        `We now have ${milestone.value.toLocaleString()} users on SkinVaults! 🚀\n\n` +
+        `Thank you to everyone who trusts us to track their CS2 inventory.\n\n` +
+        `Track your CS2 inventory:\nskinvaults.online\n\n` +
+        `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+    } else {
+      milestoneText = `🎉 Milestone Reached!\n\n` +
+        `Thank you for being part of the SkinVaults community! 🚀\n\n` +
+        `Track your CS2 inventory:\nskinvaults.online\n\n` +
+        `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+    }
+
+    // Post the milestone (same OAuth logic)
+    const X_API_KEY = process.env.X_API_KEY;
+    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
+    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
+
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      return { success: false, error: 'X API credentials not configured' };
+    }
+
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: X_API_KEY,
+      oauth_token: X_ACCESS_TOKEN,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_version: '1.0',
+    };
+
+    const sortedParams = Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+      .join('&');
+
+    const signatureBaseString = [
+      'POST',
+      encodeURIComponent('https://api.x.com/2/tweets'),
+      encodeURIComponent(sortedParams),
+    ].join('&');
+
+    const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET)}`;
+    const signature = crypto.createHmac('sha1', signingKey)
+      .update(signatureBaseString)
+      .digest('base64');
+
+    oauthParams.oauth_signature = signature;
+
+    const authHeader = 'OAuth ' + Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+      .join(', ');
+
+    const response = await fetch('https://api.x.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: milestoneText.substring(0, 280),
+      }),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { detail: responseText || 'Unknown error' };
+      }
+      return { success: false, error: errorData.detail || errorData.title || 'Failed to post' };
+    }
+
+    const data = JSON.parse(responseText);
+    
+    // Mark milestone as posted
+    if (data.data?.id) {
+      await markMilestonePosted(milestone, data.data.id);
+    }
+    
+    return { success: true, postId: data.data?.id };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create user milestone post' };
   }
 }
 

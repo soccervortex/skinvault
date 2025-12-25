@@ -10,6 +10,7 @@ import {
   createItemHighlightPost,
   checkForMilestonesOrAlerts,
   createTrendingAlertPost,
+  createUserMilestonePost,
   PostType,
 } from '@/app/lib/x-post-types';
 import { updatePriceHistory } from '@/app/lib/price-tracking';
@@ -116,9 +117,17 @@ export async function GET(request: Request) {
       case 'alert':
         // Check for milestones/alerts first
         const milestoneCheck = await checkForMilestonesOrAlerts();
-        if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost && milestoneCheck.milestone?.type === 'trending_alert') {
-          console.log('[X Cron] Creating trending alert post...');
-          postResult = await createTrendingAlertPost(milestoneCheck.milestone.item);
+        if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost) {
+          if (milestoneCheck.milestone?.type === 'user_milestone') {
+            console.log('[X Cron] Creating user milestone post...');
+            postResult = await createUserMilestonePost(milestoneCheck.milestone.milestone);
+          } else if (milestoneCheck.milestone?.type === 'trending_alert') {
+            console.log('[X Cron] Creating trending alert post...');
+            postResult = await createTrendingAlertPost(milestoneCheck.milestone.item);
+          } else {
+            // Unknown milestone type, use regular item highlight
+            postResult = await createItemHighlightPost(postHistory);
+          }
         } else {
           // No milestone/alert, use regular item highlight
           postResult = await createItemHighlightPost(postHistory);

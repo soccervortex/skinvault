@@ -111,18 +111,21 @@ async function writeClaimedFreeMonth(data: Record<string, boolean>): Promise<voi
 }
 
 // Record first login (only if not already recorded)
-export async function recordFirstLogin(steamId: string): Promise<void> {
+// Returns true if this was a new user (first login), false if already existed
+export async function recordFirstLogin(steamId: string): Promise<boolean> {
   // Validate Steam ID format (should be numeric, 17 digits)
   if (!steamId || typeof steamId !== 'string' || !/^\d{17}$/.test(steamId)) {
     console.warn('Invalid Steam ID format for first login:', steamId);
-    return;
+    return false;
   }
 
   const logins = await readFirstLogins();
   if (!logins[steamId]) {
     logins[steamId] = new Date().toISOString();
     await writeFirstLogins(logins);
+    return true; // New user
   }
+  return false; // Existing user
 }
 
 // Get first login date
