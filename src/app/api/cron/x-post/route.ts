@@ -86,7 +86,6 @@ export async function GET(request: Request) {
     }
 
     // Determine what type of post to make based on day/time
-    const now = new Date();
     const context = {
       dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
       hour: now.getUTCHours(),
