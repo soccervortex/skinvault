@@ -24,15 +24,15 @@ interface PostContext {
  * Determine what type of post to make based on current date/time
  */
 export function determinePostType(context: PostContext): PostType {
-  const { dayOfWeek, hour, isFirstOfMonth } = context;
+  const { dayOfWeek, hour, minute, isFirstOfMonth } = context;
 
-  // 1st of the month at 9 AM = Monthly stats
-  if (isFirstOfMonth && hour === 9) {
+  // 1st of the month at 9 AM (8:00 UTC) = Monthly stats
+  if (isFirstOfMonth && hour === 8 && minute === 0) {
     return 'monthly_stats';
   }
 
-  // Monday or Sunday at 8 PM = Weekly summary
-  if ((dayOfWeek === 1 || dayOfWeek === 0) && hour === 20) {
+  // Monday (1) or Sunday (0) at 8 PM (19:00 UTC) = Weekly summary
+  if ((dayOfWeek === 1 || dayOfWeek === 0) && hour === 19 && minute === 0) {
     return 'weekly_summary';
   }
 

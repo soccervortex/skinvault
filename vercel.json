@@ -6,7 +6,23 @@
     },
     {
       "path": "/api/cron/x-post",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 19 * * 1"
+    },
+    {
+      "path": "/api/cron/x-post",
+      "schedule": "0 19 * * 0"
+    },
+    {
+      "path": "/api/cron/x-post",
+      "schedule": "0 8 1 * *"
+    },
+    {
+      "path": "/api/cron/x-post",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/x-post",
+      "schedule": "30 10 * * *"
     }
   ]
 }
