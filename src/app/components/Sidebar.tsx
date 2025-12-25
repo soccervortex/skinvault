@@ -4,6 +4,7 @@ import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileTe
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
 import { FaTwitter } from "react-icons/fa";
+import { FaInstagram } from "react-icons/fa";
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
 import ChatPreloader from './ChatPreloader';
@@ -557,6 +558,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             >
               <FaDiscord size={10} /> 
               Discord
+            </a>
+            <a
+              href="https://www.instagram.com/skinvaults"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+            >
+              <FaInstagram size={10} /> 
+              Instagram
             </a>
           </div>
           
