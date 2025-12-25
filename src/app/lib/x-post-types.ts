@@ -15,6 +15,7 @@ export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | '
 interface PostContext {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
   hour: number;
+  minute: number;
   dayOfMonth: number;
   isFirstOfMonth: boolean;
 }

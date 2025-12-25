@@ -93,12 +93,27 @@ export async function GET(request: Request) {
     const context = {
       dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
       hour: now.getUTCHours(),
+      minute: now.getUTCMinutes(),
       dayOfMonth: now.getUTCDate(),
       isFirstOfMonth: now.getUTCDate() === 1,
     };
 
+    // Check if it's time to post (only post at specific times)
+    const shouldPost = 
+      // Weekly summary: Monday or Sunday at 8 PM (19:00 UTC)
+      ((context.dayOfWeek === 1 || context.dayOfWeek === 0) && context.hour === 19 && context.minute === 0) ||
+      // Monthly stats: 1st of month at 9 AM (8:00 UTC)
+      (context.isFirstOfMonth && context.hour === 8 && context.minute === 0) ||
+      // Daily posts: 11:00 AM (10:00 UTC) or 11:30 AM (10:30 UTC) for retry
+      (context.hour === 10 && (context.minute === 0 || context.minute === 30));
+
+    if (!shouldPost) {
+      console.log(`[X Cron] Not time to post yet (Day: ${context.dayOfWeek}, Hour: ${context.hour}, Minute: ${context.minute})`);
+      return NextResponse.json({ skipped: true, reason: 'not_scheduled_time' });
+    }
+
     const postType = determinePostType(context);
-    console.log(`[X Cron] Post type determined: ${postType} (Day: ${context.dayOfWeek}, Hour: ${context.hour}, First of month: ${context.isFirstOfMonth})`);
+    console.log(`[X Cron] Post type determined: ${postType} (Day: ${context.dayOfWeek}, Hour: ${context.hour}, Minute: ${context.minute}, First of month: ${context.isFirstOfMonth})`);
 
     let postResult: { success: boolean; postId?: string; error?: string; itemName?: string };
 
