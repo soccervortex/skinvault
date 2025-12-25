@@ -7,6 +7,7 @@ import { dbGet, dbSet } from '@/app/utils/database';
 import { getNextItemFromAllDatasets, getItemPrice, createAutomatedXPostWithImage } from '@/app/lib/inngest-functions';
 import { getTopMovers, getTrendingItems, PriceChange } from '@/app/lib/price-tracking';
 import { checkUserCountMilestone, getUnpostedMilestones, markMilestonePosted, UserMilestone } from '@/app/lib/user-milestones';
+import { getUnpostedFeatureAnnouncements, markFeatureAnnouncementPosted, FeatureAnnouncement } from '@/app/lib/feature-announcements';
 import crypto from 'crypto';
 
 export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert';
