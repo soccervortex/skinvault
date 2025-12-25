@@ -208,7 +208,7 @@ export async function GET() {
     // Calculate aggregate rating
     const totalRating = trustpilotRating + sitejabberRating;
     const totalCount = trustpilotCount + sitejabberCount;
-    const aggregateRating = totalCount > 0 ? totalRating / totalCount : null;
+    const aggregateRating = totalCount > 0 ? totalRating / totalCount : 0;
 
     console.log(`Reviews API: Found ${totalCount} reviews (Trustpilot: ${trustpilotCount}, Sitejabber: ${sitejabberCount}), Aggregate: ${aggregateRating}`);
 
@@ -225,7 +225,7 @@ export async function GET() {
       { 
         reviews: [],
         sources: REVIEW_SOURCES,
-        aggregateRating: null,
+        aggregateRating: 0,
         totalReviews: 0,
         ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
         error: 'Failed to fetch reviews' 

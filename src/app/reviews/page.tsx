@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Star, ExternalLink, Loader2 } from 'lucide-react';
+import { Star, ExternalLink, Filter, Loader2 } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
+import Link from 'next/link';
 
 interface Review {
   id: string;
@@ -19,7 +20,7 @@ interface Review {
 interface ReviewsData {
   reviews: Review[];
   sources: Array<{ name: string; url: string }>;
-  aggregateRating: number | null;
+  aggregateRating: number;
   totalReviews: number;
   ratingBreakdown: Record<number, number>;
 }
@@ -61,19 +62,6 @@ export default function ReviewsPage() {
     ));
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -83,7 +71,7 @@ export default function ReviewsPage() {
             <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter mb-4">
               Customer Reviews
             </h1>
-            {data && data.aggregateRating !== null && data.aggregateRating !== undefined ? (
+            {data && (
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
                   <span className="text-4xl md:text-5xl font-black text-blue-500">
@@ -114,7 +102,7 @@ export default function ReviewsPage() {
                   ))}
                 </div>
               </div>
-            ) : null}
+            )}
           </header>
 
           {loading ? (
@@ -182,7 +170,7 @@ export default function ReviewsPage() {
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               {renderStars(review.rating)}
-                              <span className="text-xs text-gray-500">{formatDate(review.date)}</span>
+                              <span className="text-xs text-gray-500">{review.date}</span>
                             </div>
                           </div>
                         </div>
