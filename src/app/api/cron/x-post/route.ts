@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import {
-  getNextItemFromAllDatasets,
-  getItemPrice,
-  createAutomatedXPostWithImage,
   checkIfPostedTodayOnX,
 } from '@/app/lib/inngest-functions';
+import {
+  determinePostType,
+  createWeeklySummaryPost,
+  createMonthlyStatsPost,
+  createItemHighlightPost,
+  checkForMilestonesOrAlerts,
+  PostType,
+} from '@/app/lib/x-post-types';
 
 /**
  * Vercel Cron Job: Automated X Posting
@@ -80,28 +85,52 @@ export async function GET(request: Request) {
       });
     }
 
-    // Get next item from all datasets
-    const item = await getNextItemFromAllDatasets(postHistory);
+    // Determine what type of post to make based on day/time
+    const now = new Date();
+    const context = {
+      dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
+      hour: now.getUTCHours(),
+      dayOfMonth: now.getUTCDate(),
+      isFirstOfMonth: now.getUTCDate() === 1,
+    };
 
-    if (!item) {
-      console.error('[X Cron] No item found for posting');
-      return NextResponse.json({ skipped: true, reason: 'no_item_found' });
+    const postType = determinePostType(context);
+    console.log(`[X Cron] Post type determined: ${postType} (Day: ${context.dayOfWeek}, Hour: ${context.hour}, First of month: ${context.isFirstOfMonth})`);
+
+    let postResult: { success: boolean; postId?: string; error?: string; itemName?: string };
+
+    // Create post based on type
+    switch (postType) {
+      case 'weekly_summary':
+        console.log('[X Cron] Creating weekly summary post...');
+        postResult = await createWeeklySummaryPost();
+        break;
+
+      case 'monthly_stats':
+        console.log('[X Cron] Creating monthly stats post...');
+        postResult = await createMonthlyStatsPost();
+        break;
+
+      case 'milestone':
+      case 'alert':
+        // Check for milestones/alerts first
+        const milestoneCheck = await checkForMilestonesOrAlerts();
+        if (milestoneCheck.hasMilestone) {
+          // TODO: Create milestone post
+          console.log('[X Cron] Milestone found, but not implemented yet. Falling back to item highlight.');
+          postResult = await createItemHighlightPost(postHistory);
+        } else {
+          // No milestone, use regular item highlight
+          postResult = await createItemHighlightPost(postHistory);
+        }
+        break;
+
+      case 'item_highlight':
+      default:
+        console.log('[X Cron] Creating item highlight post...');
+        postResult = await createItemHighlightPost(postHistory);
+        break;
     }
-
-    // Get real price from Steam API
-    const priceData = await getItemPrice(item.marketHashName || item.name);
-
-    // Create item page URL
-    const itemPageUrl = `https://www.skinvaults.online/item/${encodeURIComponent(item.id || item.marketHashName || item.name)}`;
-
-    // Create and post with image
-    console.log(`[X Cron] Creating post for ${item.name} (${item.type || 'skin'})...`);
-    const postResult = await createAutomatedXPostWithImage({
-      name: item.name,
-      imageUrl: item.imageUrl,
-      price: priceData?.price || 'Check price',
-      itemPageUrl,
-    });
 
     if (postResult.success && postResult.postId) {
       // Update history
@@ -110,23 +139,23 @@ export async function GET(request: Request) {
         {
           date: now.toISOString(),
           postId: postResult.postId,
-          itemId: item.id || '',
-          itemName: item.name,
-          itemType: item.type || 'skin',
+          itemId: postResult.itemName || '',
+          itemName: postResult.itemName || postType,
+          itemType: postType,
         },
       ];
       await dbSet('x_posting_history', newHistory);
       await dbSet('x_posting_last_post', now.toISOString());
 
-      console.log(`[X Cron] Successfully posted about ${item.name} (${item.type || 'skin'})`);
+      console.log(`[X Cron] Successfully posted ${postType} post`);
       console.log(`[X Cron] Post ID: ${postResult.postId}`);
       console.log(`[X Cron] Post URL: https://x.com/Skinvaults/status/${postResult.postId}`);
 
       return NextResponse.json({
         success: true,
+        postType,
         postId: postResult.postId,
-        itemName: item.name,
-        itemType: item.type || 'skin',
+        itemName: postResult.itemName || postType,
         postUrl: `https://x.com/Skinvaults/status/${postResult.postId}`,
         monthlyCount: thisMonthPosts.length + 1,
       });
@@ -150,8 +179,9 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         success: false,
+        postType,
         error: postResult.error || 'Failed to create post',
-        itemName: item.name,
+        itemName: postResult.itemName || postType,
         willRetry: currentHour === 10 && currentMinute === 0,
       }, { status: 500 });
     }
