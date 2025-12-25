@@ -86,6 +86,12 @@ export async function GET(request: Request) {
     const totalReads = recentPosts.reduce((sum, p) => sum + (p.reads || 0), 0);
     const avgReadsPerPost = recentPosts.length > 0 ? totalReads / recentPosts.length : 0;
     
+    // Check if we've been blocked recently (within last 24 hours)
+    const lastBlockTime = await dbGet<string>('x_posting_last_block');
+    const hoursSinceLastBlock = lastBlockTime 
+      ? (now.getTime() - new Date(lastBlockTime).getTime()) / (1000 * 60 * 60)
+      : Infinity;
+    
     // If average reads per post is very low (< 10), reduce monthly limit
     // This prevents spamming when engagement is low
     const effectiveLimit = avgReadsPerPost < 10 && thisMonthPosts.length > 50 
@@ -105,14 +111,23 @@ export async function GET(request: Request) {
     
     // Additional check: If we're posting too much relative to engagement
     // Skip posting if we have very low engagement rate (< 5 reads per post on average)
+    // BUT: Only block for 24 hours, then retry to see if engagement improved
     if (avgReadsPerPost < 5 && thisMonthPosts.length > 20) {
-      console.log(`[X Cron] Low engagement detected (${avgReadsPerPost.toFixed(1)} reads/post), skipping to avoid spam`);
-      return NextResponse.json({ 
-        skipped: true, 
-        reason: 'low_engagement', 
-        avgReadsPerPost: avgReadsPerPost.toFixed(1),
-        message: 'Posting paused due to low engagement rate'
-      });
+      // If we blocked less than 24 hours ago, skip this attempt
+      if (hoursSinceLastBlock < 24) {
+        console.log(`[X Cron] Low engagement detected (${avgReadsPerPost.toFixed(1)} reads/post), still blocked (${hoursSinceLastBlock.toFixed(1)}h ago), skipping`);
+        return NextResponse.json({ 
+          skipped: true, 
+          reason: 'low_engagement_blocked', 
+          avgReadsPerPost: avgReadsPerPost.toFixed(1),
+          hoursSinceBlock: hoursSinceLastBlock.toFixed(1),
+          message: `Posting paused due to low engagement. Will retry in ${(24 - hoursSinceLastBlock).toFixed(1)} hours.`
+        });
+      } else {
+        // 24 hours passed, retry to see if engagement improved
+        console.log(`[X Cron] Low engagement detected (${avgReadsPerPost.toFixed(1)} reads/post), but 24h passed, retrying...`);
+        // Continue with posting attempt (engagement might have improved)
+      }
     }
 
     // Determine what type of post to make based on day/time
