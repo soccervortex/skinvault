@@ -477,8 +477,6 @@ async function createAutomatedXPostWithImage(item: {
 /**
  * Upload image to X API and return media_id
  * Uses X API v1.1 media/upload endpoint with OAuth 1.0a
- * Note: Media upload with OAuth 1.0a is complex. For now, we'll post without images
- * and add image support later if needed (requires proper multipart/form-data handling)
  */
 async function uploadImageToX(
   imageUrl: string,
@@ -487,12 +485,126 @@ async function uploadImageToX(
   accessToken: string,
   accessTokenSecret: string
 ): Promise<string | null> {
-  // TODO: Implement proper OAuth 1.0a media upload
-  // X API v1.1 media upload requires multipart/form-data with proper OAuth signing
-  // This is complex and requires handling multipart boundaries in the signature
-  // For now, return null to post without images
-  // Images can be added later via X API v2 media upload (requires different approach)
-  console.log('[X Image Upload] Image upload not yet implemented, posting without image');
-  return null;
+  try {
+    console.log('[X Image Upload] Downloading image from:', imageUrl);
+    
+    // Download image
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      console.error('[X Image Upload] Failed to download image:', imageResponse.status);
+      return null;
+    }
+
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const imageBytes = Buffer.from(imageBuffer);
+    
+    // Determine content type
+    const contentType = imageResponse.headers.get('content-type') || 'image/png';
+    console.log('[X Image Upload] Image downloaded, size:', imageBytes.length, 'bytes, type:', contentType);
+
+    // X API v1.1 media upload endpoint
+    const uploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
+    
+    // Generate multipart boundary
+    const boundary = `----WebKitFormBoundary${crypto.randomBytes(16).toString('hex')}`;
+    
+    // Create multipart form data with binary image
+    const CRLF = '\r\n';
+    const formParts: Buffer[] = [];
+    
+    // Add media field header
+    formParts.push(Buffer.from(`--${boundary}${CRLF}`));
+    formParts.push(Buffer.from(`Content-Disposition: form-data; name="media"; filename="image.${contentType.split('/')[1] || 'png'}"${CRLF}`));
+    formParts.push(Buffer.from(`Content-Type: ${contentType}${CRLF}`));
+    formParts.push(Buffer.from(CRLF));
+    
+    // Add binary image data
+    formParts.push(imageBytes);
+    
+    // Add closing boundary
+    formParts.push(Buffer.from(`${CRLF}--${boundary}--${CRLF}`));
+    
+    const multipartBuffer = Buffer.concat(formParts);
+
+    // Generate OAuth 1.0a signature
+    // For multipart requests, we only sign the OAuth parameters, not the body
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: apiKey,
+      oauth_token: accessToken,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_version: '1.0',
+    };
+
+    // Generate signature (only OAuth parameters, not multipart body)
+    const sortedParams = Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+      .join('&');
+
+    const signatureBaseString = [
+      'POST',
+      encodeURIComponent(uploadUrl),
+      encodeURIComponent(sortedParams),
+    ].join('&');
+
+    const signingKey = `${encodeURIComponent(apiSecret)}&${encodeURIComponent(accessTokenSecret)}`;
+    const signature = crypto.createHmac('sha1', signingKey)
+      .update(signatureBaseString)
+      .digest('base64');
+
+    oauthParams.oauth_signature = signature;
+
+    // Build authorization header
+    const authHeader = 'OAuth ' + Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+      .join(', ');
+
+    // Upload media
+    console.log('[X Image Upload] Uploading to X API...');
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body: multipartBuffer,
+    });
+
+    const responseText = await uploadResponse.text();
+    console.log('[X Image Upload] Upload response status:', uploadResponse.status);
+
+    if (!uploadResponse.ok) {
+      console.error('[X Image Upload] Upload failed:', responseText);
+      return null;
+    }
+
+    let uploadData;
+    try {
+      uploadData = JSON.parse(responseText);
+    } catch {
+      console.error('[X Image Upload] Failed to parse response:', responseText);
+      return null;
+    }
+
+    const mediaId = uploadData.media_id_string || uploadData.media_id;
+    if (mediaId) {
+      console.log('[X Image Upload] Success! Media ID:', mediaId);
+      return mediaId.toString();
+    }
+
+    console.error('[X Image Upload] No media_id in response:', uploadData);
+    return null;
+  } catch (error: any) {
+    console.error('[X Image Upload] Error:', error);
+    return null;
+  }
 }
 
