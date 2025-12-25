@@ -19,11 +19,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'X posting is not enabled' }, { status: 400 });
     }
 
-    // Get a popular weapon from our dataset
-    const weapon = await getPopularWeapon();
+    // Get an item from all datasets (weapons, skins, stickers, agents, crates)
+    const item = await getItemFromAllDatasets();
+    
+    if (!item) {
+      return NextResponse.json(
+        { error: 'Failed to fetch item from dataset' },
+        { status: 500 }
+      );
+    }
+
+    // Get real price from Steam API
+    let price = 'Check price';
+    if (item.marketHashName) {
+      try {
+        const hash = encodeURIComponent(item.marketHashName);
+        const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=3&market_hash_name=${hash}&t=${Date.now()}`;
+        const priceResponse = await fetch(steamUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        });
+        if (priceResponse.ok) {
+          const priceData = await priceResponse.json();
+          if (priceData.success && priceData.lowest_price) {
+            const priceNum = priceData.lowest_price.replace(/[^\d,.]/g, '').replace(',', '.');
+            price = `€${priceNum}`;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch price:', e);
+      }
+    }
+
+    // Create item page URL
+    const itemPageUrl = `https://www.skinvaults.online/item/${encodeURIComponent(item.id || item.marketHashName || item.name)}`;
     
     // Create post with image
-    const postResult = await createXPost(weapon);
+    const postResult = await createXPost({
+      name: item.name,
+      imageUrl: item.imageUrl,
+      price: price,
+      itemPageUrl: itemPageUrl,
+      type: item.type,
+    });
 
     if (postResult.success) {
       // Update last post timestamp
@@ -34,7 +71,9 @@ export async function POST(request: Request) {
         success: true,
         message: 'Test post created successfully',
         postId: postResult.postId,
-        weapon: weapon.name,
+        itemName: item.name,
+        itemType: item.type,
+        hasImage: !!item.imageUrl,
       });
     } else {
       return NextResponse.json(
@@ -51,83 +90,75 @@ export async function POST(request: Request) {
   }
 }
 
-async function getPopularWeapon() {
+/**
+ * Get an item from ALL CS2 datasets (weapons, skins, stickers, agents, crates)
+ * Same logic as automated posting - can pick anything from the game
+ */
+async function getItemFromAllDatasets(): Promise<{ 
+  id: string; 
+  name: string; 
+  marketHashName: string; 
+  imageUrl: string; 
+  type: string;
+} | null> {
   try {
-    // Try to get a real weapon from the dataset
-    const response = await fetch('https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json', {
-      next: { revalidate: 3600 },
-    });
-    const data = await response.json();
-    const weapons = Array.isArray(data) ? data : Object.values(data);
-    
-    // Filter for popular/rare weapons
-    const popularWeapons = weapons.filter((w: any) => {
-      const rarity = w.rarity?.name || w.rarity || '';
-      return rarity.includes('Covert') || rarity.includes('Classified') || rarity.includes('Extraordinary');
-    });
+    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
+    const datasets = [
+      { url: `${BASE_URL}/skins_not_grouped.json`, type: 'skin' },
+      { url: `${BASE_URL}/stickers.json`, type: 'sticker' },
+      { url: `${BASE_URL}/agents.json`, type: 'agent' },
+      { url: `${BASE_URL}/crates.json`, type: 'crate' },
+    ];
 
-    if (popularWeapons.length > 0) {
-      const randomWeapon = popularWeapons[Math.floor(Math.random() * popularWeapons.length)];
-      const marketHashName = randomWeapon.market_hash_name || randomWeapon.name || '';
-      const itemId = randomWeapon.id || marketHashName;
-      
-      // Get real price
-      let price = 'Check price';
+    // Fetch all datasets
+    const allItems: any[] = [];
+    for (const dataset of datasets) {
       try {
-        const hash = encodeURIComponent(marketHashName);
-        const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=3&market_hash_name=${hash}&t=${Date.now()}`;
-        const priceResponse = await fetch(steamUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        const response = await fetch(dataset.url, { 
+          next: { revalidate: 3600 }, // Cache for 1 hour
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
         });
-        if (priceResponse.ok) {
-          const priceData = await priceResponse.json();
-          if (priceData.success && priceData.lowest_price) {
-            const priceNum = priceData.lowest_price.replace(/[^\d,.]/g, '').replace(',', '.');
-            price = `€${priceNum}`;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to fetch price:', e);
+        const data = await response.json();
+        const items = Array.isArray(data) ? data : Object.values(data);
+        
+        // Add type to each item
+        items.forEach((item: any) => {
+          allItems.push({
+            ...item,
+            type: dataset.type,
+            id: item.id || item.market_hash_name || item.name,
+            name: item.market_hash_name || item.name || 'Unknown',
+            marketHashName: item.market_hash_name || item.name || '',
+            imageUrl: item.image || item.icon_url || item.image_url || '',
+          });
+        });
+      } catch (error) {
+        console.error(`Failed to fetch ${dataset.type} dataset:`, error);
       }
-
-      return {
-        name: marketHashName,
-        imageUrl: randomWeapon.image || randomWeapon.icon_url || randomWeapon.image_url || '',
-        price: price,
-        itemId: itemId,
-        itemPageUrl: `https://www.skinvaults.online/item/${encodeURIComponent(itemId)}`,
-      };
     }
+
+    if (allItems.length === 0) {
+      console.error('No items found in any dataset');
+      return null;
+    }
+
+    // Pick a random item from all available items
+    // You could also implement smart selection here (e.g., prioritize rare items)
+    const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+
+    return {
+      id: randomItem.id || randomItem.market_hash_name || randomItem.name,
+      name: randomItem.market_hash_name || randomItem.name || 'Unknown',
+      marketHashName: randomItem.market_hash_name || randomItem.name || '',
+      imageUrl: randomItem.image || randomItem.icon_url || randomItem.image_url || '',
+      type: randomItem.type || 'skin',
+    };
   } catch (error) {
-    console.error('Failed to fetch weapon dataset:', error);
+    console.error('Failed to fetch item datasets:', error);
+    return null;
   }
-
-  // Fallback to hardcoded popular weapons
-  const fallbackWeapons = [
-    { 
-      name: 'AK-47 | Redline', 
-      imageUrl: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5gZKKkuXLPr7Vn35cppwl3r3E9t2n3gzhqUZtYz2mI4eBd1M3Y1rV-lfolOq6h8C5tJ7NnHEh7CJQ5H3D30vgzA', 
-      price: '€45.20',
-      itemId: 'AK-47 | Redline',
-      itemPageUrl: 'https://www.skinvaults.online/item/AK-47%20%7C%20Redline',
-    },
-    { 
-      name: 'AWP | Asiimov', 
-      imageUrl: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5gZKKkuXLPr7Vn35cppwl3r3E9t2n3gzhqUZtYz2mI4eBd1M3Y1rV-lfolOq6h8C5tJ7NnHEh7CJQ5H3D30vgzA', 
-      price: '€89.50',
-      itemId: 'AWP | Asiimov',
-      itemPageUrl: 'https://www.skinvaults.online/item/AWP%20%7C%20Asiimov',
-    },
-    { 
-      name: 'M4A4 | Howl', 
-      imageUrl: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5gZKKkuXLPr7Vn35cppwl3r3E9t2n3gzhqUZtYz2mI4eBd1M3Y1rV-lfolOq6h8C5tJ7NnHEh7CJQ5H3D30vgzA', 
-      price: '€1,234.00',
-      itemId: 'M4A4 | Howl',
-      itemPageUrl: 'https://www.skinvaults.online/item/M4A4%20%7C%20Howl',
-    },
-  ];
-
-  return fallbackWeapons[Math.floor(Math.random() * fallbackWeapons.length)];
 }
 
 // OAuth 1.0a signature generation
@@ -194,7 +225,13 @@ function generateOAuthHeader(
   return authHeader;
 }
 
-async function createXPost(weapon: { name: string; imageUrl: string; price: string; itemPageUrl?: string }) {
+async function createXPost(item: { 
+  name: string; 
+  imageUrl: string; 
+  price: string; 
+  itemPageUrl: string;
+  type?: string;
+}) {
   try {
     // X API v2 requires OAuth 1.0a User Context for automated posting
     // Note: OAuth 2.0 Client ID/Secret are for different flows (user authorization)
@@ -225,17 +262,18 @@ async function createXPost(weapon: { name: string; imageUrl: string; price: stri
     }
 
     // Create post text with item page link (280 char limit for X)
-    const itemPageLink = weapon.itemPageUrl || `https://www.skinvaults.online/item/${encodeURIComponent(weapon.name)}`;
-    const postText = `🎮 ${weapon.name}\n\n💰 Price: ${weapon.price}\n\n🔗 View details: ${itemPageLink}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+    const itemTypeEmoji = item.type === 'sticker' ? '🏷️' : item.type === 'agent' ? '👤' : item.type === 'crate' ? '📦' : '🎮';
+    const postText = `${itemTypeEmoji} ${item.name}\n\n💰 Price: ${item.price}\n\n🔗 View details: ${item.itemPageUrl}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     console.log('[X Post] Attempting to post with OAuth 1.0a:', postText.substring(0, 50) + '...');
+    console.log('[X Post] Item type:', item.type, 'Image URL:', item.imageUrl ? 'Yes' : 'No');
 
     // Upload image first if available
     let mediaId: string | null = null;
-    if (weapon.imageUrl) {
+    if (item.imageUrl) {
       try {
-        console.log('[X Post] Uploading image...');
-        mediaId = await uploadImageToX(weapon.imageUrl, X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET);
+        console.log('[X Post] Uploading image from:', item.imageUrl);
+        mediaId = await uploadImageToX(item.imageUrl, X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET);
         if (!mediaId) {
           console.warn('[X Post] Failed to upload image, posting without image');
         } else {
@@ -245,6 +283,8 @@ async function createXPost(weapon: { name: string; imageUrl: string; price: stri
         console.warn('[X Post] Image upload error:', error);
         // Continue without image
       }
+    } else {
+      console.log('[X Post] No image URL available for this item');
     }
 
     const url = 'https://api.x.com/2/tweets';
