@@ -308,14 +308,132 @@ export async function createItemHighlightPost(
 }
 
 /**
- * Check for milestones or alerts (for future implementation)
+ * Check for trending items or price alerts
  */
-export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: boolean; milestone?: any }> {
-  // TODO: Implement milestone checking
-  // Examples:
-  // - User count milestones (1000, 5000, 10000 users)
-  // - Price alerts (significant price changes)
-  // - Feature announcements
-  return { hasMilestone: false };
+export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: boolean; milestone?: any; shouldPost?: boolean }> {
+  try {
+    // Check for trending items (>15% change in 24h)
+    const trending = await getTrendingItems(15, '24h', 5);
+    
+    if (trending.length > 0) {
+      // Get the most significant change
+      const topTrend = trending[0];
+      
+      // Check if we've already posted about this item today
+      const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+      const today = new Date().toISOString().split('T')[0];
+      const postedToday = postHistory.some(p => {
+        const postDate = p.date.split('T')[0];
+        return postDate === today && (p.itemName === topTrend.marketHashName || p.itemId === topTrend.marketHashName);
+      });
+
+      if (!postedToday) {
+        return {
+          hasMilestone: true,
+          milestone: {
+            type: 'trending_alert',
+            item: topTrend,
+            message: topTrend.isIncrease
+              ? `🚨 ALERT: ${topTrend.marketHashName} +${topTrend.changePercent.toFixed(1)}% in 24h! Current: €${topTrend.currentPrice.toFixed(2)}`
+              : `📉 ALERT: ${topTrend.marketHashName} ${topTrend.changePercent.toFixed(1)}% in 24h! Current: €${topTrend.currentPrice.toFixed(2)}`,
+          },
+          shouldPost: true,
+        };
+      }
+    }
+
+    return { hasMilestone: false };
+  } catch (error) {
+    console.error('Failed to check for milestones/alerts:', error);
+    return { hasMilestone: false };
+  }
+}
+
+/**
+ * Create trending alert post
+ */
+export async function createTrendingAlertPost(priceChange: PriceChange): Promise<{ success: boolean; postId?: string; error?: string }> {
+  try {
+    const emoji = priceChange.isIncrease ? '🚨' : '📉';
+    const sign = priceChange.isIncrease ? '+' : '';
+    const itemPageUrl = `https://www.skinvaults.online/item/${encodeURIComponent(priceChange.marketHashName)}`;
+    
+    const alertText = `${emoji} ALERT: ${priceChange.marketHashName}\n\n` +
+      `${sign}${priceChange.changePercent.toFixed(1)}% in 24h\n` +
+      `💰 Current: €${priceChange.currentPrice.toFixed(2)}\n` +
+      `📊 Previous: €${priceChange.previousPrice.toFixed(2)}\n\n` +
+      `🔗 View: ${itemPageUrl}\n\n` +
+      `Track your CS2 inventory:\nskinvaults.online\n\n` +
+      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+
+    // Post the alert (same OAuth logic as weekly summary)
+    const X_API_KEY = process.env.X_API_KEY;
+    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
+    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
+
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      return { success: false, error: 'X API credentials not configured' };
+    }
+
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: X_API_KEY,
+      oauth_token: X_ACCESS_TOKEN,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_version: '1.0',
+    };
+
+    const sortedParams = Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+      .join('&');
+
+    const signatureBaseString = [
+      'POST',
+      encodeURIComponent('https://api.x.com/2/tweets'),
+      encodeURIComponent(sortedParams),
+    ].join('&');
+
+    const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET)}`;
+    const signature = crypto.createHmac('sha1', signingKey)
+      .update(signatureBaseString)
+      .digest('base64');
+
+    oauthParams.oauth_signature = signature;
+
+    const authHeader = 'OAuth ' + Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+      .join(', ');
+
+    const response = await fetch('https://api.x.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: alertText.substring(0, 280),
+      }),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { detail: responseText || 'Unknown error' };
+      }
+      return { success: false, error: errorData.detail || errorData.title || 'Failed to post' };
+    }
+
+    const data = JSON.parse(responseText);
+    return { success: true, postId: data.data?.id };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create trending alert post' };
+  }
 }
 
