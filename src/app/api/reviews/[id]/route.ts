@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const ADMIN_HEADER = 'x-admin-key';
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN || process.env.NEXT_PUBLIC_ADMIN_KEY;
-  if (expected && adminKey !== expected) {
-    return false;
-  }
-  return true;
-}
+import { isOwner } from '@/app/utils/owner-ids';
 
 // Initialize Supabase client
 function getSupabaseClient() {
@@ -29,12 +19,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check admin authentication
-    if (!checkAuth(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const adminSteamId = searchParams.get('adminSteamId');
+
+    // Check if user is owner
+    if (!adminSteamId || !isOwner(adminSteamId)) {
+      return NextResponse.json({ error: 'Unauthorized - Owner access required' }, { status: 401 });
+    }
     const supabase = getSupabaseClient();
 
     // Delete review from Supabase

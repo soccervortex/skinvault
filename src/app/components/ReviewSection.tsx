@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Star, ExternalLink, CheckCircle2, Loader2, Trash2 } from 'lucide-react';
+import { isOwner } from '@/app/utils/owner-ids';
 
 interface Review {
   id: string;
@@ -29,6 +30,28 @@ export default function ReviewSection() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filterRating, setFilterRating] = useState<number | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [userIsOwner, setUserIsOwner] = useState(false);
+
+  useEffect(() => {
+    // Load user from localStorage
+    const checkUser = () => {
+      try {
+        if (typeof window === 'undefined') return;
+        const savedUser = window.localStorage.getItem('steam_user');
+        const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+        setUser(parsedUser);
+        setUserIsOwner(isOwner(parsedUser?.steamId));
+      } catch {
+        setUser(null);
+        setUserIsOwner(false);
+      }
+    };
+
+    checkUser();
+    window.addEventListener('storage', checkUser);
+    return () => window.removeEventListener('storage', checkUser);
+  }, []);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -74,35 +97,19 @@ export default function ReviewSection() {
   };
 
   const handleDelete = async (reviewId: string) => {
+    if (!userIsOwner || !user?.steamId) {
+      alert('Only owners can delete reviews');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this review?')) {
       return;
     }
 
     setDeletingId(reviewId);
     try {
-      // Get admin key from localStorage or prompt
-      let adminKey = '';
-      if (typeof window !== 'undefined') {
-        adminKey = localStorage.getItem('admin_key') || '';
-      }
-      
-      if (!adminKey) {
-        const promptKey = prompt('Enter admin key:');
-        if (!promptKey) {
-          setDeletingId(null);
-          return;
-        }
-        adminKey = promptKey;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('admin_key', adminKey);
-        }
-      }
-
-      const res = await fetch(`/api/reviews/${reviewId}`, {
+      const res = await fetch(`/api/reviews/${reviewId}?adminSteamId=${user.steamId}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': adminKey,
-        },
       });
 
       if (!res.ok) {
@@ -338,24 +345,26 @@ export default function ReviewSection() {
                         </p>
                       )}
 
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDelete(review.id)}
-                        disabled={deletingId === review.id}
-                        className="mt-4 flex items-center gap-2 px-3 py-1.5 text-xs font-black uppercase text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg hover:bg-red-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {deletingId === review.id ? (
-                          <>
-                            <Loader2 size={12} className="animate-spin" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 size={12} />
-                            Delete Review
-                          </>
-                        )}
-                      </button>
+                      {/* Delete Button - Only for owners */}
+                      {userIsOwner && (
+                        <button
+                          onClick={() => handleDelete(review.id)}
+                          disabled={deletingId === review.id}
+                          className="mt-4 flex items-center gap-2 px-3 py-1.5 text-xs font-black uppercase text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg hover:bg-red-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deletingId === review.id ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 size={12} />
+                              Delete Review
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
 
