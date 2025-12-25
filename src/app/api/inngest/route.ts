@@ -10,7 +10,8 @@ import { inngest } from '@/app/lib/inngest';
 import { 
   checkPriceAlerts,
   sendWelcomeEmail,
-  processFailedPurchases 
+  processFailedPurchases,
+  automatedXPosting
 } from '@/app/lib/inngest-functions';
 
 export const { GET, POST, PUT } = serve({
@@ -19,6 +20,7 @@ export const { GET, POST, PUT } = serve({
     checkPriceAlerts,
     sendWelcomeEmail,
     processFailedPurchases,
+    automatedXPosting,
     // Add more functions here
   ],
 });
