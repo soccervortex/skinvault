@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Star, ExternalLink, CheckCircle2, Loader2 } from 'lucide-react';
+import { Star, ExternalLink, CheckCircle2, Loader2, Trash2 } from 'lucide-react';
 
 interface Review {
   id: string;
@@ -27,6 +27,8 @@ export default function ReviewSection() {
   const [data, setData] = useState<ReviewsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [filterRating, setFilterRating] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -71,10 +73,80 @@ export default function ReviewSection() {
     }
   };
 
+  const handleDelete = async (reviewId: string) => {
+    if (!confirm('Are you sure you want to delete this review?')) {
+      return;
+    }
+
+    setDeletingId(reviewId);
+    try {
+      // Get admin key from localStorage or prompt
+      let adminKey = '';
+      if (typeof window !== 'undefined') {
+        adminKey = localStorage.getItem('admin_key') || '';
+      }
+      
+      if (!adminKey) {
+        const promptKey = prompt('Enter admin key:');
+        if (!promptKey) {
+          setDeletingId(null);
+          return;
+        }
+        adminKey = promptKey;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('admin_key', adminKey);
+        }
+      }
+
+      const res = await fetch(`/api/reviews/${reviewId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-key': adminKey,
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Failed to delete review' }));
+        throw new Error(errorData.error || 'Failed to delete review');
+      }
+
+      // Refresh reviews after deletion
+      if (data) {
+        const deletedReview = data.reviews.find((r) => r.id === reviewId);
+        const newRatingBreakdown = { ...data.ratingBreakdown };
+        if (deletedReview) {
+          newRatingBreakdown[deletedReview.rating] = Math.max(0, (newRatingBreakdown[deletedReview.rating] || 0) - 1);
+        }
+
+        const remainingReviews = data.reviews.filter((r) => r.id !== reviewId);
+        const newTotalRating = remainingReviews.reduce((sum, r) => sum + r.rating, 0);
+        const newAggregateRating = remainingReviews.length > 0 ? newTotalRating / remainingReviews.length : 0;
+
+        setData({
+          ...data,
+          reviews: remainingReviews,
+          totalReviews: remainingReviews.length,
+          aggregateRating: newAggregateRating,
+          ratingBreakdown: newRatingBreakdown,
+        });
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete review');
+      console.error('Delete error:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const getRatingPercentage = (rating: number): number => {
     if (!data || data.totalReviews === 0) return 0;
     return (data.ratingBreakdown[rating] / data.totalReviews) * 100;
   };
+
+  // Filter reviews based on selected rating
+  const filteredReviews = data?.reviews.filter(
+    (review) => filterRating === null || review.rating === filterRating
+  ) || [];
 
   if (loading) {
     return (
@@ -138,6 +210,36 @@ export default function ReviewSection() {
             </div>
           </div>
         </div>
+
+        {/* Filter Buttons */}
+        <div className="mt-6 pt-6 border-t border-white/5">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-black uppercase text-gray-400">Filter by rating:</span>
+            <button
+              onClick={() => setFilterRating(null)}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${
+                filterRating === null
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-black/40 text-gray-400 hover:text-white hover:bg-black/60'
+              }`}
+            >
+              All ({data.totalReviews})
+            </button>
+            {[5, 4, 3, 2, 1].map((rating) => (
+              <button
+                key={rating}
+                onClick={() => setFilterRating(filterRating === rating ? null : rating)}
+                className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1 ${
+                  filterRating === rating
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-black/40 text-gray-400 hover:text-white hover:bg-black/60'
+                }`}
+              >
+                {rating}★ ({data.ratingBreakdown[rating] || 0})
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Review Sources */}
@@ -163,17 +265,31 @@ export default function ReviewSection() {
 
       {/* Individual Reviews List */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-black uppercase text-gray-300 mb-4">
-          Customer Reviews ({data.reviews.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-black uppercase text-gray-300">
+            Customer Reviews {filterRating !== null && `(${filterRating}★)`} ({filteredReviews.length})
+          </h2>
+          {filterRating !== null && (
+            <button
+              onClick={() => setFilterRating(null)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-black uppercase"
+            >
+              Clear Filter
+            </button>
+          )}
+        </div>
         
-        {data.reviews.length === 0 ? (
+        {filteredReviews.length === 0 ? (
           <div className="bg-[#11141d] p-10 rounded-2xl border border-white/5 text-center">
-            <p className="text-gray-500">No reviews available yet. Check back soon!</p>
+            <p className="text-gray-500">
+              {filterRating
+                ? `No ${filterRating}-star reviews found.`
+                : 'No reviews available yet. Check back soon!'}
+            </p>
           </div>
         ) : (
           <div className="space-y-4 max-h-[800px] overflow-y-auto custom-scrollbar pr-2">
-            {data.reviews.map((review) => (
+            {filteredReviews.map((review) => (
               <div
                 key={review.id}
                 className="bg-[#11141d] p-6 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all"
@@ -221,6 +337,25 @@ export default function ReviewSection() {
                           {review.reviewText}
                         </p>
                       )}
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => handleDelete(review.id)}
+                        disabled={deletingId === review.id}
+                        className="mt-4 flex items-center gap-2 px-3 py-1.5 text-xs font-black uppercase text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg hover:bg-red-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {deletingId === review.id ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 size={12} />
+                            Delete Review
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
