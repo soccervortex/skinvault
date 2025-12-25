@@ -62,32 +62,41 @@ async function getSteamUsername(steamId: string): Promise<string | null> {
 export async function getUnpostedNewUsers(): Promise<NewUser[]> {
   try {
     const postedUsers = (await dbGet<Record<string, { posted: boolean; postId?: string; postedAt?: string }>>(NEW_USERS_POSTED_KEY)) || {};
+    console.log('[New User Post] Posted users:', Object.keys(postedUsers).length);
     
     // Read directly from first_logins database (KV or MongoDB)
     const FIRST_LOGINS_KEY = 'first_logins';
     const firstLogins = (await dbGet<Record<string, string>>(FIRST_LOGINS_KEY)) || {};
+    console.log('[New User Post] Total first logins:', Object.keys(firstLogins).length);
+    console.log('[New User Post] First logins data:', JSON.stringify(firstLogins, null, 2));
     
     const unpostedUsers: NewUser[] = [];
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    console.log('[New User Post] Checking for users between', twentyFourHoursAgo.toISOString(), 'and', now.toISOString());
 
     // Check all users with first login dates
     for (const [steamId, firstLoginDate] of Object.entries(firstLogins)) {
       // Skip if already posted
       if (postedUsers[steamId]?.posted) {
+        console.log(`[New User Post] Skipping ${steamId} - already posted`);
         continue;
       }
 
       if (!firstLoginDate) {
+        console.log(`[New User Post] Skipping ${steamId} - no login date`);
         continue;
       }
 
       const loginDate = new Date(firstLoginDate);
+      console.log(`[New User Post] Checking ${steamId}: loginDate=${loginDate.toISOString()}, twentyFourHoursAgo=${twentyFourHoursAgo.toISOString()}, isRecent=${loginDate >= twentyFourHoursAgo}`);
       
       // Only include users who joined in the last 24 hours
       if (loginDate >= twentyFourHoursAgo) {
+        console.log(`[New User Post] User ${steamId} is recent, fetching Steam username...`);
         // Get Steam username
         const steamName = await getSteamUsername(steamId);
+        console.log(`[New User Post] Steam username for ${steamId}:`, steamName);
         
         if (steamName) {
           unpostedUsers.push({
@@ -96,7 +105,12 @@ export async function getUnpostedNewUsers(): Promise<NewUser[]> {
             firstLoginDate,
             posted: false,
           });
+          console.log(`[New User Post] Added ${steamId} (${steamName}) to unposted users`);
+        } else {
+          console.log(`[New User Post] Skipping ${steamId} - could not fetch Steam username`);
         }
+      } else {
+        console.log(`[New User Post] User ${steamId} is too old (${Math.round((now.getTime() - loginDate.getTime()) / (1000 * 60 * 60))} hours ago)`);
       }
     }
 

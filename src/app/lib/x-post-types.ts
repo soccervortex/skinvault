@@ -406,9 +406,12 @@ export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: bool
     }
 
     // Check for new users (priority: post about new users if available)
+    console.log('[X Post Types] Checking for new users...');
     const unpostedNewUsers = await getUnpostedNewUsers();
+    console.log('[X Post Types] Found unposted new users:', unpostedNewUsers.length);
     if (unpostedNewUsers.length > 0) {
       const newUser = unpostedNewUsers[0]; // Post about the oldest unposted user
+      console.log('[X Post Types] Returning new user milestone:', newUser.steamId, newUser.steamName);
       return {
         hasMilestone: true,
         shouldPost: true,
