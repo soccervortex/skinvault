@@ -236,9 +236,16 @@ export async function GET(request: Request) {
     // Always check for new users first (priority over other posts, except weekly/monthly summaries)
     // But only if it's not a special post (weekly/monthly)
     if (!isSpecialPost) {
+      console.log('[X Cron] Checking for milestones/alerts (including new users)...');
       const milestoneCheck = await checkForMilestonesOrAlerts();
+      console.log('[X Cron] Milestone check result:', {
+        hasMilestone: milestoneCheck.hasMilestone,
+        shouldPost: milestoneCheck.shouldPost,
+        type: milestoneCheck.milestone?.type,
+      });
       if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost && milestoneCheck.milestone?.type === 'new_user') {
         console.log('[X Cron] New user detected - creating welcome post...');
+        console.log('[X Cron] New user details:', milestoneCheck.milestone.user);
         postResult = await createNewUserPost(milestoneCheck.milestone.user);
         
         // If new user post was successful, return early
