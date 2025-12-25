@@ -8,9 +8,10 @@ import { getNextItemFromAllDatasets, getItemPrice, createAutomatedXPostWithImage
 import { getTopMovers, getTrendingItems, PriceChange } from '@/app/lib/price-tracking';
 import { checkUserCountMilestone, getUnpostedMilestones, markMilestonePosted, UserMilestone } from '@/app/lib/user-milestones';
 import { getUnpostedFeatureAnnouncements, markFeatureAnnouncementPosted, FeatureAnnouncement } from '@/app/lib/feature-announcements';
+import { getUnpostedNewUsers, createNewUserWelcomePost, NewUser } from '@/app/lib/new-user-posts';
 import crypto from 'crypto';
 
-export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert';
+export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert' | 'new_user';
 
 interface PostContext {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
@@ -404,10 +405,36 @@ export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: bool
       }
     }
 
+    // Check for new users (priority: post about new users if available)
+    const unpostedNewUsers = await getUnpostedNewUsers();
+    if (unpostedNewUsers.length > 0) {
+      const newUser = unpostedNewUsers[0]; // Post about the oldest unposted user
+      return {
+        hasMilestone: true,
+        shouldPost: true,
+        milestone: {
+          type: 'new_user',
+          user: newUser,
+        },
+      };
+    }
+
     return { hasMilestone: false };
   } catch (error) {
     console.error('Failed to check for milestones/alerts:', error);
     return { hasMilestone: false };
+  }
+}
+
+/**
+ * Create new user welcome post
+ */
+export async function createNewUserPost(user: NewUser): Promise<{ success: boolean; postId?: string; error?: string }> {
+  try {
+    const result = await createNewUserWelcomePost(user);
+    return result;
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create new user post' };
   }
 }
 

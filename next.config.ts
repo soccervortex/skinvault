@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react'],
   },
   // Turbopack configuration
-  turbopack: {
+    turbopack: {
     root: path.resolve(__dirname),
   },
   // Performance optimizations

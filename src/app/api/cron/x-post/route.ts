@@ -12,6 +12,7 @@ import {
   createTrendingAlertPost,
   createUserMilestonePost,
   createFeatureAnnouncementPost,
+  createNewUserPost,
   PostType,
 } from '@/app/lib/x-post-types';
 import { updatePriceHistory } from '@/app/lib/price-tracking';
@@ -232,6 +233,38 @@ export async function GET(request: Request) {
 
     let postResult: { success: boolean; postId?: string; error?: string; itemName?: string };
 
+    // Always check for new users first (priority over other posts, except weekly/monthly summaries)
+    // But only if it's not a special post (weekly/monthly)
+    if (!isSpecialPost) {
+      const milestoneCheck = await checkForMilestonesOrAlerts();
+      if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost && milestoneCheck.milestone?.type === 'new_user') {
+        console.log('[X Cron] New user detected - creating welcome post...');
+        postResult = await createNewUserPost(milestoneCheck.milestone.user);
+        
+        // If new user post was successful, return early
+        if (postResult.success) {
+          // Update post history
+          const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+          postHistory.push({
+            date: now.toISOString(),
+            postId: postResult.postId || '',
+            itemId: milestoneCheck.milestone.user.steamId,
+            itemName: `New User: ${milestoneCheck.milestone.user.steamName || 'Unknown'}`,
+            itemType: 'new_user',
+          });
+          await dbSet('x_posting_history', postHistory);
+          await dbSet('x_posting_last_post', now.toISOString());
+
+          return NextResponse.json({
+            success: true,
+            postType: 'new_user',
+            postId: postResult.postId,
+            itemName: milestoneCheck.milestone.user.steamName,
+          });
+        }
+      }
+    }
+
     // Create post based on type
     switch (postType) {
       case 'weekly_summary':
@@ -246,10 +279,14 @@ export async function GET(request: Request) {
 
       case 'milestone':
       case 'alert':
-        // Check for milestones/alerts first
+      case 'new_user':
+        // Check for milestones/alerts/new users first
         const milestoneCheck = await checkForMilestonesOrAlerts();
         if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost) {
-          if (milestoneCheck.milestone?.type === 'feature_announcement') {
+          if (milestoneCheck.milestone?.type === 'new_user') {
+            console.log('[X Cron] Creating new user welcome post...');
+            postResult = await createNewUserPost(milestoneCheck.milestone.user);
+          } else if (milestoneCheck.milestone?.type === 'feature_announcement') {
             console.log('[X Cron] Creating feature announcement post...');
             postResult = await createFeatureAnnouncementPost(milestoneCheck.milestone.announcement);
           } else if (milestoneCheck.milestone?.type === 'user_milestone') {
@@ -263,7 +300,7 @@ export async function GET(request: Request) {
             postResult = await createItemHighlightPost(postHistory);
           }
         } else {
-          // No milestone/alert, use regular item highlight
+          // No milestone/alert/new user, use regular item highlight
           postResult = await createItemHighlightPost(postHistory);
         }
         break;

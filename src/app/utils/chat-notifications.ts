@@ -274,9 +274,9 @@ export function markAllDMsAsRead(currentUserId: string): void {
       if (participants.length === 2) {
         // Only update if count is not already 0
         if (unreadDms[dmId].count > 0) {
-          unreadDms[dmId].count = 0;
-          unreadDms[dmId].lastRead = Date.now();
-          unreadDms[dmId].userId = currentUserId; // Update userId to current user
+        unreadDms[dmId].count = 0;
+        unreadDms[dmId].lastRead = Date.now();
+        unreadDms[dmId].userId = currentUserId; // Update userId to current user
           hasChanges = true;
         } else if (unreadDms[dmId].userId !== currentUserId) {
           // Update userId even if count is 0 (to ensure correct user tracking)
@@ -287,10 +287,10 @@ export function markAllDMsAsRead(currentUserId: string): void {
     });
     
     if (hasChanges) {
-      localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
-      
-      // Dispatch event for other components
-      window.dispatchEvent(new CustomEvent('chat-unread-updated'));
+    localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
+    
+    // Dispatch event for other components
+    window.dispatchEvent(new CustomEvent('chat-unread-updated'));
     }
   } catch (error) {
     // Log error for debugging but don't throw
