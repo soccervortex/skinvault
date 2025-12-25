@@ -130,7 +130,9 @@ function generateOAuthHeader(
 
 async function createXPost(weapon: { name: string; imageUrl: string; price: string }) {
   try {
-    // X API v2 requires OAuth 1.0a User Context or OAuth 2.0 User Context for posting
+    // X API v2 requires OAuth 1.0a User Context for automated posting
+    // Note: OAuth 2.0 Client ID/Secret are for different flows (user authorization)
+    // For automated bots, we use OAuth 1.0a with API Key/Secret + Access Token/Secret
     const X_API_KEY = process.env.X_API_KEY;
     const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
     const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
