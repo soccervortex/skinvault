@@ -411,7 +411,7 @@ async function createAutomatedXPostWithImage(item: {
 
     // Create post text with item page link
     const itemTypeEmoji = item.type === 'sticker' ? '🏷️' : item.type === 'agent' ? '👤' : item.type === 'crate' ? '📦' : '🎮';
-    const postText = `${itemTypeEmoji} ${item.name}\n\n💰 Price: ${item.price}\n\n🔗 View details: ${item.itemPageUrl}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2 #CSGO #Skins`;
+    const postText = `${itemTypeEmoji} ${item.name}\n\n💰 Price: ${item.price}\n\n🔗 View details: ${item.itemPageUrl}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Upload image first if available
     let mediaId: string | null = null;

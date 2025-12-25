@@ -159,7 +159,7 @@ async function createXPost(weapon: { name: string; imageUrl: string; price: stri
     }
 
     // Create post text (280 char limit for X)
-    const postText = `🎮 ${weapon.name}\n\n💰 Price: ${weapon.price}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2 #CSGO #Skins`;
+    const postText = `🎮 ${weapon.name}\n\n💰 Price: ${weapon.price}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     console.log('[X Post] Attempting to post with OAuth 1.0a:', postText.substring(0, 50) + '...');
 
