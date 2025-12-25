@@ -77,8 +77,8 @@ export async function GET(request: Request) {
     }
 
     // Check monthly post count (500 limit)
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const thisMonthPosts = postHistory.filter(p => p.date.startsWith(currentMonth));
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const thisMonthPosts = postHistory.filter(p => p.date.startsWith(currentMonthStr));
     
     // Smart limit: If we have low engagement (reads), reduce posting frequency
     // Calculate average engagement rate from recent posts
@@ -90,15 +90,15 @@ export async function GET(request: Request) {
     // Reset block at start of each month
     const lastBlockTime = await dbGet<string>('x_posting_last_block');
     const lastBlockMonth = lastBlockTime ? new Date(lastBlockTime).getUTCMonth() : null;
-    const currentMonth = now.getUTCMonth();
+    const currentMonthNum = now.getUTCMonth();
     
     // Reset block if we're in a new month
-    if (lastBlockMonth !== null && lastBlockMonth !== currentMonth) {
+    if (lastBlockMonth !== null && lastBlockMonth !== currentMonthNum) {
       await dbSet('x_posting_last_block', null);
       console.log('[X Cron] New month detected, resetting engagement block');
     }
     
-    const hoursSinceLastBlock = lastBlockTime && lastBlockMonth === currentMonth
+    const hoursSinceLastBlock = lastBlockTime && lastBlockMonth === currentMonthNum
       ? (now.getTime() - new Date(lastBlockTime).getTime()) / (1000 * 60 * 60)
       : Infinity;
     
@@ -119,11 +119,23 @@ export async function GET(request: Request) {
       });
     }
     
+    // Determine post type FIRST to check if it's a special post (weekly/monthly)
+    // Weekly and monthly posts ALWAYS post, regardless of engagement
+    const context = {
+      dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
+      hour: now.getUTCHours(),
+      minute: now.getUTCMinutes(),
+      dayOfMonth: now.getUTCDate(),
+      isFirstOfMonth: now.getUTCDate() === 1,
+    };
+    const postType = determinePostType(context);
+    const isSpecialPost = postType === 'weekly_summary' || postType === 'monthly_stats';
+    
     // Additional check: If we're posting too much relative to engagement
     // Skip posting if we have very low engagement rate (< 5 reads per post on average)
     // Strategy: Reduce frequency instead of complete block - ensure at least 2-3 posts per week
-    // NOTE: This check is skipped for weekly_summary and monthly_stats posts (they always post)
-    // This check will be done later, after postType is determined
+    // BUT: Skip this check for weekly_summary and monthly_stats posts (they always post)
+    if (!isSpecialPost && avgReadsPerPost < 5 && thisMonthPosts.length > 20) {
       const daysSinceLastBlock = hoursSinceLastBlock / 24;
       const lastPostTime = await dbGet<string>('x_posting_last_post');
       const hoursSinceLastPost = lastPostTime 
