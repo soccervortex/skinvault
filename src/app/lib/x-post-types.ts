@@ -5,6 +5,7 @@
 
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getNextItemFromAllDatasets, getItemPrice, createAutomatedXPostWithImage } from '@/app/lib/inngest-functions';
+import { getTopMovers, getTrendingItems, PriceChange } from '@/app/lib/price-tracking';
 import crypto from 'crypto';
 
 export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert';
@@ -44,7 +45,7 @@ export function determinePostType(context: PostContext): PostType {
 }
 
 /**
- * Create weekly summary post
+ * Create weekly summary post with top movers
  */
 export async function createWeeklySummaryPost(): Promise<{ success: boolean; postId?: string; error?: string }> {
   try {
@@ -65,11 +66,33 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
     // Get most popular item type
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
     
-    const summaryText = `📊 Weekly CS2 Market Summary\n\n` +
-      `📈 Posts this week: ${recentPosts.length}\n` +
-      `🎮 Most featured: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n\n` +
-      `Track your CS2 inventory:\nskinvaults.online\n\n` +
-      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+    // Get top 5 movers (gainers and losers) from last 7 days
+    const { gainers, losers } = await getTopMovers('7d', 5);
+    
+    let summaryText = `📊 Weekly CS2 Market Summary\n\n`;
+    summaryText += `📈 Posts this week: ${recentPosts.length}\n`;
+    summaryText += `🎮 Most featured: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n\n`;
+    
+    // Add top gainers
+    if (gainers.length > 0) {
+      summaryText += `📈 Top Gainers (7d):\n`;
+      gainers.slice(0, 3).forEach((item, idx) => {
+        summaryText += `${idx + 1}. ${item.marketHashName}: +${item.changePercent.toFixed(1)}%\n`;
+      });
+      summaryText += `\n`;
+    }
+    
+    // Add top losers
+    if (losers.length > 0) {
+      summaryText += `📉 Top Losers (7d):\n`;
+      losers.slice(0, 3).forEach((item, idx) => {
+        summaryText += `${idx + 1}. ${item.marketHashName}: ${item.changePercent.toFixed(1)}%\n`;
+      });
+      summaryText += `\n`;
+    }
+    
+    summaryText += `Track your CS2 inventory:\nskinvaults.online\n\n`;
+    summaryText += `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the summary
     const X_API_KEY = process.env.X_API_KEY;

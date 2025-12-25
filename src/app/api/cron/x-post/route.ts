@@ -9,8 +9,10 @@ import {
   createMonthlyStatsPost,
   createItemHighlightPost,
   checkForMilestonesOrAlerts,
+  createTrendingAlertPost,
   PostType,
 } from '@/app/lib/x-post-types';
+import { updatePriceHistory } from '@/app/lib/price-tracking';
 
 /**
  * Vercel Cron Job: Automated X Posting
@@ -114,12 +116,11 @@ export async function GET(request: Request) {
       case 'alert':
         // Check for milestones/alerts first
         const milestoneCheck = await checkForMilestonesOrAlerts();
-        if (milestoneCheck.hasMilestone) {
-          // TODO: Create milestone post
-          console.log('[X Cron] Milestone found, but not implemented yet. Falling back to item highlight.');
-          postResult = await createItemHighlightPost(postHistory);
+        if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost && milestoneCheck.milestone?.type === 'trending_alert') {
+          console.log('[X Cron] Creating trending alert post...');
+          postResult = await createTrendingAlertPost(milestoneCheck.milestone.item);
         } else {
-          // No milestone, use regular item highlight
+          // No milestone/alert, use regular item highlight
           postResult = await createItemHighlightPost(postHistory);
         }
         break;
