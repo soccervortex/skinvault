@@ -111,6 +111,24 @@ export async function GET(request: Request) {
       await dbSet(discordConnectionsKey, connections);
       console.log(`[Discord Callback] ✅ Stored Discord connection for Steam ID ${steamId} -> Discord ID ${discordUser.id} (${discordUser.username})`);
       
+      // Trigger role sync for this user
+      try {
+        const syncResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/api/discord/sync-roles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            discordId: discordUser.id,
+            steamId: steamId,
+            reason: 'discord_connected',
+          }),
+        });
+        if (syncResponse.ok) {
+          console.log(`[Discord Callback] ✅ Triggered role sync for ${discordUser.username}`);
+        }
+      } catch (error) {
+        console.error('[Discord Callback] ⚠️ Failed to trigger role sync:', error);
+      }
+      
       // Queue welcome message for bot to process - THIS MUST RUN
       console.log(`[Discord Callback] 🚀 Starting welcome message queue process...`);
       

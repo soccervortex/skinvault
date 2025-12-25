@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, Twitter } from 'lucide-react';
 import Link from 'next/link';
+import { FaDiscord } from "react-icons/fa";
+import { FaTwitter } from "react-icons/fa";
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
 import ChatPreloader from './ChatPreloader';
@@ -544,8 +546,17 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
               title="Follow us on X (Twitter)"
             >
-              <Twitter size={10} />
+              <FaTwitter size={10} />
               X
+            </a>
+            <a
+              href="https://discord.gg/bGqf8bBhy5"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+            >
+              <FaDiscord size={10} /> 
+              Discord
             </a>
           </div>
           

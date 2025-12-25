@@ -119,6 +119,31 @@ export async function POST(request: Request) {
           const recentPurchases = existingPurchases.slice(-1000);
           await dbSet(purchasesKey, recentPurchases);
           console.log(`✅ Purchase ${session.id} recorded in history`);
+          
+          // Trigger Discord role sync if user has Discord connected
+          try {
+            const { dbGet } = await import('@/app/utils/database');
+            const discordConnectionsKey = 'discord_connections';
+            const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
+            const connection = connections[steamId];
+            
+            if (connection?.discordId) {
+              const syncResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/api/discord/sync-roles`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  discordId: connection.discordId,
+                  steamId: steamId,
+                  reason: 'pro_purchased',
+                }),
+              });
+              if (syncResponse.ok) {
+                console.log(`✅ Triggered Discord role sync for Pro purchase`);
+              }
+            }
+          } catch (error) {
+            console.error('⚠️ Failed to trigger Discord role sync:', error);
+          }
         } catch (error) {
           console.error('❌ Failed to record purchase history:', error);
           // Still continue - the Pro was granted

@@ -149,11 +149,11 @@ export async function createNewUserWelcomePost(users: NewUser | NewUser[]): Prom
     if (usersArray.length === 1) {
       // Single user - personalized message
       const user = usersArray[0];
-      const welcomeMessages = [
-        `Hey ${user.steamName}! 👋 Welcome to SkinVaults! 🎮\n\nWe're excited to have you join our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-        `Welcome ${user.steamName}! 🎉\n\nThanks for joining SkinVaults! We'd love to hear about your experience using our platform. What features are you most excited about? 🚀\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-        `Hey ${user.steamName}! 👋\n\nWelcome to the SkinVaults family! 🎮 Are you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-      ];
+    const welcomeMessages = [
+      `Hey ${user.steamName}! 👋 Welcome to SkinVaults! 🎮\n\nWe're excited to have you join our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+      `Welcome ${user.steamName}! 🎉\n\nThanks for joining SkinVaults! We'd love to hear about your experience using our platform. What features are you most excited about? 🚀\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+      `Hey ${user.steamName}! 👋\n\nWelcome to the SkinVaults family! 🎮 Are you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+    ];
       message = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
     } else {
       // Multiple users - combine in one post with all names
@@ -250,11 +250,11 @@ export async function createNewUserWelcomePost(users: NewUser | NewUser[]): Prom
       const now = new Date().toISOString();
       
       for (const user of usersArray) {
-        postedUsers[user.steamId] = {
-          posted: true,
-          postId,
+      postedUsers[user.steamId] = {
+        posted: true,
+        postId,
           postedAt: now,
-        };
+      };
       }
       
       await dbSet(NEW_USERS_POSTED_KEY, postedUsers);
