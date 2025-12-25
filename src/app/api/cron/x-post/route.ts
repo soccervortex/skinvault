@@ -11,6 +11,7 @@ import {
   checkForMilestonesOrAlerts,
   createTrendingAlertPost,
   createUserMilestonePost,
+  createFeatureAnnouncementPost,
   PostType,
 } from '@/app/lib/x-post-types';
 import { updatePriceHistory } from '@/app/lib/price-tracking';
