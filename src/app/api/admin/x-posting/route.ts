@@ -45,14 +45,18 @@ export async function POST(request: Request) {
       await dbSet(X_POSTING_ENABLED_KEY, enabled);
       
       // If enabling, trigger initial test post
+      let testPostError: string | null = null;
+      let testPostSuccess = false;
+      
       if (enabled) {
         // Trigger test post via internal API
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL 
           ? `https://${process.env.VERCEL_URL}` 
           : 'http://localhost:3000');
         
-        // Await the response to catch errors, but don't fail the main request
+        // Await the response to catch errors
         try {
+          console.log('[X Posting] Triggering test post to:', `${baseUrl}/api/x/post/test`);
           const testPostResponse = await fetch(`${baseUrl}/api/x/post/test`, {
             method: 'POST',
             headers: {
@@ -63,20 +67,38 @@ export async function POST(request: Request) {
           
           const testPostData = await testPostResponse.json();
           if (!testPostResponse.ok) {
-            console.error('[X Posting] Test post failed:', testPostData.error);
+            testPostError = testPostData.error || 'Test post failed';
+            console.error('[X Posting] Test post failed:', testPostError);
           } else {
+            testPostSuccess = true;
             console.log('[X Posting] Test post successful:', testPostData);
+            // Update last post timestamp
+            await dbSet(X_POSTING_LAST_POST_KEY, new Date().toISOString());
           }
-        } catch (error) {
+        } catch (error: any) {
+          testPostError = error.message || 'Failed to trigger test post';
           console.error('[X Posting] Failed to trigger test post:', error);
-          // Don't fail the main request if test post fails
         }
       }
+
+      return NextResponse.json({
+        success: true,
+        enabled: enabled,
+        testPostSuccess,
+        testPostError,
+        message: enabled 
+          ? (testPostSuccess 
+              ? 'X posting enabled and test post created successfully!' 
+              : testPostError 
+                ? `X posting enabled but test post failed: ${testPostError}`
+                : 'X posting enabled')
+          : 'X posting disabled',
+      });
     }
 
     return NextResponse.json({
       success: true,
-      enabled: typeof enabled === 'boolean' ? enabled : (await dbGet<boolean>(X_POSTING_ENABLED_KEY)) || false,
+      enabled: (await dbGet<boolean>(X_POSTING_ENABLED_KEY)) || false,
     });
   } catch (error) {
     console.error('Failed to update X posting status:', error);

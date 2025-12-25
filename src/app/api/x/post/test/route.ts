@@ -81,8 +81,24 @@ async function createXPost(weapon: { name: string; imageUrl: string; price: stri
       hasAccessTokenSecret: !!X_ACCESS_TOKEN_SECRET,
     });
 
+    // Check what credentials we have
     if (!X_BEARER_TOKEN && !X_ACCESS_TOKEN) {
-      const errorMsg = 'X API credentials not configured. Please set X_BEARER_TOKEN or X_ACCESS_TOKEN/X_ACCESS_TOKEN_SECRET in environment variables.';
+      const availableCreds = [];
+      if (X_API_KEY) availableCreds.push('X_API_KEY');
+      if (X_API_SECRET) availableCreds.push('X_API_SECRET');
+      
+      let errorMsg = 'X API credentials not configured. ';
+      if (availableCreds.length > 0) {
+        errorMsg += `Found partial OAuth credentials (${availableCreds.join(', ')}), but missing X_ACCESS_TOKEN and X_ACCESS_TOKEN_SECRET. `;
+      }
+      errorMsg += 'Please set X_BEARER_TOKEN (recommended) or complete OAuth 1.0a credentials (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET) in environment variables.';
+      console.error('[X Post]', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+    
+    // If using OAuth but missing Bearer token, we need full OAuth implementation
+    if (!X_BEARER_TOKEN && X_ACCESS_TOKEN && !X_ACCESS_TOKEN_SECRET) {
+      const errorMsg = 'OAuth 1.0a requires X_ACCESS_TOKEN_SECRET. Please set X_BEARER_TOKEN (recommended) or complete OAuth credentials.';
       console.error('[X Post]', errorMsg);
       return { success: false, error: errorMsg };
     }

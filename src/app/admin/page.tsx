@@ -496,11 +496,19 @@ export default function AdminPage() {
       } else {
         setXPostingEnabled(data.enabled || false);
         if (enabled) {
-          setXPostingMessage('X posting enabled! Test post will be created...');
+          // Show test post result
+          if (data.testPostSuccess) {
+            setXPostingMessage(data.message || 'X posting enabled and test post created successfully!');
+          } else if (data.testPostError) {
+            setXPostingError(`Test post failed: ${data.testPostError}`);
+            setXPostingMessage('X posting enabled, but test post failed. Check your X API credentials.');
+          } else {
+            setXPostingMessage(data.message || 'X posting enabled!');
+          }
         } else {
           setXPostingMessage('X posting disabled.');
         }
-        setTimeout(() => setXPostingMessage(null), 5000);
+        setTimeout(() => setXPostingMessage(null), 10000); // Show longer for errors
       }
     } catch (e: any) {
       setXPostingError(e?.message || "Request failed.");
