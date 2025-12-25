@@ -80,12 +80,38 @@ export async function GET(request: Request) {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const thisMonthPosts = postHistory.filter(p => p.date.startsWith(currentMonth));
     
-    if (thisMonthPosts.length >= 500) {
-      console.log('[X Cron] Monthly limit reached (500 posts), skipping');
+    // Smart limit: If we have low engagement (reads), reduce posting frequency
+    // Calculate average engagement rate from recent posts
+    const recentPosts = thisMonthPosts.slice(-30); // Last 30 posts
+    const totalReads = recentPosts.reduce((sum, p) => sum + (p.reads || 0), 0);
+    const avgReadsPerPost = recentPosts.length > 0 ? totalReads / recentPosts.length : 0;
+    
+    // If average reads per post is very low (< 10), reduce monthly limit
+    // This prevents spamming when engagement is low
+    const effectiveLimit = avgReadsPerPost < 10 && thisMonthPosts.length > 50 
+      ? Math.min(500, Math.max(50, Math.floor(thisMonthPosts.length * 1.1))) // Only 10% growth if low engagement
+      : 500; // Full limit if engagement is good
+    
+    if (thisMonthPosts.length >= effectiveLimit) {
+      console.log(`[X Cron] Monthly limit reached (${effectiveLimit} posts, avg reads: ${avgReadsPerPost.toFixed(1)}), skipping`);
       return NextResponse.json({ 
         skipped: true, 
         reason: 'monthly_limit_reached', 
-        count: thisMonthPosts.length 
+        count: thisMonthPosts.length,
+        effectiveLimit,
+        avgReadsPerPost: avgReadsPerPost.toFixed(1)
+      });
+    }
+    
+    // Additional check: If we're posting too much relative to engagement
+    // Skip posting if we have very low engagement rate (< 5 reads per post on average)
+    if (avgReadsPerPost < 5 && thisMonthPosts.length > 20) {
+      console.log(`[X Cron] Low engagement detected (${avgReadsPerPost.toFixed(1)} reads/post), skipping to avoid spam`);
+      return NextResponse.json({ 
+        skipped: true, 
+        reason: 'low_engagement', 
+        avgReadsPerPost: avgReadsPerPost.toFixed(1),
+        message: 'Posting paused due to low engagement rate'
       });
     }
 
@@ -147,7 +173,7 @@ export async function GET(request: Request) {
     }
 
     if (postResult.success && postResult.postId) {
-      // Update history
+      // Update history with initial reads count (0, will be updated later via engagement tracking)
       const newHistory = [
         ...postHistory,
         {
@@ -156,6 +182,7 @@ export async function GET(request: Request) {
           itemId: postResult.itemName || '',
           itemName: postResult.itemName || postType,
           itemType: postType,
+          reads: 0, // Initial reads count, will be updated by engagement tracking
         },
       ];
       await dbSet('x_posting_history', newHistory);
