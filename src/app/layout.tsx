@@ -147,12 +147,41 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+async function getHomePageRating() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://skinvaults.online');
+    
+    const res = await fetch(`${baseUrl}/api/reviews/aggregate`, {
+      cache: 'no-store',
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data.aggregateRating && data.aggregateRating > 0 && data.totalReviews > 0) {
+        return {
+          rating: data.aggregateRating,
+          count: data.totalReviews,
+        };
+      }
+    }
+  } catch (error) {
+    // Silently fail - ratings are optional
+  }
+  
+  return null;
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+  
+  // Fetch rating for homepage structured data
+  // Note: This will be included on all pages, but Google only displays ratings on the canonical homepage URL
+  const ratingData = await getHomePageRating();
   
   // Comprehensive structured data for GEO (Generative Engine Optimization)
   const organizationSchema = {
@@ -192,13 +221,6 @@ export default function RootLayout({
       "price": "0",
       "priceCurrency": "USD",
       "availability": "https://schema.org/InStock"
-    },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "0",
-      "ratingCount": "0",
-      "bestRating": "5",
-      "worstRating": "1"
     },
     "featureList": [
       "CS2 Inventory Tracking",
@@ -316,19 +338,13 @@ export default function RootLayout({
   };
 
   // Review aggregation schema - references Trustpilot and Sitejabber
-  const reviewSchema = {
+  // Aggregate rating is dynamically fetched from API (aggregates both Trustpilot and Sitejabber)
+  // Google will only display ratings on the canonical homepage URL
+  const reviewSchema: any = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "SkinVaults",
     "url": baseUrl,
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "0",
-      "ratingCount": "0",
-      "bestRating": "5",
-      "worstRating": "1",
-      "reviewCount": "0"
-    },
     "review": [
       {
         "@type": "Review",
@@ -356,6 +372,28 @@ export default function RootLayout({
       }
     ]
   };
+
+  // Add aggregateRating only if we have valid rating data from API
+  if (ratingData) {
+    reviewSchema.aggregateRating = {
+      "@type": "AggregateRating",
+      "ratingValue": ratingData.rating.toFixed(1),
+      "ratingCount": ratingData.count.toString(),
+      "reviewCount": ratingData.count.toString(),
+      "bestRating": "5",
+      "worstRating": "1"
+    };
+    
+    // Also add rating to SoftwareApplication schema
+    (softwareApplicationSchema as any).aggregateRating = {
+      "@type": "AggregateRating",
+      "ratingValue": ratingData.rating.toFixed(1),
+      "ratingCount": ratingData.count.toString(),
+      "reviewCount": ratingData.count.toString(),
+      "bestRating": "5",
+      "worstRating": "1"
+    };
+  }
 
   const structuredDataArray = [organizationSchema, softwareApplicationSchema, faqSchema, reviewSchema];
 

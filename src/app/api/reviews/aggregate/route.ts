@@ -22,14 +22,14 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      aggregateRating: null,
+      aggregateRating: 0,
       totalReviews: 0,
       ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
     });
   } catch (error) {
     console.error('Aggregate reviews API error:', error);
     return NextResponse.json({
-      aggregateRating: null,
+      aggregateRating: 0,
       totalReviews: 0,
       ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
     });
