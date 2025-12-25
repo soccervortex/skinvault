@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ skipped: true, reason: 'disabled' });
     }
 
-    const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+    const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string; reads?: number }>>('x_posting_history')) || [];
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
@@ -179,9 +179,20 @@ export async function GET(request: Request) {
         }
         console.log(`[X Cron] Low engagement - allowing post (2 days since last post)`);
       } else {
-        // After 14 days: Resume normal posting (engagement might have improved, or we accept low engagement)
-        console.log(`[X Cron] Low engagement persists but 14 days passed, resuming normal posting schedule`);
-        await dbSet('x_posting_last_block', null); // Clear block
+        // After 14 days: Keep reduced frequency (1 post per 2 days) if engagement still low
+        // Don't clear block - keep reduced frequency to prevent spam
+        if (daysSinceLastPost < 2) {
+          console.log(`[X Cron] Low engagement persists after 14 days - keeping reduced frequency: last post ${daysSinceLastPost.toFixed(1)} days ago, need 2 days`);
+          return NextResponse.json({ 
+            skipped: true, 
+            reason: 'low_engagement_reduced_frequency', 
+            avgReadsPerPost: avgReadsPerPost.toFixed(1),
+            daysSinceLastPost: daysSinceLastPost.toFixed(1),
+            message: `Posting reduced to 1 post per 2 days due to persistent low engagement. Next post in ${(2 - daysSinceLastPost).toFixed(1)} days.`
+          });
+        }
+        console.log(`[X Cron] Low engagement persists after 14 days - allowing post (2 days since last post, reduced frequency maintained)`);
+        // Continue with posting (reduced frequency maintained)
       }
       
       // Set block timestamp if not already set
