@@ -188,6 +188,9 @@ export async function GET(request: Request) {
     }
 
     if (postResult.success && postResult.postId) {
+      // Clear any previous block (posting succeeded, engagement might be improving)
+      await dbSet('x_posting_last_block', null);
+      
       // Update history with initial reads count (0, will be updated later via engagement tracking)
       const newHistory = [
         ...postHistory,
