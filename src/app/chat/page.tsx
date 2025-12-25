@@ -260,6 +260,25 @@ export default function ChatPage() {
     
     loadUser();
     
+    // Mark all DMs as read when chat page loads (user is viewing chat)
+    const markChatAsRead = () => {
+      try {
+        const stored = window.localStorage.getItem('steam_user');
+        const parsedUser = stored ? JSON.parse(stored) : null;
+        if (parsedUser?.steamId) {
+          // Mark all DMs as read when user visits chat page
+          markAllDMsAsRead(parsedUser.steamId);
+          // Also update last check time to prevent re-adding unread counts
+          updateLastCheckTime();
+        }
+      } catch {
+        // Ignore errors
+      }
+    };
+    
+    // Mark as read when page loads
+    markChatAsRead();
+    
     // Check for ban status and auto-logout if banned
     const checkBanStatus = async () => {
       try {

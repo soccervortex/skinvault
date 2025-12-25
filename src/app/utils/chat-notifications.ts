@@ -252,31 +252,49 @@ export function updateLastCheckTime(): void {
 }
 
 /**
- * Mark all DMs as read (when user views DMs tab)
+ * Mark all DMs as read (when user views DMs tab or chat page)
  */
 export function markAllDMsAsRead(currentUserId: string): void {
   try {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !currentUserId) return;
     
     const unreadDms = JSON.parse(localStorage.getItem(UNREAD_DMS_KEY) || '{}');
+    let hasChanges = false;
     
     // Mark all DMs where current user is a participant as read
     Object.keys(unreadDms).forEach(dmId => {
       // Extract participants from DM ID (format: steamId1_steamId2)
-      const participants = dmId.split('_');
-      if (participants.includes(currentUserId)) {
-        unreadDms[dmId].count = 0;
-        unreadDms[dmId].lastRead = Date.now();
-        unreadDms[dmId].userId = currentUserId; // Update userId to current user
+      const participants = dmId.split('_').filter(Boolean);
+      
+      // Check if current user is a participant (handle both sorted and unsorted DM IDs)
+      const isParticipant = participants.length === 2 && participants.includes(currentUserId);
+      
+      // Always mark as read if DM ID is valid format (even if participant check fails, still mark it)
+      // This ensures DMs are always marked as read when viewed
+      if (participants.length === 2) {
+        // Only update if count is not already 0
+        if (unreadDms[dmId].count > 0) {
+          unreadDms[dmId].count = 0;
+          unreadDms[dmId].lastRead = Date.now();
+          unreadDms[dmId].userId = currentUserId; // Update userId to current user
+          hasChanges = true;
+        } else if (unreadDms[dmId].userId !== currentUserId) {
+          // Update userId even if count is 0 (to ensure correct user tracking)
+          unreadDms[dmId].userId = currentUserId;
+          hasChanges = true;
+        }
       }
     });
     
-    localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
-    
-    // Dispatch event for other components
-    window.dispatchEvent(new CustomEvent('chat-unread-updated'));
-  } catch {
-    // Ignore errors
+    if (hasChanges) {
+      localStorage.setItem(UNREAD_DMS_KEY, JSON.stringify(unreadDms));
+      
+      // Dispatch event for other components
+      window.dispatchEvent(new CustomEvent('chat-unread-updated'));
+    }
+  } catch (error) {
+    // Log error for debugging but don't throw
+    console.warn('Error marking all DMs as read:', error);
   }
 }
 
