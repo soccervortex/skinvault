@@ -117,31 +117,40 @@ export const automatedXPosting = inngest.createFunction(
           return { skipped: true, reason: 'disabled' };
         }
 
-        // Check monthly post count (500 limit)
         const { dbGet: dbGetUtil, dbSet } = await import('@/app/utils/database');
         const postHistory = (await dbGetUtil<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
-        
-        // Filter posts from current month
         const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        // Check if we already posted today (check database first)
+        const todayPosts = postHistory.filter(p => {
+          const postDate = new Date(p.date);
+          const postDay = `${postDate.getFullYear()}-${String(postDate.getMonth() + 1).padStart(2, '0')}-${String(postDate.getDate()).padStart(2, '0')}`;
+          return postDay === today;
+        });
+
+        if (todayPosts.length > 0) {
+          console.log(`[X Auto Post] Already posted ${todayPosts.length} time(s) today, skipping`);
+          return { skipped: true, reason: 'already_posted_today', count: todayPosts.length };
+        }
+
+        // Also check X API to see if we posted today (double check)
+        const alreadyPostedOnX = await step.run('check-x-profile', async () => {
+          return await checkIfPostedTodayOnX();
+        });
+
+        if (alreadyPostedOnX) {
+          console.log('[X Auto Post] Found post on X profile today, skipping');
+          return { skipped: true, reason: 'already_posted_on_x_today' };
+        }
+
+        // Check monthly post count (500 limit)
         const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const thisMonthPosts = postHistory.filter(p => p.date.startsWith(currentMonth));
         
         if (thisMonthPosts.length >= 500) {
           console.log('[X Auto Post] Monthly limit reached (500 posts), skipping');
           return { skipped: true, reason: 'monthly_limit_reached', count: thisMonthPosts.length };
-        }
-
-        // Check last post time (avoid posting too frequently)
-        const lastPost = await dbGetUtil<string>('x_posting_last_post');
-        if (lastPost) {
-          const lastPostDate = new Date(lastPost);
-          const hoursSinceLastPost = (now.getTime() - lastPostDate.getTime()) / (1000 * 60 * 60);
-          
-          // Minimum 4 hours between posts
-          if (hoursSinceLastPost < 4) {
-            console.log(`[X Auto Post] Too soon since last post (${hoursSinceLastPost.toFixed(1)}h), skipping`);
-            return { skipped: true, reason: 'too_soon', hoursSince: hoursSinceLastPost };
-          }
         }
 
         // Get next item from all datasets (weapons, skins, stickers, agents, crates)
