@@ -111,22 +111,82 @@ export async function GET(request: Request) {
     
     // Additional check: If we're posting too much relative to engagement
     // Skip posting if we have very low engagement rate (< 5 reads per post on average)
-    // BUT: Only block for 24 hours, then retry to see if engagement improved
+    // Strategy: Reduce frequency instead of complete block - ensure at least 2-3 posts per week
     if (avgReadsPerPost < 5 && thisMonthPosts.length > 20) {
-      // If we blocked less than 24 hours ago, skip this attempt
-      if (hoursSinceLastBlock < 24) {
-        console.log(`[X Cron] Low engagement detected (${avgReadsPerPost.toFixed(1)} reads/post), still blocked (${hoursSinceLastBlock.toFixed(1)}h ago), skipping`);
-        return NextResponse.json({ 
-          skipped: true, 
-          reason: 'low_engagement_blocked', 
-          avgReadsPerPost: avgReadsPerPost.toFixed(1),
-          hoursSinceBlock: hoursSinceLastBlock.toFixed(1),
-          message: `Posting paused due to low engagement. Will retry in ${(24 - hoursSinceLastBlock).toFixed(1)} hours.`
-        });
+      const daysSinceLastBlock = hoursSinceLastBlock / 24;
+      const lastPostTime = await dbGet<string>('x_posting_last_post');
+      const hoursSinceLastPost = lastPostTime 
+        ? (now.getTime() - new Date(lastPostTime).getTime()) / (1000 * 60 * 60)
+        : Infinity;
+      const daysSinceLastPost = hoursSinceLastPost / 24;
+      
+      // Smart frequency reduction:
+      // - First 2 days: Complete block (skip all posts)
+      // - After 2 days: Allow 1 post per 3 days (min 2-3 posts per week)
+      // - After 7 days: Allow 1 post per 2 days (slightly more frequent)
+      // - After 14 days: Resume normal posting (engagement might have improved)
+      
+      if (daysSinceLastBlock < 2) {
+        // First 2 days: Complete block
+        if (hoursSinceLastBlock < 24) {
+          console.log(`[X Cron] Low engagement (${avgReadsPerPost.toFixed(1)} reads/post), blocked (${hoursSinceLastBlock.toFixed(1)}h ago), skipping`);
+          return NextResponse.json({ 
+            skipped: true, 
+            reason: 'low_engagement_blocked', 
+            avgReadsPerPost: avgReadsPerPost.toFixed(1),
+            hoursSinceBlock: hoursSinceLastBlock.toFixed(1),
+            message: `Posting paused due to low engagement. Will retry in ${(24 - hoursSinceLastBlock).toFixed(1)} hours.`
+          });
+        } else {
+          // 24h passed, but still in 2-day block period - check if we can post (reduced frequency)
+          if (daysSinceLastPost < 3) {
+            console.log(`[X Cron] Low engagement - reduced frequency: last post ${daysSinceLastPost.toFixed(1)} days ago, need 3 days`);
+            return NextResponse.json({ 
+              skipped: true, 
+              reason: 'low_engagement_reduced_frequency', 
+              avgReadsPerPost: avgReadsPerPost.toFixed(1),
+              daysSinceLastPost: daysSinceLastPost.toFixed(1),
+              message: `Posting reduced to 1 post per 3 days. Next post in ${(3 - daysSinceLastPost).toFixed(1)} days.`
+            });
+          }
+          // Allow post (3 days passed)
+          console.log(`[X Cron] Low engagement - allowing post (3 days since last post)`);
+        }
+      } else if (daysSinceLastBlock < 7) {
+        // After 2 days: 1 post per 3 days (ensures 2-3 posts per week)
+        if (daysSinceLastPost < 3) {
+          console.log(`[X Cron] Low engagement - reduced frequency: last post ${daysSinceLastPost.toFixed(1)} days ago, need 3 days`);
+          return NextResponse.json({ 
+            skipped: true, 
+            reason: 'low_engagement_reduced_frequency', 
+            avgReadsPerPost: avgReadsPerPost.toFixed(1),
+            daysSinceLastPost: daysSinceLastPost.toFixed(1),
+            message: `Posting reduced to 1 post per 3 days. Next post in ${(3 - daysSinceLastPost).toFixed(1)} days.`
+          });
+        }
+        console.log(`[X Cron] Low engagement - allowing post (3 days since last post)`);
+      } else if (daysSinceLastBlock < 14) {
+        // After 7 days: 1 post per 2 days (slightly more frequent)
+        if (daysSinceLastPost < 2) {
+          console.log(`[X Cron] Low engagement - reduced frequency: last post ${daysSinceLastPost.toFixed(1)} days ago, need 2 days`);
+          return NextResponse.json({ 
+            skipped: true, 
+            reason: 'low_engagement_reduced_frequency', 
+            avgReadsPerPost: avgReadsPerPost.toFixed(1),
+            daysSinceLastPost: daysSinceLastPost.toFixed(1),
+            message: `Posting reduced to 1 post per 2 days. Next post in ${(2 - daysSinceLastPost).toFixed(1)} days.`
+          });
+        }
+        console.log(`[X Cron] Low engagement - allowing post (2 days since last post)`);
       } else {
-        // 24 hours passed, retry to see if engagement improved
-        console.log(`[X Cron] Low engagement detected (${avgReadsPerPost.toFixed(1)} reads/post), but 24h passed, retrying...`);
-        // Continue with posting attempt (engagement might have improved)
+        // After 14 days: Resume normal posting (engagement might have improved, or we accept low engagement)
+        console.log(`[X Cron] Low engagement persists but 14 days passed, resuming normal posting schedule`);
+        await dbSet('x_posting_last_block', null); // Clear block
+      }
+      
+      // Set block timestamp if not already set
+      if (!lastBlockTime) {
+        await dbSet('x_posting_last_block', now.toISOString());
       }
     }
 
