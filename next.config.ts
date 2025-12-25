@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from '@sentry/nextjs';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -19,6 +20,10 @@ const nextConfig: NextConfig = {
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react'],
+  },
+  // Turbopack configuration
+  turbopack: {
+    root: path.resolve(__dirname),
   },
   // Performance optimizations
   compress: true,
