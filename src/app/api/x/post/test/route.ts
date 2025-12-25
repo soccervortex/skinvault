@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet } from '@/app/utils/database';
+import crypto from 'crypto';
 
 // POST: Create test post (weapon with image)
 export async function POST(request: Request) {
@@ -63,42 +64,94 @@ async function getPopularWeapon() {
   return popularWeapons[Math.floor(Math.random() * popularWeapons.length)];
 }
 
+// OAuth 1.0a signature generation
+function generateOAuthSignature(
+  method: string,
+  url: string,
+  params: Record<string, string>,
+  consumerSecret: string,
+  tokenSecret: string
+): string {
+  // Create parameter string
+  const sortedParams = Object.keys(params)
+    .sort()
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+    .join('&');
+
+  // Create signature base string
+  const signatureBaseString = [
+    method.toUpperCase(),
+    encodeURIComponent(url),
+    encodeURIComponent(sortedParams),
+  ].join('&');
+
+  // Create signing key
+  const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
+
+  // Generate signature
+  const signature = crypto
+    .createHmac('sha1', signingKey)
+    .update(signatureBaseString)
+    .digest('base64');
+
+  return signature;
+}
+
+// Generate OAuth 1.0a authorization header
+function generateOAuthHeader(
+  method: string,
+  url: string,
+  apiKey: string,
+  apiSecret: string,
+  accessToken: string,
+  accessTokenSecret: string
+): string {
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: apiKey,
+    oauth_token: accessToken,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_version: '1.0',
+  };
+
+  // Generate signature (only OAuth parameters, not body)
+  const signature = generateOAuthSignature(method, url, oauthParams, apiSecret, accessTokenSecret);
+  oauthParams.oauth_signature = signature;
+
+  // Build authorization header
+  const authHeader = 'OAuth ' + Object.keys(oauthParams)
+    .sort()
+    .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+    .join(', ');
+
+  return authHeader;
+}
+
 async function createXPost(weapon: { name: string; imageUrl: string; price: string }) {
   try {
-    // X API v2 post with media
-    // Support both Bearer token and OAuth 1.0a
-    const X_BEARER_TOKEN = process.env.X_BEARER_TOKEN;
+    // X API v2 requires OAuth 1.0a User Context or OAuth 2.0 User Context for posting
     const X_API_KEY = process.env.X_API_KEY;
     const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
     const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
     const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
 
     console.log('[X Post] Checking credentials...', {
-      hasBearer: !!X_BEARER_TOKEN,
       hasApiKey: !!X_API_KEY,
       hasApiSecret: !!X_API_SECRET,
       hasAccessToken: !!X_ACCESS_TOKEN,
       hasAccessTokenSecret: !!X_ACCESS_TOKEN_SECRET,
     });
 
-    // Check what credentials we have
-    if (!X_BEARER_TOKEN && !X_ACCESS_TOKEN) {
-      const availableCreds = [];
-      if (X_API_KEY) availableCreds.push('X_API_KEY');
-      if (X_API_SECRET) availableCreds.push('X_API_SECRET');
+    // Check if we have all required OAuth 1.0a credentials
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      const missing = [];
+      if (!X_API_KEY) missing.push('X_API_KEY');
+      if (!X_API_SECRET) missing.push('X_API_SECRET');
+      if (!X_ACCESS_TOKEN) missing.push('X_ACCESS_TOKEN');
+      if (!X_ACCESS_TOKEN_SECRET) missing.push('X_ACCESS_TOKEN_SECRET');
       
-      let errorMsg = 'X API credentials not configured. ';
-      if (availableCreds.length > 0) {
-        errorMsg += `Found partial OAuth credentials (${availableCreds.join(', ')}), but missing X_ACCESS_TOKEN and X_ACCESS_TOKEN_SECRET. `;
-      }
-      errorMsg += 'Please set X_BEARER_TOKEN (recommended) or complete OAuth 1.0a credentials (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET) in environment variables.';
-      console.error('[X Post]', errorMsg);
-      return { success: false, error: errorMsg };
-    }
-    
-    // If using OAuth but missing Bearer token, we need full OAuth implementation
-    if (!X_BEARER_TOKEN && X_ACCESS_TOKEN && !X_ACCESS_TOKEN_SECRET) {
-      const errorMsg = 'OAuth 1.0a requires X_ACCESS_TOKEN_SECRET. Please set X_BEARER_TOKEN (recommended) or complete OAuth credentials.';
+      const errorMsg = `Missing required OAuth 1.0a credentials: ${missing.join(', ')}. Please set all four: X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, and X_ACCESS_TOKEN_SECRET in environment variables.`;
       console.error('[X Post]', errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -106,28 +159,30 @@ async function createXPost(weapon: { name: string; imageUrl: string; price: stri
     // Create post text (280 char limit for X)
     const postText = `🎮 ${weapon.name}\n\n💰 Price: ${weapon.price}\n\nTrack your CS2 inventory:\nskinvaults.online\n\n#CS2 #CSGO #Skins`;
 
-    console.log('[X Post] Attempting to post:', postText.substring(0, 50) + '...');
+    console.log('[X Post] Attempting to post with OAuth 1.0a:', postText.substring(0, 50) + '...');
 
-    // Use Bearer token if available (simpler)
-    let authHeader = '';
-    if (X_BEARER_TOKEN) {
-      authHeader = `Bearer ${X_BEARER_TOKEN}`;
-    } else if (X_ACCESS_TOKEN && X_ACCESS_TOKEN_SECRET) {
-      // OAuth 1.0a would require signing - for now, we'll use Bearer token approach
-      // This is a simplified version - full OAuth 1.0a requires a library
-      console.warn('[X Post] OAuth 1.0a not fully implemented, using Bearer token approach');
-      authHeader = `Bearer ${X_ACCESS_TOKEN}`;
-    }
+    const url = 'https://api.x.com/2/tweets';
+    const body = {
+      text: postText.substring(0, 280), // Ensure within limit
+    };
 
-    const postResponse = await fetch('https://api.x.com/2/tweets', {
+    // Generate OAuth 1.0a authorization header
+    const authHeader = generateOAuthHeader(
+      'POST',
+      url,
+      X_API_KEY,
+      X_API_SECRET,
+      X_ACCESS_TOKEN,
+      X_ACCESS_TOKEN_SECRET
+    );
+
+    const postResponse = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': authHeader,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        text: postText.substring(0, 280), // Ensure within limit
-      }),
+      body: JSON.stringify(body),
     });
 
     const responseText = await postResponse.text();
