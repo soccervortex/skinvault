@@ -13,10 +13,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if X posting is enabled
+    // For test posts, we allow them even if automated posting is disabled
+    // This allows owners to test the posting functionality
+    // Check if X posting is enabled (just for logging, not blocking)
     const enabled = (await dbGet<boolean>('x_posting_enabled')) || false;
     if (!enabled) {
-      return NextResponse.json({ error: 'X posting is not enabled' }, { status: 400 });
+      console.log('[X Post Test] X posting is disabled, but allowing test post for owner');
     }
 
     // Get an item from all datasets (weapons, skins, stickers, agents, crates)
