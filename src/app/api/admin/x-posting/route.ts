@@ -15,8 +15,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const enabled = (await dbGet<boolean>(X_POSTING_ENABLED_KEY, false)) || false;
-    const lastPost = await dbGet<string>(X_POSTING_LAST_POST_KEY, null);
+    const enabled = (await dbGet<boolean>(X_POSTING_ENABLED_KEY)) || false;
+    const lastPost = await dbGet<string>(X_POSTING_LAST_POST_KEY);
 
     return NextResponse.json({
       enabled,
