@@ -95,6 +95,8 @@ export default function AdminPage() {
   const [xPostingMessage, setXPostingMessage] = useState<string | null>(null);
   const [xPostingError, setXPostingError] = useState<string | null>(null);
   const [xPostingLastPost, setXPostingLastPost] = useState<string | null>(null);
+  const [xPostingStatus, setXPostingStatus] = useState<any>(null);
+  const [triggeringPost, setTriggeringPost] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -495,6 +497,7 @@ export default function AdminPage() {
         setXPostingError(data?.error || `Failed to ${enabled ? 'enable' : 'disable'} X posting.`);
       } else {
         setXPostingEnabled(data.enabled || false);
+        setXPostingLastPost(data.lastPost || null);
         if (enabled) {
           // Show test post result
           if (data.testPostSuccess) {
@@ -512,6 +515,45 @@ export default function AdminPage() {
       }
     } catch (e: any) {
       setXPostingError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleManualTrigger = async () => {
+    if (!confirm('Are you sure you want to manually trigger a post now? This will create a post immediately.')) {
+      return;
+    }
+
+    setTriggeringPost(true);
+    setXPostingError(null);
+    setXPostingMessage(null);
+
+    try {
+      const res = await fetch(`/api/x/post/trigger`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ adminSteamId: user?.steamId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setXPostingError(data?.error || 'Failed to trigger post.');
+      } else {
+        setXPostingMessage(`Post created successfully! ${data.postUrl ? `View: ${data.postUrl}` : ''}`);
+        setXPostingLastPost(new Date().toISOString());
+        // Reload status
+        const statusRes = await fetch(`/api/x/post/trigger?adminSteamId=${user?.steamId}`);
+        const statusData = await statusRes.json();
+        if (statusRes.ok) {
+          setXPostingStatus(statusData);
+        }
+        setTimeout(() => setXPostingMessage(null), 10000);
+      }
+    } catch (e: any) {
+      setXPostingError(e?.message || "Request failed.");
+    } finally {
+      setTriggeringPost(false);
     }
   };
 
@@ -1817,6 +1859,19 @@ export default function AdminPage() {
                       Last post: {new Date(xPostingLastPost).toLocaleString()}
                     </p>
                   )}
+                  {xPostingStatus && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-[9px] md:text-[10px] text-gray-500">
+                        Status: <span className="text-blue-400">{xPostingStatus.status}</span>
+                      </p>
+                      <p className="text-[9px] md:text-[10px] text-gray-500">
+                        Today: {xPostingStatus.todayPosts || 0} posts | This month: {xPostingStatus.monthlyPosts || 0}/{xPostingStatus.monthlyLimit || 500}
+                      </p>
+                      <p className="text-[9px] md:text-[10px] text-gray-500">
+                        Next: {xPostingStatus.nextScheduledTime}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => handleXPostingToggle(!xPostingEnabled)}
@@ -1833,6 +1888,35 @@ export default function AdminPage() {
                   />
                 </button>
               </div>
+
+              {xPostingEnabled && (
+                <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-gray-300">
+                        Manual Trigger
+                      </span>
+                      <p className="text-[9px] md:text-[10px] text-gray-500 mt-1">
+                        Manually trigger a post now (bypasses schedule)
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleManualTrigger}
+                      disabled={triggeringPost}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white text-[10px] md:text-[11px] font-black uppercase rounded-lg transition-all"
+                    >
+                      {triggeringPost ? (
+                        <>
+                          <Loader2 size={12} className="inline animate-spin mr-1" />
+                          Posting...
+                        </>
+                      ) : (
+                        'Trigger Post Now'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

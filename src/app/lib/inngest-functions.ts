@@ -231,7 +231,7 @@ export const automatedXPosting = inngest.createFunction(
  * Get next item from ALL CS2 datasets (weapons, skins, stickers, agents, crates)
  * Cycles through all items intelligently to avoid duplicates
  */
-async function getNextItemFromAllDatasets(
+export async function getNextItemFromAllDatasets(
   postHistory: Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>
 ): Promise<{ id: string; name: string; marketHashName: string; imageUrl: string; type: string } | null> {
   try {
@@ -304,7 +304,7 @@ async function getNextItemFromAllDatasets(
 /**
  * Get real price from Steam API
  */
-async function getItemPrice(marketHashName: string): Promise<{ price: string; currency: string } | null> {
+export async function getItemPrice(marketHashName: string): Promise<{ price: string; currency: string } | null> {
   try {
     if (!marketHashName) return null;
 
@@ -342,7 +342,7 @@ async function getItemPrice(marketHashName: string): Promise<{ price: string; cu
 /**
  * Create an automated X post with image (without owner check)
  */
-async function createAutomatedXPostWithImage(item: { 
+export async function createAutomatedXPostWithImage(item: { 
   name: string; 
   imageUrl: string; 
   price: string; 
@@ -619,7 +619,7 @@ async function uploadImageToX(
 /**
  * Check if we already posted today by checking X API profile
  */
-async function checkIfPostedTodayOnX(): Promise<boolean> {
+export async function checkIfPostedTodayOnX(): Promise<boolean> {
   try {
     const X_API_KEY = process.env.X_API_KEY;
     const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
