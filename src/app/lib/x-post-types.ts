@@ -34,17 +34,17 @@ interface PostContext {
 export function determinePostType(context: PostContext): PostType {
   const { dayOfWeek, hour, minute, isFirstOfMonth } = context;
 
-  // 1st of the month at 9 AM (8:00 UTC) = Monthly stats
-  // Only post on best days (Tuesday-Thursday) if possible
-  if (isFirstOfMonth && hour === 8 && minute === 0) {
-    // If 1st falls on Tuesday-Thursday, post at 11 AM (10:00 UTC) instead
-    if (dayOfWeek >= 2 && dayOfWeek <= 4) {
-      if (hour === 10 && minute === 0) {
-        return 'monthly_stats';
-      }
-      return 'item_highlight'; // Wait for better time
+  // Monthly stats: 1st of the month
+  // If 1st falls on Tuesday-Thursday (best days), post at 11 AM (10:00 UTC)
+  // Otherwise, post at 9 AM (8:00 UTC) as fallback
+  if (isFirstOfMonth) {
+    if (dayOfWeek >= 2 && dayOfWeek <= 4 && hour === 10 && minute === 0) {
+      // Best days: Tuesday-Thursday at 11 AM
+      return 'monthly_stats';
+    } else if (hour === 8 && minute === 0) {
+      // Fallback: Other days at 9 AM
+      return 'monthly_stats';
     }
-    return 'monthly_stats';
   }
 
   // Weekly summary: Monday or Sunday at 8 PM (19:00 UTC)
