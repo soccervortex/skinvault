@@ -89,6 +89,11 @@ export default function AdminPage() {
   const [loadingChatControl, setLoadingChatControl] = useState(true);
   const [chatControlMessage, setChatControlMessage] = useState<string | null>(null);
   const [chatControlError, setChatControlError] = useState<string | null>(null);
+  const [xPostingEnabled, setXPostingEnabled] = useState(false);
+  const [loadingXPosting, setLoadingXPosting] = useState(true);
+  const [xPostingMessage, setXPostingMessage] = useState<string | null>(null);
+  const [xPostingError, setXPostingError] = useState<string | null>(null);
+  const [xPostingLastPost, setXPostingLastPost] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -165,6 +170,24 @@ export default function AdminPage() {
       }
     };
     loadChatControl();
+
+    const loadXPosting = async () => {
+      if (!userIsOwner) return;
+      setLoadingXPosting(true);
+      try {
+        const res = await fetch(`/api/admin/x-posting?adminSteamId=${user?.steamId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setXPostingEnabled(data.enabled || false);
+          setXPostingLastPost(data.lastPost || null);
+        }
+      } catch (e: any) {
+        console.error("Failed to load X posting status:", e);
+      } finally {
+        setLoadingXPosting(false);
+      }
+    };
+    loadXPosting();
 
     const loadPurchases = async () => {
       if (!userIsOwner) return;
@@ -450,6 +473,66 @@ export default function AdminPage() {
       }
     } catch (e: any) {
       setChatControlError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleXPostingToggle = async (enabled: boolean) => {
+    setXPostingError(null);
+    setXPostingMessage(null);
+
+    try {
+      const res = await fetch(`/api/admin/x-posting?adminSteamId=${user?.steamId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setXPostingError(data?.error || `Failed to ${enabled ? 'enable' : 'disable'} X posting.`);
+      } else {
+        setXPostingEnabled(data.enabled || false);
+        if (enabled) {
+          setXPostingMessage('X posting enabled! Test post will be created...');
+        } else {
+          setXPostingMessage('X posting disabled.');
+        }
+        setTimeout(() => setXPostingMessage(null), 5000);
+      }
+    } catch (e: any) {
+      setXPostingError(e?.message || "Request failed.");
+    }
+  };
+
+  const handleXPostingToggle = async (enabled: boolean) => {
+    setXPostingError(null);
+    setXPostingMessage(null);
+
+    try {
+      const res = await fetch(`/api/admin/x-posting?adminSteamId=${user?.steamId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setXPostingError(data?.error || `Failed to ${enabled ? 'enable' : 'disable'} X posting.`);
+      } else {
+        setXPostingEnabled(data.enabled || false);
+        if (enabled) {
+          setXPostingMessage('X posting enabled! Test post will be created...');
+        } else {
+          setXPostingMessage('X posting disabled.');
+        }
+        setTimeout(() => setXPostingMessage(null), 5000);
+      }
+    } catch (e: any) {
+      setXPostingError(e?.message || "Request failed.");
     }
   };
 
@@ -1699,6 +1782,74 @@ export default function AdminPage() {
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       dmChatDisabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* X Posting Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+              <Twitter className="text-blue-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Social Media
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                X (Twitter) Posting
+              </h2>
+            </div>
+          </div>
+
+          {loadingXPosting ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {xPostingMessage && (
+                <div className="bg-blue-500/10 border border-blue-500/40 rounded-xl md:rounded-2xl p-3 text-[10px] md:text-[11px] text-blue-400">
+                  {xPostingMessage}
+                </div>
+              )}
+              {xPostingError && (
+                <div className="bg-red-500/10 border border-red-500/40 rounded-xl md:rounded-2xl p-3 text-[10px] md:text-[11px] text-red-400">
+                  {xPostingError}
+                </div>
+              )}
+
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-gray-300">
+                    X Posting
+                  </span>
+                  <p className="text-[9px] md:text-[10px] text-gray-500 mt-1">
+                    {xPostingEnabled 
+                      ? 'X posting is enabled. Posts will be created automatically.' 
+                      : 'X posting is disabled. Enable to start posting.'}
+                  </p>
+                  {xPostingLastPost && (
+                    <p className="text-[9px] md:text-[10px] text-gray-600 mt-1">
+                      Last post: {new Date(xPostingLastPost).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleXPostingToggle(!xPostingEnabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    xPostingEnabled
+                      ? "bg-blue-600"
+                      : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      xPostingEnabled ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
