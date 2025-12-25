@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, Twitter } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star } from 'lucide-react';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
-import { FaTwitter } from "react-icons/fa";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXTwitter } from "@fortawesome/free-brands-svg-icons";
 import { FaInstagram } from "react-icons/fa";
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -374,8 +375,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
                 >
-                  <FaTwitter size={10} />
-                  X
+                  <FontAwesomeIcon icon={faXTwitter} className="text-[10px]" />                  X
                 </a>
                 <a
                   href="https://discord.gg/bGqf8bBhy5"
@@ -582,8 +582,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
               title="Follow us on X (Twitter)"
             >
-              <FaTwitter size={10} />
-              X
+              <FontAwesomeIcon icon={faXTwitter} className="text-[10px]" />              X
             </a>
             <a
               href="https://discord.gg/bGqf8bBhy5"

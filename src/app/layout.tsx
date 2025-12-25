@@ -20,6 +20,10 @@ import GlobalChatService from "./components/GlobalChatService";
 import BanChecker from "./components/BanChecker";
 import VercelAnalytics from "./components/VercelAnalytics";
 import GlobalErrorHandler from "./components/GlobalErrorHandler";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
+
+config.autoAddCss = false;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-brands-svg-icons": "^7.1.0",
+    "@fortawesome/react-fontawesome": "^3.1.1",
     "@sentry/nextjs": "^10.32.1",
     "@statsig/js-client": "^3.31.0",
     "@stripe/stripe-js": "^8.6.0",
