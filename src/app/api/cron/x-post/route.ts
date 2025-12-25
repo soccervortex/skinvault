@@ -15,6 +15,7 @@ import {
   createNewUserPost,
   PostType,
 } from '@/app/lib/x-post-types';
+import { NewUser } from '@/app/lib/new-user-posts';
 import { updatePriceHistory } from '@/app/lib/price-tracking';
 
 /**
@@ -244,19 +245,23 @@ export async function GET(request: Request) {
         type: milestoneCheck.milestone?.type,
       });
       if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost && milestoneCheck.milestone?.type === 'new_user') {
-        console.log('[X Cron] New user detected - creating welcome post...');
-        console.log('[X Cron] New user details:', milestoneCheck.milestone.user);
-        postResult = await createNewUserPost(milestoneCheck.milestone.user);
+        const users = milestoneCheck.milestone.users || (milestoneCheck.milestone.user ? [milestoneCheck.milestone.user] : []);
+        console.log('[X Cron] New user(s) detected - creating welcome post for', users.length, 'user(s)...');
+        console.log('[X Cron] New user details:', users.map((u: NewUser) => ({ steamId: u.steamId, steamName: u.steamName })));
+        postResult = await createNewUserPost(users);
         
         // If new user post was successful, return early
         if (postResult.success) {
           // Update post history
           const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+          
+          // Add one entry for the post, or multiple if you want to track each user separately
+          const userNames = users.map((u: NewUser) => u.steamName).join(', ');
           postHistory.push({
             date: now.toISOString(),
             postId: postResult.postId || '',
-            itemId: milestoneCheck.milestone.user.steamId,
-            itemName: `New User: ${milestoneCheck.milestone.user.steamName || 'Unknown'}`,
+            itemId: users.map((u: NewUser) => u.steamId).join(','), // Comma-separated Steam IDs
+            itemName: users.length === 1 ? `New User: ${userNames}` : `${users.length} New Users: ${userNames}`,
             itemType: 'new_user',
           });
           await dbSet('x_posting_history', postHistory);
@@ -266,7 +271,8 @@ export async function GET(request: Request) {
             success: true,
             postType: 'new_user',
             postId: postResult.postId,
-            itemName: milestoneCheck.milestone.user.steamName,
+            itemName: postResult.itemName || userNames,
+            userCount: users.length,
           });
         }
       }

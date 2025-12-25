@@ -410,14 +410,15 @@ export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: bool
     const unpostedNewUsers = await getUnpostedNewUsers();
     console.log('[X Post Types] Found unposted new users:', unpostedNewUsers.length);
     if (unpostedNewUsers.length > 0) {
-      const newUser = unpostedNewUsers[0]; // Post about the oldest unposted user
-      console.log('[X Post Types] Returning new user milestone:', newUser.steamId, newUser.steamName);
+      // Post about all unposted users in one post (max 5 to keep message readable)
+      const usersToPost = unpostedNewUsers.slice(0, 5);
+      console.log('[X Post Types] Returning new user milestone for', usersToPost.length, 'user(s):', usersToPost.map(u => u.steamName).join(', '));
       return {
         hasMilestone: true,
         shouldPost: true,
         milestone: {
           type: 'new_user',
-          user: newUser,
+          users: usersToPost, // Changed from single user to array
         },
       };
     }
@@ -430,12 +431,17 @@ export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: bool
 }
 
 /**
- * Create new user welcome post
+ * Create new user welcome post (supports single user or multiple users)
  */
-export async function createNewUserPost(user: NewUser): Promise<{ success: boolean; postId?: string; error?: string }> {
+export async function createNewUserPost(users: NewUser | NewUser[]): Promise<{ success: boolean; postId?: string; error?: string; itemName?: string }> {
   try {
-    const result = await createNewUserWelcomePost(user);
-    return result;
+    const result = await createNewUserWelcomePost(users);
+    const usersArray = Array.isArray(users) ? users : [users];
+    const userNames = usersArray.map(u => u.steamName).join(', ');
+    return {
+      ...result,
+      itemName: usersArray.length === 1 ? userNames : `${usersArray.length} new users`,
+    };
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to create new user post' };
   }

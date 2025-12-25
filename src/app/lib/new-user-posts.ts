@@ -127,9 +127,9 @@ export async function getUnpostedNewUsers(): Promise<NewUser[]> {
 }
 
 /**
- * Create a welcome post for a new user
+ * Create a welcome post for one or more new users
  */
-export async function createNewUserWelcomePost(user: NewUser): Promise<{ success: boolean; postId?: string; error?: string }> {
+export async function createNewUserWelcomePost(users: NewUser | NewUser[]): Promise<{ success: boolean; postId?: string; error?: string; postedUsers?: NewUser[] }> {
   try {
     // Check if new user posts are enabled
     const enabled = (await dbGet<boolean>(NEW_USER_POSTS_ENABLED_KEY)) ?? true; // Default to enabled
@@ -137,15 +137,36 @@ export async function createNewUserWelcomePost(user: NewUser): Promise<{ success
       return { success: false, error: 'New user posts are disabled' };
     }
 
-    // Create personalized welcome message
-    const welcomeMessages = [
-      `Hey ${user.steamName}! 👋 Welcome to SkinVaults! 🎮\n\nWe're excited to have you join our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-      `Welcome ${user.steamName}! 🎉\n\nThanks for joining SkinVaults! We'd love to hear about your experience using our platform. What features are you most excited about? 🚀\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-      `Hey ${user.steamName}! 👋\n\nWelcome to the SkinVaults family! 🎮 Are you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
-    ];
+    // Normalize to array
+    const usersArray = Array.isArray(users) ? users : [users];
+    
+    if (usersArray.length === 0) {
+      return { success: false, error: 'No users provided' };
+    }
 
-    // Pick a random welcome message
-    const message = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+    let message = '';
+    
+    if (usersArray.length === 1) {
+      // Single user - personalized message
+      const user = usersArray[0];
+      const welcomeMessages = [
+        `Hey ${user.steamName}! 👋 Welcome to SkinVaults! 🎮\n\nWe're excited to have you join our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Welcome ${user.steamName}! 🎉\n\nThanks for joining SkinVaults! We'd love to hear about your experience using our platform. What features are you most excited about? 🚀\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Hey ${user.steamName}! 👋\n\nWelcome to the SkinVaults family! 🎮 Are you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+      ];
+      message = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+    } else {
+      // Multiple users - combine in one post
+      const userNames = usersArray.map(u => u.steamName).join(', ');
+      const userCount = usersArray.length;
+      
+      const multiUserMessages = [
+        `Welcome ${userNames}! 👋🎉\n\n${userCount} new ${userCount === 1 ? 'user' : 'users'} joined SkinVaults! 🎮\n\nThanks for joining our CS2 community! Are you using our website to track your inventory? Let us know what you think! 💬\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Hey ${userNames}! 👋\n\n${userCount} new ${userCount === 1 ? 'member' : 'members'} joined SkinVaults! 🚀\n\nWe're excited to have you in our CS2 community! What features are you most excited about?\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+        `Welcome ${userNames}! 🎉\n\n${userCount} new ${userCount === 1 ? 'user' : 'users'} just joined the SkinVaults family! 🎮\n\nAre you already using our website to manage your CS2 inventory? Share your thoughts with us! 💭\n\n🔗 skinvaults.online\n\n#CS2Skins #CounterStrike2 #Skinvaults @counterstrike`,
+      ];
+      message = multiUserMessages[Math.floor(Math.random() * multiUserMessages.length)];
+    }
 
     // Create post using the automated posting function (without image for welcome posts)
     const X_API_KEY = process.env.X_API_KEY;
@@ -224,17 +245,23 @@ export async function createNewUserWelcomePost(user: NewUser): Promise<{ success
     const postId = data.data?.id;
 
     if (postId) {
-      // Mark user as posted
+      // Mark all users as posted
       const postedUsers = (await dbGet<Record<string, { posted: boolean; postId?: string; postedAt?: string }>>(NEW_USERS_POSTED_KEY)) || {};
-      postedUsers[user.steamId] = {
-        posted: true,
-        postId,
-        postedAt: new Date().toISOString(),
-      };
+      const now = new Date().toISOString();
+      
+      for (const user of usersArray) {
+        postedUsers[user.steamId] = {
+          posted: true,
+          postId,
+          postedAt: now,
+        };
+      }
+      
       await dbSet(NEW_USERS_POSTED_KEY, postedUsers);
 
-      console.log(`[New User Post] Successfully posted welcome message for ${user.steamName} (${user.steamId})`);
-      return { success: true, postId };
+      const userNames = usersArray.map(u => u.steamName).join(', ');
+      console.log(`[New User Post] Successfully posted welcome message for ${usersArray.length} user(s): ${userNames}`);
+      return { success: true, postId, postedUsers: usersArray };
     }
 
     return { success: false, error: 'No post ID returned' };

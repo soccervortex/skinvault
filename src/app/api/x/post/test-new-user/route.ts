@@ -21,21 +21,22 @@ export async function GET(request: Request) {
       });
     }
 
-    // Try to post about the first unposted user
-    const firstUser = unpostedUsers[0];
-    console.log('[Test New User] Attempting to post for user:', firstUser.steamId, firstUser.steamName);
+    // Try to post about all unposted users (max 5 to keep message readable)
+    const usersToPost = unpostedUsers.slice(0, 5);
+    console.log('[Test New User] Attempting to post for', usersToPost.length, 'user(s):', usersToPost.map(u => u.steamName).join(', '));
     
-    const result = await createNewUserWelcomePost(firstUser);
+    const result = await createNewUserWelcomePost(usersToPost);
     
     return NextResponse.json({
       success: result.success,
       postId: result.postId,
       error: result.error,
-      user: {
-        steamId: firstUser.steamId,
-        steamName: firstUser.steamName,
-        firstLoginDate: firstUser.firstLoginDate,
-      },
+      users: usersToPost.map(u => ({
+        steamId: u.steamId,
+        steamName: u.steamName,
+        firstLoginDate: u.firstLoginDate,
+      })),
+      userCount: usersToPost.length,
       unpostedCount: unpostedUsers.length,
       allUnpostedUsers: unpostedUsers.map(u => ({
         steamId: u.steamId,
