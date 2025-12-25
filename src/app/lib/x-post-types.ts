@@ -22,28 +22,87 @@ interface PostContext {
 
 /**
  * Determine what type of post to make based on current date/time
+ * Optimized for best X (Twitter) posting times:
+ * - Monday: 9 AM - 8 PM
+ * - Tuesday: 11 AM - 5 PM (best day)
+ * - Wednesday: 10 AM - 5 PM (best day)
+ * - Thursday: 10 AM - 5 PM (best day)
+ * - Friday: 10 AM - 5 PM
+ * - Saturday: 11 AM - 2 PM (worst day)
+ * - Sunday: 2 PM - 6 PM (worst day)
  */
 export function determinePostType(context: PostContext): PostType {
   const { dayOfWeek, hour, minute, isFirstOfMonth } = context;
 
   // 1st of the month at 9 AM (8:00 UTC) = Monthly stats
+  // Only post on best days (Tuesday-Thursday) if possible
   if (isFirstOfMonth && hour === 8 && minute === 0) {
+    // If 1st falls on Tuesday-Thursday, post at 11 AM (10:00 UTC) instead
+    if (dayOfWeek >= 2 && dayOfWeek <= 4) {
+      if (hour === 10 && minute === 0) {
+        return 'monthly_stats';
+      }
+      return 'item_highlight'; // Wait for better time
+    }
     return 'monthly_stats';
   }
 
-  // Monday (1) or Sunday (0) at 8 PM (19:00 UTC) = Weekly summary
+  // Weekly summary: Monday or Sunday at 8 PM (19:00 UTC)
+  // Monday 8 PM is within best times (9 AM - 8 PM)
+  // Sunday 8 PM is outside best times (2 PM - 6 PM), but we keep it for consistency
   if ((dayOfWeek === 1 || dayOfWeek === 0) && hour === 19 && minute === 0) {
     return 'weekly_summary';
   }
 
-  // Tuesday-Saturday: Check for milestones/alerts first
-  if (dayOfWeek >= 2 && dayOfWeek <= 6) {
-    // Check if there are any milestones or alerts
-    // For now, fall back to item highlight
+  // Daily item highlights - optimized per day
+  // Monday: 11 AM (10:00 UTC) - within 9 AM - 8 PM
+  if (dayOfWeek === 1 && hour === 10 && minute === 0) {
     return 'item_highlight';
   }
 
-  // Default: Regular item highlight
+  // Tuesday: 11 AM (10:00 UTC) - BEST DAY, within 11 AM - 5 PM
+  if (dayOfWeek === 2 && hour === 10 && minute === 0) {
+    return 'item_highlight';
+  }
+
+  // Wednesday: 11 AM (10:00 UTC) - BEST DAY, within 10 AM - 5 PM
+  if (dayOfWeek === 3 && hour === 10 && minute === 0) {
+    return 'item_highlight';
+  }
+
+  // Thursday: 11 AM (10:00 UTC) - BEST DAY, within 10 AM - 5 PM
+  if (dayOfWeek === 4 && hour === 10 && minute === 0) {
+    return 'item_highlight';
+  }
+
+  // Friday: 11 AM (10:00 UTC) - within 10 AM - 5 PM
+  if (dayOfWeek === 5 && hour === 10 && minute === 0) {
+    return 'item_highlight';
+  }
+
+  // Saturday: 11 AM (10:00 UTC) - WORST DAY, but within 11 AM - 2 PM
+  if (dayOfWeek === 6 && hour === 10 && minute === 0) {
+    return 'item_highlight';
+  }
+
+  // Sunday: 2 PM (13:00 UTC) - WORST DAY, but within 2 PM - 6 PM
+  // Changed from 11 AM to 2 PM to be within best times
+  if (dayOfWeek === 0 && hour === 13 && minute === 0) {
+    return 'item_highlight';
+  }
+
+  // Retry times (if first attempt fails)
+  // Monday-Saturday: 11:30 AM (10:30 UTC)
+  if (dayOfWeek >= 1 && dayOfWeek <= 6 && hour === 10 && minute === 30) {
+    return 'item_highlight';
+  }
+
+  // Sunday retry: 2:30 PM (13:30 UTC) - within 2 PM - 6 PM
+  if (dayOfWeek === 0 && hour === 13 && minute === 30) {
+    return 'item_highlight';
+  }
+
+  // Default: No post (outside optimal times)
   return 'item_highlight';
 }
 
