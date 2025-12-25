@@ -212,17 +212,11 @@ export async function GET(request: Request) {
       }
     }
 
-    // Determine what type of post to make based on day/time
-    const context = {
-      dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
-      hour: now.getUTCHours(),
-      minute: now.getUTCMinutes(),
-      dayOfMonth: now.getUTCDate(),
-      isFirstOfMonth: now.getUTCDate() === 1,
-    };
-
-    const postType = determinePostType(context);
+    // Post type already determined above (needed for engagement check)
     console.log(`[X Cron] Post type determined: ${postType} (Day: ${context.dayOfWeek}, Hour: ${context.hour}, Minute: ${context.minute}, First of month: ${context.isFirstOfMonth})`);
+    if (isSpecialPost) {
+      console.log(`[X Cron] Special post (${postType}) - skipping engagement blocking, will always post`);
+    }
 
     let postResult: { success: boolean; postId?: string; error?: string; itemName?: string };
 
