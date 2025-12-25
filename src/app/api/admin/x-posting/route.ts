@@ -44,30 +44,39 @@ export async function POST(request: Request) {
     if (typeof enabled === 'boolean') {
       await dbSet(X_POSTING_ENABLED_KEY, enabled);
       
-      // If enabling, trigger initial test post (async, don't wait)
+      // If enabling, trigger initial test post
       if (enabled) {
-        // Trigger test post via internal API (fire and forget)
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
+        // Trigger test post via internal API
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL 
           ? `https://${process.env.VERCEL_URL}` 
-          : 'http://localhost:3000';
+          : 'http://localhost:3000');
         
-        // Don't await - let it run in background
-        fetch(`${baseUrl}/api/x/post/test`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ adminSteamId }),
-        }).catch((error) => {
-          console.error('Failed to trigger test post:', error);
-          // Don't fail the request if test post fails
-        });
+        // Await the response to catch errors, but don't fail the main request
+        try {
+          const testPostResponse = await fetch(`${baseUrl}/api/x/post/test`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ adminSteamId }),
+          });
+          
+          const testPostData = await testPostResponse.json();
+          if (!testPostResponse.ok) {
+            console.error('[X Posting] Test post failed:', testPostData.error);
+          } else {
+            console.log('[X Posting] Test post successful:', testPostData);
+          }
+        } catch (error) {
+          console.error('[X Posting] Failed to trigger test post:', error);
+          // Don't fail the main request if test post fails
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
-      enabled: typeof enabled === 'boolean' ? enabled : (await dbGet<boolean>(X_POSTING_ENABLED_KEY, false)) || false,
+      enabled: typeof enabled === 'boolean' ? enabled : (await dbGet<boolean>(X_POSTING_ENABLED_KEY)) || false,
     });
   } catch (error) {
     console.error('Failed to update X posting status:', error);
