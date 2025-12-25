@@ -118,7 +118,10 @@ export async function GET(request: Request) {
         // Check for milestones/alerts first
         const milestoneCheck = await checkForMilestonesOrAlerts();
         if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost) {
-          if (milestoneCheck.milestone?.type === 'user_milestone') {
+          if (milestoneCheck.milestone?.type === 'feature_announcement') {
+            console.log('[X Cron] Creating feature announcement post...');
+            postResult = await createFeatureAnnouncementPost(milestoneCheck.milestone.announcement);
+          } else if (milestoneCheck.milestone?.type === 'user_milestone') {
             console.log('[X Cron] Creating user milestone post...');
             postResult = await createUserMilestonePost(milestoneCheck.milestone.milestone);
           } else if (milestoneCheck.milestone?.type === 'trending_alert') {

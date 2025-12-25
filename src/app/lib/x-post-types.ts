@@ -351,6 +351,94 @@ export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: bool
 }
 
 /**
+ * Create feature announcement post
+ */
+export async function createFeatureAnnouncementPost(announcement: FeatureAnnouncement): Promise<{ success: boolean; postId?: string; error?: string }> {
+  try {
+    const linkText = announcement.link ? `\n\n🔗 ${announcement.link}` : '';
+    const announcementText = `✨ New: ${announcement.title}\n\n` +
+      `${announcement.description}${linkText}\n\n` +
+      `Track your CS2 inventory:\nskinvaults.online\n\n` +
+      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+
+    // Post the announcement (same OAuth logic)
+    const X_API_KEY = process.env.X_API_KEY;
+    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
+    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
+
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      return { success: false, error: 'X API credentials not configured' };
+    }
+
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: X_API_KEY,
+      oauth_token: X_ACCESS_TOKEN,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_version: '1.0',
+    };
+
+    const sortedParams = Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+      .join('&');
+
+    const signatureBaseString = [
+      'POST',
+      encodeURIComponent('https://api.x.com/2/tweets'),
+      encodeURIComponent(sortedParams),
+    ].join('&');
+
+    const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET)}`;
+    const signature = crypto.createHmac('sha1', signingKey)
+      .update(signatureBaseString)
+      .digest('base64');
+
+    oauthParams.oauth_signature = signature;
+
+    const authHeader = 'OAuth ' + Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+      .join(', ');
+
+    const response = await fetch('https://api.x.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: announcementText.substring(0, 280),
+      }),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { detail: responseText || 'Unknown error' };
+      }
+      return { success: false, error: errorData.detail || errorData.title || 'Failed to post' };
+    }
+
+    const data = JSON.parse(responseText);
+    
+    // Mark announcement as posted
+    if (data.data?.id) {
+      await markFeatureAnnouncementPosted(announcement.id, data.data.id);
+    }
+    
+    return { success: true, postId: data.data?.id };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create feature announcement post' };
+  }
+}
+
+/**
  * Create user milestone post
  */
 export async function createUserMilestonePost(milestone: UserMilestone): Promise<{ success: boolean; postId?: string; error?: string }> {
