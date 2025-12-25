@@ -87,8 +87,18 @@ export async function GET(request: Request) {
     const avgReadsPerPost = recentPosts.length > 0 ? totalReads / recentPosts.length : 0;
     
     // Check if we've been blocked recently (within last 24 hours)
+    // Reset block at start of each month
     const lastBlockTime = await dbGet<string>('x_posting_last_block');
-    const hoursSinceLastBlock = lastBlockTime 
+    const lastBlockMonth = lastBlockTime ? new Date(lastBlockTime).getUTCMonth() : null;
+    const currentMonth = now.getUTCMonth();
+    
+    // Reset block if we're in a new month
+    if (lastBlockMonth !== null && lastBlockMonth !== currentMonth) {
+      await dbSet('x_posting_last_block', null);
+      console.log('[X Cron] New month detected, resetting engagement block');
+    }
+    
+    const hoursSinceLastBlock = lastBlockTime && lastBlockMonth === currentMonth
       ? (now.getTime() - new Date(lastBlockTime).getTime()) / (1000 * 60 * 60)
       : Infinity;
     
@@ -112,7 +122,8 @@ export async function GET(request: Request) {
     // Additional check: If we're posting too much relative to engagement
     // Skip posting if we have very low engagement rate (< 5 reads per post on average)
     // Strategy: Reduce frequency instead of complete block - ensure at least 2-3 posts per week
-    if (avgReadsPerPost < 5 && thisMonthPosts.length > 20) {
+    // NOTE: This check is skipped for weekly_summary and monthly_stats posts (they always post)
+    // This check will be done later, after postType is determined
       const daysSinceLastBlock = hoursSinceLastBlock / 24;
       const lastPostTime = await dbGet<string>('x_posting_last_post');
       const hoursSinceLastPost = lastPostTime 
