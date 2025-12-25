@@ -506,36 +506,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleXPostingToggle = async (enabled: boolean) => {
-    setXPostingError(null);
-    setXPostingMessage(null);
-
-    try {
-      const res = await fetch(`/api/admin/x-posting?adminSteamId=${user?.steamId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ enabled }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setXPostingError(data?.error || `Failed to ${enabled ? 'enable' : 'disable'} X posting.`);
-      } else {
-        setXPostingEnabled(data.enabled || false);
-        if (enabled) {
-          setXPostingMessage('X posting enabled! Test post will be created...');
-        } else {
-          setXPostingMessage('X posting disabled.');
-        }
-        setTimeout(() => setXPostingMessage(null), 5000);
-      }
-    } catch (e: any) {
-      setXPostingError(e?.message || "Request failed.");
-    }
-  };
-
   const handleTestModeToggle = async (enabled: boolean) => {
     setTestModeMessage(null);
     setTestModeError(null);
