@@ -101,13 +101,12 @@ export const processFailedPurchases = inngest.createFunction(
 
 /**
  * Automated X posting - posts about ALL CS2 items (weapons, skins, stickers, agents, crates)
- * Runs 3 times per day to stay within 500 posts/month limit
- * Schedule: 10:00, 16:00, 22:00 UTC
+ * Runs at 11:15 AM Amsterdam time (10:15 UTC) - checks if post was made today, if not posts
  * Cycles through all items in the game, includes images and links to item pages
  */
 export const automatedXPosting = inngest.createFunction(
   { id: 'automated-x-posting' },
-  { cron: '0 10,16,22 * * *' }, // 3 times per day: 10:00, 16:00, 22:00 UTC
+  { cron: '15 10 * * *' }, // 10:15 UTC = 11:15 AM Amsterdam (CET) / 12:15 PM (CEST)
   async ({ event, step }) => {
     return await step.run('check-and-post', async () => {
       try {
@@ -605,6 +604,112 @@ async function uploadImageToX(
   } catch (error: any) {
     console.error('[X Image Upload] Error:', error);
     return null;
+  }
+}
+
+/**
+ * Check if we already posted today by checking X API profile
+ */
+async function checkIfPostedTodayOnX(): Promise<boolean> {
+  try {
+    const X_API_KEY = process.env.X_API_KEY;
+    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
+    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
+
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      return false; // If no credentials, assume no post
+    }
+
+    // Generate OAuth header helper
+    function generateOAuthHeader(method: string, url: string): string {
+      const oauthParams: Record<string, string> = {
+        oauth_consumer_key: X_API_KEY!,
+        oauth_token: X_ACCESS_TOKEN!,
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+        oauth_nonce: crypto.randomBytes(16).toString('hex'),
+        oauth_version: '1.0',
+      };
+
+      const sortedParams = Object.keys(oauthParams)
+        .sort()
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+        .join('&');
+
+      const signatureBaseString = [
+        method.toUpperCase(),
+        encodeURIComponent(url),
+        encodeURIComponent(sortedParams),
+      ].join('&');
+
+      const signingKey = `${encodeURIComponent(X_API_SECRET!)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET!)}`;
+      const signature = crypto.createHmac('sha1', signingKey)
+        .update(signatureBaseString)
+        .digest('base64');
+
+      oauthParams.oauth_signature = signature;
+
+      return 'OAuth ' + Object.keys(oauthParams)
+        .sort()
+        .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+        .join(', ');
+    }
+
+    // Get user ID
+    const userUrl = 'https://api.x.com/2/users/me';
+    const userAuthHeader = generateOAuthHeader('GET', userUrl);
+    
+    const userResponse = await fetch(userUrl, {
+      headers: { 'Authorization': userAuthHeader },
+    });
+
+    if (!userResponse.ok) {
+      console.warn('[X Check] Failed to get user ID');
+      return false;
+    }
+
+    const userData = await userResponse.json();
+    const userId = userData.data?.id;
+
+    if (!userId) {
+      return false;
+    }
+
+    // Get recent tweets (last 10)
+    const tweetsUrl = `https://api.x.com/2/users/${userId}/tweets?max_results=10&tweet.fields=created_at`;
+    const tweetsAuthHeader = generateOAuthHeader('GET', tweetsUrl);
+    
+    const tweetsResponse = await fetch(tweetsUrl, {
+      headers: { 'Authorization': tweetsAuthHeader },
+    });
+
+    if (!tweetsResponse.ok) {
+      console.warn('[X Check] Failed to get tweets');
+      return false;
+    }
+
+    const tweetsData = await tweetsResponse.json();
+    const tweets = tweetsData.data || [];
+
+    // Check if any tweet was posted today
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    for (const tweet of tweets) {
+      const tweetDate = new Date(tweet.created_at);
+      const tweetDay = new Date(tweetDate.getFullYear(), tweetDate.getMonth(), tweetDate.getDate());
+      
+      if (tweetDay.getTime() === today.getTime()) {
+        console.log('[X Check] Found tweet posted today:', tweet.id, tweet.text?.substring(0, 50));
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('[X Check] Error checking X API:', error);
+    return false; // If check fails, allow posting
   }
 }
 
