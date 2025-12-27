@@ -6,6 +6,7 @@ import { FaDiscord } from "react-icons/fa";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXTwitter } from "@fortawesome/free-brands-svg-icons";
 import { FaInstagram } from "react-icons/fa";
+import { FaTiktok } from "react-icons/fa";	
 import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
 import ChatPreloader from './ChatPreloader';
@@ -395,6 +396,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   <FaInstagram size={10} />
                   Instagram
                 </a>
+                <a
+                  href="https://www.tiktok.com/@skinvaults"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+                >
+                  <FaTiktok size={10} />
+                  Tiktok
+                </a>
               </div>
 
               {/* Footer Links */}
@@ -601,6 +611,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             >
               <FaInstagram size={10} />
               Instagram
+            </a>
+            <a
+              href="https://www.tiktok.com/@skinvaults"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[8px] font-black text-gray-500 hover:text-blue-400 uppercase transition-colors"
+            >
+              <FaTiktok size={10} />
+              Tiktok
             </a>
           </div>
 
