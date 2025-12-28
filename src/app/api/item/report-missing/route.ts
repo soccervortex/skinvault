@@ -7,7 +7,7 @@ const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/145472153931547037
 interface ReportData {
   itemName: string;
   itemId: string;
-  itemImage?: string;
+  itemImage?: string | null;
   reason: string;
 }
 
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       id: reportId,
       itemName,
       itemId,
-      itemImage: itemImage || null,
+      itemImage: itemImage || undefined,
       reason,
       existsInAPI,
       status: 'pending',
@@ -147,7 +147,12 @@ export async function POST(request: Request) {
     }
 
     // Send Discord notification
-    await sendDiscordNotification(report, existsInAPI);
+    await sendDiscordNotification({
+      itemName: report.itemName,
+      itemId: report.itemId,
+      itemImage: report.itemImage || undefined,
+      reason: report.reason,
+    }, existsInAPI);
 
     return NextResponse.json({ 
       success: true, 
