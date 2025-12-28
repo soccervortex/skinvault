@@ -2,15 +2,23 @@
 
 This guide will walk you through the process of reporting an item that is missing or has issues on SkinVaults.
 
-## Step-by-Step Guide
+## Two Ways to Report Missing Items
+
+### Method 1: Report from Item Detail Page (For Existing Items)
+Use this method when you're already viewing an item page and want to report an issue with it.
+
+### Method 2: Report from Dedicated Page (For Items That Don't Exist Yet) ⭐ **NEW!**
+Use this method when the item doesn't exist on SkinVaults at all - perfect for reporting completely missing items!
+
+---
+
+## Method 1: Report from Item Detail Page
 
 ### Step 1: Navigate to an Item Page
 
 1. Go to the SkinVaults website: `https://skinvaults.online`
 2. Search for an item using the search bar, or browse through the market
 3. Click on any item to open its detail page
-
-**Note:** You can also report items that don't exist on the site yet. In that case, you'll need to use the item ID or name from Steam.
 
 ---
 
@@ -84,6 +92,73 @@ After successful submission:
 1. You'll see a success message: **"Report Submitted!"**
 2. A confirmation message will appear: "Thank you for your contribution. We will review your report shortly."
 3. Click **"Close"** to dismiss the modal
+4. Your report has been sent to the admin team via Discord webhook
+
+---
+
+## Method 2: Report from Dedicated Page (For Items That Don't Exist Yet)
+
+This is the **best method** for reporting items that don't exist on SkinVaults at all!
+
+### Step 1: Access the Report Page
+
+You can access the report page in three ways:
+
+#### **Option A: From Sidebar Navigation**
+1. Look at the left sidebar (or mobile menu)
+2. Find the **"Report Item"** link with a yellow warning triangle icon (⚠️)
+3. Click it to go to `/report-item`
+
+#### **Option B: From Search Results**
+1. Search for an item that doesn't exist
+2. When you see "No items found", you'll see a **"Report Missing Item"** button
+3. Click it to go to the report page
+
+#### **Option C: Direct URL**
+1. Go directly to: `https://skinvaults.online/report-item`
+
+### Step 2: Fill Out the Report Form
+
+The form has the following fields:
+
+#### **Item Name** (Required)
+- Enter the full item name exactly as it appears on Steam Market
+- Example: `AK-47 | Redline (Field-Tested)`
+- **Tip:** Copy the exact name from Steam Market to avoid typos
+
+#### **Item ID** (Optional but Recommended)
+- Enter the item ID if you know it
+- Example: `skin-ak47-redline-ft` or `skin-ad56dc47a4c4_1_st`
+- You can find this in the Steam Market URL or item details
+- **Tip:** This helps admins process your report faster!
+
+#### **Item Image URL** (Optional)
+- Enter a direct URL to the item's image
+- Right-click the item image on Steam Market and "Copy image address"
+- Example: `https://community.cloudflare.steamstatic.com/economy/image/...`
+- **Tip:** This helps admins identify the item more easily
+
+#### **Why is this item missing?** (Required)
+- Describe why you're reporting this item
+- Be as specific as possible
+- Examples:
+  - "This item exists on Steam Market but I can't find it when searching on SkinVaults"
+  - "I searched for 'AK-47 Redline' but no results appeared"
+  - "This is a new item that was just released and isn't in the database yet"
+
+### Step 3: Submit the Report
+
+1. Review all the information you've entered
+2. Click the **"Submit Report"** button (blue button at the bottom)
+3. Wait for the submission to complete (you'll see a loading spinner)
+
+### Step 4: Confirmation
+
+After successful submission:
+
+1. You'll see a success message: **"Report Submitted!"**
+2. A confirmation message will appear: "Thank you for your contribution. We will review your report shortly."
+3. The form will automatically reset after 3 seconds
 4. Your report has been sent to the admin team via Discord webhook
 
 ---
