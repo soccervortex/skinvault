@@ -1,3 +1,5 @@
+import { API_FILES, BASE_URL } from './api-endpoints';
+
 export interface Weapon {
   name: string;
   slug: string;
@@ -20,17 +22,14 @@ export function generateSlug(name: string): string {
 
 /**
  * Fetch all CS2 items from the API and generate slugs
- * This includes skins, stickers, agents, and crates
+ * This includes ALL available item types from the CS2 API
  */
 export async function getAllItems(): Promise<Weapon[]> {
   try {
-    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
-    const datasets = [
-      { url: `${BASE_URL}/skins_not_grouped.json`, type: 'skin' },
-      { url: `${BASE_URL}/stickers.json`, type: 'sticker' },
-      { url: `${BASE_URL}/agents.json`, type: 'agent' },
-      { url: `${BASE_URL}/crates.json`, type: 'crate' },
-    ];
+    const datasets = API_FILES.map(file => ({
+      url: `${BASE_URL}/${file}`,
+      type: file.replace('.json', '').replace(/_/g, '_'),
+    }));
 
     const allItems: Weapon[] = [];
 

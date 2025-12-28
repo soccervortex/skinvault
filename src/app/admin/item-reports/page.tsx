@@ -68,9 +68,12 @@ export default function ItemReportsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setReports(data.reports || data || []);
+        // Handle both { reports: [...] } and direct array response
+        const reportsArray = Array.isArray(data) ? data : (data.reports || []);
+        setReports(reportsArray);
       } else {
         console.error('Failed to load reports:', data);
+        setReports([]);
       }
     } catch (error) {
       console.error('Error loading reports:', error);

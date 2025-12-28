@@ -22,7 +22,8 @@ import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wi
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
-const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
+import { API_FILES, BASE_URL as API_BASE_URL } from '@/data/api-endpoints';
+
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
 const DATASET_CACHE_TTL = 1000 * 60 * 60 * 12; // 12h
 const PRICE_CACHE_KEY = 'sv_price_cache_item_v1';
@@ -133,7 +134,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           if (fresh) {
             itemArray = cached.data;
           } else {
-            const res = await fetch(`https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/${file}`, { cache: 'force-cache' });
+            const res = await fetch(`${API_BASE_URL}/${file}`, { cache: 'force-cache' });
             const data = await res.json();
             itemArray = Array.isArray(data) ? data : Object.values(data);
             datasetCacheRef.current[file] = { data: itemArray, timestamp: Date.now() };

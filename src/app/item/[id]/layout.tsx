@@ -32,8 +32,7 @@ async function getItemInfo(itemId: string) {
     }
 
     // Then check API
-    const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
-    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
+    const { API_FILES, BASE_URL } = await import('@/data/api-endpoints');
     
     for (const file of API_FILES) {
       try {

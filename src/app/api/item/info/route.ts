@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { findBestMatch } from '@/app/utils/fuzzy-search';
+import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 
 // Get item info (image, name) by market_hash_name with fuzzy search
 export async function GET(request: Request) {
@@ -59,9 +60,6 @@ export async function GET(request: Request) {
     }
 
     // Try to find item in dataset files
-    const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
-    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
-    
     let allApiItems: any[] = [];
     
     // Collect all items for fuzzy search

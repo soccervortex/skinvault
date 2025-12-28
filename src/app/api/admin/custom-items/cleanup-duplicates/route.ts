@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbDelete } from '@/app/utils/database';
+import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 
 /**
  * Cleanup custom items that now exist in the API
@@ -10,9 +11,6 @@ export async function POST(request: Request) {
   try {
     const db = await getDatabase();
     const customItems = await db.collection('custom_items').find({}).toArray();
-    
-    const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
-    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
     
     // Fetch all API items
     const apiItems: any[] = [];

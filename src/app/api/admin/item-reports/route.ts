@@ -31,7 +31,8 @@ export async function GET(request: Request) {
       .sort({ createdAt: -1 })
       .toArray();
 
-    return NextResponse.json({ reports });
+    // Return reports array directly (frontend expects { reports } or array)
+    return NextResponse.json({ reports: reports || [] });
   } catch (error) {
     console.error('Error fetching reports:', error);
     return NextResponse.json(

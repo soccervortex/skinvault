@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbSet } from '@/app/utils/database';
+import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1454721539315470376/o8WS6sffMhdYgsPMZq8u0j1hhfVfak88AqoBc8nrngkMxK0rEOu39gzEYSfCFEobf4Lz';
 
@@ -14,9 +15,7 @@ interface ReportData {
 // Check if item exists in the API
 async function checkItemExists(itemId: string, itemName: string): Promise<boolean> {
   try {
-    const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
-    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
-    
+    // Check ALL available API endpoints
     for (const file of API_FILES) {
       try {
         const response = await fetch(`${BASE_URL}/${file}`, { 

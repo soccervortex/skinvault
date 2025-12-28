@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
+import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 
 /**
  * Check if a custom item should be deleted because it now exists in the API
@@ -18,9 +19,6 @@ export async function POST(request: Request) {
     }
 
     // Check if item exists in API
-    const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
-    const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
-    
     for (const file of API_FILES) {
       try {
         const response = await fetch(`${BASE_URL}/${file}`, { 
