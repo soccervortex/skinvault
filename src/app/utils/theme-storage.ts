@@ -52,7 +52,7 @@ async function readThemeSettings(useCache: boolean = true): Promise<ThemeSetting
 }
 
 // Write theme settings (database abstraction)
-async function writeThemeSettings(settings: ThemeSettingsMap): Promise<void> {
+export async function setThemeSettings(settings: ThemeSettingsMap): Promise<void> {
   try {
     // Ensure all theme keys are present before writing
     const completeSettings: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
@@ -136,7 +136,7 @@ export async function setThemeEnabled(theme: ThemeType, enabled: boolean): Promi
   newSettings[theme] = { enabled };
   
   // Write the complete settings (this will clear cache and write to both KV and MongoDB)
-  await writeThemeSettings(newSettings);
+  await setThemeSettings(newSettings);
 }
 
 // Check if a theme is enabled (admin enabled it)

@@ -44,8 +44,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid theme' }, { status: 400 });
     }
 
-    // Update the theme setting
-    await setThemeEnabled(theme, enabled);
+    // Read current settings (bypass cache to get fresh data)
+    const currentSettings = await getThemeSettings();
+    
+    // Create new settings object
+    const newSettings = { ...currentSettings };
+    
+    // If enabling a theme, disable all other themes first (only one theme active at a time)
+    if (enabled) {
+      for (const otherTheme of validThemes) {
+        if (otherTheme !== theme) {
+          newSettings[otherTheme] = { enabled: false };
+        }
+      }
+    }
+    
+    // Update the specific theme
+    newSettings[theme] = { enabled };
+    
+    // Write all settings at once (more efficient and avoids race conditions)
+    const { setThemeSettings } = await import('@/app/utils/theme-storage');
+    await setThemeSettings(newSettings);
     
     // Wait a bit to ensure database write completes
     await new Promise(resolve => setTimeout(resolve, 100));
