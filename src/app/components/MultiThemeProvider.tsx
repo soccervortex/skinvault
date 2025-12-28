@@ -155,8 +155,8 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
     // Listen for custom storage event (for same-tab changes)
     window.addEventListener('localStorageChange', handleLocalStorageChange);
     
-    // Also poll periodically to catch admin changes (every 1.5 seconds for faster updates)
-    const interval = setInterval(loadActiveTheme, 1500);
+    // Also poll periodically to catch admin changes (every 1 second for real-time updates)
+    const interval = setInterval(loadActiveTheme, 1000);
     
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);

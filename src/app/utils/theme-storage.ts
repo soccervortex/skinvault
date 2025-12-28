@@ -170,8 +170,9 @@ const THEME_PRIORITY_ORDER: ThemeType[] = [
 
 // Get which theme should be active (check admin enabled + user preference)
 export async function getActiveTheme(steamId?: string | null, bypassCache: boolean = false): Promise<ThemeType | null> {
-  // Bypass cache if requested (e.g., after a theme change)
-  const settings = await readThemeSettings(!bypassCache);
+  // ALWAYS bypass cache for getActiveTheme to ensure users get fresh data
+  // This ensures all users see theme changes immediately
+  const settings = await readThemeSettings(false); // Always bypass cache
   
   // If user has disabled all themes, return null
   if (steamId) {

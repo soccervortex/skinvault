@@ -251,6 +251,13 @@ async function syncAllFromMongoDBToKV(): Promise<void> {
  * Get value from database (with caching to reduce KV reads)
  */
 export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T | null> {
+  // For theme_settings, always bypass cache to ensure fresh data for all users
+  if (key === 'theme_settings') {
+    useCache = false;
+    // Explicitly clear cache for theme settings
+    readCache.delete(key);
+  }
+  
   // Check cache first (reduces KV reads)
   if (useCache) {
     const cached = readCache.get(key);
