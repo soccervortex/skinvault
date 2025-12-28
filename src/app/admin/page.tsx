@@ -1449,6 +1449,32 @@ export default function AdminPage() {
           </button>
         </div>
 
+        {/* Item Reports Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-yellow-500/10 border border-yellow-500/40 shrink-0">
+              <AlertTriangle className="text-yellow-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Content Management
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Item Reports
+              </h2>
+            </div>
+          </div>
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
+            View and manage missing item reports. Add custom items that aren't in the API.
+          </p>
+          <button
+            onClick={() => router.push('/admin/item-reports')}
+            className="w-full bg-yellow-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-yellow-500 transition-all shadow-xl shadow-yellow-600/20 flex items-center justify-center gap-2"
+          >
+            <AlertTriangle size={14} /> Manage Item Reports
+          </button>
+        </div>
+
         {/* User Search Section */}
         <div className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">

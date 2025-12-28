@@ -6,6 +6,32 @@ import { SITE_CONFIG } from '@/lib/seo-config';
 // Fetch item info to get the actual name instead of technical ID
 async function getItemInfo(itemId: string) {
   try {
+    // First check custom items
+    try {
+      const { getDatabase } = await import('@/app/utils/mongodb-client');
+      const db = await getDatabase();
+      const customItem = await db.collection('custom_items').findOne({
+        $or: [
+          { id: itemId },
+          { marketHashName: itemId },
+          { name: itemId },
+        ]
+      });
+      
+      if (customItem) {
+        return {
+          name: customItem.name,
+          image: customItem.image || null,
+          rarity: customItem.rarity || null,
+          weapon: customItem.weapon || null,
+          marketHashName: customItem.marketHashName || customItem.name,
+        };
+      }
+    } catch (customError) {
+      // Continue to API check if custom items fail
+    }
+
+    // Then check API
     const API_FILES = ['skins_not_grouped.json', 'crates.json', 'stickers.json', 'agents.json'];
     const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
     

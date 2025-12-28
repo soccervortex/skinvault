@@ -41,5 +41,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  return [...staticRoutes, ...skinRoutes];
+  // Fetch custom items and add to sitemap
+  let customItemRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const { getDatabase } = await import('@/app/utils/mongodb-client');
+    const db = await getDatabase();
+    const customItems = await db.collection('custom_items').find({}).toArray();
+    
+    customItemRoutes = customItems.map((item: any) => ({
+      url: `${BASE_URL}/item/${encodeURIComponent(item.id)}`,
+      lastModified: new Date(),
+      changeFrequency: 'always' as const,
+      priority: 0.7,
+    }));
+  } catch (error) {
+    // Ignore custom items errors
+  }
+
+  return [...staticRoutes, ...skinRoutes, ...customItemRoutes];
 }

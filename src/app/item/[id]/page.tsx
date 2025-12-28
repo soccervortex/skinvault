@@ -6,7 +6,36 @@ const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public
 
 // Server-side function to fetch item data for SEO and initial render
 async function getItemData(itemId: string) {
+  try {
+    // First check custom items
     try {
+      const { getDatabase } = await import('@/app/utils/mongodb-client');
+      const db = await getDatabase();
+      const customItem = await db.collection('custom_items').findOne({
+        $or: [
+          { id: itemId },
+          { marketHashName: itemId },
+          { name: itemId },
+        ]
+      });
+      
+      if (customItem) {
+        // Convert custom item format to match API format
+        return {
+          id: customItem.id,
+          name: customItem.name,
+          market_hash_name: customItem.marketHashName || customItem.name,
+          image: customItem.image,
+          rarity: customItem.rarity ? { name: customItem.rarity } : null,
+          weapon: customItem.weapon ? { name: customItem.weapon } : null,
+          isCustom: true,
+        };
+      }
+    } catch (customError) {
+      // Continue to API check if custom items fail
+    }
+
+    // Then check API
     for (const file of API_FILES) {
       try {
         const response = await fetch(`${BASE_URL}/${file}`, { 
@@ -35,7 +64,7 @@ async function getItemData(itemId: string) {
   }
 
   return null;
-  }
+}
 
 export default async function ItemDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

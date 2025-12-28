@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale } from 'lucide-react';
+import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import dynamic from 'next/dynamic';
+import ReportMissingItemModal from '@/app/components/ReportMissingItemModal';
 
 // Dynamic imports for modals to reduce initial bundle size
 const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal'), {
@@ -46,6 +47,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showTrackerModal, setShowTrackerModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const priceCacheRef = useRef<Record<string, any>>({});
@@ -452,6 +454,15 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   <Scale size={18} className="text-blue-400" />
                   <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Compare</span>
                 </button>
+                {/* Report Missing Item Button */}
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-yellow-500 hover:bg-yellow-500/10 transition-all shrink-0 min-h-[44px]"
+                  aria-label="Report missing item"
+                >
+                  <AlertTriangle size={18} className="text-yellow-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400">Report</span>
+                </button>
                 {/* Price Tracker Button */}
                 {user && (
                   <button
@@ -564,6 +575,14 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           image: item.image,
           market_hash_name: (item as any).market_hash_name,
         } : undefined}
+      />
+      
+      <ReportMissingItemModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        itemName={item?.name || decodedId}
+        itemId={item?.id || decodedId}
+        itemImage={item?.image}
       />
         </div>
       </div>

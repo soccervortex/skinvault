@@ -63,12 +63,40 @@ export async function getAllItems(): Promise<Weapon[]> {
       }
     }
 
-    // Remove duplicates based on slug
-    const uniqueItems = Array.from(
-      new Map(allItems.map(item => [item.slug, item])).values()
-    );
+    // Fetch custom items and add them
+    try {
+      const { getDatabase } = await import('@/app/utils/mongodb-client');
+      const db = await getDatabase();
+      const customItems = await db.collection('custom_items').find({}).toArray();
+      
+      customItems.forEach((item: any) => {
+        const marketHashName = item.marketHashName || item.name || '';
+        if (marketHashName) {
+          allItems.push({
+            name: item.name,
+            slug: generateSlug(item.name),
+            id: item.id,
+            marketHashName: marketHashName,
+            metaDescription: `Check the current price and market history for ${item.name} on SkinVaults. The most accurate CS2 skin valuation tool.`,
+          });
+        }
+      });
+    } catch (error) {
+      // Ignore custom items errors
+    }
 
-    return uniqueItems;
+    // Remove duplicates based on ID (prefer API items over custom items)
+    const itemMap = new Map<string, Weapon>();
+    
+    // Add all items (API items first, then custom items)
+    allItems.forEach(item => {
+      const key = item.id || item.marketHashName || item.slug;
+      if (key && !itemMap.has(key)) {
+        itemMap.set(key, item);
+      }
+    });
+
+    return Array.from(itemMap.values());
   } catch (error) {
     console.error('Failed to fetch all items:', error);
     return [];
