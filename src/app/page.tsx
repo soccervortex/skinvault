@@ -249,7 +249,7 @@ export default function GlobalSkinSearch() {
 
       // If "All Items" category, load from all API files
       if (activeCat.file === 'all') {
-        const { API_FILES, BASE_URL } = await import('@/data/api-endpoints');
+        const { API_FILES, BASE_URL, isItemExcluded } = await import('@/data/api-endpoints');
         let allItems: any[] = [];
         
         // Check cache for all files
@@ -257,7 +257,9 @@ export default function GlobalSkinSearch() {
           const cached = datasetCacheRef.current[file];
           const isFresh = cached && Date.now() - cached.timestamp < CACHE_TTL;
           if (isFresh) {
-            allItems.push(...cached.data);
+            // Filter excluded items from cached data
+            const filtered = cached.data.filter((item: any) => !isItemExcluded(item.id));
+            allItems.push(...filtered);
             return true;
           }
           return false;
