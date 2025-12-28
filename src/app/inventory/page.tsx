@@ -168,16 +168,43 @@ function InventoryContent() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000); // Reduced to 6 seconds for faster loading
       
-      const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
-        signal: controller.signal,
-        cache: 'force-cache', // Cache profile data for faster subsequent loads
-      });
-      clearTimeout(timeoutId);
+      // Try multiple proxy fallbacks
+      const proxyUrls = [
+        `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`,
+        `https://thingproxy.freeboard.io/fetch/${steamUrl}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(steamUrl)}`,
+        `https://yacdn.org/proxy/${steamUrl}`,
+      ];
       
-      const text = await textRes.text();
-      const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
-      const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
-      return { steamId: id, name, avatar };
+      let lastError: any = null;
+      for (const proxyUrl of proxyUrls) {
+        try {
+          const textRes = await fetch(proxyUrl, {
+            signal: controller.signal,
+            cache: 'force-cache', // Cache profile data for faster subsequent loads
+          });
+          
+          if (textRes.ok) {
+            clearTimeout(timeoutId);
+            const text = await textRes.text();
+            const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
+            const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
+            return { steamId: id, name, avatar };
+          } else if (textRes.status === 403 || textRes.status === 429) {
+            // Try next proxy on 403/429
+            continue;
+          }
+        } catch (err: any) {
+          lastError = err;
+          if (err?.name === 'AbortError') {
+            break; // Timeout, don't try more proxies
+          }
+          continue; // Try next proxy
+        }
+      }
+      
+      clearTimeout(timeoutId);
+      throw lastError || new Error('All proxies failed');
     } catch (e: any) { 
       // Don't log AbortErrors (intentional timeouts) or network errors (502, CORS issues, etc.)
       if (e?.name !== 'AbortError' && 
@@ -283,10 +310,12 @@ function InventoryContent() {
       if (!res.ok) {
         if (res.status === 404) {
           // Player not found on Faceit - this is normal, not an error
+          // Silently set to null without logging
           setFaceitStats(null);
           return;
         }
         // Suppress Faceit errors - they're not critical
+        // Don't log to console to reduce noise
         return;
       }
       

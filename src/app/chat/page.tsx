@@ -177,15 +177,37 @@ export default function ChatPage() {
         if (parsedUser?.steamId && (!parsedUser.name || !parsedUser.avatar)) {
           try {
             const steamUrl = `https://steamcommunity.com/profiles/${parsedUser.steamId}/?xml=1`;
-            const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`);
-            const text = await textRes.text();
-            const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || parsedUser.name || 'User';
-            const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || parsedUser.avatar || '';
+            // Try multiple proxy fallbacks
+            const proxyUrls = [
+              `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`,
+              `https://thingproxy.freeboard.io/fetch/${steamUrl}`,
+              `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(steamUrl)}`,
+              `https://yacdn.org/proxy/${steamUrl}`,
+            ];
             
-            parsedUser = { ...parsedUser, name, avatar };
-            window.localStorage.setItem('steam_user', JSON.stringify(parsedUser));
+            let text = '';
+            for (const proxyUrl of proxyUrls) {
+              try {
+                const textRes = await fetch(proxyUrl);
+                if (textRes.ok) {
+                  text = await textRes.text();
+                  break;
+                } else if (textRes.status === 403 || textRes.status === 429) {
+                  continue; // Try next proxy
+                }
+              } catch {
+                continue; // Try next proxy
+              }
+            }
+            
+            if (text) {
+              const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || parsedUser.name || 'User';
+              const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || parsedUser.avatar || '';
+              parsedUser = { ...parsedUser, name, avatar };
+              window.localStorage.setItem('steam_user', JSON.stringify(parsedUser));
+            }
           } catch (error) {
-            console.warn('Failed to fetch Steam profile:', error);
+            // Silently fail - don't spam console
           }
         }
         

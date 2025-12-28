@@ -24,21 +24,37 @@ interface UserInfo {
   isPro: boolean;
 }
 
-// Fetch current Steam profile information
+// Fetch current Steam profile information with proxy fallback
 export async function fetchSteamProfile(steamId: string): Promise<{ name: string; avatar: string }> {
-  try {
-    const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
-    const textRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
-      next: { revalidate: 300 }, // Cache for 5 minutes
-    });
-    const text = await textRes.text();
-    const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
-    const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
-    return { name, avatar };
-  } catch (error) {
-    console.warn(`Failed to fetch Steam profile for ${steamId}:`, error);
-    return { name: 'Unknown User', avatar: '' };
+  const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
+  const proxyUrls = [
+    `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`,
+    `https://thingproxy.freeboard.io/fetch/${steamUrl}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(steamUrl)}`,
+    `https://yacdn.org/proxy/${steamUrl}`,
+  ];
+  
+  for (const proxyUrl of proxyUrls) {
+    try {
+      const textRes = await fetch(proxyUrl, {
+        next: { revalidate: 300 }, // Cache for 5 minutes
+      });
+      
+      if (textRes.ok) {
+        const text = await textRes.text();
+        const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
+        const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
+        return { name, avatar };
+      } else if (textRes.status === 403 || textRes.status === 429) {
+        continue; // Try next proxy
+      }
+    } catch (error) {
+      continue; // Try next proxy
+    }
   }
+  
+  // All proxies failed
+  return { name: 'Unknown User', avatar: '' };
 }
 
 // Get current user info for all unique users in messages
