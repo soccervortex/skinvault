@@ -67,13 +67,9 @@ export const metadata: Metadata = {
       'max-image-preview': 'large',
       'max-snippet': -1,
     },
-    bingbot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
+  },
+  other: {
+    'bingbot': 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   },
   icons: {
     icon: [
