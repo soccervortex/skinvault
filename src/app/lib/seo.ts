@@ -282,16 +282,23 @@ export const pageSEO = {
     ],
   },
   item: (itemName: string) => {
-    // Truncate title if too long (max 60 chars for SEO, but allow up to 70)
-    const baseTitle = itemName.length > 50 
-      ? `${itemName.substring(0, 47)}...` 
-      : itemName;
-    const title = `${baseTitle} - CS2 Skin Price`;
+    // Truncate title if too long (max 60 chars total including suffix)
+    // Bing recommends 50-60 chars, Google shows up to 70 but truncates
+    const suffix = ' - CS2 Skin Price'; // 18 chars
+    const maxItemNameLength = 60 - suffix.length; // 42 chars for item name
     
-    // Truncate description if too long (max 160 chars)
+    let baseTitle = itemName;
+    if (itemName.length > maxItemNameLength) {
+      baseTitle = `${itemName.substring(0, maxItemNameLength - 3)}...`;
+    }
+    const title = `${baseTitle}${suffix}`;
+    
+    // Truncate description if too long (max 160 chars for SEO)
+    // Bing recommends 120-160 chars
     const baseDescription = `View prices, price history, and market trends for ${itemName}. Compare wear conditions and make informed CS2 trading decisions.`;
-    const description = baseDescription.length > 160
-      ? `${baseDescription.substring(0, 157)}...`
+    const maxDescriptionLength = 160;
+    const description = baseDescription.length > maxDescriptionLength
+      ? `${baseDescription.substring(0, maxDescriptionLength - 3)}...`
       : baseDescription;
     
     return {

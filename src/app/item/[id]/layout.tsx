@@ -149,10 +149,17 @@ export async function generateMetadata(
   // Use the actual ID from URL params for canonical URL, not the item name
   const actualPath = `/item/${id}`;
   
+  // Create description with proper truncation (max 160 chars for SEO)
+  const baseDescription = `Check the current price and market history for ${itemName} on SkinVaults. View real-time CS2 skin prices, price trends, and detailed analytics.`;
+  const maxDescriptionLength = 160;
+  const description = baseDescription.length > maxDescriptionLength
+    ? `${baseDescription.substring(0, maxDescriptionLength - 3)}...`
+    : baseDescription;
+  
   return generateSEOMetadata({
     ...pageSEO.item(itemName),
     path: actualPath, // Override path to use actual ID instead of encoded name
-    description: `Check the current price and market history for ${itemName} on SkinVaults. View real-time CS2 skin prices, price trends, and detailed analytics. The most accurate CS2 skin valuation tool.`,
+    description, // Use truncated description
     image: itemInfo.image || undefined,
   });
 }
