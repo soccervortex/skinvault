@@ -178,7 +178,7 @@ export default function XPostAdminPage() {
                         {Object.entries(stats.weekly.typeCounts).map(([type, count]) => (
                           <div key={type} className="flex justify-between text-xs">
                             <span className="text-gray-400">{type}:</span>
-                            <span className="font-bold">{count}x</span>
+                            <span className="font-bold">{Number(count)}x</span>
                           </div>
                         ))}
                       </div>
@@ -215,7 +215,7 @@ export default function XPostAdminPage() {
                         {Object.entries(stats.monthly.typeCounts).map(([type, count]) => (
                           <div key={type} className="flex justify-between text-xs">
                             <span className="text-gray-400">{type}:</span>
-                            <span className="font-bold">{count}x</span>
+                            <span className="font-bold">{Number(count)}x</span>
                           </div>
                         ))}
                       </div>
