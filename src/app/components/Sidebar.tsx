@@ -34,7 +34,29 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         window.localStorage.removeItem(testKey);
 
         const savedUser = window.localStorage.getItem('steam_user');
-        setUser(savedUser ? JSON.parse(savedUser) : null);
+        const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+        
+        // If user exists but name/avatar is missing, fetch from API
+        if (parsedUser?.steamId && (!parsedUser.name || !parsedUser.avatar)) {
+          fetch(`/api/steam/profile?steamId=${parsedUser.steamId}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data) {
+                const updatedUser = {
+                  ...parsedUser,
+                  name: data.name || parsedUser.name || 'User',
+                  avatar: data.avatar || parsedUser.avatar || '',
+                };
+                window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
+                setUser(updatedUser);
+              } else {
+                setUser(parsedUser);
+              }
+            })
+            .catch(() => setUser(parsedUser));
+        } else {
+          setUser(parsedUser);
+        }
       } catch {
         // Ignore localStorage errors
         setUser(null);
@@ -43,7 +65,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
     checkUser();
     window.addEventListener('storage', checkUser);
-    return () => window.removeEventListener('storage', checkUser);
+    // Also listen for custom user update events
+    const handleUserUpdate = () => checkUser();
+    window.addEventListener('userUpdated', handleUserUpdate);
+    
+    // Periodically check for user updates (every 5 seconds)
+    const interval = setInterval(checkUser, 5000);
+    
+    return () => {
+      window.removeEventListener('storage', checkUser);
+      window.removeEventListener('userUpdated', handleUserUpdate);
+      clearInterval(interval);
+    };
   }, []);
 
   // Sync theme state (works for logged in and not logged in users)

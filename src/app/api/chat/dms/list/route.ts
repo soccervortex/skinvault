@@ -2,36 +2,23 @@ import { NextResponse } from 'next/server';
 import { getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { getDatabase } from '@/app/utils/mongodb-client';
 
-// Fetch Steam profile helper with proxy fallback
+// Fetch Steam profile helper using server-side API route
 async function fetchSteamProfile(steamId: string): Promise<{ name: string; avatar: string }> {
-  const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
-  const proxyUrls = [
-    `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`,
-    `https://thingproxy.freeboard.io/fetch/${steamUrl}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(steamUrl)}`,
-    `https://yacdn.org/proxy/${steamUrl}`,
-  ];
-  
-  for (const proxyUrl of proxyUrls) {
-    try {
-      const textRes = await fetch(proxyUrl, {
-        cache: 'no-store', // Don't cache in API routes
-      });
-      
-      if (textRes.ok) {
-        const text = await textRes.text();
-        const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || 'Unknown User';
-        const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || '';
-        return { name, avatar };
-      } else if (textRes.status === 403 || textRes.status === 429) {
-        continue; // Try next proxy
-      }
-    } catch (error) {
-      continue; // Try next proxy
+  try {
+    // Use internal server-side fetch (no proxies needed)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/steam/profile?steamId=${steamId}`, {
+      cache: 'no-store', // Don't cache in API routes
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      return { name: data.name || 'Unknown User', avatar: data.avatar || '' };
     }
+  } catch (error) {
+    // Silently fail
   }
   
-  // All proxies failed
   return { name: 'Unknown User', avatar: '' };
 }
 

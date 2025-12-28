@@ -48,21 +48,51 @@ function CompareContent() {
       return;
     }
     
-    fetch('https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json')
-      .then(res => res.json())
-      .then((data: CompareSkin[] | Record<string, CompareSkin>) => {
+    const loadItems = async () => {
+      try {
+        // First try to load from API
+        const res = await fetch('https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json');
+        const data = await res.json();
         const arr = Array.isArray(data) ? data : Object.values(data);
+        
+        // Also load custom items
+        let customItems: CompareSkin[] = [];
+        try {
+          const customRes = await fetch('/api/admin/custom-items');
+          if (customRes.ok) {
+            const customData = await customRes.json();
+            if (customData.items && Array.isArray(customData.items)) {
+              customItems = customData.items.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                image: item.image || '',
+                weapon: item.weapon ? { name: item.weapon } : undefined,
+                rarity: item.rarity ? { name: item.rarity } : undefined,
+                market_hash_name: item.marketHashName || item.name,
+              }));
+            }
+          }
+        } catch (error) {
+          // Silently ignore custom items errors
+        }
+        
+        // Combine API items and custom items
+        const allItems = [...arr, ...customItems];
+        
         const found = [
-          arr.find((i) => i.id === id1),
-          arr.find((i) => i.id === id2),
+          allItems.find((i) => i.id === id1 || (i as any).market_hash_name === id1),
+          allItems.find((i) => i.id === id2 || (i as any).market_hash_name === id2),
         ].filter(Boolean) as CompareSkin[];
+        
         setItems(found);
         setLoading(false);
-      })
-      .catch(() => {
+      } catch (error) {
         setItems([]);
         setLoading(false);
-      });
+      }
+    };
+    
+    loadItems();
   }, [searchParams]);
 
   // Hydrate wishlist / user / Pro status once

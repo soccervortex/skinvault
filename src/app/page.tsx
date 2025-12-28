@@ -294,6 +294,37 @@ export default function GlobalSkinSearch() {
           persistCache();
         }
 
+        // Load custom items and add them to the list
+        try {
+          const customRes = await fetch('/api/admin/custom-items');
+          if (customRes.ok) {
+            const customData = await customRes.json();
+            if (customData.items && Array.isArray(customData.items)) {
+              // Convert custom items to match API format
+              const formattedCustomItems = customData.items.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                market_hash_name: item.marketHashName || item.name,
+                image: item.image || null,
+                rarity: item.rarity ? { name: item.rarity } : null,
+                weapon: item.weapon ? { name: item.weapon } : null,
+                category: item.weapon ? { name: item.weapon } : null,
+                isCustom: true,
+              }));
+              // Add custom items (avoid duplicates by checking ID)
+              const existingIds = new Set(allItems.map((i: any) => i.id));
+              formattedCustomItems.forEach((customItem: any) => {
+                if (!existingIds.has(customItem.id)) {
+                  allItems.push(customItem);
+                }
+              });
+            }
+          }
+        } catch (error) {
+          // Silently ignore custom items errors
+          console.warn('Failed to load custom items:', error);
+        }
+
         if (cancelled) return;
         setItems(filterItems(allItems, activeCat));
         setLoading(false);
@@ -318,6 +349,37 @@ export default function GlobalSkinSearch() {
         } catch {
           rawItems = [];
         }
+      }
+
+      // Load custom items and add them to the list
+      try {
+        const customRes = await fetch('/api/admin/custom-items');
+        if (customRes.ok) {
+          const customData = await customRes.json();
+          if (customData.items && Array.isArray(customData.items)) {
+            // Convert custom items to match API format
+            const formattedCustomItems = customData.items.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              market_hash_name: item.marketHashName || item.name,
+              image: item.image || null,
+              rarity: item.rarity ? { name: item.rarity } : null,
+              weapon: item.weapon ? { name: item.weapon } : null,
+              category: item.weapon ? { name: item.weapon } : null,
+              isCustom: true,
+            }));
+            // Add custom items (avoid duplicates by checking ID)
+            const existingIds = new Set((rawItems || []).map((i: any) => i.id));
+            formattedCustomItems.forEach((customItem: any) => {
+              if (!existingIds.has(customItem.id)) {
+                rawItems = [...(rawItems || []), customItem];
+              }
+            });
+          }
+        }
+      } catch (error) {
+        // Silently ignore custom items errors
+        console.warn('Failed to load custom items:', error);
       }
 
       if (cancelled) return;

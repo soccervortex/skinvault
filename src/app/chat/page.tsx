@@ -176,35 +176,18 @@ export default function ChatPage() {
         // If user exists but name/avatar is missing, fetch from Steam
         if (parsedUser?.steamId && (!parsedUser.name || !parsedUser.avatar)) {
           try {
-            const steamUrl = `https://steamcommunity.com/profiles/${parsedUser.steamId}/?xml=1`;
-            // Try multiple proxy fallbacks
-            const proxyUrls = [
-              `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`,
-              `https://thingproxy.freeboard.io/fetch/${steamUrl}`,
-              `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(steamUrl)}`,
-              `https://yacdn.org/proxy/${steamUrl}`,
-            ];
-            
-            let text = '';
-            for (const proxyUrl of proxyUrls) {
-              try {
-                const textRes = await fetch(proxyUrl);
-                if (textRes.ok) {
-                  text = await textRes.text();
-                  break;
-                } else if (textRes.status === 403 || textRes.status === 429) {
-                  continue; // Try next proxy
-                }
-              } catch {
-                continue; // Try next proxy
-              }
-            }
-            
-            if (text) {
-              const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || parsedUser.name || 'User';
-              const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || parsedUser.avatar || '';
-              parsedUser = { ...parsedUser, name, avatar };
+            // Use server-side API route instead of proxies
+            const res = await fetch(`/api/steam/profile?steamId=${parsedUser.steamId}`);
+            if (res.ok) {
+              const data = await res.json();
+              parsedUser = { 
+                ...parsedUser, 
+                name: data.name || parsedUser.name || 'User',
+                avatar: data.avatar || parsedUser.avatar || ''
+              };
               window.localStorage.setItem('steam_user', JSON.stringify(parsedUser));
+              // Notify sidebar and other components of user update
+              window.dispatchEvent(new CustomEvent('userUpdated'));
             }
           } catch (error) {
             // Silently fail - don't spam console

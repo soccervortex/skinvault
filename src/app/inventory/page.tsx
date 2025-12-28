@@ -164,64 +164,20 @@ function InventoryContent() {
 
   const fetchViewedProfile = async (id: string) => {
     try {
-      const steamUrl = `https://steamcommunity.com/profiles/${id}/?xml=1`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // Reduced to 6 seconds for faster loading
-      
-      // Try multiple proxy fallbacks
-      const proxyUrls = [
-        `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`,
-        `https://thingproxy.freeboard.io/fetch/${steamUrl}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(steamUrl)}`,
-        `https://yacdn.org/proxy/${steamUrl}`,
-      ];
-      
-      let lastError: any = null;
-      for (const proxyUrl of proxyUrls) {
-        try {
-          const textRes = await fetch(proxyUrl, {
-            signal: controller.signal,
-            cache: 'force-cache', // Cache profile data for faster subsequent loads
-          });
-          
-          if (textRes.ok) {
-            clearTimeout(timeoutId);
-            const text = await textRes.text();
-            const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
-            const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
-            return { steamId: id, name, avatar };
-          } else if (textRes.status === 403 || textRes.status === 429) {
-            // Try next proxy on 403/429
-            continue;
-          }
-        } catch (err: any) {
-          lastError = err;
-          if (err?.name === 'AbortError') {
-            break; // Timeout, don't try more proxies
-          }
-          continue; // Try next proxy
-        }
-      }
-      
-      clearTimeout(timeoutId);
-      throw lastError || new Error('All proxies failed');
-    } catch (e: any) { 
-      // Silently fail - don't log expected errors (timeouts, CORS issues, proxy failures)
-      // These are handled gracefully with fallbacks
-      if (e?.name === 'AbortError' || 
-          e?.message?.includes('502') || 
-          e?.message?.includes('503') ||
-          e?.message?.includes('403') ||
-          e?.message?.includes('Bad Gateway') ||
-          e?.message?.includes('Failed to fetch') ||
-          e?.message?.includes('ERR_NAME_NOT_RESOLVED') ||
-          e?.message?.includes('NetworkError') ||
-          e?.message?.includes('All proxies failed')) {
-        // Silently return default values - no logging
+      // Use server-side API route instead of proxies
+      const res = await fetch(`/api/steam/profile?steamId=${id}`, {
+        cache: 'force-cache', // Cache profile data for faster subsequent loads
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return { steamId: id, name: data.name || "User", avatar: data.avatar || "" };
       } else {
-        // Only log unexpected errors
-        console.warn('Profile fetch failed:', e);
+        // Silently return null for expected errors (404, 408, etc.)
+        return null;
       }
+    } catch (e: any) { 
+      // Silently fail - don't log expected errors
       return null; 
     }
   };
@@ -783,6 +739,8 @@ function InventoryContent() {
                 if (typeof window !== 'undefined') {
                   window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
                   setLoggedInUser(updatedUser);
+                  // Notify sidebar and other components of user update
+                  window.dispatchEvent(new CustomEvent('userUpdated'));
                 }
               } catch {}
             }

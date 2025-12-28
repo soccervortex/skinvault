@@ -124,27 +124,58 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
       setLoading(true);
       let foundItem: any = null;
 
-      for (const file of API_FILES) {
-        try {
-          // Try cache first
-          const cached = datasetCacheRef.current[file];
-          const fresh = cached && Date.now() - cached.timestamp < DATASET_CACHE_TTL;
-          let itemArray: any[];
-
-          if (fresh) {
-            itemArray = cached.data;
-          } else {
-            const res = await fetch(`${API_BASE_URL}/${file}`, { cache: 'force-cache' });
-            const data = await res.json();
-            itemArray = Array.isArray(data) ? data : Object.values(data);
-            datasetCacheRef.current[file] = { data: itemArray, timestamp: Date.now() };
-            persistDatasetCache();
+      // First check custom items
+      try {
+        const customRes = await fetch('/api/admin/custom-items');
+        if (customRes.ok) {
+          const customData = await customRes.json();
+          if (customData.items && Array.isArray(customData.items)) {
+            const customItem = customData.items.find((item: any) => 
+              item.id === decodedId || 
+              item.marketHashName === decodedId || 
+              item.name === decodedId
+            );
+            if (customItem) {
+              foundItem = {
+                id: customItem.id,
+                name: customItem.name,
+                market_hash_name: customItem.marketHashName || customItem.name,
+                image: customItem.image || null,
+                rarity: customItem.rarity ? { name: customItem.rarity } : null,
+                weapon: customItem.weapon ? { name: customItem.weapon } : null,
+                isCustom: true,
+              };
+            }
           }
+        }
+      } catch (error) {
+        // Silently ignore custom items errors
+      }
 
-          foundItem = itemArray.find((i: any) => i.id === decodedId || i.market_hash_name === decodedId || i.name === decodedId);
-          if (foundItem) break;
-        } catch (e) {
-          console.error(e);
+      // If not found in custom items, check API files
+      if (!foundItem) {
+        for (const file of API_FILES) {
+          try {
+            // Try cache first
+            const cached = datasetCacheRef.current[file];
+            const fresh = cached && Date.now() - cached.timestamp < DATASET_CACHE_TTL;
+            let itemArray: any[];
+
+            if (fresh) {
+              itemArray = cached.data;
+            } else {
+              const res = await fetch(`${API_BASE_URL}/${file}`, { cache: 'force-cache' });
+              const data = await res.json();
+              itemArray = Array.isArray(data) ? data : Object.values(data);
+              datasetCacheRef.current[file] = { data: itemArray, timestamp: Date.now() };
+              persistDatasetCache();
+            }
+
+            foundItem = itemArray.find((i: any) => i.id === decodedId || i.market_hash_name === decodedId || i.name === decodedId);
+            if (foundItem) break;
+          } catch (e) {
+            console.error(e);
+          }
         }
       }
 
