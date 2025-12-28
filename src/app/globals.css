@@ -133,15 +133,20 @@ button:disabled,
 }
 
 /* Optimize animations for compositing - use GPU acceleration */
-.transition-transform,
-.group-hover\:scale-110 {
-  will-change: transform;
+/* Only apply will-change on hover/active states to reduce memory usage */
+.transition-transform {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
 
-/* Optimize opacity transitions */
-.transition-opacity {
+/* Apply will-change only when actually animating (on hover) */
+.group:hover .transition-transform,
+.transition-transform:hover {
+  will-change: transform;
+}
+
+/* Optimize opacity transitions - only apply will-change when needed */
+.transition-opacity:hover {
   will-change: opacity;
 }
 
@@ -154,13 +159,13 @@ a {
   transition-timing-function: ease-out;
 }
 
-/* For buttons that need color transitions, use will-change hint */
-button.transition-all,
-a.transition-all {
+/* For buttons that need color transitions, use will-change hint only on hover */
+button.transition-all:hover,
+a.transition-all:hover {
   will-change: background-color, border-color, color, transform, opacity;
 }
 
-/* Optimize specific transitions */
-.transition-colors {
+/* Optimize specific transitions - only on hover */
+.transition-colors:hover {
   will-change: color, background-color, border-color;
 }

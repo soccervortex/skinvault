@@ -30,12 +30,15 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
   display: 'swap',
+  // Preload is enabled by default in Next.js - this font is used on initial page load
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: 'swap',
+  adjustFontFallback: false, // Reduce font loading overhead
+  // This font is only used on specific pages (admin, contact), not initial load
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || SITE_CONFIG.url;

@@ -627,7 +627,8 @@ export default function GlobalSkinSearch() {
                           src={item.image} 
                           width={384} 
                           height={384} 
-                          className="w-full h-full object-contain relative z-10 will-change-transform group-hover:scale-110 transition-transform duration-500" 
+                          className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500" 
+                          style={{ transform: 'translateZ(0)' }}
                           alt={item.name ? `${item.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Image"}
                           loading="lazy"
                           unoptimized
