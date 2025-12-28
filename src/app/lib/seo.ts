@@ -282,10 +282,14 @@ export const pageSEO = {
     ],
   },
   item: (itemName: string) => {
-    // Truncate title if too long (max 60 chars total including suffix)
-    // Bing recommends 50-60 chars, Google shows up to 70 but truncates
+    // Truncate title if too long
+    // Bing recommends max 70 chars total, but we need to account for " | SkinVaults" suffix (13 chars)
+    // So max title from here should be 57 chars (70 - 13)
     const suffix = ' - CS2 Skin Price'; // 18 chars
-    const maxItemNameLength = 60 - suffix.length; // 42 chars for item name
+    const siteSuffix = ' | SkinVaults'; // 13 chars (added by generateSEOMetadata)
+    const maxTotalLength = 70; // Bing's limit
+    const maxTitleLength = maxTotalLength - siteSuffix.length; // 57 chars max for this part
+    const maxItemNameLength = maxTitleLength - suffix.length; // 39 chars for item name (57 - 18)
     
     let baseTitle = itemName;
     if (itemName.length > maxItemNameLength) {
