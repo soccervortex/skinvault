@@ -303,7 +303,21 @@ export default function ItemReportsPage() {
         </div>
       </div>
 
-      {/* Add Item Modal - will be created next */}
+      {/* View Details Modal */}
+      {selectedReport && !showAddItemModal && (
+        <ViewDetailsModal
+          report={selectedReport}
+          onClose={() => setSelectedReport(null)}
+          onAddItem={() => {
+            setShowAddItemModal(true);
+          }}
+          onUpdateStatus={updateReportStatus}
+          onDelete={deleteReport}
+          updating={updating}
+        />
+      )}
+
+      {/* Add Item Modal */}
       {showAddItemModal && selectedReport && (
         <AddCustomItemModal
           report={selectedReport}
@@ -318,6 +332,191 @@ export default function ItemReportsPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// View Details Modal Component
+function ViewDetailsModal({
+  report,
+  onClose,
+  onAddItem,
+  onUpdateStatus,
+  onDelete,
+  updating,
+}: {
+  report: ItemReport;
+  onClose: () => void;
+  onAddItem: () => void;
+  onUpdateStatus: (reportId: string, status: string) => void;
+  onDelete: (reportId: string) => void;
+  updating: string | null;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <Eye className="text-blue-400" size={20} />
+            </div>
+            <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-white">
+              Report Details
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-white transition-colors"
+            aria-label="Close"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Item Image */}
+          {report.itemImage && (
+            <div className="flex justify-center">
+              <img
+                src={report.itemImage}
+                alt={report.itemName}
+                className="w-32 h-32 rounded-xl object-cover border border-white/10"
+              />
+            </div>
+          )}
+
+          {/* Item Information */}
+          <div className="bg-[#08090d] rounded-xl p-4 border border-white/5">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+              Item Information
+            </h3>
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Item Name</p>
+                <p className="text-sm font-bold text-white">{report.itemName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Item ID</p>
+                <p className="text-sm font-mono text-gray-300">{report.itemId}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Report Information */}
+          <div className="bg-[#08090d] rounded-xl p-4 border border-white/5">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+              Report Information
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-400">Status:</p>
+                <span
+                  className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                    report.status === 'pending'
+                      ? 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400'
+                      : report.status === 'resolved'
+                      ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+                      : 'bg-gray-500/10 border border-gray-500/20 text-gray-400'
+                  }`}
+                >
+                  {report.status}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-400">API Status:</p>
+                {report.existsInAPI ? (
+                  <span className="px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-[10px] font-black uppercase text-green-400">
+                    Found in API
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] font-black uppercase text-red-400">
+                    Not in API
+                  </span>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Reason</p>
+                <p className="text-sm text-gray-300">{report.reason}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Reported</p>
+                <p className="text-sm text-gray-300">
+                  {new Date(report.createdAt).toLocaleString()}
+                </p>
+              </div>
+              {report.reviewedAt && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Reviewed</p>
+                  <p className="text-sm text-gray-300">
+                    {new Date(report.reviewedAt).toLocaleString()}
+                    {report.reviewedBy && ` by ${report.reviewedBy}`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-white/5">
+            {!report.existsInAPI && (
+              <button
+                onClick={onAddItem}
+                className="px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              >
+                <Plus size={14} />
+                Add Item
+              </button>
+            )}
+            {report.status === 'pending' && (
+              <>
+                <button
+                  onClick={() => onUpdateStatus(report.id, 'resolved')}
+                  disabled={updating === report.id}
+                  className="px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+                >
+                  {updating === report.id ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      Resolve
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => onUpdateStatus(report.id, 'dismissed')}
+                  disabled={updating === report.id}
+                  className="px-4 py-2 rounded-lg bg-gray-500/10 border border-gray-500/20 text-gray-400 hover:bg-gray-500/20 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                  Dismiss
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this report?')) {
+                  onDelete(report.id);
+                  onClose();
+                }
+              }}
+              disabled={updating === report.id}
+              className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-white/10 bg-black/40 text-gray-400 hover:text-white hover:border-white/20 transition-all text-xs font-black uppercase tracking-widest ml-auto"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
