@@ -114,10 +114,24 @@ export async function DELETE(request: Request) {
     }
 
     const db = await getDatabase();
+    
+    // First, check if there's a custom item linked to this report
+    const customItem = await db.collection('custom_items').findOne({ reportId });
+    
+    // Delete the report
     await db.collection('item_reports').deleteOne({ id: reportId });
     await dbDelete(`item_report:${reportId}`);
 
-    return NextResponse.json({ success: true });
+    // If there's a linked custom item, delete it as well
+    if (customItem) {
+      await db.collection('custom_items').deleteOne({ id: customItem.id });
+      await dbDelete(`custom_item:${customItem.id}`);
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      deletedCustomItem: !!customItem 
+    });
   } catch (error) {
     console.error('Error deleting report:', error);
     return NextResponse.json(

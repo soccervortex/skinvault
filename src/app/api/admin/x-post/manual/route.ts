@@ -1,0 +1,158 @@
+import { NextResponse } from 'next/server';
+import { dbGet } from '@/app/utils/database';
+import {
+  createWeeklySummaryPost,
+  createMonthlyStatsPost,
+  createItemHighlightPost,
+} from '@/app/lib/x-post-types';
+
+const ADMIN_HEADER = 'x-admin-key';
+
+export async function POST(request: Request) {
+  try {
+    const adminKey = request.headers.get(ADMIN_HEADER);
+    const expected = process.env.ADMIN_PRO_TOKEN;
+
+    if (expected && adminKey !== expected) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { postType } = body; // 'weekly', 'monthly', or 'live'
+
+    if (!postType || !['weekly', 'monthly', 'live'].includes(postType)) {
+      return NextResponse.json(
+        { error: 'Invalid postType. Must be: weekly, monthly, or live' },
+        { status: 400 }
+      );
+    }
+
+    let result;
+    const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+
+    switch (postType) {
+      case 'weekly':
+        result = await createWeeklySummaryPost();
+        break;
+      
+      case 'monthly':
+        result = await createMonthlyStatsPost();
+        break;
+      
+      case 'live':
+        result = await createItemHighlightPost(postHistory);
+        break;
+      
+      default:
+        return NextResponse.json(
+          { error: 'Invalid postType' },
+          { status: 400 }
+        );
+    }
+
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        postId: result.postId,
+        itemName: result.itemName || null,
+        message: `Successfully posted ${postType} post`,
+      });
+    } else {
+      return NextResponse.json(
+        { error: result.error || 'Failed to create post' },
+        { status: 500 }
+      );
+    }
+  } catch (error: any) {
+    console.error('Error creating manual post:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to create post' },
+      { status: 500 }
+    );
+  }
+}
+
+// GET: Get date ranges and post statistics
+export async function GET(request: Request) {
+  try {
+    const adminKey = request.headers.get(ADMIN_HEADER);
+    const expected = process.env.ADMIN_PRO_TOKEN;
+
+    if (expected && adminKey !== expected) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentDay = now.getDate();
+
+    // Calculate date ranges
+    // Weekly: last 7 days
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    // Monthly: from start of current month
+    const monthStart = new Date(currentYear, currentMonth - 1, 1);
+    
+    // Next month start (max date for monthly count)
+    const nextMonthStart = new Date(currentYear, currentMonth, 1);
+    
+    // Format dates as DD-MM-YYYY
+    const formatDate = (date: Date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    };
+
+    // Get post history
+    const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+
+    // Count posts in different periods
+    const weeklyPosts = postHistory.filter(p => {
+      const postDate = new Date(p.date);
+      return postDate >= sevenDaysAgo;
+    });
+
+    const monthlyPosts = postHistory.filter(p => {
+      const postDate = new Date(p.date);
+      return postDate >= monthStart;
+    });
+
+    // Count by type for weekly
+    const weeklyTypeCounts: Record<string, number> = {};
+    weeklyPosts.forEach(p => {
+      weeklyTypeCounts[p.itemType] = (weeklyTypeCounts[p.itemType] || 0) + 1;
+    });
+
+    // Count by type for monthly
+    const monthlyTypeCounts: Record<string, number> = {};
+    monthlyPosts.forEach(p => {
+      monthlyTypeCounts[p.itemType] = (monthlyTypeCounts[p.itemType] || 0) + 1;
+    });
+
+    return NextResponse.json({
+      weekly: {
+        startDate: formatDate(sevenDaysAgo),
+        endDate: formatDate(now),
+        postCount: weeklyPosts.length,
+        typeCounts: weeklyTypeCounts,
+      },
+      monthly: {
+        startDate: formatDate(monthStart),
+        endDate: formatDate(now),
+        maxDate: formatDate(nextMonthStart),
+        postCount: monthlyPosts.length,
+        typeCounts: monthlyTypeCounts,
+      },
+      currentDate: formatDate(now),
+    });
+  } catch (error: any) {
+    console.error('Error getting post statistics:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to get statistics' },
+      { status: 500 }
+    );
+  }
+}
+

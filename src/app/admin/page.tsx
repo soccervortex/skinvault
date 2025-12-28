@@ -1475,6 +1475,32 @@ export default function AdminPage() {
           </button>
         </div>
 
+        {/* X Post Manager Section */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+              <Twitter className="text-blue-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Social Media
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                X Post Manager
+              </h2>
+            </div>
+          </div>
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
+            Manually trigger weekly, monthly, or live posts. View date ranges and post statistics.
+          </p>
+          <button
+            onClick={() => router.push('/admin/x-post')}
+            className="w-full bg-blue-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-2"
+          >
+            <Twitter size={14} /> Manage X Posts
+          </button>
+        </div>
+
         {/* User Search Section */}
         <div className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
