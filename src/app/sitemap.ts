@@ -29,12 +29,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Create a link for every item
-  const skinRoutes: MetadataRoute.Sitemap = allItems.map((item) => ({
-    url: `${BASE_URL}/skin/${item.slug}`,
-    lastModified: new Date(),
-    changeFrequency: 'always' as const,
-    priority: 0.7,
-  }));
+  // Use the item ID if available, otherwise fall back to market hash name
+  const skinRoutes: MetadataRoute.Sitemap = allItems.map((item) => {
+    // Use item.id if available, otherwise use marketHashName, otherwise use slug as fallback
+    const itemId = item.id || item.marketHashName || item.slug;
+    return {
+      url: `${BASE_URL}/item/${encodeURIComponent(itemId)}`,
+      lastModified: new Date(),
+      changeFrequency: 'always' as const,
+      priority: 0.7,
+    };
+  });
 
   return [...staticRoutes, ...skinRoutes];
 }

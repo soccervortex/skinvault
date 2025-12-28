@@ -1,6 +1,7 @@
 export interface Weapon {
   name: string;
   slug: string;
+  id?: string;
   marketHashName?: string;
   metaDescription?: string;
 }
@@ -46,10 +47,12 @@ export async function getAllItems(): Promise<Weapon[]> {
         
         items.forEach((item: any) => {
           const marketHashName = item.market_hash_name || item.name || '';
+          const itemId = item.id || null;
           if (marketHashName) {
             allItems.push({
               name: marketHashName,
               slug: generateSlug(marketHashName),
+              id: itemId,
               marketHashName: marketHashName,
               metaDescription: `Check the current price and market history for ${marketHashName} on SkinVaults. The most accurate CS2 skin valuation tool.`,
             });
