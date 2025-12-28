@@ -552,12 +552,14 @@ export async function checkDbHealth(): Promise<{
 
 /**
  * Close database connections (for cleanup)
+ * Uses shared connection pool from mongodb-client
  */
 export async function closeDbConnections(): Promise<void> {
-  if (mongoClient) {
-    await mongoClient.close();
-    mongoClient = null;
-    mongoDb = null;
+  try {
+    const { closeConnection } = await import('@/app/utils/mongodb-client');
+    await closeConnection();
+  } catch (error) {
+    // Ignore errors - connection pool manages itself
   }
 }
 
