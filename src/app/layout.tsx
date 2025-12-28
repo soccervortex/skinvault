@@ -99,8 +99,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
   themeColor: '#000000',
 };
 
@@ -153,8 +152,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <link rel="preconnect" href="https://raw.githubusercontent.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://steamcommunity.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://api.steampowered.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://steamcommunity.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://community.akamai.steamstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://community.cloudflare.steamstatic.com" />
         {/* Structured Data injected as Script tags */}
         <script
           type="application/ld+json"

@@ -13,14 +13,34 @@ const nextConfig: NextConfig = {
   // Optimize images
   images: {
     formats: ['image/avif', 'image/webp'],
-    minimumCacheTTL: 60,
+    minimumCacheTTL: 31536000, // 1 year cache for images
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'community.akamai.steamstatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'community.cloudflare.steamstatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'steamcommunity.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+      },
+    ],
   },
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // Reduce legacy JavaScript - target modern browsers
+  transpilePackages: [],
   // Turbopack configuration
     turbopack: {
     root: path.resolve(__dirname),
