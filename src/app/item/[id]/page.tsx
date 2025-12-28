@@ -6,7 +6,7 @@ const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public
 
 // Server-side function to fetch item data for SEO and initial render
 async function getItemData(itemId: string) {
-  try {
+    try {
     for (const file of API_FILES) {
       try {
         const response = await fetch(`${BASE_URL}/${file}`, { 
@@ -33,9 +33,9 @@ async function getItemData(itemId: string) {
   } catch (error) {
     console.error('Failed to fetch item data:', error);
   }
-  
+
   return null;
-}
+  }
 
 export default async function ItemDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -48,7 +48,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ id: str
   // If item not found, return proper 404 (not soft 404)
   if (!initialItem) {
     notFound();
-  }
+                    }
   
   // Pass initial data to client component
   // Client component will handle interactivity and price fetching

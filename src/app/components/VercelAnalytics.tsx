@@ -111,9 +111,9 @@ export default function VercelAnalytics() {
     
     // Suppress resource loading errors (for Network tab errors)
     const originalAddEventListener = EventTarget.prototype.addEventListener;
-    EventTarget.prototype.addEventListener = function(type: string, listener: any, options?: any) {
+    EventTarget.prototype.addEventListener = function(this: EventTarget, type: string, listener: any, options?: any) {
       if (type === 'error' && listener) {
-        const wrappedListener = function(e: Event) {
+        const wrappedListener = function(this: EventTarget, e: Event) {
           const target = e.target as any;
           if (target && (target.src || target.href)) {
             const url = target.src || target.href || '';
