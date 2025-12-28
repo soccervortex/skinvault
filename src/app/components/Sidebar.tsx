@@ -220,8 +220,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           className="lg:hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         >
-          <aside
-            role="navigation"
+          <nav
             aria-label="Main navigation"
             className="w-80 bg-[#0f111a] border-r border-white/5 flex flex-col p-6 overflow-y-auto h-full"
             onClick={(e) => e.stopPropagation()}
@@ -229,7 +228,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-2xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVaults</h1>
-                <p className="text-[8px] font-black text-gray-600 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -241,16 +240,16 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             </div>
 
             <div className="space-y-2 mb-10 flex-1">
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Market">
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
                 <Tag size={16} /> Market
               </Link>
-              <Link href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="My Vault">
+              <Link href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
                 <Wallet size={16} /> My Vault
               </Link>
-              <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
+              <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16} /> Wishlist
               </Link>
-              <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)} className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
+              <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)} className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Chat">
                 <MessageSquare size={16} /> Chat
                 {unreadCount > 0 && (
                   <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
@@ -274,7 +273,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
                 <ShoppingCart size={16} /> Shop
               </Link>
-              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
+              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact
               </Link>
               {isOwner(user?.steamId) && (
@@ -285,7 +284,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
               {pathname === '/' && categories && (
                 <div className="mt-8 pt-8 border-t border-white/5">
-                  <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-4">Weapon Categories</h3>
+                  <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-4">Weapon Categories</h2>
                   <nav className="space-y-1">
                     {categories.map((cat: any) => (
                       <button
@@ -439,37 +438,37 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     Reviews
                   </Link>
                 </div>
-                <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
+                <div className="text-[8px] font-black uppercase tracking-widest text-gray-400 px-2">
                   © {new Date().getFullYear()} SkinVault. All rights reserved.
                 </div>
               </div>
             </div>
-          </aside>
+          </nav>
         </div>
       )}
 
       {/* Desktop Sidebar */}
-      <aside role="navigation" aria-label="Main navigation" className="w-80 bg-[#0f111a] border-r border-white/5 hidden lg:flex flex-col p-8 overflow-y-auto shrink-0">
+      <nav aria-label="Main navigation" className="w-80 bg-[#0f111a] border-r border-white/5 hidden lg:flex flex-col p-8 overflow-y-auto shrink-0">
         <div className="mb-12 px-4">
           <h1 className="text-3xl font-black text-blue-500 italic uppercase tracking-tighter">SkinVaults</h1>
-          <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1">Premium Analytics</p>
         </div>
 
         <div className="space-y-2 mb-10 flex-1">
-          <Link href="/" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Market">
+          <Link href="/" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
             <Tag size={16} /> Market
           </Link>
           <Link
             href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'}
-            className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`}
+            className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`}
             aria-label="My Vault"
           >
             <Wallet size={16} /> My Vault
           </Link>
-          <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Wishlist">
+          <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16} /> Wishlist
           </Link>
-          <Link href="/chat" className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Chat">
+          <Link href="/chat" className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/chat' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Chat">
             <MessageSquare size={16} /> Chat
             {unreadCount > 0 && (
               <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
@@ -490,7 +489,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/shop" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
             <ShoppingCart size={16} /> Shop
           </Link>
-          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-500 hover:text-white'}`} aria-label="Contact">
+          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
             <Mail size={16} /> Contact
           </Link>
           {isOwner(user?.steamId) && (
@@ -501,7 +500,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
           {pathname === '/' && categories && (
             <div className="mt-8 pt-8 border-t border-white/5">
-              <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-4">Weapon Categories</h3>
+              <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-4">Weapon Categories</h2>
               <nav className="space-y-1">
                 {categories.map((cat: any) => (
                   <button
@@ -655,12 +654,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 Reviews
               </Link>
             </div>
-            <div className="text-[8px] font-black uppercase tracking-widest text-gray-600 px-2">
+            <div className="text-[8px] font-black uppercase tracking-widest text-gray-400 px-2">
               © {new Date().getFullYear()} SkinVault. All rights reserved.
             </div>
           </div>
         </div>
-      </aside>
+      </nav>
 
       {/* --- SEARCH MODAL --- */}
       {isSearchOpen && (

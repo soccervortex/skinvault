@@ -109,14 +109,53 @@ export default function VercelAnalytics() {
       return originalXHRSend.apply(this, args as any);
     };
     
+    // Suppress resource loading errors (for Network tab errors)
+    const originalAddEventListener = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function(type: string, listener: any, options?: any) {
+      if (type === 'error' && listener) {
+        const wrappedListener = function(e: Event) {
+          const target = e.target as any;
+          if (target && (target.src || target.href)) {
+            const url = target.src || target.href || '';
+            if (url.includes('_vercel/insights') || url.includes('_vercel/speed-insights')) {
+              e.stopPropagation();
+              e.preventDefault();
+              return;
+            }
+          }
+          if (typeof listener === 'function') {
+            listener.call(this, e);
+          }
+        };
+        return originalAddEventListener.call(this, type, wrappedListener, options);
+      }
+      return originalAddEventListener.call(this, type, listener, options);
+    };
+    
+    // Suppress unhandled promise rejections for Vercel scripts
+    const originalUnhandledRejection = window.onunhandledrejection;
+    window.onunhandledrejection = function(event: PromiseRejectionEvent) {
+      const reason = event.reason?.toString() || '';
+      if (reason.includes('_vercel/insights') || reason.includes('_vercel/speed-insights') || 
+          reason.includes('ERR_BLOCKED_BY_CLIENT') || reason.includes('net::ERR_BLOCKED_BY_CLIENT')) {
+        event.preventDefault();
+        return;
+      }
+      if (originalUnhandledRejection) {
+        return originalUnhandledRejection.call(window, event);
+      }
+    };
+    
     return () => {
       console.warn = originalWarn;
       console.error = originalError;
       console.log = originalLog;
       window.fetch = originalFetch;
       window.onerror = originalErrorHandler;
+      window.onunhandledrejection = originalUnhandledRejection;
       XMLHttpRequest.prototype.open = originalXHROpen;
       XMLHttpRequest.prototype.send = originalXHRSend;
+      EventTarget.prototype.addEventListener = originalAddEventListener;
     };
   }, []);
 
