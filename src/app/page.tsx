@@ -29,7 +29,7 @@ type SortType =
   | 'weapon-za';
 
 const CATEGORIES = [
-  { name: 'All Skins', icon: <Tag size={14}/>, file: 'skins_not_grouped.json', filter: 'all' },
+  { name: 'All Items', icon: <Tag size={14}/>, file: 'all', filter: 'all' },
   { name: 'Rifles', icon: <Crosshair size={14}/>, file: 'skins_not_grouped.json', filter: 'rifle' },
   { name: 'Sniper Rifles', icon: <Target size={14}/>, file: 'skins_not_grouped.json', filter: 'sniper' },
   { name: 'SMGs', icon: <Zap size={14}/>, file: 'skins_not_grouped.json', filter: 'smg' },
@@ -245,6 +245,55 @@ export default function GlobalSkinSearch() {
     const load = async () => {
       setLoading(true);
 
+      // If "All Items" category, load from all API files
+      if (activeCat.file === 'all') {
+        const { API_FILES, BASE_URL } = await import('@/data/api-endpoints');
+        let allItems: any[] = [];
+        
+        // Check cache for all files
+        const allCached = API_FILES.every(file => {
+          const cached = datasetCacheRef.current[file];
+          const isFresh = cached && Date.now() - cached.timestamp < CACHE_TTL;
+          if (isFresh) {
+            allItems.push(...cached.data);
+            return true;
+          }
+          return false;
+        });
+
+        // If not all cached, fetch missing files
+        if (!allCached) {
+          const fetchPromises = API_FILES.map(async (file) => {
+            const cached = datasetCacheRef.current[file];
+            const isFresh = cached && Date.now() - cached.timestamp < CACHE_TTL;
+            
+            if (isFresh) {
+              return cached.data;
+            }
+            
+            try {
+              const res = await fetch(`${BASE_URL}/${file}`, { cache: 'force-cache' });
+              const data = await res.json();
+              const items = Array.isArray(data) ? data : Object.values(data);
+              datasetCacheRef.current[file] = { data: items, timestamp: Date.now() };
+              return items;
+            } catch {
+              return [];
+            }
+          });
+          
+          const results = await Promise.all(fetchPromises);
+          allItems = results.flat();
+          persistCache();
+        }
+
+        if (cancelled) return;
+        setItems(filterItems(allItems, activeCat));
+        setLoading(false);
+        return;
+      }
+
+      // For specific categories, load from single file
       const cached = datasetCacheRef.current[activeCat.file];
       const isFresh = cached && Date.now() - cached.timestamp < CACHE_TTL;
       let rawItems: any[] | undefined = isFresh ? cached.data : undefined;
