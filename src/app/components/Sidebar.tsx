@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -489,9 +489,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/shop" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
             <ShoppingCart size={16} /> Shop
           </Link>
-          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
-            <Mail size={16} /> Contact
-          </Link>
+              <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
+                <Mail size={16} /> Contact
+              </Link>
+              <Link href="/report-item" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
+                <AlertTriangle size={16} /> Report Item
+              </Link>
           {isOwner(user?.steamId) && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
               <Shield size={16} /> Admin Panel

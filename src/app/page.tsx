@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
-import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell, Star, ExternalLink } from 'lucide-react';
+import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell, Star, ExternalLink, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
@@ -424,6 +424,23 @@ export default function GlobalSkinSearch() {
               {Array.from({ length: 20 }).map((_, i) => (
                 <ItemCardSkeleton key={i} />
               ))}
+            </div>
+          ) : processedItems.length === 0 && query.trim() ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-white/10 rounded-[2.5rem] bg-black/20">
+              <Search className="text-gray-600 mb-4" size={32} />
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+                No items found
+              </p>
+              <p className="text-[10px] text-gray-600 mb-6 max-w-md">
+                We couldn't find any items matching "{query}". Try a different search term or check the spelling.
+              </p>
+              <Link
+                href="/report-item"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-black uppercase tracking-widest transition-all"
+              >
+                <AlertTriangle size={16} />
+                Report Missing Item
+              </Link>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
