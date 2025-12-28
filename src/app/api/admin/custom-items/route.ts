@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbGet, dbSet, dbDelete } from '@/app/utils/database';
+import { submitItemToIndexNow } from '@/app/utils/indexnow';
 
 // Get all custom items
 export async function GET(request: Request) {
@@ -87,6 +88,13 @@ export async function POST(request: Request) {
         }
       );
     }
+
+    // Submit to IndexNow for real-time search engine indexing
+    // Fire and forget - don't block the response if IndexNow fails
+    submitItemToIndexNow(id).catch((error) => {
+      console.error('Failed to submit item to IndexNow:', error);
+      // Don't throw - IndexNow is non-critical
+    });
 
     return NextResponse.json({ success: true, item: customItem });
   } catch (error) {

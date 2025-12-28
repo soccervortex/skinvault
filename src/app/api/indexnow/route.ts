@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const INDEXNOW_API_KEY = '99982adb45e64fb7b2e24712db654185';
-const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/IndexNow';
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-const KEY_LOCATION = `${BASE_URL}/99982adb45e64fb7b2e24712db654185.txt`;
+import { submitToIndexNow } from '@/app/utils/indexnow';
 
 /**
  * POST /api/indexnow
@@ -27,61 +23,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate URLs belong to our domain
-    const validUrls = urls.filter((url: string) => {
-      try {
-        const urlObj = new URL(url);
-        const baseUrlObj = new URL(BASE_URL);
-        return urlObj.hostname === baseUrlObj.hostname;
-      } catch {
-        return false;
-      }
-    });
+    // Use the utility function for consistency
+    const result = await submitToIndexNow(urls);
 
-    if (validUrls.length === 0) {
-      return NextResponse.json(
-        { error: 'All URLs must belong to the same host as the base URL' },
-        { status: 400 }
-      );
-    }
-
-    // Prepare IndexNow request
-    const indexNowPayload = {
-      host: new URL(BASE_URL).hostname,
-      key: INDEXNOW_API_KEY,
-      keyLocation: KEY_LOCATION,
-      urlList: validUrls,
-    };
-
-    // Submit to IndexNow
-    const response = await fetch(INDEXNOW_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: JSON.stringify(indexNowPayload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('IndexNow API error:', response.status, errorText);
-      
+    if (!result.success) {
       return NextResponse.json(
         { 
-          error: 'Failed to submit URLs to IndexNow',
-          status: response.status,
-          details: errorText,
+          error: result.error || 'Failed to submit URLs to IndexNow',
+          urls: result.urls,
+          submitted: result.submitted,
+          skipped: result.skipped,
         },
-        { status: response.status }
+        { status: 400 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: `Successfully submitted ${validUrls.length} URL(s) to IndexNow`,
-      urls: validUrls,
-      submitted: validUrls.length,
-      skipped: urls.length - validUrls.length,
+      message: `Successfully submitted ${result.submitted} URL(s) to IndexNow`,
+      urls: result.urls,
+      submitted: result.submitted,
+      skipped: result.skipped,
     });
   } catch (error) {
     console.error('IndexNow submission error:', error);
@@ -98,6 +60,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+    
     // Get URLs from sitemap
     const sitemapUrls = [
       BASE_URL,
@@ -105,43 +69,32 @@ export async function GET(request: NextRequest) {
       `${BASE_URL}/wishlist`,
       `${BASE_URL}/pro`,
       `${BASE_URL}/compare`,
+      `${BASE_URL}/shop`,
+      `${BASE_URL}/contact`,
+      `${BASE_URL}/faq`,
     ];
 
-    // Prepare IndexNow request
-    const indexNowPayload = {
-      host: new URL(BASE_URL).hostname,
-      key: INDEXNOW_API_KEY,
-      keyLocation: KEY_LOCATION,
-      urlList: sitemapUrls,
-    };
+    // Use the utility function for consistency
+    const result = await submitToIndexNow(sitemapUrls);
 
-    // Submit to IndexNow
-    const response = await fetch(INDEXNOW_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: JSON.stringify(indexNowPayload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('IndexNow API error:', response.status, errorText);
-      
+    if (!result.success) {
       return NextResponse.json(
         { 
-          error: 'Failed to submit URLs to IndexNow',
-          status: response.status,
-          details: errorText,
+          error: result.error || 'Failed to submit URLs to IndexNow',
+          urls: result.urls,
+          submitted: result.submitted,
+          skipped: result.skipped,
         },
-        { status: response.status }
+        { status: 400 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: `Successfully submitted ${sitemapUrls.length} URL(s) from sitemap to IndexNow`,
-      urls: sitemapUrls,
+      message: `Successfully submitted ${result.submitted} URL(s) from sitemap to IndexNow`,
+      urls: result.urls,
+      submitted: result.submitted,
+      skipped: result.skipped,
     });
   } catch (error) {
     console.error('IndexNow submission error:', error);
