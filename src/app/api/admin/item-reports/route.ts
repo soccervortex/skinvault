@@ -2,9 +2,20 @@ import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbGet, dbSet, dbDelete } from '@/app/utils/database';
 
+const ADMIN_HEADER = 'x-admin-key';
+
 // Get all item reports
 export async function GET(request: Request) {
   try {
+    // Optional admin check (can be removed if not needed)
+    const adminKey = request.headers.get(ADMIN_HEADER);
+    const expected = process.env.ADMIN_PRO_TOKEN;
+    
+    // Only check if ADMIN_PRO_TOKEN is set
+    if (expected && adminKey !== expected) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
 
@@ -33,6 +44,13 @@ export async function GET(request: Request) {
 // Update report status
 export async function PATCH(request: Request) {
   try {
+    const adminKey = request.headers.get(ADMIN_HEADER);
+    const expected = process.env.ADMIN_PRO_TOKEN;
+
+    if (expected && adminKey !== expected) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { reportId, status, reviewedBy } = body;
 
@@ -77,6 +95,13 @@ export async function PATCH(request: Request) {
 // Delete report
 export async function DELETE(request: Request) {
   try {
+    const adminKey = request.headers.get(ADMIN_HEADER);
+    const expected = process.env.ADMIN_PRO_TOKEN;
+
+    if (expected && adminKey !== expected) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const reportId = searchParams.get('reportId');
 

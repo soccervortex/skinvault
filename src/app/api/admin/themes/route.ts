@@ -44,7 +44,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid theme' }, { status: 400 });
     }
 
+    // Update the theme setting
     await setThemeEnabled(theme, enabled);
+    
+    // Wait a bit to ensure database write completes
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Get fresh settings (bypass cache to ensure we get the latest)
     const updatedSettings = await getThemeSettings();
 
     // If theme is being disabled, clear gift claims for that theme so users can claim again next year

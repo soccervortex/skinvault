@@ -357,7 +357,10 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
  * Set value in database (ALWAYS write to both KV and MongoDB for sync)
  */
 export async function dbSet<T>(key: string, value: T): Promise<boolean> {
-  // Update cache immediately (reduces future KV reads)
+  // Clear cache for this key first to ensure fresh read after write
+  readCache.delete(key);
+  
+  // Update cache immediately with new value (reduces future KV reads)
   readCache.set(key, { value, timestamp: Date.now() });
   if (readCache.size > MAX_CACHE_SIZE) {
     const firstKey = readCache.keys().next().value;

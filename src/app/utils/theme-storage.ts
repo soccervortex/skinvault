@@ -26,25 +26,57 @@ let fallbackThemeSettings: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
 let fallbackUserDisabled: Record<string, boolean> = {};
 
 // Read theme settings (database abstraction)
-async function readThemeSettings(): Promise<ThemeSettingsMap> {
+async function readThemeSettings(useCache: boolean = true): Promise<ThemeSettingsMap> {
   try {
-    const data = await dbGet<ThemeSettingsMap>(THEME_SETTINGS_KEY);
-    return data || { ...DEFAULT_THEME_SETTINGS };
+    // Use dbGet with cache control - when reading after a write, we want fresh data
+    const data = await dbGet<ThemeSettingsMap>(THEME_SETTINGS_KEY, useCache);
+    
+    // If no data or empty object, return defaults
+    if (!data || Object.keys(data).length === 0) {
+      return { ...DEFAULT_THEME_SETTINGS };
+    }
+    
+    // Ensure all theme keys exist (merge with defaults to fill missing keys)
+    const merged: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
+    for (const theme of Object.keys(DEFAULT_THEME_SETTINGS) as ThemeType[]) {
+      if (data[theme] !== undefined && data[theme] !== null) {
+        merged[theme] = data[theme];
+      }
+    }
+    
+    return merged;
   } catch (error) {
     console.warn('Database read failed for theme settings, using fallback:', error);
   }
-  return fallbackThemeSettings;
+  return { ...fallbackThemeSettings };
 }
 
 // Write theme settings (database abstraction)
 async function writeThemeSettings(settings: ThemeSettingsMap): Promise<void> {
   try {
-    await dbSet(THEME_SETTINGS_KEY, settings);
-    return;
+    // Ensure all theme keys are present before writing
+    const completeSettings: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
+    for (const theme of Object.keys(DEFAULT_THEME_SETTINGS) as ThemeType[]) {
+      if (settings[theme] !== undefined) {
+        completeSettings[theme] = settings[theme];
+      }
+    }
+    
+    // Write to database (both KV and MongoDB)
+    const success = await dbSet(THEME_SETTINGS_KEY, completeSettings);
+    
+    if (success) {
+      // Update fallback cache
+      fallbackThemeSettings = { ...completeSettings };
+      return;
+    } else {
+      console.warn('Database write returned false for theme settings');
+    }
   } catch (error) {
     console.warn('Database write failed for theme settings, using fallback:', error);
   }
-  fallbackThemeSettings = settings;
+  // Update fallback even if write failed
+  fallbackThemeSettings = { ...settings };
 }
 
 // Get user's disabled themes preference (database abstraction)
@@ -70,24 +102,41 @@ async function writeUserDisabledThemes(data: Record<string, boolean>): Promise<v
 }
 
 // Get all theme settings (admin)
+// This function ensures we always return a complete settings object
 export async function getThemeSettings(): Promise<ThemeSettingsMap> {
-  return await readThemeSettings();
+  const settings = await readThemeSettings();
+  
+  // Ensure all keys exist (double-check)
+  const complete: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
+  for (const theme of Object.keys(DEFAULT_THEME_SETTINGS) as ThemeType[]) {
+    if (settings[theme] !== undefined) {
+      complete[theme] = settings[theme];
+    }
+  }
+  
+  return complete;
 }
 
 // Update a specific theme setting (admin)
 export async function setThemeEnabled(theme: ThemeType, enabled: boolean): Promise<void> {
-  const settings = await readThemeSettings();
+  // Read current settings (bypass cache to get fresh data from database)
+  const currentSettings = await readThemeSettings(false);
   
-  // Ensure all theme keys exist (merge with defaults to avoid missing keys)
-  const mergedSettings: ThemeSettingsMap = {
-    ...DEFAULT_THEME_SETTINGS,
-    ...settings,
-  };
+  // Create new settings object with the update
+  const newSettings: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };
+  
+  // Copy all current settings (preserve existing state)
+  for (const t of Object.keys(DEFAULT_THEME_SETTINGS) as ThemeType[]) {
+    if (currentSettings[t] !== undefined) {
+      newSettings[t] = currentSettings[t];
+    }
+  }
   
   // Update the specific theme
-  mergedSettings[theme] = { enabled };
+  newSettings[theme] = { enabled };
   
-  await writeThemeSettings(mergedSettings);
+  // Write the complete settings (this will clear cache and write to both KV and MongoDB)
+  await writeThemeSettings(newSettings);
 }
 
 // Check if a theme is enabled (admin enabled it)
@@ -118,8 +167,10 @@ export async function getActiveTheme(steamId?: string | null): Promise<ThemeType
   }
   
   // Find enabled themes in priority order
+  // Only check themes that exist in settings and are explicitly enabled
   for (const theme of THEME_PRIORITY_ORDER) {
-    if (settings[theme]?.enabled) {
+    const themeSetting = settings[theme];
+    if (themeSetting && themeSetting.enabled === true) {
       return theme;
     }
   }

@@ -394,7 +394,16 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 <ShieldCheck size={12} className="text-green-400" />
                 <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-green-400">Verified</span>
               </div>
-              <div className="md:hidden flex-1 flex justify-end">
+              <div className="md:hidden flex-1 flex justify-end gap-2">
+                {/* Report Button (Mobile) */}
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-yellow-500 hover:bg-yellow-500/10 transition-all"
+                  aria-label="Report missing item"
+                >
+                  <AlertTriangle size={16} className="text-yellow-400" />
+                </button>
+                {/* Wishlist Button (Mobile) */}
                 <button
                   onClick={() => {
                     const result = toggleWishlistEntry(

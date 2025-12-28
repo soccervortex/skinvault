@@ -30,33 +30,47 @@ export default function ItemReportsPage() {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
 
+  const [userLoaded, setUserLoaded] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const stored = window.localStorage.getItem('steam_user');
-      setUser(stored ? JSON.parse(stored) : null);
+      const parsedUser = stored ? JSON.parse(stored) : null;
+      setUser(parsedUser);
+      setUserLoaded(true);
     } catch {
       setUser(null);
+      setUserLoaded(true);
     }
   }, []);
 
   const userIsOwner = isOwner(user?.steamId);
 
   useEffect(() => {
+    // Wait for user to be loaded before checking ownership
+    if (!userLoaded) return;
+    
     if (!userIsOwner) {
       router.push('/');
       return;
     }
     loadReports();
-  }, [userIsOwner, filter]);
+  }, [userLoaded, userIsOwner, filter]);
 
   const loadReports = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/item-reports?status=${filter}`);
+      const res = await fetch(`/api/admin/item-reports?status=${filter}`, {
+        headers: {
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+      });
       const data = await res.json();
       if (res.ok) {
-        setReports(data.reports || []);
+        setReports(data.reports || data || []);
+      } else {
+        console.error('Failed to load reports:', data);
       }
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -70,7 +84,10 @@ export default function ItemReportsPage() {
     try {
       const res = await fetch('/api/admin/item-reports', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
         body: JSON.stringify({
           reportId,
           status,
@@ -81,6 +98,9 @@ export default function ItemReportsPage() {
       if (res.ok) {
         await loadReports();
         setSelectedReport(null);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update report');
       }
     } catch (error) {
       console.error('Error updating report:', error);
@@ -97,11 +117,17 @@ export default function ItemReportsPage() {
     try {
       const res = await fetch(`/api/admin/item-reports?reportId=${reportId}`, {
         method: 'DELETE',
+        headers: {
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
       });
 
       if (res.ok) {
         await loadReports();
         setSelectedReport(null);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete report');
       }
     } catch (error) {
       console.error('Error deleting report:', error);
@@ -110,6 +136,18 @@ export default function ItemReportsPage() {
       setUpdating(null);
     }
   };
+
+  // Show loading state while checking user
+  if (!userLoaded) {
+    return (
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="animate-spin text-blue-500" size={32} />
+        </div>
+      </div>
+    );
+  }
 
   if (!userIsOwner) {
     return null;
@@ -312,7 +350,10 @@ function AddCustomItemModal({
     try {
       const res = await fetch('/api/admin/custom-items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
         body: JSON.stringify({
           ...formData,
           reportId: report.id,
