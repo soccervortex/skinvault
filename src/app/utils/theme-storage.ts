@@ -77,8 +77,17 @@ export async function getThemeSettings(): Promise<ThemeSettingsMap> {
 // Update a specific theme setting (admin)
 export async function setThemeEnabled(theme: ThemeType, enabled: boolean): Promise<void> {
   const settings = await readThemeSettings();
-  settings[theme] = { enabled };
-  await writeThemeSettings(settings);
+  
+  // Ensure all theme keys exist (merge with defaults to avoid missing keys)
+  const mergedSettings: ThemeSettingsMap = {
+    ...DEFAULT_THEME_SETTINGS,
+    ...settings,
+  };
+  
+  // Update the specific theme
+  mergedSettings[theme] = { enabled };
+  
+  await writeThemeSettings(mergedSettings);
 }
 
 // Check if a theme is enabled (admin enabled it)
@@ -87,16 +96,20 @@ export async function isThemeEnabled(theme: ThemeType): Promise<boolean> {
   return settings[theme]?.enabled ?? false;
 }
 
+// Theme priority order (higher priority = earlier in array)
+// This determines which theme shows when multiple are enabled
+const THEME_PRIORITY_ORDER: ThemeType[] = [
+  'newyear',      // Highest priority (New Year)
+  'oldyear',      // Second priority (Old Year)
+  'christmas',    // Third priority (Christmas)
+  'sinterklaas',  // Fourth priority (Sinterklaas)
+  'halloween',    // Fifth priority (Halloween)
+  'easter',       // Lowest priority (Easter)
+];
+
 // Get which theme should be active (check admin enabled + user preference)
 export async function getActiveTheme(steamId?: string | null): Promise<ThemeType | null> {
   const settings = await readThemeSettings();
-  
-  // Find first enabled theme
-  const enabledThemes = Object.entries(settings)
-    .filter(([_, s]) => s.enabled)
-    .map(([theme]) => theme as ThemeType);
-  
-  if (enabledThemes.length === 0) return null;
   
   // If user has disabled all themes, return null
   if (steamId) {
@@ -104,8 +117,14 @@ export async function getActiveTheme(steamId?: string | null): Promise<ThemeType
     if (userDisabled[steamId] === true) return null;
   }
   
-  // Return first enabled theme (priority order)
-  return enabledThemes[0] || null;
+  // Find enabled themes in priority order
+  for (const theme of THEME_PRIORITY_ORDER) {
+    if (settings[theme]?.enabled) {
+      return theme;
+    }
+  }
+  
+  return null;
 }
 
 // Check if user has disabled themes
