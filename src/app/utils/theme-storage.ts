@@ -62,12 +62,14 @@ export async function setThemeSettings(settings: ThemeSettingsMap): Promise<void
       }
     }
     
-    // Write to database (both KV and MongoDB)
+    // Write to database (both KV and MongoDB) - dbSet already clears cache
     const success = await dbSet(THEME_SETTINGS_KEY, completeSettings);
     
     if (success) {
       // Update fallback cache
       fallbackThemeSettings = { ...completeSettings };
+      // Wait a bit to ensure write completes and propagates
+      await new Promise(resolve => setTimeout(resolve, 300));
       return;
     } else {
       console.warn('Database write returned false for theme settings');
@@ -157,8 +159,9 @@ const THEME_PRIORITY_ORDER: ThemeType[] = [
 ];
 
 // Get which theme should be active (check admin enabled + user preference)
-export async function getActiveTheme(steamId?: string | null): Promise<ThemeType | null> {
-  const settings = await readThemeSettings();
+export async function getActiveTheme(steamId?: string | null, bypassCache: boolean = false): Promise<ThemeType | null> {
+  // Bypass cache if requested (e.g., after a theme change)
+  const settings = await readThemeSettings(!bypassCache);
   
   // If user has disabled all themes, return null
   if (steamId) {

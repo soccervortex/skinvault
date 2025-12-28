@@ -66,10 +66,11 @@ export async function POST(request: Request) {
     const { setThemeSettings } = await import('@/app/utils/theme-storage');
     await setThemeSettings(newSettings);
     
-    // Wait a bit to ensure database write completes
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait a bit to ensure database write completes and propagates
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     // Get fresh settings (bypass cache to ensure we get the latest)
+    // dbSet already clears the cache, but wait a bit for propagation
     const updatedSettings = await getThemeSettings();
 
     // If theme is being disabled, clear gift claims for that theme so users can claim again next year

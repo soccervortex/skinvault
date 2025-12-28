@@ -364,8 +364,22 @@ export default function AdminPage() {
         setThemeSettings(data.settings);
         setThemeMessage(`${theme} theme ${enabled ? "enabled" : "disabled"}`);
         setTimeout(() => setThemeMessage(null), 3000);
-        // Trigger theme update for all users
+        
+        // Force immediate theme reload by dispatching event and reloading theme
         window.dispatchEvent(new CustomEvent('themeChanged'));
+        
+        // Also force a page reload of the theme after a short delay to ensure database write propagated
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('themeChanged'));
+          // Force reload theme in all open tabs/windows
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+              window.localStorage.setItem('sv_theme_force_reload', Date.now().toString());
+            } catch {
+              // Ignore localStorage errors
+            }
+          }
+        }, 500);
       }
     } catch (e: any) {
       setThemeError(e?.message || "Request failed.");

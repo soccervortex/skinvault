@@ -63,8 +63,15 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
     
     const loadActiveTheme = async () => {
       try {
-        const url = `/api/themes/active${steamId ? `?steamId=${steamId}` : ''}`;
-        const response = await fetch(url);
+        // Add cache-busting timestamp to ensure fresh data
+        const timestamp = Date.now();
+        const url = `/api/themes/active${steamId ? `?steamId=${steamId}` : ''}&_t=${timestamp}`;
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
         if (!response.ok) {
           setActiveTheme(null);
           updateBodyClass(null);
@@ -105,22 +112,25 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
 
     // Listen for theme changes
     const handleThemeChange = () => {
-      loadActiveTheme();
+      // Small delay to ensure database write has propagated
+      setTimeout(() => {
+        loadActiveTheme();
+      }, 400);
     };
 
     window.addEventListener('themeChanged', handleThemeChange);
     
     // Listen for storage changes (for localStorage updates)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sv_theme_disabled') {
+      if (e.key === 'sv_theme_disabled' || e.key === 'sv_theme_force_reload') {
         loadActiveTheme();
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
     
-    // Also poll periodically to catch admin changes (every 3 seconds)
-    const interval = setInterval(loadActiveTheme, 3000);
+    // Also poll periodically to catch admin changes (every 2 seconds for faster updates)
+    const interval = setInterval(loadActiveTheme, 2000);
     
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
