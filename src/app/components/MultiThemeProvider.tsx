@@ -112,29 +112,56 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
 
     // Listen for theme changes
     const handleThemeChange = () => {
-      // Small delay to ensure database write has propagated
+      // Immediate reload, then retry after delay to ensure database write has propagated
+      loadActiveTheme();
       setTimeout(() => {
         loadActiveTheme();
-      }, 400);
+      }, 600);
+      setTimeout(() => {
+        loadActiveTheme();
+      }, 1200);
     };
 
     window.addEventListener('themeChanged', handleThemeChange);
     
-    // Listen for storage changes (for localStorage updates)
+    // Listen for storage changes (for cross-tab communication)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sv_theme_disabled' || e.key === 'sv_theme_force_reload') {
-        loadActiveTheme();
+      if (e.key === 'sv_theme_disabled' || e.key === 'sv_theme_force_reload' || e.key === 'sv_theme_changed') {
+        // Immediate reload when theme changes in another tab
+        setTimeout(() => {
+          loadActiveTheme();
+        }, 100);
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
     
-    // Also poll periodically to catch admin changes (every 2 seconds for faster updates)
-    const interval = setInterval(loadActiveTheme, 2000);
+    // Also listen for same-tab localStorage changes (using a custom event)
+    const handleLocalStorageChange = () => {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          const changed = window.localStorage.getItem('sv_theme_changed');
+          if (changed) {
+            setTimeout(() => {
+              loadActiveTheme();
+            }, 100);
+          }
+        } catch {
+          // Ignore errors
+        }
+      }
+    };
+    
+    // Listen for custom storage event (for same-tab changes)
+    window.addEventListener('localStorageChange', handleLocalStorageChange);
+    
+    // Also poll periodically to catch admin changes (every 1.5 seconds for faster updates)
+    const interval = setInterval(loadActiveTheme, 1500);
     
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleLocalStorageChange);
       clearInterval(interval);
     };
   }, [steamId, updateBodyClass]);

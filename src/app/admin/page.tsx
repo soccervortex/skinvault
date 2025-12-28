@@ -365,21 +365,40 @@ export default function AdminPage() {
         setThemeMessage(`${theme} theme ${enabled ? "enabled" : "disabled"}`);
         setTimeout(() => setThemeMessage(null), 3000);
         
-        // Force immediate theme reload by dispatching event and reloading theme
+        // Force immediate theme reload in current tab
         window.dispatchEvent(new CustomEvent('themeChanged'));
         
-        // Also force a page reload of the theme after a short delay to ensure database write propagated
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('themeChanged'));
-          // Force reload theme in all open tabs/windows
-          if (typeof window !== 'undefined' && window.localStorage) {
-            try {
-              window.localStorage.setItem('sv_theme_force_reload', Date.now().toString());
-            } catch {
-              // Ignore localStorage errors
-            }
+        // Force reload in ALL tabs using localStorage (triggers storage event in other tabs)
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            const reloadKey = 'sv_theme_force_reload';
+            const timestamp = Date.now().toString();
+            // Set values to trigger storage event in other tabs
+            window.localStorage.setItem(reloadKey, timestamp);
+            // Also set a value that changes to ensure event fires
+            window.localStorage.setItem('sv_theme_changed', `${theme}:${enabled}:${timestamp}`);
+            
+            // Dispatch custom event for same-tab listeners
+            window.dispatchEvent(new CustomEvent('localStorageChange'));
+            
+            // Trigger multiple reloads with delays to ensure database propagation
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('themeChanged'));
+              window.dispatchEvent(new CustomEvent('localStorageChange'));
+              window.localStorage.setItem(reloadKey, (Date.now() + 1).toString());
+              window.localStorage.setItem('sv_theme_changed', `${theme}:${enabled}:${Date.now() + 1}`);
+            }, 600);
+            
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('themeChanged'));
+              window.dispatchEvent(new CustomEvent('localStorageChange'));
+              window.localStorage.setItem(reloadKey, (Date.now() + 2).toString());
+              window.localStorage.setItem('sv_theme_changed', `${theme}:${enabled}:${Date.now() + 2}`);
+            }, 1200);
+          } catch {
+            // Ignore localStorage errors
           }
-        }, 500);
+        }
       }
     } catch (e: any) {
       setThemeError(e?.message || "Request failed.");
