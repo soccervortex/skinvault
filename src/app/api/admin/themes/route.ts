@@ -14,8 +14,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const settings = await getThemeSettings();
-    return NextResponse.json(settings);
+    // Always bypass cache to get fresh settings
+    const settings = await getThemeSettings(true);
+    return NextResponse.json(settings, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Failed to get theme settings:', error);
     return NextResponse.json({ error: 'Failed to get theme settings' }, { status: 500 });
