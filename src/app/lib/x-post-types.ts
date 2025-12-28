@@ -120,21 +120,52 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const recentPosts = postHistory.filter(p => new Date(p.date) >= sevenDaysAgo);
 
-    // Count by type
-    const typeCounts: Record<string, number> = {};
+    // Count by item name (for actual items, not types)
+    const itemCounts: Record<string, number> = {};
     recentPosts.forEach(p => {
-      typeCounts[p.itemType] = (typeCounts[p.itemType] || 0) + 1;
+      // Only count actual items (not post types like 'item_highlight', 'weekly_summary', etc.)
+      if (p.itemName && p.itemName !== p.itemType && !['item_highlight', 'weekly_summary', 'monthly_stats', 'milestone', 'alert', 'new_user'].includes(p.itemName)) {
+        itemCounts[p.itemName] = (itemCounts[p.itemName] || 0) + 1;
+      }
     });
 
-    // Get most popular item type
-    const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+    // Get most featured item (by name)
+    const mostFeaturedItem = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0];
+    
+    // If no actual items found, try to get most popular type (but format it better)
+    let mostFeaturedText = 'N/A';
+    if (mostFeaturedItem) {
+      // Truncate long item names
+      const itemName = mostFeaturedItem[0].length > 30 
+        ? mostFeaturedItem[0].substring(0, 27) + '...' 
+        : mostFeaturedItem[0];
+      mostFeaturedText = `${itemName} (${mostFeaturedItem[1]}x)`;
+    } else {
+      // Fallback: count by type but format better
+      const typeCounts: Record<string, number> = {};
+      recentPosts.forEach(p => {
+        typeCounts[p.itemType] = (typeCounts[p.itemType] || 0) + 1;
+      });
+      const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+      if (mostPopularType) {
+        // Format type names better
+        const typeName = mostPopularType[0] === 'item_highlight' ? 'Item Highlights' :
+                         mostPopularType[0] === 'weekly_summary' ? 'Weekly Summaries' :
+                         mostPopularType[0] === 'monthly_stats' ? 'Monthly Stats' :
+                         mostPopularType[0] === 'new_user' ? 'New Users' :
+                         mostPopularType[0] === 'milestone' ? 'Milestones' :
+                         mostPopularType[0] === 'alert' ? 'Alerts' :
+                         mostPopularType[0];
+        mostFeaturedText = `${typeName} (${mostPopularType[1]}x)`;
+      }
+    }
     
     // Get top 5 movers (gainers and losers) from last 7 days
     const { gainers, losers } = await getTopMovers('7d', 5);
     
     let summaryText = `📊 Weekly CS2 Market Summary\n\n`;
     summaryText += `📈 Posts this week: ${recentPosts.length}\n`;
-    summaryText += `🎮 Most featured: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n\n`;
+    summaryText += `🎮 Most featured: ${mostFeaturedText}\n\n`;
     
     // Add top gainers
     if (gainers.length > 0) {
