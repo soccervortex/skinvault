@@ -1,94 +1,19 @@
 import { MetadataRoute } from 'next';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  // Get base URL from environment variable or use default
-  // Vercel automatically provides VERCEL_URL in production
-  // You can also set NEXT_PUBLIC_BASE_URL in your environment variables
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://skinvaults.online');
-  
-  const currentDate = new Date().toISOString();
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const BASE_URL = 'https://skinvaults.online';
 
-  return [
-    {
-      url: `${baseUrl}/llms.txt`,
-      lastModified: currentDate,
-      changeFrequency: 'weekly',
-      priority: 1.0, // High priority for AI crawlers
-    },
-    {
-      url: baseUrl,
-      lastModified: currentDate,
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
-    {
-      url: `${baseUrl}/inventory`,
-      lastModified: currentDate,
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/wishlist`,
-      lastModified: currentDate,
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/pro`,
-      lastModified: currentDate,
-      changeFrequency: 'monthly',
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/compare`,
-      lastModified: currentDate,
-      changeFrequency: 'weekly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/shop`,
-      lastModified: currentDate,
-      changeFrequency: 'weekly',
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/contact`,
-      lastModified: currentDate,
-      changeFrequency: 'monthly',
-      priority: 0.4,
-    },
-    {
-      url: `${baseUrl}/faq`,
-      lastModified: currentDate,
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/privacy`,
-      lastModified: currentDate,
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
-    {
-      url: `${baseUrl}/terms`,
-      lastModified: currentDate,
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
-    {
-      url: `${baseUrl}/reviews`,
-      lastModified: currentDate,
-      changeFrequency: 'weekly',
-      priority: 0.4,
-    },
-  ];
+  // 1. Static Routes
+  const staticRoutes = ['', '/contact', '/faq', '/premium', '/shop'].map(route => ({
+    url: `${BASE_URL}${route}`,
+    lastModified: new Date(),
+    changeFrequency: 'daily' as const,
+    priority: route === '' ? 1.0 : 0.8,
+  }));
+
+  // 2. ADVANCED: In the future, you can fetch all skins from your DB here!
+  // const skins = await fetchSkins();
+  // const skinRoutes = skins.map(skin => ({ url: `${BASE_URL}/skin/${skin.id}`, ... }));
+
+  return [...staticRoutes];
 }
-
-
-
-
-
-
-
-
