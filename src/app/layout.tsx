@@ -23,6 +23,7 @@ import GlobalErrorHandler from "./components/GlobalErrorHandler";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { faqStructuredData } from "@/data/faq-data";
+import { SITE_CONFIG, ALL_KEYWORDS } from "@/lib/seo-config";
 
 config.autoAddCss = false;
 
@@ -38,26 +39,22 @@ const geistMono = Geist_Mono({
   display: 'swap',
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-const SHORT_DESCRIPTION = 'Track CS2 skin prices, manage your Steam inventory, set price alerts, and analyze your portfolio value safely with our read-only tools.';
-const COMPREHENSIVE_DESCRIPTION = 'SkinVaults is the premier CS2 skin analytics platform for tracking inventory value, monitoring market prices, setting price alerts, and managing your CS2 skin portfolio. Get real-time price data, portfolio analytics, wishlist management, and skin comparison tools. Safe, secure, and read-only - we never modify or transfer your skins.';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || SITE_CONFIG.url;
+const SHORT_DESCRIPTION = SITE_CONFIG.description;
+const COMPREHENSIVE_DESCRIPTION = SITE_CONFIG.description;
 
 // --- 1. METADATA API (The Robot Cover) ---
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: "SkinVaults - CS2 Inventory Tracker & Skin Valuation Tool",
+    default: SITE_CONFIG.title,
     template: "%s | SkinVaults"
   },
   description: COMPREHENSIVE_DESCRIPTION,
-  keywords: [
-    'CS2 inventory tracker', 'CS2 skin valuation', 'Steam portfolio analytics', 
-    'CS2 investment tool', 'skin price alerts', 'CS2 float checker',
-    'CS2 skin analytics', 'Counter-Strike 2 skins', 'CS2 price tracking',
-    'Steam inventory management', 'CS2 skin portfolio', 'skin market data',
-    'CS2 skin prices', 'inventory value tracker', 'CS2 skin comparison',
-    'skin price history', 'CS2 investment tracking', 'Steam skin analytics'
-  ],
+  keywords: ALL_KEYWORDS,
+  alternates: {
+    canonical: BASE_URL,
+  },
   authors: [{ name: 'SkinVaults' }],
   creator: 'SkinVaults',
   publisher: 'SkinVaults',
@@ -162,6 +159,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://raw.githubusercontent.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://steamcommunity.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.steampowered.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://steamcommunity.com" crossOrigin="anonymous" />
         {/* Structured Data injected as Script tags */}
         <script
           type="application/ld+json"

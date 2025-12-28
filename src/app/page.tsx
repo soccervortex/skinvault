@@ -356,7 +356,7 @@ export default function GlobalSkinSearch() {
             <div className="flex gap-2 md:gap-4">
               {compareList.map(i => (
                 <div key={i.id} className="relative bg-black/40 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/5">
-                   <img src={i.image} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name || "Category icon"} />
+                   <img src={i.image} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name ? `${i.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Category Icon"} />
                    <button onClick={() => toggleCompare(i)} className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-red-500 rounded-full p-0.5 md:p-1" aria-label={`Remove ${i.name} from compare`}><X size={8} /></button>
                 </div>
               ))}
@@ -404,10 +404,10 @@ export default function GlobalSkinSearch() {
 
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
           {/* SEO-optimized heading structure for AI crawlers */}
-          <h1 className="sr-only">The Safest CS2 Inventory Analytics Tool - Track Your Skin Collection Securely</h1>
+          <h1 className="sr-only">CS2 Inventory Tracker - The Ultimate Skin Valuation Tool</h1>
           <div className="mb-6 md:mb-8 text-center">
             <h2 className="text-[11px] md:text-xs lg:text-sm font-black uppercase tracking-[0.3em] text-gray-400 mb-2">
-              CS2 Skin Analytics & Inventory Management
+              CS2 Skin Analytics & Market Valuation
             </h2>
             <p className="text-[9px] md:text-[10px] text-gray-500 max-w-2xl mx-auto">
               Track your CS2 skin collection, monitor prices, and analyze your inventory value. 
@@ -541,7 +541,7 @@ export default function GlobalSkinSearch() {
                     <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
-                        <img loading="lazy" src={item.image} className="w-full h-full object-contain relative z-10 will-change-transform group-hover:scale-110 transition-transform duration-500" alt={item.name} />
+                        <img loading="lazy" src={item.image} className="w-full h-full object-contain relative z-10 will-change-transform group-hover:scale-110 transition-transform duration-500" alt={item.name ? `${item.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Image"} />
                       </div>
                       <p className="text-[9px] md:text-[10px] font-black uppercase truncate tracking-widest text-white/90">{item.name}</p>
                       <p className="text-[7px] md:text-[8px] font-black mt-1 md:mt-2 opacity-80 uppercase" style={{color: rarityColor}}>{item.rarity?.name || 'Standard'}</p>

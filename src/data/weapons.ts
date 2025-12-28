@@ -2,6 +2,7 @@ export interface Weapon {
   name: string;
   slug: string;
   marketHashName?: string;
+  metaDescription?: string;
 }
 
 /**
@@ -50,6 +51,7 @@ export async function getAllItems(): Promise<Weapon[]> {
               name: marketHashName,
               slug: generateSlug(marketHashName),
               marketHashName: marketHashName,
+              metaDescription: `Check the current price and market history for ${marketHashName} on SkinVaults. The most accurate CS2 skin valuation tool.`,
             });
           }
         });
@@ -72,10 +74,30 @@ export async function getAllItems(): Promise<Weapon[]> {
 
 // Fallback list for static generation (used when API is unavailable)
 export const weaponsList: Weapon[] = [
-  { name: "AK-47 | Slate", slug: "ak47-slate" },
-  { name: "AWP | Dragon Lore", slug: "awp-dragon-lore" },
-  { name: "M4A4 | Howl", slug: "m4a4-howl" },
-  { name: "Glock-18 | Fade", slug: "glock18-fade" },
-  { name: "Karambit | Fade", slug: "karambit-fade" },
+  { 
+    name: "AK-47 | Slate", 
+    slug: "ak47-slate",
+    metaDescription: "Check the current price and market history for AK-47 | Slate on SkinVaults. The most accurate CS2 skin valuation tool."
+  },
+  { 
+    name: "AWP | Dragon Lore", 
+    slug: "awp-dragon-lore",
+    metaDescription: "Check the current price and market history for AWP | Dragon Lore on SkinVaults. The most accurate CS2 skin valuation tool."
+  },
+  { 
+    name: "M4A4 | Howl", 
+    slug: "m4a4-howl",
+    metaDescription: "Check the current price and market history for M4A4 | Howl on SkinVaults. The most accurate CS2 skin valuation tool."
+  },
+  { 
+    name: "Glock-18 | Fade", 
+    slug: "glock18-fade",
+    metaDescription: "Check the current price and market history for Glock-18 | Fade on SkinVaults. The most accurate CS2 skin valuation tool."
+  },
+  { 
+    name: "Karambit | Fade", 
+    slug: "karambit-fade",
+    metaDescription: "Check the current price and market history for Karambit | Fade on SkinVaults. The most accurate CS2 skin valuation tool."
+  },
 ];
 

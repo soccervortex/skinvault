@@ -32,7 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const skinRoutes: MetadataRoute.Sitemap = allItems.map((item) => ({
     url: `${BASE_URL}/skin/${item.slug}`,
     lastModified: new Date(),
-    changeFrequency: 'weekly',
+    changeFrequency: 'always' as const,
     priority: 0.7,
   }));
 
