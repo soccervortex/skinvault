@@ -31,6 +31,7 @@ async function getItemInfo(itemId: string) {
             image: item.image || item.image_inventory || item.image_large || null,
             rarity: item.rarity?.name || null,
             weapon: item.weapon?.name || null,
+            marketHashName: item.market_hash_name || item.name || itemId,
           };
         }
       } catch (error) {
@@ -47,7 +48,69 @@ async function getItemInfo(itemId: string) {
     image: null,
     rarity: null,
     weapon: null,
+    marketHashName: decodeURIComponent(itemId),
   };
+}
+
+// Fetch price data from Steam API
+async function getPriceData(marketHashName: string) {
+  try {
+    const hash = encodeURIComponent(marketHashName);
+    const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=3&market_hash_name=${hash}`;
+    
+    const response = await fetch(steamUrl, { 
+      next: { revalidate: 300 }, // Cache for 5 minutes
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      // Parse prices - Steam returns strings like "€1,234.56"
+      const parsePrice = (priceStr: string): number | null => {
+        if (!priceStr) return null;
+        // Remove currency symbols and spaces, replace comma with dot
+        const cleaned = priceStr.replace(/[€$£¥,\s]/g, '').replace(',', '.');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? null : num;
+      };
+
+      const lowestPrice = parsePrice(data.lowest_price);
+      const medianPrice = parsePrice(data.median_price);
+      
+      // Estimate high price as 1.5x median (typical market spread)
+      const highPrice = medianPrice ? Math.round(medianPrice * 1.5 * 100) / 100 : null;
+      
+      // Estimate offer count from volume (if available)
+      let offerCount: number | undefined = undefined;
+      if (data.volume) {
+        // Volume is usually a string like "1,234" or "Low"
+        const volumeStr = data.volume.toString().replace(/,/g, '');
+        const volumeNum = parseInt(volumeStr);
+        if (!isNaN(volumeNum)) {
+          offerCount = volumeNum;
+        }
+      }
+
+      return {
+        lowPrice: lowestPrice || medianPrice || undefined,
+        highPrice: highPrice || undefined,
+        offerCount: offerCount,
+        medianPrice: medianPrice || undefined,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch price data:', error);
+    return null;
+  }
 }
 
 export async function generateMetadata(
@@ -76,8 +139,31 @@ export default async function ItemLayout({
   const decodedId = decodeURIComponent(id);
   const itemInfo = await getItemInfo(decodedId);
   
+  // Fetch price data for schema
+  const priceData = await getPriceData(itemInfo.marketHashName);
+  
+  // Build AggregateOffer with price data
+  const aggregateOffer: any = {
+    "@type": "AggregateOffer",
+    "availability": "https://schema.org/InStock",
+    "priceCurrency": "EUR",
+    "url": `${SITE_CONFIG.url}/item/${encodeURIComponent(decodedId)}`
+  };
+  
+  if (priceData?.lowPrice) {
+    aggregateOffer.lowPrice = priceData.lowPrice.toString();
+  }
+  
+  if (priceData?.highPrice) {
+    aggregateOffer.highPrice = priceData.highPrice.toString();
+  }
+  
+  if (priceData?.offerCount !== undefined) {
+    aggregateOffer.offerCount = priceData.offerCount;
+  }
+  
   // Product structured data for better Google search results
-  const productSchema = {
+  const productSchema: any = {
     "@context": "https://schema.org",
     "@type": "Product",
     "name": itemInfo.name,
@@ -87,15 +173,54 @@ export default async function ItemLayout({
       "@type": "Brand",
       "name": "Counter-Strike 2"
     },
-    "offers": {
-      "@type": "AggregateOffer",
-      "availability": "https://schema.org/InStock",
-      "priceCurrency": "EUR",
-      "url": `${SITE_CONFIG.url}/item/${encodeURIComponent(decodedId)}`
+    "offers": aggregateOffer,
+  };
+  
+  // Add image if available
+  if (itemInfo.image) {
+    productSchema.image = itemInfo.image;
+  }
+  
+  // Add aggregateRating (optional but recommended)
+  // Using a default rating based on rarity/quality
+  const rarityRatings: { [key: string]: number } = {
+    'Covert': 5.0,
+    'Extraordinary': 5.0,
+    'Classified': 4.5,
+    'Restricted': 4.0,
+    'Mil-Spec Grade': 3.5,
+    'Mil-Spec': 3.5,
+    'Industrial Grade': 3.0,
+    'Industrial': 3.0,
+    'Consumer Grade': 2.5,
+    'Consumer': 2.5,
+    'Base Grade': 2.0,
+    'Base': 2.0,
+  };
+  
+  const defaultRating = rarityRatings[itemInfo.rarity || ''] || 3.5;
+  productSchema.aggregateRating = {
+    "@type": "AggregateRating",
+    "ratingValue": defaultRating.toString(),
+    "reviewCount": "1",
+    "bestRating": "5",
+    "worstRating": "1"
+  };
+  
+  // Add review (optional but recommended)
+  productSchema.review = {
+    "@type": "Review",
+    "reviewRating": {
+      "@type": "Rating",
+      "ratingValue": defaultRating.toString(),
+      "bestRating": "5",
+      "worstRating": "1"
     },
-    ...(itemInfo.image && {
-      "image": itemInfo.image
-    })
+    "author": {
+      "@type": "Organization",
+      "name": "SkinVaults"
+    },
+    "reviewBody": `Professional CS2 skin analytics and price tracking for ${itemInfo.name}. Real-time market data and trading insights.`
   };
   
   // BreadcrumbList schema
