@@ -14,11 +14,10 @@
 
 import { kv } from '@vercel/kv';
 import { MongoClient, Db, Collection } from 'mongodb';
+import { getMongoClient, getDatabase as getSharedDatabase } from './mongodb-client';
 
 // Database status
 let dbStatus: 'kv' | 'mongodb' | 'fallback' = 'kv';
-let mongoClient: MongoClient | null = null;
-let mongoDb: Db | null = null;
 let previousKVAvailable: boolean | null = null; // Track KV availability to detect recovery
 
 // Cache to reduce KV reads (simple in-memory cache)
@@ -30,7 +29,7 @@ const MAX_CACHE_SIZE = 1000; // Max cached items
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
-// Initialize MongoDB connection
+// Initialize MongoDB connection using shared connection pool
 async function initMongoDB(): Promise<Db | null> {
   if (!MONGODB_URI) {
     console.warn('[Database] ⚠️ MONGODB_URI not configured');
@@ -38,36 +37,12 @@ async function initMongoDB(): Promise<Db | null> {
   }
 
   try {
-    // Check if client exists and try to ping to verify connection
-    if (!mongoClient) {
-      console.log('[Database] Connecting to MongoDB...');
-      mongoClient = new MongoClient(MONGODB_URI);
-      await mongoClient.connect();
-      mongoDb = mongoClient.db(MONGODB_DB_NAME);
-      console.log('[Database] ✅ MongoDB connected successfully');
-    } else {
-      // Try to ping to verify connection is still alive
-      try {
-        await mongoClient.db('admin').command({ ping: 1 });
-        console.log('[Database] MongoDB connection verified');
-      } catch (pingError) {
-        console.log('[Database] MongoDB connection lost, reconnecting...');
-        try {
-          await mongoClient.close();
-        } catch (e) {
-          // Ignore close errors
-        }
-        mongoClient = new MongoClient(MONGODB_URI);
-        await mongoClient.connect();
-        mongoDb = mongoClient.db(MONGODB_DB_NAME);
-        console.log('[Database] ✅ MongoDB reconnected successfully');
-      }
-    }
-    return mongoDb;
+    // Use shared connection pool instead of creating new client
+    const db = await getSharedDatabase();
+    console.log('[Database] ✅ Using shared MongoDB connection pool');
+    return db;
   } catch (error) {
     console.error('[Database] ❌ MongoDB connection failed:', error);
-    mongoClient = null;
-    mongoDb = null;
     return null;
   }
 }

@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
 import { isOwner } from '@/app/utils/owner-ids';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
 
 // Backup current chat messages before clearing
 export async function POST(request: Request) {
@@ -30,8 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
     const backupsCollection = db.collection('chat_backups');
 
     // Get all messages from last 24 hours using date-based collections
@@ -64,7 +53,7 @@ export async function POST(request: Request) {
       await collection.deleteMany({ timestamp: { $lt: twentyFourHoursAgo } });
     }
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({ 
       success: true, 
@@ -92,8 +81,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ backups: [] });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
     const backupsCollection = db.collection('chat_backups');
 
     const backups = await backupsCollection
@@ -102,7 +90,7 @@ export async function GET(request: Request) {
       .limit(100)
       .toArray();
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({ 
       backups: backups.map(backup => ({

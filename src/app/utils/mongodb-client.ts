@@ -36,12 +36,14 @@ export async function getMongoClient(): Promise<MongoClient> {
   }
 
   // Create new client with connection pooling settings
+  // Reduced pool size for M0 cluster (500 connection limit)
   const client = new MongoClient(MONGODB_URI, {
     serverSelectionTimeoutMS: 5000,
     connectTimeoutMS: 5000,
-    maxPoolSize: 10, // Maximum number of connections in pool
-    minPoolSize: 2, // Minimum number of connections
+    maxPoolSize: 5, // Reduced from 10 to prevent hitting M0 limit (500 connections)
+    minPoolSize: 1, // Reduced from 2 to minimize connections
     maxIdleTimeMS: 30000, // Close connections after 30s of inactivity
+    socketTimeoutMS: 45000, // Close idle sockets after 45s
   });
 
   await client.connect();

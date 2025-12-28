@@ -1,21 +1,11 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
 import { isOwner } from '@/app/utils/owner-ids';
 import { getProUntil } from '@/app/utils/pro-storage';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForRange, getChatCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
 
 export async function GET(
   request: Request,
@@ -72,8 +62,7 @@ export async function GET(
     // Get chat messages using date-based collections
     let messages: any[] = [];
     if (MONGODB_URI) {
-      const client = await getMongoClient();
-      const db = client.db(MONGODB_DB_NAME);
+      const db = await getDatabase();
 
       // Calculate time filter and collection names
       let timeFilterDate: Date | null = null;
@@ -124,7 +113,7 @@ export async function GET(
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 1000);
 
-      await client.close();
+      // Don't close connection - it's from shared pool
     }
 
     // Count timeout history (from backups)
@@ -144,7 +133,7 @@ export async function GET(
           return count;
         }, 0);
         
-        await client.close();
+        // Don't close connection - it's from shared pool
       } catch (error) {
         console.error('Failed to count timeout history:', error);
       }
@@ -242,7 +231,7 @@ export async function GET(
             };
           });
         
-        await client.close();
+        // Don't close connection - it's from shared pool
       } catch (error) {
         console.error('Failed to get DM messages:', error);
       }

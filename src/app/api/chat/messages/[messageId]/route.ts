@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { isOwner } from '@/app/utils/owner-ids';
 import Pusher from 'pusher';
@@ -26,14 +27,8 @@ interface DMMessage {
   timestamp: Date;
 }
 
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
+// Use shared connection pool
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 // PATCH: Edit a message
 export async function PATCH(
@@ -57,8 +52,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
 
     let updated = false;
 
@@ -72,7 +66,7 @@ export async function PATCH(
         if (message) {
           const isAdmin = isOwner(userSteamId);
           if (message.steamId !== userSteamId && !isAdmin) {
-            await client.close();
+            // Don't close connection - it's from shared pool
             return NextResponse.json({ error: 'Unauthorized - you can only edit your own messages' }, { status: 403 });
           }
           
@@ -99,7 +93,7 @@ export async function PATCH(
         if (message) {
           const isAdmin = isOwner(userSteamId);
           if (message.senderId !== userSteamId && !isAdmin) {
-            await client.close();
+            // Don't close connection - it's from shared pool
             return NextResponse.json({ error: 'Unauthorized - you can only edit your own messages' }, { status: 403 });
           }
           
@@ -152,8 +146,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Missing messageId' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
 
     let deleted = false;
     let messageOwner: string | null = null;
@@ -172,7 +165,7 @@ export async function DELETE(
           // Check permissions: user can delete own message, owner can delete any
           const isAdmin = isOwner(userSteamId);
           if (message.steamId !== userSteamId && !isAdmin) {
-            await client.close();
+            // Don't close connection - it's from shared pool
             return NextResponse.json({ error: 'Unauthorized - you can only delete your own messages' }, { status: 403 });
           }
           
@@ -200,7 +193,7 @@ export async function DELETE(
           // Check permissions: user can delete own message, owner can delete any
           const isAdmin = isOwner(userSteamId);
           if (message.senderId !== userSteamId && !isAdmin) {
-            await client.close();
+            // Don't close connection - it's from shared pool
             return NextResponse.json({ error: 'Unauthorized - you can only delete your own messages' }, { status: 403 });
           }
           

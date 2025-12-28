@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { setupChatIndexes, CHAT_INDEXES } from '@/app/utils/mongodb-indexes';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 /**
  * API route to set up MongoDB indexes for optimal chat performance
@@ -30,18 +29,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const client = new MongoClient(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-    });
-    
-    await client.connect();
+    // Use shared connection pool
+    const db = await getDatabase();
     
     try {
-      await setupChatIndexes(client, MONGODB_DB_NAME);
+      // Get client from database for setupChatIndexes
+      const { getMongoClient } = await import('@/app/utils/mongodb-client');
+      const client = await getMongoClient();
+      await setupChatIndexes(client, db.databaseName);
       
       // Also create indexes on existing collections manually
-      const db = client.db(MONGODB_DB_NAME);
       
       // Get all collections
       const collections = await db.listCollections().toArray();
@@ -88,7 +85,7 @@ export async function POST(request: Request) {
         }
       }
       
-      await client.close();
+      // Don't close connection - it's from shared pool
       
       return NextResponse.json({
         success: true,
@@ -96,7 +93,7 @@ export async function POST(request: Request) {
         results,
       });
     } catch (error: any) {
-      await client.close();
+      // Don't close connection - it's from shared pool
       throw error;
     }
   } catch (error: any) {

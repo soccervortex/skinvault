@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { dbGet } from '@/app/utils/database';
-import { MongoClient } from 'mongodb';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 const FIRST_LOGINS_KEY = 'first_logins';
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 export async function GET() {
   try {
@@ -19,12 +18,10 @@ export async function GET() {
       // Fallback: Count from MongoDB directly
       if (MONGODB_URI) {
         try {
-          const client = new MongoClient(MONGODB_URI);
-          await client.connect();
-          const db = client.db(MONGODB_DB_NAME);
+          const db = await getDatabase();
           const collection = db.collection('first_logins');
           userCount = await collection.countDocuments();
-          await client.close();
+          // Don't close connection - it's from shared pool
         } catch (error) {
           console.error('Failed to count users from MongoDB:', error);
         }

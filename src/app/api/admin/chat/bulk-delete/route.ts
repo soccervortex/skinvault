@@ -1,19 +1,10 @@
 import { NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { isOwner } from '@/app/utils/owner-ids';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
 
 // POST: Bulk delete messages
 export async function POST(request: Request) {
@@ -36,8 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid messageIds array' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
 
     let deletedCount = 0;
     const objectIds = messageIds.map(id => new ObjectId(id));
@@ -63,7 +53,7 @@ export async function POST(request: Request) {
       }
     }
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({ 
       success: true, 

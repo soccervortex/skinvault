@@ -3,7 +3,7 @@
  * This will automatically create indexes when the app starts or connects to MongoDB
  */
 
-import { MongoClient } from 'mongodb';
+import { getDatabase } from './mongodb-client';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
@@ -34,13 +34,8 @@ export async function autoSetupIndexes(): Promise<void> {
         return;
       }
 
-      const client = new MongoClient(MONGODB_URI, {
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-      });
-
-      await client.connect();
-      const db = client.db(MONGODB_DB_NAME);
+      // Use shared connection pool instead of creating new client
+      const db = await getDatabase();
 
       console.log('🔧 Setting up MongoDB indexes automatically...');
 
@@ -117,7 +112,7 @@ export async function autoSetupIndexes(): Promise<void> {
         }
       }
 
-      await client.close();
+      // Don't close connection - it's from shared pool
 
       if (results.length > 0) {
         console.log('📊 Index setup results:');
@@ -126,6 +121,7 @@ export async function autoSetupIndexes(): Promise<void> {
 
       console.log('✅ MongoDB indexes setup complete');
       indexesSetup = true;
+      // Don't close connection - it's from shared pool
     } catch (error: any) {
       console.error('❌ Failed to setup indexes automatically:', error.message);
       // Don't throw - allow app to continue even if index setup fails
@@ -142,13 +138,8 @@ export async function setupIndexesForCollection(collectionName: string): Promise
   if (!MONGODB_URI) return;
 
   try {
-    const client = new MongoClient(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-    });
-
-    await client.connect();
-    const db = client.db(MONGODB_DB_NAME);
+    // Use shared connection pool instead of creating new client
+    const db = await getDatabase();
     const collection = db.collection(collectionName);
 
     if (collectionName.startsWith('chats_')) {
@@ -161,7 +152,7 @@ export async function setupIndexesForCollection(collectionName: string): Promise
       ).catch(() => {});
     }
 
-    await client.close();
+    // Don't close connection - it's from shared pool
   } catch (error) {
     // Silently fail - indexes will be created on next auto-setup
     console.warn(`Failed to setup indexes for ${collectionName}:`, error);

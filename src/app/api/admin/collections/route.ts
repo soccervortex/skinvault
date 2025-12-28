@@ -1,18 +1,8 @@
 import { NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
 import { isOwner } from '@/app/utils/owner-ids';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
 
 // GET: List all collections in the database (admin only)
 export async function GET(request: Request) {
@@ -29,8 +19,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
 
     // Get all collections
     const collections = await db.listCollections().toArray();
@@ -54,7 +43,7 @@ export async function GET(request: Request) {
       })
     );
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     // Sort by type and name
     collectionsWithCounts.sort((a, b) => {

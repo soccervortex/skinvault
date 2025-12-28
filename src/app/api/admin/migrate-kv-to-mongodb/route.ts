@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import { MongoClient } from 'mongodb';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { isOwner } from '@/app/utils/owner-ids';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -52,10 +52,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Connect to MongoDB
-    const mongoClient = new MongoClient(MONGODB_URI);
-    await mongoClient.connect();
-    const db = mongoClient.db(MONGODB_DB_NAME);
+    // Use shared connection pool
+    const db = await getDatabase();
 
     const results: Array<{ key: string; status: 'success' | 'error' | 'not_found'; error?: string }> = [];
     let totalMigrated = 0;
@@ -110,7 +108,7 @@ export async function POST(request: Request) {
     // Note: KV doesn't support key listing via REST API, so we can't discover all keys
     // But we can try common patterns
 
-    await mongoClient.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({
       success: true,
@@ -155,9 +153,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const mongoClient = new MongoClient(MONGODB_URI);
-    await mongoClient.connect();
-    const db = mongoClient.db(MONGODB_DB_NAME);
+    // Use shared connection pool
+    const db = await getDatabase();
 
     const comparison: Array<{
       key: string;
@@ -190,7 +187,7 @@ export async function GET(request: Request) {
       }
     }
 
-    await mongoClient.close();
+    // Don't close connection - it's from shared pool
 
     const inBoth = comparison.filter((c) => c.inKV && c.inMongoDB).length;
     const onlyKV = comparison.filter((c) => c.inKV && !c.inMongoDB).length;

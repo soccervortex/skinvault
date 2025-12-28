@@ -1,20 +1,8 @@
 import { NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
 import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 const PINNED_MESSAGES_KEY = 'pinned_messages'; // Format: { "messageId": { messageType: 'global'|'dm', pinnedAt: Date, pinnedBy: steamId } }
-
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
 
 // POST: Pin a message
 export async function POST(request: Request) {

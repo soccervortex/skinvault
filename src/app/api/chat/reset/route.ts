@@ -20,9 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
     const backupsCollection = db.collection('chat_backups');
     const dmBackupsCollection = db.collection('dm_backups');
 
@@ -84,7 +82,7 @@ export async function POST(request: Request) {
       deletedDMCount += result.deletedCount;
     }
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({ 
       success: true, 

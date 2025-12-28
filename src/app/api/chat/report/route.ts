@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
+import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface Report {
   _id?: string;
@@ -25,14 +23,8 @@ interface Report {
   adminNotes?: string;
 }
 
-async function getMongoClient() {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
+// Use shared connection pool
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 // POST: Create a report
 export async function POST(request: Request) {
@@ -52,8 +44,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cannot report yourself' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
 
     // Fetch conversation log
     const conversationLog: Array<{
@@ -128,7 +119,7 @@ export async function POST(request: Request) {
     };
 
     await reportsCollection.insertOne(report);
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({ 
       success: true, 
@@ -158,8 +149,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
     const reportsCollection = db.collection<Report>('chat_reports');
 
     const query: any = {};
@@ -173,7 +163,7 @@ export async function GET(request: Request) {
       .limit(100)
       .toArray();
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({
       reports: reports.map(report => ({
@@ -220,8 +210,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const client = await getMongoClient();
-    const db = client.db(MONGODB_DB_NAME);
+    const db = await getDatabase();
     const reportsCollection = db.collection<Report>('chat_reports');
 
     const update: any = { 
@@ -237,7 +226,7 @@ export async function PATCH(request: Request) {
     try {
       objectId = new ObjectId(reportId);
     } catch (error) {
-      await client.close();
+      // Don't close connection - it's from shared pool
       return NextResponse.json({ error: 'Invalid report ID' }, { status: 400 });
     }
 
@@ -246,7 +235,7 @@ export async function PATCH(request: Request) {
       { $set: update }
     );
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     return NextResponse.json({ success: true, message: 'Report updated' });
   } catch (error) {
