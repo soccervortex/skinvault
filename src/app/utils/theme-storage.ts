@@ -28,6 +28,15 @@ let fallbackUserDisabled: Record<string, boolean> = {};
 // Read theme settings (database abstraction)
 async function readThemeSettings(useCache: boolean = true): Promise<ThemeSettingsMap> {
   try {
+    // If bypassing cache, explicitly delete from cache first to ensure fresh read
+    if (!useCache) {
+      // Import database to access cache
+      const dbModule = await import('./database');
+      // Clear cache for this key
+      if (dbModule.readCache && typeof dbModule.readCache.delete === 'function') {
+        dbModule.readCache.delete(THEME_SETTINGS_KEY);
+      }
+    }
     // Use dbGet with cache control - when reading after a write, we want fresh data
     const data = await dbGet<ThemeSettingsMap>(THEME_SETTINGS_KEY, useCache);
     
@@ -105,8 +114,9 @@ async function writeUserDisabledThemes(data: Record<string, boolean>): Promise<v
 
 // Get all theme settings (admin)
 // This function ensures we always return a complete settings object
-export async function getThemeSettings(): Promise<ThemeSettingsMap> {
-  const settings = await readThemeSettings();
+export async function getThemeSettings(bypassCache: boolean = false): Promise<ThemeSettingsMap> {
+  // Bypass cache if requested (e.g., after a theme change)
+  const settings = await readThemeSettings(!bypassCache);
   
   // Ensure all keys exist (double-check)
   const complete: ThemeSettingsMap = { ...DEFAULT_THEME_SETTINGS };

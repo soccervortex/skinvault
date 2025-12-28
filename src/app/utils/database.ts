@@ -21,7 +21,7 @@ let dbStatus: 'kv' | 'mongodb' | 'fallback' = 'kv';
 let previousKVAvailable: boolean | null = null; // Track KV availability to detect recovery
 
 // Cache to reduce KV reads (simple in-memory cache)
-const readCache: Map<string, { value: any; timestamp: number }> = new Map();
+export const readCache: Map<string, { value: any; timestamp: number }> = new Map();
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes cache
 const MAX_CACHE_SIZE = 1000; // Max cached items
 
