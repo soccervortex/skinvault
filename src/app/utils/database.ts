@@ -251,8 +251,9 @@ async function syncAllFromMongoDBToKV(): Promise<void> {
  * Get value from database (with caching to reduce KV reads)
  */
 export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T | null> {
-  // For theme_settings, always bypass cache to ensure fresh data for all users
-  if (key === 'theme_settings') {
+  // For theme_settings, always bypass cache and prioritize MongoDB to ensure fresh data
+  const isThemeSettings = key === 'theme_settings';
+  if (isThemeSettings) {
     useCache = false;
     // Explicitly clear cache for theme settings
     readCache.delete(key);
@@ -266,7 +267,25 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
     }
   }
 
-  // Try KV first
+  // For theme_settings, prioritize MongoDB over KV to ensure we get the latest data
+  // (KV might have stale data if write to KV failed or was slow)
+  if (isThemeSettings && MONGODB_URI) {
+    try {
+      const mongoValue = await mongoGet<T>(key);
+      if (mongoValue !== null) {
+        dbStatus = 'mongodb';
+        // Sync to KV in background
+        if (await isKVAvailable()) {
+          kv.set(key, mongoValue).catch(() => {}); // Sync to KV
+        }
+        return mongoValue;
+      }
+    } catch (error) {
+      console.warn(`[Database] ⚠️ MongoDB read failed for ${key}, trying KV:`, error);
+    }
+  }
+
+  // Try KV first (for non-theme-settings or if MongoDB read failed)
   if (await isKVAvailable()) {
     try {
       const value = await kv.get<T>(key);
