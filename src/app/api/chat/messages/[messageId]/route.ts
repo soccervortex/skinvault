@@ -6,7 +6,6 @@ import { isOwner } from '@/app/utils/owner-ids';
 import Pusher from 'pusher';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
 interface ChatMessage {
   _id?: string;
@@ -26,9 +25,6 @@ interface DMMessage {
   message: string;
   timestamp: Date;
 }
-
-// Use shared connection pool
-import { getDatabase } from '@/app/utils/mongodb-client';
 
 // PATCH: Edit a message
 export async function PATCH(
@@ -109,7 +105,7 @@ export async function PATCH(
       }
     }
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     if (!updated) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });
@@ -209,7 +205,7 @@ export async function DELETE(
       }
     }
 
-    await client.close();
+    // Don't close connection - it's from shared pool
 
     if (!deleted) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });

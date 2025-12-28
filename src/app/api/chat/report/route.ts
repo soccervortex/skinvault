@@ -4,6 +4,8 @@ import { dbGet } from '@/app/utils/database';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
+const MONGODB_URI = process.env.MONGODB_URI || '';
+
 interface Report {
   _id?: string;
   reporterSteamId: string;
@@ -22,9 +24,6 @@ interface Report {
   status: 'pending' | 'reviewed' | 'resolved';
   adminNotes?: string;
 }
-
-// Use shared connection pool
-import { getDatabase } from '@/app/utils/mongodb-client';
 
 // POST: Create a report
 export async function POST(request: Request) {
