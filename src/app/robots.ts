@@ -12,7 +12,8 @@ export default function robots(): MetadataRoute.Robots {
       // 1. Rules for specific search engine bots from your original file
       {
         userAgent: [
-          'Googlebot', 'googlebot-image', 'googlebot-mobile', 'MSNBot', 
+          'Googlebot', 'googlebot-image', 'googlebot-mobile', 
+          'bingbot', 'MSNBot', // Bing uses both bingbot (modern) and MSNBot (legacy)
           'Slurp', 'Gigabot', 'Robozilla', 'Nutch', 'ia_archiver', 
           'baiduspider', 'naverbot', 'yeti', 'yahoo-mmcrawler', 'psbot', 'yahoo-blogs/v3.9'
         ],
