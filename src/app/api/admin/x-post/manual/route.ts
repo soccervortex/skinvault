@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         postId: result.postId,
-        itemName: result.itemName || null,
+        itemName: 'itemName' in result ? result.itemName || null : null,
         message: `Successfully posted ${postType} post`,
       });
     } else {
