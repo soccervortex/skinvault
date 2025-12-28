@@ -206,11 +206,20 @@ function InventoryContent() {
       clearTimeout(timeoutId);
       throw lastError || new Error('All proxies failed');
     } catch (e: any) { 
-      // Don't log AbortErrors (intentional timeouts) or network errors (502, CORS issues, etc.)
-      if (e?.name !== 'AbortError' && 
-          !e?.message?.includes('502') && 
-          !e?.message?.includes('Bad Gateway') &&
-          !e?.message?.includes('Failed to fetch')) {
+      // Silently fail - don't log expected errors (timeouts, CORS issues, proxy failures)
+      // These are handled gracefully with fallbacks
+      if (e?.name === 'AbortError' || 
+          e?.message?.includes('502') || 
+          e?.message?.includes('503') ||
+          e?.message?.includes('403') ||
+          e?.message?.includes('Bad Gateway') ||
+          e?.message?.includes('Failed to fetch') ||
+          e?.message?.includes('ERR_NAME_NOT_RESOLVED') ||
+          e?.message?.includes('NetworkError') ||
+          e?.message?.includes('All proxies failed')) {
+        // Silently return default values - no logging
+      } else {
+        // Only log unexpected errors
         console.warn('Profile fetch failed:', e);
       }
       return null; 
@@ -314,8 +323,9 @@ function InventoryContent() {
           setFaceitStats(null);
           return;
         }
-        // Suppress Faceit errors - they're not critical
+        // Suppress all Faceit API errors - they're not critical
         // Don't log to console to reduce noise
+        setFaceitStats(null);
         return;
       }
       
