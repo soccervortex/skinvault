@@ -120,8 +120,7 @@ export async function GET(
     let timeoutCount = 0;
     if (MONGODB_URI) {
       try {
-        const client = await getMongoClient();
-        const db = client.db(MONGODB_DB_NAME);
+        const db = await getDatabase();
         const backupsCollection = db.collection('chat_backups');
         
         const backups = await backupsCollection.find({}).toArray();
@@ -143,8 +142,7 @@ export async function GET(
     let dmMessages: any[] = [];
     if (MONGODB_URI) {
       try {
-        const client = await getMongoClient();
-        const db = client.db(MONGODB_DB_NAME);
+        const db = await getDatabase();
         
         // Get all DMs where this user is sender or receiver
         const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
