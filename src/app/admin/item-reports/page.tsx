@@ -266,7 +266,16 @@ export default function ItemReportsPage() {
                           {report.status === 'pending' && (
                             <>
                               <button
-                                onClick={() => updateReportStatus(report.id, 'resolved')}
+                                onClick={() => {
+                                  // If item is not in API, open add item modal
+                                  // Otherwise, just mark as resolved
+                                  if (!report.existsInAPI) {
+                                    setSelectedReport(report);
+                                    setShowAddItemModal(true);
+                                  } else {
+                                    updateReportStatus(report.id, 'resolved');
+                                  }
+                                }}
                                 disabled={updating === report.id}
                                 className="px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                               >
@@ -473,7 +482,15 @@ function ViewDetailsModal({
             {report.status === 'pending' && (
               <>
                 <button
-                  onClick={() => onUpdateStatus(report.id, 'resolved')}
+                  onClick={() => {
+                    // If item is not in API, open add item modal
+                    // Otherwise, just mark as resolved
+                    if (!report.existsInAPI) {
+                      onAddItem();
+                    } else {
+                      onUpdateStatus(report.id, 'resolved');
+                    }
+                  }}
                   disabled={updating === report.id}
                   className="px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
                 >
