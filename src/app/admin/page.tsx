@@ -365,30 +365,10 @@ export default function AdminPage() {
       if (!res.ok) {
         setThemeError(data?.error || "Failed to update theme.");
       } else {
-        // Update settings from response
+        // Update settings from API response - the API already waits for DB write and reads fresh data
         setThemeSettings(data.settings);
         setThemeMessage(`${theme} theme ${enabled ? "enabled" : "disabled"}`);
         setTimeout(() => setThemeMessage(null), 3000);
-        
-        // Reload themes after a short delay to verify the saved state
-        setTimeout(async () => {
-          try {
-            const timestamp = Date.now();
-            const reloadRes = await fetch(`/api/admin/themes?_t=${timestamp}`, {
-              cache: 'no-store',
-              headers: {
-                "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-                'Cache-Control': 'no-cache',
-              },
-            });
-            const reloadData = await reloadRes.json();
-            if (reloadRes.ok) {
-              setThemeSettings(reloadData);
-            }
-          } catch (e) {
-            console.error("Failed to reload themes:", e);
-          }
-        }, 500);
         
         // Force immediate theme reload in current tab
         window.dispatchEvent(new CustomEvent('themeChanged'));
