@@ -154,7 +154,7 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
       summaryText += `\n`;
     }
     
-    summaryText += `Track your CS2 inventory:\nskinvaults.online\n\n`;
+    summaryText += `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n`;
     summaryText += `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the summary
@@ -254,7 +254,7 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
       `📈 Total posts: ${totalPosts}\n` +
       `🎮 Top category: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n` +
       `📅 Month: ${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })}\n\n` +
-      `Track your CS2 inventory:\nskinvaults.online\n\n` +
+      `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the stats (same OAuth logic as weekly summary)
@@ -455,7 +455,7 @@ export async function createFeatureAnnouncementPost(announcement: FeatureAnnounc
     const linkText = announcement.link ? `\n\n🔗 ${announcement.link}` : '';
     const announcementText = `✨ New: ${announcement.title}\n\n` +
       `${announcement.description}${linkText}\n\n` +
-      `Track your CS2 inventory:\nskinvaults.online\n\n` +
+      `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the announcement (same OAuth logic)
@@ -546,12 +546,12 @@ export async function createUserMilestonePost(milestone: UserMilestone): Promise
       milestoneText = `🎉 Milestone Reached!\n\n` +
         `We now have ${milestone.value.toLocaleString()} users on SkinVaults! 🚀\n\n` +
         `Thank you to everyone who trusts us to track their CS2 inventory.\n\n` +
-        `Track your CS2 inventory:\nskinvaults.online\n\n` +
+        `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
         `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
     } else {
       milestoneText = `🎉 Milestone Reached!\n\n` +
         `Thank you for being part of the SkinVaults community! 🚀\n\n` +
-        `Track your CS2 inventory:\nskinvaults.online\n\n` +
+        `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
         `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
     }
 
@@ -646,7 +646,7 @@ export async function createTrendingAlertPost(priceChange: PriceChange): Promise
       `💰 Current: €${priceChange.currentPrice.toFixed(2)}\n` +
       `📊 Previous: €${priceChange.previousPrice.toFixed(2)}\n\n` +
       `🔗 View: ${itemPageUrl}\n\n` +
-      `Track your CS2 inventory:\nskinvaults.online\n\n` +
+      `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the alert (same OAuth logic as weekly summary)
