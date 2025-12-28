@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { getAllItems, generateSlug } from '@/data/weapons';
 
 // This is just a helper to make the "ak47-slate" look like "AK47 Slate"
 const formatName = (slug: string) => slug.replace(/-/g, ' ').toUpperCase();
@@ -14,7 +15,16 @@ type Props = {
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = params;
-  const displayName = formatName(slug);
+  const allItems = await getAllItems();
+  const weapon = allItems.find(w => w.slug === slug);
+  
+  if (!weapon) {
+    return {
+      title: 'Skin Not Found',
+    };
+  }
+
+  const displayName = weapon.name;
 
   return {
     title: `${displayName} - Price Tracker & History`,
@@ -35,20 +45,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function SkinPage({ params }: Props) {
   const { slug } = params;
 
-  // 1. Fetch data for this specific skin from your database or API
-  // Replace this with your actual API call
-  // const skinData = await fetch(`https://skinvaults.online/api/skins/${slug}`).then(res => res.json());
+  // Fetch all items and find the weapon by slug
+  const allItems = await getAllItems();
+  const weapon = allItems.find(w => w.slug === slug);
 
-  // If the skin doesn't exist, show a 404 error
-  if (!slug) {
+  // If the weapon doesn't exist, show a 404 error
+  if (!weapon) {
     notFound();
   }
 
   return (
     <div className="max-w-4xl mx-auto p-10">
-      <h1 className="text-4xl font-bold mb-4">{formatName(slug)}</h1>
+      <h1 className="text-4xl font-bold mb-4">{weapon.name}</h1>
       <div className="bg-gray-900 p-6 rounded-xl border border-blue-500/30">
-        <p className="text-gray-400">Analytics Dashboard for {slug}</p>
+        <p className="text-gray-400">Analytics Dashboard for {weapon.name}</p>
         
         <div className="mt-10 h-64 bg-black/50 rounded flex items-center justify-center border border-dashed border-gray-700">
           <p className="text-gray-500"> [ Your Price Chart Component Goes Here ] </p>

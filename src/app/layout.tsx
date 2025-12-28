@@ -22,6 +22,7 @@ import VercelAnalytics from "./components/VercelAnalytics";
 import GlobalErrorHandler from "./components/GlobalErrorHandler";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
+import { faqStructuredData } from "@/data/faq-data";
 
 config.autoAddCss = false;
 
@@ -39,6 +40,7 @@ const geistMono = Geist_Mono({
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
 const SHORT_DESCRIPTION = 'Track CS2 skin prices, manage your Steam inventory, set price alerts, and analyze your portfolio value safely with our read-only tools.';
+const COMPREHENSIVE_DESCRIPTION = 'SkinVaults is the premier CS2 skin analytics platform for tracking inventory value, monitoring market prices, setting price alerts, and managing your CS2 skin portfolio. Get real-time price data, portfolio analytics, wishlist management, and skin comparison tools. Safe, secure, and read-only - we never modify or transfer your skins.';
 
 // --- 1. METADATA API (The Robot Cover) ---
 export const metadata: Metadata = {
@@ -47,10 +49,14 @@ export const metadata: Metadata = {
     default: "SkinVaults - CS2 Inventory Tracker & Skin Valuation Tool",
     template: "%s | SkinVaults"
   },
-  description: SHORT_DESCRIPTION,
+  description: COMPREHENSIVE_DESCRIPTION,
   keywords: [
     'CS2 inventory tracker', 'CS2 skin valuation', 'Steam portfolio analytics', 
-    'CS2 investment tool', 'skin price alerts', 'CS2 float checker'
+    'CS2 investment tool', 'skin price alerts', 'CS2 float checker',
+    'CS2 skin analytics', 'Counter-Strike 2 skins', 'CS2 price tracking',
+    'Steam inventory management', 'CS2 skin portfolio', 'skin market data',
+    'CS2 skin prices', 'inventory value tracker', 'CS2 skin comparison',
+    'skin price history', 'CS2 investment tracking', 'Steam skin analytics'
   ],
   authors: [{ name: 'SkinVaults' }],
   creator: 'SkinVaults',
@@ -118,13 +124,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const ratingData = await getHomePageRating();
 
   // --- 3. STRUCTURED DATA (The Advanced Secret whisper) ---
-  const jsonLd = {
+  const softwareApplicationSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "SkinVaults",
     "applicationCategory": "FinanceApplication",
     "operatingSystem": "Web",
-    "description": SHORT_DESCRIPTION,
+    "description": COMPREHENSIVE_DESCRIPTION,
+    "url": BASE_URL,
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     ...(ratingData && {
       "aggregateRating": {
@@ -135,14 +142,38 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     })
   };
 
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "SkinVaults",
+    "url": BASE_URL,
+    "logo": `${BASE_URL}/icons/favicon.svg`,
+    "description": COMPREHENSIVE_DESCRIPTION,
+    "sameAs": []
+  };
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqStructuredData
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://raw.githubusercontent.com" crossOrigin="anonymous" />
-        {/* Structured Data injected as a Script tag */}
+        {/* Structured Data injected as Script tags */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>

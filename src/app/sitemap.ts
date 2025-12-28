@@ -1,4 +1,5 @@
 import { MetadataRoute } from 'next';
+import { getAllItems, weaponsList } from '@/data/weapons';
 
 // 1. Define where your site lives
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
@@ -18,30 +19,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // --- SECTION B: Dynamic Skin Pages (The "Advanced" Part) ---
-  let skinRoutes: MetadataRoute.Sitemap = [];
+  // Fetch all items from the CS2 API
+  let allItems = await getAllItems();
   
-  try {
-    // We call your internal API to get a list of all skin names/IDs
-    // NOTE: Change '/api/skins/list' to your actual endpoint that returns your items
-    const response = await fetch(`${BASE_URL}/api/skins/all`, { 
-      next: { revalidate: 3600 } // Update this list every hour
-    });
-
-    if (response.ok) {
-      const skins = await response.json();
-      
-      // We create a link for every skin in your database
-      skinRoutes = skins.map((skin: { slug: string; updatedAt: string }) => ({
-        url: `${BASE_URL}/skin/${skin.slug}`,
-        lastModified: new Date(skin.updatedAt || Date.now()),
-        changeFrequency: 'weekly',
-        priority: 0.7,
-      }));
-    }
-  } catch (error) {
-    console.error("Sitemap: Failed to fetch dynamic skins", error);
-    // If the API fails, we still return the static routes so the sitemap doesn't break
+  // Fallback to static list if API fails
+  if (allItems.length === 0) {
+    console.warn('Failed to fetch items from API, using fallback list');
+    allItems = weaponsList;
   }
+
+  // Create a link for every item
+  const skinRoutes: MetadataRoute.Sitemap = allItems.map((item) => ({
+    url: `${BASE_URL}/skin/${item.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
 
   return [...staticRoutes, ...skinRoutes];
 }
