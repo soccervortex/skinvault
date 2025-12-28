@@ -89,10 +89,15 @@ export async function getAllItems(): Promise<Weapon[]> {
     const itemMap = new Map<string, Weapon>();
     
     // Add all items (API items first, then custom items)
+    // This ensures API items take priority, but unique custom items are still included
     allItems.forEach(item => {
       const key = item.id || item.marketHashName || item.slug;
-      if (key && !itemMap.has(key)) {
-        itemMap.set(key, item);
+      if (key) {
+        // Only add if key doesn't exist (API items are added first, so they take priority)
+        // Custom items with unique IDs will still be added
+        if (!itemMap.has(key)) {
+          itemMap.set(key, item);
+        }
       }
     });
 

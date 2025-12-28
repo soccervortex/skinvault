@@ -28,8 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     allItems = weaponsList;
   }
 
-  // Create a link for every item
-  // Use the item ID if available, otherwise fall back to market hash name
+  // Create a link for every item (includes both API items and custom items)
+  // getAllItems() already merges custom items, so we don't need to fetch them separately
   const skinRoutes: MetadataRoute.Sitemap = allItems.map((item) => {
     // Use item.id if available, otherwise use marketHashName, otherwise use slug as fallback
     const itemId = item.id || item.marketHashName || item.slug;
@@ -41,22 +41,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  // Fetch custom items and add to sitemap
-  let customItemRoutes: MetadataRoute.Sitemap = [];
-  try {
-    const { getDatabase } = await import('@/app/utils/mongodb-client');
-    const db = await getDatabase();
-    const customItems = await db.collection('custom_items').find({}).toArray();
-    
-    customItemRoutes = customItems.map((item: any) => ({
-      url: `${BASE_URL}/item/${encodeURIComponent(item.id)}`,
-      lastModified: new Date(),
-      changeFrequency: 'always' as const,
-      priority: 0.7,
-    }));
-  } catch (error) {
-    // Ignore custom items errors
-  }
-
-  return [...staticRoutes, ...skinRoutes, ...customItemRoutes];
+  return [...staticRoutes, ...skinRoutes];
 }
