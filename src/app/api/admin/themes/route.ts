@@ -85,6 +85,38 @@ export async function POST(request: Request) {
       }
     }
 
+    // Broadcast theme change to all users via Pusher for real-time updates
+    try {
+      const pusherAppId = process.env.PUSHER_APP_ID;
+      const pusherSecret = process.env.PUSHER_SECRET;
+      const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+
+      if (pusherAppId && pusherSecret) {
+        const Pusher = (await import('pusher')).default;
+        const pusher = new Pusher({
+          appId: pusherAppId,
+          key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+          secret: pusherSecret,
+          cluster: pusherCluster,
+          useTLS: true,
+        });
+
+        // Get the active theme after the change
+        const { getActiveTheme } = await import('@/app/utils/theme-storage');
+        const activeTheme = await getActiveTheme(null, true);
+
+        await pusher.trigger('global', 'theme_changed', {
+          type: 'theme_changed',
+          theme: activeTheme,
+          settings: updatedSettings,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (pusherError) {
+      console.error('Failed to trigger Pusher theme change event:', pusherError);
+      // Don't fail the request if Pusher fails
+    }
+
     return NextResponse.json({ success: true, settings: updatedSettings });
   } catch (error) {
     console.error('Failed to update theme setting:', error);

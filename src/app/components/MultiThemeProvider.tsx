@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ThemeType } from '@/app/utils/theme-storage';
 import ThemeParticles from './ThemeParticles';
 import ThemeGift from './ThemeGift';
+import { getPusherClient } from '@/app/utils/pusher-client';
 
 export default function MultiThemeProvider({ steamId }: { steamId?: string | null }) {
   const [activeTheme, setActiveTheme] = useState<ThemeType | null>(null);
@@ -65,7 +66,7 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
       try {
         // Add cache-busting timestamp to ensure fresh data
         const timestamp = Date.now();
-        const url = `/api/themes/active${steamId ? `?steamId=${steamId}` : ''}&_t=${timestamp}`;
+        const url = `/api/themes/active${steamId ? `?steamId=${steamId}&_t=${timestamp}` : `?_t=${timestamp}`}`;
         const response = await fetch(url, {
           cache: 'no-store',
           headers: {
@@ -155,14 +156,78 @@ export default function MultiThemeProvider({ steamId }: { steamId?: string | nul
     // Listen for custom storage event (for same-tab changes)
     window.addEventListener('localStorageChange', handleLocalStorageChange);
     
-    // Also poll periodically to catch admin changes (every 1 second for real-time updates)
-    const interval = setInterval(loadActiveTheme, 1000);
+    // Listen to Pusher for real-time theme changes from admin
+    let pusherChannel: any = null;
+    let pusherSubscription: any = null;
+    
+    try {
+      const pusher = getPusherClient();
+      if (pusher) {
+        pusherChannel = pusher.subscribe('global');
+        
+        pusherSubscription = pusherChannel.bind('theme_changed', (data: any) => {
+          // Immediately update theme when admin changes it
+          if (data && data.type === 'theme_changed') {
+            let newTheme: ThemeType | null = data.theme || null;
+            
+            // If admin disabled all themes (newTheme is null), apply immediately for everyone
+            if (!newTheme) {
+              setActiveTheme(null);
+              updateBodyClass(null);
+              return;
+            }
+            
+            // If a theme is enabled, check user preferences
+            // For non-logged-in users, check localStorage preference
+            if (!steamId && typeof window !== 'undefined') {
+              try {
+                const testKey = '__localStorage_test__';
+                window.localStorage.setItem(testKey, 'test');
+                window.localStorage.removeItem(testKey);
+                
+                const userDisabled = window.localStorage.getItem('sv_theme_disabled') === 'true';
+                if (userDisabled) {
+                  newTheme = null;
+                }
+              } catch {
+                // Ignore localStorage errors
+              }
+            }
+            
+            // For logged-in users, reload to check their preference
+            // For non-logged-in users, apply directly if not disabled
+            if (steamId) {
+              // Reload to check user preference
+              loadActiveTheme();
+            } else {
+              // Directly update theme (already checked localStorage above)
+              setActiveTheme(newTheme);
+              updateBodyClass(newTheme);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to subscribe to Pusher theme channel:', error);
+    }
+    
+    // Also poll periodically as fallback (every 3 seconds - reduced since Pusher handles real-time)
+    const interval = setInterval(loadActiveTheme, 3000);
     
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('localStorageChange', handleLocalStorageChange);
       clearInterval(interval);
+      
+      // Cleanup Pusher subscription
+      if (pusherSubscription && pusherChannel) {
+        try {
+          pusherChannel.unbind('theme_changed', pusherSubscription);
+        } catch (error) {
+          console.error('Failed to unbind Pusher theme subscription:', error);
+        }
+      }
     };
   }, [steamId, updateBodyClass]);
 
