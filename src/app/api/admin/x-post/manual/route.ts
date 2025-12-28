@@ -4,6 +4,13 @@ import {
   createWeeklySummaryPost,
   createMonthlyStatsPost,
   createItemHighlightPost,
+  createTestPost,
+  createDailySummaryPost,
+  createNewUserPost,
+  createUserMilestonePost,
+  createTrendingAlertPost,
+  createFeatureAnnouncementPost,
+  checkForMilestonesOrAlerts,
 } from '@/app/lib/x-post-types';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -18,11 +25,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { postType } = body; // 'weekly', 'monthly', or 'live'
+    const { postType } = body; // 'weekly', 'monthly', 'test', 'daily', 'milestone', or 'new_user'
 
-    if (!postType || !['weekly', 'monthly', 'live'].includes(postType)) {
+    if (!postType || !['weekly', 'monthly', 'test', 'daily', 'milestone', 'new_user'].includes(postType)) {
       return NextResponse.json(
-        { error: 'Invalid postType. Must be: weekly, monthly, or live' },
+        { error: 'Invalid postType. Must be: weekly, monthly, test, daily, milestone, or new_user' },
         { status: 400 }
       );
     }
@@ -39,8 +46,38 @@ export async function POST(request: Request) {
         result = await createMonthlyStatsPost();
         break;
       
-      case 'live':
-        result = await createItemHighlightPost(postHistory);
+      case 'test':
+        result = await createTestPost(postHistory);
+        break;
+      
+      case 'daily':
+        result = await createDailySummaryPost();
+        break;
+      
+      case 'milestone':
+        const milestoneCheck = await checkForMilestonesOrAlerts();
+        if (milestoneCheck.hasMilestone && milestoneCheck.shouldPost) {
+          if (milestoneCheck.milestone?.type === 'user_milestone') {
+            result = await createUserMilestonePost(milestoneCheck.milestone.milestone);
+          } else if (milestoneCheck.milestone?.type === 'trending_alert') {
+            result = await createTrendingAlertPost(milestoneCheck.milestone.item);
+          } else if (milestoneCheck.milestone?.type === 'feature_announcement') {
+            result = await createFeatureAnnouncementPost(milestoneCheck.milestone.announcement);
+          } else {
+            result = await createItemHighlightPost(postHistory);
+          }
+        } else {
+          result = { success: false, error: 'No milestone or alert found to post' };
+        }
+        break;
+      
+      case 'new_user':
+        const newUserCheck = await checkForMilestonesOrAlerts();
+        if (newUserCheck.hasMilestone && newUserCheck.shouldPost && newUserCheck.milestone?.type === 'new_user') {
+          result = await createNewUserPost(newUserCheck.milestone.users || newUserCheck.milestone.user);
+        } else {
+          result = { success: false, error: 'No new users found to post' };
+        }
         break;
       
       default:

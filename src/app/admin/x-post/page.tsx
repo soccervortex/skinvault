@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ArrowLeft, Twitter, Loader2, Calendar, TrendingUp, BarChart3, Zap } from 'lucide-react';
+import { ArrowLeft, Twitter, Loader2, Calendar, TrendingUp, BarChart3, Zap, TestTube, Sun, Trophy, Users } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 
 export default function XPostAdminPage() {
@@ -65,7 +65,7 @@ export default function XPostAdminPage() {
     }
   };
 
-  const triggerPost = async (postType: 'weekly' | 'monthly' | 'live') => {
+  const triggerPost = async (postType: 'weekly' | 'monthly' | 'test' | 'daily' | 'milestone' | 'new_user') => {
     if (!confirm(`Are you sure you want to post a ${postType} post now?`)) {
       return;
     }
@@ -239,7 +239,7 @@ export default function XPostAdminPage() {
             )}
 
             {/* Post Triggers */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {/* Weekly Post */}
               <button
                 onClick={() => triggerPost('weekly')}
@@ -276,21 +276,75 @@ export default function XPostAdminPage() {
                 )}
               </button>
 
-              {/* Live Post */}
+              {/* Test Post */}
               <button
-                onClick={() => triggerPost('live')}
+                onClick={() => triggerPost('test')}
                 disabled={posting !== null}
-                className="bg-green-600/20 border border-green-500/40 p-6 rounded-2xl hover:bg-green-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-4"
+                className="bg-yellow-600/20 border border-yellow-500/40 p-6 rounded-2xl hover:bg-yellow-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-4"
               >
-                <div className="p-3 rounded-xl bg-green-500/20">
-                  <Zap className="text-green-400" size={24} />
+                <div className="p-3 rounded-xl bg-yellow-500/20">
+                  <TestTube className="text-yellow-400" size={24} />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-lg font-black uppercase tracking-tighter mb-2">Live Post</h3>
-                  <p className="text-xs text-gray-400">Post item highlight now</p>
+                  <h3 className="text-lg font-black uppercase tracking-tighter mb-2">Test Post</h3>
+                  <p className="text-xs text-gray-400">Test posting functionality</p>
                 </div>
-                {posting === 'live' && (
-                  <Loader2 className="animate-spin text-green-400" size={20} />
+                {posting === 'test' && (
+                  <Loader2 className="animate-spin text-yellow-400" size={20} />
+                )}
+              </button>
+
+              {/* Daily Post */}
+              <button
+                onClick={() => triggerPost('daily')}
+                disabled={posting !== null}
+                className="bg-orange-600/20 border border-orange-500/40 p-6 rounded-2xl hover:bg-orange-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-4"
+              >
+                <div className="p-3 rounded-xl bg-orange-500/20">
+                  <Sun className="text-orange-400" size={24} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-black uppercase tracking-tighter mb-2">Daily Post</h3>
+                  <p className="text-xs text-gray-400">Post daily summary with today's stats</p>
+                </div>
+                {posting === 'daily' && (
+                  <Loader2 className="animate-spin text-orange-400" size={20} />
+                )}
+              </button>
+
+              {/* Milestone Post */}
+              <button
+                onClick={() => triggerPost('milestone')}
+                disabled={posting !== null}
+                className="bg-pink-600/20 border border-pink-500/40 p-6 rounded-2xl hover:bg-pink-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-4"
+              >
+                <div className="p-3 rounded-xl bg-pink-500/20">
+                  <Trophy className="text-pink-400" size={24} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-black uppercase tracking-tighter mb-2">Milestone Post</h3>
+                  <p className="text-xs text-gray-400">Post user milestone or alert</p>
+                </div>
+                {posting === 'milestone' && (
+                  <Loader2 className="animate-spin text-pink-400" size={20} />
+                )}
+              </button>
+
+              {/* New User Post */}
+              <button
+                onClick={() => triggerPost('new_user')}
+                disabled={posting !== null}
+                className="bg-cyan-600/20 border border-cyan-500/40 p-6 rounded-2xl hover:bg-cyan-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-4"
+              >
+                <div className="p-3 rounded-xl bg-cyan-500/20">
+                  <Users className="text-cyan-400" size={24} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-black uppercase tracking-tighter mb-2">New User Post</h3>
+                  <p className="text-xs text-gray-400">Post welcome message for new users</p>
+                </div>
+                {posting === 'new_user' && (
+                  <Loader2 className="animate-spin text-cyan-400" size={20} />
                 )}
               </button>
             </div>

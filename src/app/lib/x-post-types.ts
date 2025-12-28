@@ -371,6 +371,146 @@ export async function createItemHighlightPost(
 }
 
 /**
+ * Create test post (for testing posting functionality)
+ */
+export async function createTestPost(
+  postHistory: Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>
+): Promise<{ success: boolean; postId?: string; error?: string; itemName?: string }> {
+  try {
+    // Get next item from all datasets
+    const item = await getNextItemFromAllDatasets(postHistory);
+
+    if (!item) {
+      return { success: false, error: 'No item found for posting' };
+    }
+
+    // Get real price from Steam API
+    const priceData = await getItemPrice(item.marketHashName || item.name);
+
+    // Create item page URL
+    const itemPageUrl = `https://www.skinvaults.online/item/${encodeURIComponent(item.id || item.marketHashName || item.name)}`;
+
+    // Create and post with image
+    const postResult = await createAutomatedXPostWithImage({
+      name: item.name,
+      imageUrl: item.imageUrl,
+      price: priceData?.price || 'Check price',
+      itemPageUrl,
+    });
+
+    if (postResult.success) {
+      return { 
+        success: true, 
+        postId: postResult.postId,
+        itemName: item.name,
+      };
+    } else {
+      return { success: false, error: postResult.error };
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create test post' };
+  }
+}
+
+/**
+ * Create daily summary post with today's stats
+ */
+export async function createDailySummaryPost(): Promise<{ success: boolean; postId?: string; error?: string }> {
+  try {
+    // Get stats from database
+    const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+    
+    // Get posts from today
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayPosts = postHistory.filter(p => new Date(p.date) >= todayStart);
+
+    // Count by type
+    const typeCounts: Record<string, number> = {};
+    todayPosts.forEach(p => {
+      typeCounts[p.itemType] = (typeCounts[p.itemType] || 0) + 1;
+    });
+
+    // Get most popular item type today
+    const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+    
+    // Get top 3 movers from today
+    const { gainers, losers } = await getTopMovers('24h', 3);
+    
+    const dailyText = `📊 Daily CS2 Market Summary\n\n` +
+      `📈 Posts today: ${todayPosts.length}\n` +
+      `🎮 Top category: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n\n` +
+      (gainers.length > 0 ? `📈 Top Gainers:\n${gainers.slice(0, 3).map((g, i) => `${i + 1}. ${g.marketHashName} +${g.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
+      (losers.length > 0 ? `📉 Top Losers:\n${losers.slice(0, 3).map((l, i) => `${i + 1}. ${l.marketHashName} ${l.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
+      `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
+      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+
+    // Post the daily summary (same OAuth logic)
+    const X_API_KEY = process.env.X_API_KEY;
+    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
+    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
+
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      return { success: false, error: 'X API credentials not configured' };
+    }
+
+    const url = 'https://api.twitter.com/2/tweets';
+    const method = 'POST';
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const nonce = crypto.randomBytes(16).toString('base64');
+
+    const params: Record<string, string> = {
+      oauth_consumer_key: X_API_KEY,
+      oauth_token: X_ACCESS_TOKEN,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: timestamp,
+      oauth_nonce: nonce,
+      oauth_version: '1.0',
+    };
+
+    const paramString = Object.keys(params)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+      .join('&');
+
+    const signatureBaseString = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
+    const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET)}`;
+    const signature = crypto.createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
+
+    params.oauth_signature = signature;
+
+    const authHeader = 'OAuth ' + Object.keys(params)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(params[key])}"`)
+      .join(', ');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: dailyText.substring(0, 280), // X character limit
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('X API error:', errorText);
+      return { success: false, error: `X API error: ${response.status}` };
+    }
+
+    const data = await response.json();
+    return { success: true, postId: data.data?.id };
+  } catch (error: any) {
+    console.error('Failed to create daily summary:', error);
+    return { success: false, error: error.message || 'Failed to create daily summary' };
+  }
+}
+
+/**
  * Check for trending items or price alerts
  */
 export async function checkForMilestonesOrAlerts(): Promise<{ hasMilestone: boolean; milestone?: any; shouldPost?: boolean }> {
