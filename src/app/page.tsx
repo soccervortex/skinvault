@@ -38,6 +38,7 @@ const CATEGORIES = [
   { name: 'Agents', icon: <User size={14}/>, file: 'agents.json', filter: 'agent' },
   { name: 'Stickers', icon: <Disc size={14}/>, file: 'stickers.json', filter: 'sticker' },
   { name: 'Crates', icon: <Package size={14}/>, file: 'crates.json', filter: 'crate' },
+  { name: 'Crate Keys', icon: <Package size={14}/>, file: 'keys.json', filter: 'key' },
   { name: 'Patches', icon: <Tag size={14}/>, file: 'patches.json', filter: 'patch' },
   { name: 'Graffiti', icon: <Tag size={14}/>, file: 'graffiti.json', filter: 'graffiti' },
   { name: 'Music Kits', icon: <Tag size={14}/>, file: 'music_kits.json', filter: 'music_kit' },
