@@ -22,7 +22,6 @@ import VercelAnalytics from "./components/VercelAnalytics";
 import GlobalErrorHandler from "./components/GlobalErrorHandler";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
-import { faqStructuredData } from "@/data/faq-data";
 import { SITE_CONFIG, ALL_KEYWORDS } from "@/lib/seo-config";
 
 config.autoAddCss = false;
@@ -149,12 +148,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     "sameAs": []
   };
 
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": faqStructuredData
-  };
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -170,10 +163,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>

@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useState } from 'react';
+import Script from 'next/script';
 import Sidebar from '@/app/components/Sidebar';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { faqStructuredData } from '@/data/faq-data';
+import { SITE_CONFIG } from '@/lib/seo-config';
 
 interface FAQItem {
   question: string;
@@ -260,8 +263,21 @@ export default function FAQPage() {
     setOpenIndex(openIndex === index ? null : index);
   };
 
+  // FAQPage schema for SEO - only on FAQ page
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqStructuredData
+  };
+
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <>
+      <Script
+        id="faq-schema"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-8 pb-32">
@@ -348,6 +364,7 @@ export default function FAQPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
