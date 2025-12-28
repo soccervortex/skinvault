@@ -146,8 +146,12 @@ export async function generateMetadata(
   const itemInfo = await getItemInfo(decodedId);
   const itemName = itemInfo.name;
   
+  // Use the actual ID from URL params for canonical URL, not the item name
+  const actualPath = `/item/${id}`;
+  
   return generateSEOMetadata({
     ...pageSEO.item(itemName),
+    path: actualPath, // Override path to use actual ID instead of encoded name
     description: `Check the current price and market history for ${itemName} on SkinVaults. View real-time CS2 skin prices, price trends, and detailed analytics. The most accurate CS2 skin valuation tool.`,
     image: itemInfo.image || undefined,
   });

@@ -281,11 +281,24 @@ export const pageSEO = {
       'SkinVaults',
     ],
   },
-  item: (itemName: string) => ({
-    title: `${itemName} - CS2 Skin Price & Details`,
-    description: `View prices, price history, and market trends for ${itemName}. Compare wear conditions and make informed CS2 trading decisions.`,
-    path: `/item/${encodeURIComponent(itemName)}`,
-    type: 'product' as const,
+  item: (itemName: string) => {
+    // Truncate title if too long (max 60 chars for SEO, but allow up to 70)
+    const baseTitle = itemName.length > 50 
+      ? `${itemName.substring(0, 47)}...` 
+      : itemName;
+    const title = `${baseTitle} - CS2 Skin Price`;
+    
+    // Truncate description if too long (max 160 chars)
+    const baseDescription = `View prices, price history, and market trends for ${itemName}. Compare wear conditions and make informed CS2 trading decisions.`;
+    const description = baseDescription.length > 160
+      ? `${baseDescription.substring(0, 157)}...`
+      : baseDescription;
+    
+    return {
+      title,
+      description,
+      path: `/item/${encodeURIComponent(itemName)}`,
+      type: 'product' as const,
     keywords: [
       itemName,
       `${itemName} price`,
@@ -315,6 +328,7 @@ export const pageSEO = {
       'Skinvaults',
       'SkinVaults',
     ],
-  }),
+    };
+  },
 };
 
