@@ -20,3 +20,19 @@ export const API_FILES = [
 
 export const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
 
+/**
+ * List of item IDs to exclude from all listings
+ * These items will not appear in search, categories, or sitemap
+ */
+export const EXCLUDED_ITEM_IDS = [
+  'collectible-5180', // Excluded per user request
+] as const;
+
+/**
+ * Check if an item should be excluded based on its ID
+ */
+export function isItemExcluded(itemId: string | null | undefined): boolean {
+  if (!itemId) return false;
+  return EXCLUDED_ITEM_IDS.includes(itemId as any);
+}
+

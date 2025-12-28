@@ -277,8 +277,11 @@ export default function GlobalSkinSearch() {
               const res = await fetch(`${BASE_URL}/${file}`, { cache: 'force-cache' });
               const data = await res.json();
               const items = Array.isArray(data) ? data : Object.values(data);
-              datasetCacheRef.current[file] = { data: items, timestamp: Date.now() };
-              return items;
+              // Filter out excluded items
+              const { isItemExcluded } = await import('@/data/api-endpoints');
+              const filteredItems = items.filter((item: any) => !isItemExcluded(item.id));
+              datasetCacheRef.current[file] = { data: filteredItems, timestamp: Date.now() };
+              return filteredItems;
             } catch {
               return [];
             }
@@ -305,6 +308,9 @@ export default function GlobalSkinSearch() {
           const res = await fetch(`https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/${activeCat.file}`, { cache: 'force-cache' });
           const data = await res.json();
           rawItems = Array.isArray(data) ? data : Object.values(data);
+          // Filter out excluded items
+          const { isItemExcluded } = await import('@/data/api-endpoints');
+          rawItems = rawItems.filter((item: any) => !isItemExcluded(item.id));
           datasetCacheRef.current[activeCat.file] = { data: rawItems, timestamp: Date.now() };
           persistCache();
         } catch {

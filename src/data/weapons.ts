@@ -1,4 +1,4 @@
-import { API_FILES, BASE_URL } from './api-endpoints';
+import { API_FILES, BASE_URL, isItemExcluded } from './api-endpoints';
 
 export interface Weapon {
   name: string;
@@ -47,6 +47,10 @@ export async function getAllItems(): Promise<Weapon[]> {
         items.forEach((item: any) => {
           const marketHashName = item.market_hash_name || item.name || '';
           const itemId = item.id || null;
+          // Skip excluded items
+          if (isItemExcluded(itemId)) {
+            return;
+          }
           if (marketHashName) {
             allItems.push({
               name: marketHashName,

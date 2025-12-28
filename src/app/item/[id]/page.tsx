@@ -62,7 +62,7 @@ async function getItemData(itemId: string) {
   }
 
   return null;
-}
+  }
 
 export default async function ItemDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
