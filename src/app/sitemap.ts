@@ -19,12 +19,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // --- SECTION B: Dynamic Skin Pages (The "Advanced" Part) ---
-  // Fetch all items from the CS2 API
-  let allItems = await getAllItems();
+  // Fetch all items from the CS2 API with timeout protection
+  let allItems: typeof weaponsList = [];
   
-  // Fallback to static list if API fails
-  if (allItems.length === 0) {
-    console.warn('Failed to fetch items from API, using fallback list');
+  try {
+    // Set a timeout for the entire getAllItems() call to prevent hanging
+    const itemsPromise = getAllItems();
+    const timeoutPromise = new Promise<typeof weaponsList>((resolve) => 
+      setTimeout(() => {
+        console.warn('[Sitemap] getAllItems timeout after 30 seconds, using fallback');
+        resolve(weaponsList);
+      }, 30000)
+    );
+    
+    allItems = await Promise.race([itemsPromise, timeoutPromise]);
+    
+    // Log success for monitoring
+    if (allItems.length > 0 && allItems.length > weaponsList.length) {
+      console.log(`[Sitemap] Successfully fetched ${allItems.length} items from API`);
+    } else if (allItems.length === weaponsList.length) {
+      console.warn('[Sitemap] Only fallback items found, API may have failed');
+    } else {
+      console.warn(`[Sitemap] Only ${allItems.length} items found, expected more`);
+    }
+  } catch (error) {
+    console.error('[Sitemap] Error fetching items:', error instanceof Error ? error.message : 'Unknown error');
+    console.warn('[Sitemap] Using fallback list due to error');
     allItems = weaponsList;
   }
 
@@ -40,6 +60,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     };
   });
+
+  const totalRoutes = staticRoutes.length + skinRoutes.length;
+  console.log(`[Sitemap] Generated sitemap with ${totalRoutes} URLs (${staticRoutes.length} static + ${skinRoutes.length} dynamic)`);
 
   return [...staticRoutes, ...skinRoutes];
 }

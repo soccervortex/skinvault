@@ -4,63 +4,28 @@ import { generateSEOMetadata, pageSEO } from '../../lib/seo';
 import { SITE_CONFIG } from '@/lib/seo-config';
 
 // Fetch item info to get the actual name instead of technical ID
+// OPTIMIZED: Uses fast API endpoint instead of slow sequential file checking
 async function getItemInfo(itemId: string) {
   try {
-    // First check custom items
-    try {
-      const { getDatabase } = await import('@/app/utils/mongodb-client');
-      const db = await getDatabase();
-      const customItem = await db.collection('custom_items').findOne({
-        $or: [
-          { id: itemId },
-          { marketHashName: itemId },
-          { name: itemId },
-        ]
-      });
-      
-      if (customItem) {
-        return {
-          name: customItem.name,
-          image: customItem.image || null,
-          rarity: customItem.rarity || null,
-          weapon: customItem.weapon || null,
-          marketHashName: customItem.marketHashName || customItem.name,
-        };
-      }
-    } catch (customError) {
-      // Continue to API check if custom items fail
-    }
-
-    // Then check API
-    const { API_FILES, BASE_URL } = await import('@/data/api-endpoints');
+    // Use the optimized API endpoint which fetches in parallel
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+    const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(itemId)}&fuzzy=false`;
     
-    for (const file of API_FILES) {
-      try {
-        const response = await fetch(`${BASE_URL}/${file}`, { 
-          next: { revalidate: 3600 } // Cache for 1 hour
-        });
-        if (!response.ok) continue;
-        
-        const data = await response.json();
-        const items = Array.isArray(data) ? data : Object.values(data);
-        
-        const item = items.find((i: any) => 
-          i.id === itemId || 
-          i.market_hash_name === itemId || 
-          i.name === itemId
-        );
-        
-        if (item) {
-          return {
-            name: item.market_hash_name || item.name || itemId,
-            image: item.image || item.image_inventory || item.image_large || null,
-            rarity: item.rarity?.name || null,
-            weapon: item.weapon?.name || null,
-            marketHashName: item.market_hash_name || item.name || itemId,
-          };
-        }
-      } catch (error) {
-        continue;
+    const response = await fetch(apiUrl, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    });
+    
+    if (response.ok) {
+      const item = await response.json();
+      
+      if (item && (item.name || item.market_hash_name)) {
+        return {
+          name: item.name || item.market_hash_name || itemId,
+          image: item.image || null,
+          rarity: item.rarity?.name || item.rarity || null,
+          weapon: item.weapon?.name || item.weapon || null,
+          marketHashName: item.market_hash_name || item.name || itemId,
+        };
       }
     }
   } catch (error) {

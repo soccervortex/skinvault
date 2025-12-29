@@ -21,6 +21,26 @@ export function generateSlug(name: string): string {
 }
 
 /**
+ * Fetch with timeout helper
+ */
+async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+/**
  * Fetch all CS2 items from the API and generate slugs
  * This includes ALL available item types from the CS2 API
  */
@@ -33,16 +53,19 @@ export async function getAllItems(): Promise<Weapon[]> {
 
     const allItems: Weapon[] = [];
 
-    for (const dataset of datasets) {
+    // Fetch all datasets in parallel for better performance
+    const fetchPromises = datasets.map(async (dataset) => {
       try {
-        const response = await fetch(dataset.url, { 
-          next: { revalidate: 3600 } // Cache for 1 hour
-        });
+        const response = await fetchWithTimeout(dataset.url, 15000); // 15 second timeout
         
-        if (!response.ok) continue;
+        if (!response.ok) {
+          console.warn(`Failed to fetch ${dataset.type}: ${response.status} ${response.statusText}`);
+          return [];
+        }
         
         const data = await response.json();
         const items = Array.isArray(data) ? data : Object.values(data);
+        const processedItems: Weapon[] = [];
         
         items.forEach((item: any) => {
           const marketHashName = item.market_hash_name || item.name || '';
@@ -52,7 +75,7 @@ export async function getAllItems(): Promise<Weapon[]> {
             return;
           }
           if (marketHashName) {
-            allItems.push({
+            processedItems.push({
               name: marketHashName,
               slug: generateSlug(marketHashName),
               id: itemId,
@@ -61,10 +84,23 @@ export async function getAllItems(): Promise<Weapon[]> {
             });
           }
         });
+        
+        return processedItems;
       } catch (error) {
-        console.error(`Failed to fetch ${dataset.type} dataset:`, error);
+        console.error(`Failed to fetch ${dataset.type} dataset:`, error instanceof Error ? error.message : 'Unknown error');
+        return [];
       }
-    }
+    });
+
+    // Wait for all fetches to complete (using allSettled to not fail if some fail)
+    const results = await Promise.allSettled(fetchPromises);
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        allItems.push(...result.value);
+      } else {
+        console.error(`Promise rejected for ${datasets[index].type}:`, result.reason);
+      }
+    });
 
     // Fetch custom items and add them
     try {

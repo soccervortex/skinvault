@@ -1,68 +1,36 @@
 import { notFound } from 'next/navigation';
 import ItemDetailClient from './ItemDetailClient';
-import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 
 // Server-side function to fetch item data for SEO and initial render
+// OPTIMIZED: Uses fast API endpoint instead of slow sequential file checking
 async function getItemData(itemId: string) {
   try {
-    // First check custom items
-    try {
-      const { getDatabase } = await import('@/app/utils/mongodb-client');
-      const db = await getDatabase();
-      const customItem = await db.collection('custom_items').findOne({
-        $or: [
-          { id: itemId },
-          { marketHashName: itemId },
-          { name: itemId },
-        ]
-      });
-      
-      if (customItem) {
-        // Convert custom item format to match API format
-        return {
-          id: customItem.id,
-          name: customItem.name,
-          market_hash_name: customItem.marketHashName || customItem.name,
-          image: customItem.image,
-          rarity: customItem.rarity ? { name: customItem.rarity } : null,
-          weapon: customItem.weapon ? { name: customItem.weapon } : null,
-          isCustom: true,
-        };
-      }
-    } catch (customError) {
-      // Continue to API check if custom items fail
+    // Use the optimized API endpoint which fetches in parallel
+    // This is much faster than checking files sequentially
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+    const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(itemId)}&fuzzy=false`;
+    
+    const response = await fetch(apiUrl, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    });
+    
+    if (!response.ok) {
+      return null;
     }
-
-    // Then check API
-      for (const file of API_FILES) {
-        try {
-        const response = await fetch(`${BASE_URL}/${file}`, { 
-          next: { revalidate: 3600 } // Cache for 1 hour
-        });
-        if (!response.ok) continue;
-        
-        const data = await response.json();
-        const items = Array.isArray(data) ? data : Object.values(data);
-        
-        const item = items.find((i: any) => 
-          i.id === itemId || 
-          i.market_hash_name === itemId || 
-          i.name === itemId
-        );
-        
-        if (item) {
-          return item;
-        }
-      } catch (error) {
-        continue;
-      }
+    
+    const item = await response.json();
+    
+    // Return null if item not found (empty response)
+    if (!item || (!item.name && !item.market_hash_name)) {
+      return null;
     }
+    
+    return item;
   } catch (error) {
     console.error('Failed to fetch item data:', error);
+    return null;
   }
-
-  return null;
-  }
+}
 
 export default async function ItemDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
