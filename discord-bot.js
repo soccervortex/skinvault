@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, SlashCommandBuilder, ActivityType, PresenceUpdateStatus } = require('discord.js');
 require('dotenv').config();
 
-// Helper function for timestamped logging
+// Helper: timestamped logs
 function log(message) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`);
@@ -164,10 +164,10 @@ async function fetchQueuedMessages() {
       headers['Authorization'] = `Bearer ${API_TOKEN}`;
     }
     headers['Content-Type'] = 'application/json';
-    
+
     log(`🔍 Fetching queued messages from ${API_BASE_URL}/api/discord/bot-gateway...`);
     log(`🔑 API Token present: ${API_TOKEN ? 'Yes' : 'No'}`);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/discord/bot-gateway`, {
       method: 'POST',
       headers: headers,
@@ -216,7 +216,7 @@ async function sendDM(discordId, message) {
     }
 
     log(`👤 Found user: ${user.username} (${user.id})`);
-    
+
     // Try to send DM
     try {
       log(`📤 Attempting to send DM to ${user.username} (${discordId})...`);
@@ -253,16 +253,16 @@ async function processQueuedMessages() {
   try {
     log('🔄 Checking for queued messages...');
     const messages = await fetchQueuedMessages();
-    
+
     if (messages.length === 0) {
       return; // No messages to process
     }
 
     log(`📬 Processing ${messages.length} queued message(s)...`);
-    
+
     let successCount = 0;
     let failCount = 0;
-  
+
     for (const msg of messages) {
       log(`📤 Processing message for Discord ID: ${msg.discordId}`);
       const success = await sendDM(msg.discordId, msg.message);
@@ -274,7 +274,7 @@ async function processQueuedMessages() {
       // Small delay to avoid rate limits
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    
+
     if (successCount > 0 || failCount > 0) {
       log(`✅ Processed ${messages.length} message(s): ${successCount} sent, ${failCount} failed`);
     }
@@ -327,19 +327,19 @@ async function getDiscordUserIdFromUsername(username, client) {
     } catch (error) {
       // Fall back to Discord server search
     }
-    
+
     // Fallback: Search through Discord servers (only works if user is in same server as bot)
     if (client) {
       const cleanUsername = username.split('#')[0].toLowerCase();
-      
+
       for (const guild of client.guilds.cache.values()) {
         try {
-          const member = guild.members.cache.find(m => 
+          const member = guild.members.cache.find(m =>
             m.user.username.toLowerCase() === cleanUsername ||
             m.user.displayName.toLowerCase() === cleanUsername ||
             m.user.globalName?.toLowerCase() === cleanUsername
           );
-          
+
           if (member) {
             return member.user.id;
           }
@@ -348,7 +348,7 @@ async function getDiscordUserIdFromUsername(username, client) {
         }
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error finding Discord user:', error);
@@ -356,22 +356,24 @@ async function getDiscordUserIdFromUsername(username, client) {
   }
 }
 
-// Get Steam profile by Steam64 ID
+async function getPlayerInventory(player) {
+  // Fetch player's inventory from API
+  const response = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${player.id}&isPro=false`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.assets || [];
+}
+
+// Retrieve Steam profile info
 async function getSteamProfile(steamId) {
   try {
-    const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
-    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamUrl)}`, {
-      signal: AbortSignal.timeout(10000)
-    });
-    
+    const response = await fetch(`https://steamcommunity.com/profiles/${steamId}/?xml=1`);
     if (!response.ok) return null;
-    
     const text = await response.text();
     const name = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || "User";
     const avatar = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || "";
     return { steamId, name, avatar };
-  } catch (error) {
-    console.error('Error getting Steam profile:', error);
+  } catch {
     return null;
   }
 }
@@ -382,17 +384,17 @@ async function resolveSteamUsername(username) {
     // Clean username: extract first part before | or special chars
     // "ExampleUser | Website.com" -> "ExampleUser"
     let cleanUsername = username.trim();
-    
+
     // If it contains |, take the part before it
     if (cleanUsername.includes('|')) {
       cleanUsername = cleanUsername.split('|')[0].trim();
     }
-    
+
     // Remove special chars that aren't allowed in Steam URLs (keep alphanumeric, underscore, hyphen)
     cleanUsername = cleanUsername.replace(/[^a-zA-Z0-9_-]/g, '');
-    
+
     if (!cleanUsername || cleanUsername.length < 3) return null;
-    
+
     // Method 1: Try steamid.io lookup (most reliable)
     try {
       // steamid.io allows lookup via URL: https://steamid.io/lookup/{username}
@@ -403,7 +405,7 @@ async function resolveSteamUsername(username) {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         }
       });
-      
+
       if (response.ok) {
         const html = await response.text();
         // Extract Steam64 ID from steamid.io page
@@ -413,7 +415,7 @@ async function resolveSteamUsername(username) {
           html.match(/7656\d{13}/),
           html.match(/steamID64.*?copy[^>]*>[\s\S]{0,300}?(\d{17})/i),
         ].filter(Boolean);
-        
+
         for (const match of steamId64Matches) {
           const steamId64 = match[1] || match[0];
           if (steamId64 && /^7656\d{13}$/.test(steamId64)) {
@@ -425,14 +427,14 @@ async function resolveSteamUsername(username) {
       console.error('steamid.io lookup failed:', error);
       // Continue to fallback method
     }
-    
+
     // Method 2: Try Steam Community XML (fallback)
     try {
       const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
       const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(profileUrl)}`, {
         signal: AbortSignal.timeout(10000)
       });
-      
+
       if (response.ok) {
         const text = await response.text();
         const steamId64 = text.match(/<steamID64><!\[CDATA\[(.*?)\]\]><\/steamID64>/)?.[1];
@@ -443,7 +445,7 @@ async function resolveSteamUsername(username) {
     } catch (error) {
       // Ignore
     }
-    
+
     // Method 3: Try alternative proxy
     try {
       const profileUrl = `https://steamcommunity.com/id/${cleanUsername}/?xml=1`;
@@ -460,12 +462,20 @@ async function resolveSteamUsername(username) {
     } catch {
       // Ignore
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error resolving Steam username:', error);
     return null;
   }
+}
+
+// getSteamIdFromDiscord
+async function getSteamIdFromDiscord(discordId) {
+  const response = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${discordId}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.steamId || null;
 }
 
 // Get top weapons from inventory (returns immediately with what it has, max 3)
@@ -477,7 +487,7 @@ async function getTopWeapons(steamId, limit = 3) {
     const invData = await invResponse.json();
     const assets = invData.assets || [];
     const descriptions = invData.descriptions || [];
-    
+
     const descMap = new Map();
     descriptions.forEach(desc => {
       const key = `${desc.classid}_${desc.instanceid || 0}`;
@@ -503,8 +513,8 @@ async function getTopWeapons(steamId, limit = 3) {
       const itemName = desc.market_hash_name || desc.market_name || desc.name;
       if (!itemName) continue;
 
-      const isWeapon = desc.type === 'Weapon' || 
-                      weaponTypes.some(weaponType => itemName.includes(weaponType));
+      const isWeapon = desc.type === 'Weapon' ||
+        weaponTypes.some(weaponType => itemName.includes(weaponType));
 
       if (isWeapon) {
         weapons.push({
@@ -517,7 +527,7 @@ async function getTopWeapons(steamId, limit = 3) {
 
     // Limit to top candidates before fetching prices (to speed up)
     const candidates = weapons.slice(0, limit * 2); // Get a few extra for safety
-    
+
     // Fetch prices in parallel with timeout - return what we have after 3 seconds max
     const pricePromises = candidates.map(async (weapon, index) => {
       try {
@@ -525,7 +535,7 @@ async function getTopWeapons(steamId, limit = 3) {
           getItemPrice(weapon.name, '3'),
           new Promise(resolve => setTimeout(() => resolve(null), 2000)) // 2 second timeout per price
         ]);
-        
+
         if (price) {
           const priceStr = price.lowest_price || price.lowest || price.median_price;
           if (priceStr) {
@@ -624,10 +634,10 @@ async function searchItem(query) {
       try {
         const response = await fetch(datasetUrl, { cache: 'force-cache' });
         if (!response.ok) continue;
-        
+
         const data = await response.json();
         const items = Array.isArray(data) ? data : Object.values(data);
-        
+
         // First try exact match (normalized)
         let found = items.find(item => {
           const name = normalizeForSearch(item.market_hash_name || item.name || '');
@@ -712,7 +722,7 @@ client.on('interactionCreate', async (interaction) => {
     log(`📥 Received interaction type: ${interaction.type}`);
     return;
   }
-  
+
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName, user } = interaction;
@@ -722,7 +732,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
           content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
@@ -731,7 +741,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const wishlist = await getWishlist(steamId);
-      
+
       if (!wishlist || wishlist.length === 0) {
         await interaction.editReply({
           content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVault to track their prices!\n\nVisit: https://skinvaults.online',
@@ -741,7 +751,7 @@ client.on('interactionCreate', async (interaction) => {
 
       // Get prices for all items (limit to first 10 for embed)
       const itemsToShow = wishlist.slice(0, 10);
-      const pricePromises = itemsToShow.map(item => 
+      const pricePromises = itemsToShow.map(item =>
         getItemPrice(item.market_hash_name || item.key, '3')
       );
       const prices = await Promise.all(pricePromises);
@@ -764,7 +774,7 @@ client.on('interactionCreate', async (interaction) => {
         const price = prices[index];
         const priceText = price?.lowest_price || price?.lowest || price?.median_price || 'No price data';
         const itemUrl = `https://skinvaults.online/item/${encodeURIComponent(item.market_hash_name || item.key)}`;
-        
+
         return {
           name: `${index + 1}. ${item.name || item.key}`,
           value: `💰 **Price:** ${priceText}\n🔗 [View Item](${itemUrl})`,
@@ -785,7 +795,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
           content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
@@ -794,7 +804,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const alerts = await getAlerts(steamId);
-      
+
       if (!alerts || alerts.length === 0) {
         await interaction.editReply({
           content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVault to get notified when prices hit your target!\n\nVisit: https://skinvaults.online',
@@ -803,7 +813,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       // Get current prices for alerts
-      const pricePromises = alerts.slice(0, 10).map(alert => 
+      const pricePromises = alerts.slice(0, 10).map(alert =>
         getItemPrice(alert.marketHashName, alert.currency)
       );
       const prices = await Promise.all(pricePromises);
@@ -822,7 +832,7 @@ client.on('interactionCreate', async (interaction) => {
         const price = prices[index];
         const currentPrice = price?.lowest_price || price?.lowest || price?.median_price || 'No price data';
         const itemUrl = `https://skinvaults.online/item/${encodeURIComponent(alert.marketHashName)}`;
-        
+
         return {
           name: `${index + 1}. ${alert.marketHashName}`,
           value: `💰 **Current:** ${currentPrice}\n🎯 **Target:** ${condition} ${symbol}${alert.targetPrice.toFixed(2)}\n**Status:** ${status}\n🔗 [View Item](${itemUrl})`,
@@ -875,7 +885,7 @@ client.on('interactionCreate', async (interaction) => {
 
       // Get price for the found item
       const price = await getItemPrice(itemName, '3');
-      
+
       // If no price found, try to get item info from API
       if (!price) {
         let itemInfo = null;
@@ -900,7 +910,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const priceText = price ? (price.lowest_price || price.lowest || price.median_price || 'No price data') : 'No price data';
-      const itemUrl = itemId 
+      const itemUrl = itemId
         ? `https://skinvaults.online/item/${encodeURIComponent(itemId)}`
         : `https://skinvaults.online/item/${encodeURIComponent(itemName)}`;
 
@@ -941,10 +951,10 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -954,7 +964,7 @@ client.on('interactionCreate', async (interaction) => {
         if (!invResponse.ok) {
           const errorText = await invResponse.text().catch(() => 'Unknown error');
           let errorMessage = 'Could not fetch your inventory.';
-          
+
           if (invResponse.status === 403 || invResponse.status === 401) {
             errorMessage = 'Your Steam inventory is private. Set your Steam profile to public to view your inventory.';
           } else if (invResponse.status === 404) {
@@ -962,7 +972,7 @@ client.on('interactionCreate', async (interaction) => {
           } else if (invResponse.status === 429) {
             errorMessage = 'Too many requests. Please wait a moment and try again.';
           }
-          
+
           await interaction.editReply({
             content: `❌ **Failed to Load Inventory**\n\n${errorMessage}\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit https://skinvaults.online/inventory to sync\n• Wait a moment and try again`,
           });
@@ -970,19 +980,36 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const invData = await invResponse.json();
+
+        // Check if inventory is empty or private
+        if (!invData.success || !invData.assets || invData.assets.length === 0) {
+          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          await interaction.editReply({
+            content: `📦 **No Items Found**\n\nYour inventory appears to be empty or private.\n\n**Possible reasons:**\n• Your Steam inventory is empty\n• Your Steam profile is set to private\n• Inventory hasn't loaded yet\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit [your vault](${vaultUrl}) to sync your inventory\n• Make sure you have CS2 items in your inventory`,
+          });
+          return;
+        }
+
         const assets = invData.assets || [];
         const descriptions = invData.descriptions || [];
-        
-        // Create a map of classid_instanceid to descriptions
+
+        if (!descriptions || descriptions.length === 0) {
+          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          await interaction.editReply({
+            content: `⚠️ **Inventory Data Incomplete**\n\nCould not load item details from your inventory.\n\n💡 **Try:**\n• Visit [your vault](${vaultUrl}) to refresh your inventory\n• Make sure your Steam profile is public\n• Try again in a few moments`,
+          });
+          return;
+        }
+
+        // Create a map of description by classid_instanceid
         const descMap = new Map();
         descriptions.forEach(desc => {
           const key = `${desc.classid}_${desc.instanceid || 0}`;
           descMap.set(key, desc);
         });
 
-        // Match assets with descriptions and get item names
-        const items = [];
-        const itemCounts = new Map(); // Track counts per item name
+        // Process assets
+        const itemCounts = new Map();
 
         for (const asset of assets) {
           const key = `${asset.classid}_${asset.instanceid || 0}`;
@@ -991,13 +1018,12 @@ client.on('interactionCreate', async (interaction) => {
 
           const itemName = desc.market_hash_name || desc.market_name || desc.name || `Item ${desc.classid}`;
           const amount = asset.amount || 1;
-          
-          // Track counts
+
           const currentCount = itemCounts.get(itemName) || 0;
           itemCounts.set(itemName, currentCount + amount);
         }
 
-        // Convert to array and sort alphabetically
+        // Convert to array and sort
         const sortedItems = Array.from(itemCounts.entries())
           .map(([name, count]) => ({ name, count }))
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -1013,18 +1039,18 @@ client.on('interactionCreate', async (interaction) => {
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
-        // Add summary
         embed.addFields(
           { name: '📊 Summary', value: `**Total Items:** ${totalItems}\n**Unique Items:** ${uniqueItems}`, inline: false }
         );
 
-        // Add items list (limit to 20 to avoid embed limits)
         const itemsToShow = sortedItems.slice(0, 20);
         if (itemsToShow.length > 0) {
-          const itemsList = itemsToShow.map((item, index) => {
-            const countText = item.count > 1 ? ` (x${item.count})` : '';
-            return `${index + 1}. ${item.name}${countText}`;
-          }).join('\n');
+          const itemsList = itemsToShow
+            .map((item, index) => {
+              const countText = item.count > 1 ? ` (x${item.count})` : '';
+              return `${index + 1}. ${item.name}${countText}`;
+            })
+            .join('\n');
 
           embed.addFields({
             name: `📋 Items (${itemsToShow.length}${sortedItems.length > 20 ? ` of ${sortedItems.length}` : ''})`,
@@ -1048,15 +1074,14 @@ client.on('interactionCreate', async (interaction) => {
           content: '❌ **Error**\n\nFailed to load inventory. Please try again later.',
         });
       }
-
     } else if (commandName === 'vault') {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -1066,7 +1091,7 @@ client.on('interactionCreate', async (interaction) => {
         if (!invResponse.ok) {
           const errorText = await invResponse.text().catch(() => 'Unknown error');
           let errorMessage = 'Could not fetch your inventory.';
-          
+
           if (invResponse.status === 403 || invResponse.status === 401) {
             errorMessage = 'Your Steam inventory is private. Set your Steam profile to public to view your inventory.';
           } else if (invResponse.status === 404) {
@@ -1074,7 +1099,7 @@ client.on('interactionCreate', async (interaction) => {
           } else if (invResponse.status === 429) {
             errorMessage = 'Too many requests. Please wait a moment and try again.';
           }
-          
+
           await interaction.editReply({
             content: `❌ **Failed to Load Inventory**\n\n${errorMessage}\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit https://skinvaults.online/inventory to sync\n• Wait a moment and try again`,
           });
@@ -1082,7 +1107,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const invData = await invResponse.json();
-        
+
         // Check if inventory is empty or private
         if (!invData.success || !invData.assets || invData.assets.length === 0) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
@@ -1091,11 +1116,10 @@ client.on('interactionCreate', async (interaction) => {
           });
           return;
         }
-        
+
         const assets = invData.assets || [];
         const descriptions = invData.descriptions || [];
-        
-        // Check if we have descriptions
+
         if (!descriptions || descriptions.length === 0) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
           await interaction.editReply({
@@ -1103,15 +1127,15 @@ client.on('interactionCreate', async (interaction) => {
           });
           return;
         }
-        
-        // Create a map of classid_instanceid to descriptions
+
+        // Create a map of description by classid_instanceid
         const descMap = new Map();
         descriptions.forEach(desc => {
           const key = `${desc.classid}_${desc.instanceid || 0}`;
           descMap.set(key, desc);
         });
 
-        // Match assets with descriptions and get prices
+        // Process assets
         const items = [];
         let totalValue = 0;
         let tradableCount = 0;
@@ -1126,7 +1150,7 @@ client.on('interactionCreate', async (interaction) => {
           const itemName = desc.market_hash_name || desc.market_name || desc.name || `Item ${desc.classid}`;
           const isTradable = desc.tradable !== 0 && desc.tradable !== false;
           const isMarketable = desc.marketable !== 0 && desc.marketable !== false;
-          
+
           if (isTradable) tradableCount++;
           else nonTradableCount++;
 
@@ -1139,7 +1163,6 @@ client.on('interactionCreate', async (interaction) => {
               if (price) {
                 const priceStr = price.lowest_price || price.lowest || price.median_price;
                 if (priceStr) {
-                  // Parse price (handles formats like "€0,78" or "$1.23")
                   const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
                   priceValue = parseFloat(cleaned) || 0;
                   totalValue += priceValue * (asset.amount || 1);
@@ -1147,7 +1170,7 @@ client.on('interactionCreate', async (interaction) => {
                 }
               }
             } catch (priceError) {
-              // Ignore individual price fetch errors
+              // Ignore individual price errors
             }
           }
 
@@ -1162,37 +1185,25 @@ client.on('interactionCreate', async (interaction) => {
           });
         }
 
-        // Sort items by price (highest first)
+        // Sort items by price
         items.sort((a, b) => b.priceValue - a.priceValue);
 
-        // Get stats
+        // Fetch stats
         let stats = null;
         try {
           const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
           if (statsResponse.ok) {
             const statsData = await statsResponse.json();
-            // The API returns { playerstats: { stats: [...] } }
             const ps = statsData?.playerstats;
             const s = ps?.stats;
             if (s && Array.isArray(s)) {
-              // Convert array format to object format
               const statsObj = {};
-              s.forEach(stat => {
+              s.forEach((stat) => {
                 if (stat.name && stat.value !== undefined) {
                   statsObj[stat.name] = stat.value;
                 }
               });
-              
-              // Extract key stats
-              const kills = Number(statsObj.total_kills ?? 0);
-              const deaths = Number(statsObj.total_deaths ?? 0);
-              const matchesWon = Number(statsObj.total_matches_won ?? 0);
-              
-              stats = {
-                total_kills: kills,
-                total_deaths: deaths,
-                total_wins: matchesWon,
-              };
+              stats = statsObj;
             }
           }
         } catch (error) {
@@ -1203,7 +1214,7 @@ client.on('interactionCreate', async (interaction) => {
         const totalItems = assets.length;
         const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
 
-        // Create main embed
+        // Create embed
         const embed = new EmbedBuilder()
           .setTitle('💎 Your Vault')
           .setColor(0x5865F2)
@@ -1211,7 +1222,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
-        // Add summary fields
+        // Add summary
         const totalValueStr = totalValue > 0 ? `€${totalValue.toFixed(2).replace('.', ',')}` : '€0,00';
         embed.addFields(
           { name: '📦 Total Items', value: String(totalItems), inline: true },
@@ -1233,19 +1244,18 @@ client.on('interactionCreate', async (interaction) => {
           if (stats.total_wins) embed.addFields({ name: '🏆 Wins', value: String(stats.total_wins), inline: true });
         }
 
-        // Add items (limit to first 10 to avoid embed limits)
+        // Add top items
         const itemsToShow = items.slice(0, 10);
         if (itemsToShow.length > 0) {
           embed.addFields({ name: '\u200b', value: '**Top Items:**', inline: false });
-          
           itemsToShow.forEach((item, index) => {
-            const itemUrl = item.marketHashName 
+            const itemUrl = item.marketHashName
               ? `https://skinvaults.online/item/${encodeURIComponent(item.marketHashName)}`
               : vaultUrl;
             const priceText = item.price || (item.isMarketable ? 'No price data' : 'NOT MARKETABLE');
             const tradableText = item.isTradable ? '✅' : '🔒';
-            const amountText = item.amount > 1 ? ` (x${item.amount})` : '';
-            
+            const amountText = item.count > 1 ? ` (x${item.count})` : '';
+
             embed.addFields({
               name: `${index + 1}. ${tradableText} ${item.name}${amountText}`,
               value: `💰 **Price:** ${priceText}\n🔗 [View Item](${itemUrl})`,
@@ -1259,23 +1269,21 @@ client.on('interactionCreate', async (interaction) => {
             embed.setDescription(`[View Full Vault](${vaultUrl})`);
           }
         } else {
-          embed.setDescription(`📦 **No Items Found**\n\nYour inventory appears to be empty or items couldn't be processed.\n\n[View Vault](${vaultUrl})`);
+          embed.setDescription(`📦 **No Items Found**\n\nYour vault appears to be empty or items couldn't be processed.\n\n[View Vault](${vaultUrl})`);
         }
 
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
         console.error('Error getting vault:', error);
-        const errorMessage = error?.message || 'Unknown error';
         await interaction.editReply({
-          content: `❌ **Error Loading Vault**\n\nFailed to load vault data: ${errorMessage}\n\n💡 **Try:**\n• Make sure your Steam profile is public\n• Visit https://skinvaults.online/inventory to sync\n• Try again in a few moments`,
+          content: `❌ **Error Loading Vault**\n\nFailed to load vault data: ${error.message}\n\n💡 **Try:**\n• Make sure your Steam profile is public\n• Visit https://skinvaults.online/inventory to sync\n• Try again in a few moments`,
         });
       }
-
     } else if (commandName === 'stats') {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
           content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
@@ -1286,7 +1294,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         // Check Pro status for your own stats
         const isPro = await checkProStatus(steamId);
-        
+
         // API expects 'id' parameter, not 'steamId'
         const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
         if (!statsResponse.ok) {
@@ -1373,10 +1381,10 @@ client.on('interactionCreate', async (interaction) => {
             embed.addFields({ name: '💥 Total Damage', value: totalDamage.toLocaleString(), inline: true });
           }
         } else {
-          embed.addFields({ 
-            name: '🔒 Advanced Stats', 
+          embed.addFields({
+            name: '🔒 Advanced Stats',
             value: 'Upgrade to **PRO** to see ADR, MVPs, Accuracy, Rounds Played, and Total Damage!\n\n[Get PRO](https://skinvaults.online/pro)',
-            inline: false 
+            inline: false
           });
         }
 
@@ -1397,7 +1405,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const query = interaction.options.getString('query');
       const platform = interaction.options.getString('platform');
-      
+
       if (!query) {
         await interaction.editReply({
           content: '❌ **Missing Query**\n\nPlease provide a Steam64 ID, Discord username, or Steam username.',
@@ -1447,7 +1455,7 @@ client.on('interactionCreate', async (interaction) => {
           } catch (error) {
             // Continue to fallback
           }
-          
+
           // Fallback: Try via Discord client
           if (!steamId) {
             const discordUserId = await getDiscordUserIdFromUsername(query, client);
@@ -1459,7 +1467,7 @@ client.on('interactionCreate', async (interaction) => {
               }
             }
           }
-          
+
           if (!steamId || !profile) {
             await interaction.editReply({
               content: `❌ **Discord Username Not Found**\n\nCould not find Discord user: "${query}"\n\n💡 **Make sure:**\n• The user has connected their Discord account to SkinVault\n• You're using the correct Discord username\n• The user is in a server with the bot (if not in database)\n\nOr try using their Steam64 ID instead.`,
@@ -1603,10 +1611,10 @@ client.on('interactionCreate', async (interaction) => {
               embed.addFields({ name: '💥 Total Damage', value: totalDamage.toLocaleString(), inline: true });
             }
           } else if (!viewingOwnProfile) {
-            embed.addFields({ 
-              name: '🔒 Advanced Stats', 
+            embed.addFields({
+              name: '🔒 Advanced Stats',
               value: 'Upgrade to **PRO** to see advanced stats for other players!\n\n[Get PRO](https://skinvaults.online/pro)',
-              inline: false 
+              inline: false
             });
           }
         } else {
@@ -1655,7 +1663,7 @@ client.on('interactionCreate', async (interaction) => {
         // Search for items
         const items = [];
         const queries = [item1Query, item2Query, item3Query].filter(Boolean);
-        
+
         for (const query of queries) {
           const searchResult = await searchItem(query);
           if (searchResult) {
@@ -1708,10 +1716,10 @@ client.on('interactionCreate', async (interaction) => {
         // Add items to embed
         items.forEach((item, index) => {
           const priceText = item.price || 'No price data';
-          const itemUrl = item.id 
+          const itemUrl = item.id
             ? `https://skinvaults.online/item/${encodeURIComponent(item.id)}`
             : `https://skinvaults.online/item/${encodeURIComponent(item.marketHashName)}`;
-          
+
           embed.addFields({
             name: `${index + 1}. ${item.name}`,
             value: `💰 **Price:** ${priceText}\n🔗 [View Item](${itemUrl})`,
@@ -1815,7 +1823,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
           content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
@@ -1845,12 +1853,12 @@ client.on('interactionCreate', async (interaction) => {
 
         if (isPro && proUntil) {
           const daysRemaining = Math.ceil((proUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-          const formattedDate = proUntil.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          const formattedDate = proUntil.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           });
-          
+
           embed.setDescription(`✅ **You have an active Pro subscription!**`);
           embed.addFields(
             { name: '📅 Expires', value: formattedDate, inline: true },
@@ -1877,7 +1885,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
 
       const steamId = await getSteamIdFromDiscord(user.id);
-      
+
       if (!steamId) {
         await interaction.editReply({
           content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can purchase items!',
@@ -1943,7 +1951,7 @@ client.on('interactionCreate', async (interaction) => {
         // Create checkout URL with Steam ID
         const checkoutUrl = `https://skinvaults.online/shop?steamId=${steamId}${promoCode ? `&promo=${promoCode}` : ''}`;
 
-        await interaction.editReply({ 
+        await interaction.editReply({
           embeds: [embed],
           components: [
             {
@@ -1998,10 +2006,10 @@ client.on('interactionCreate', async (interaction) => {
     }
   } catch (error) {
     console.error('Error handling command:', error);
-    const errorMessage = interaction.deferred 
+    const errorMessage = interaction.deferred
       ? { content: '❌ An error occurred while processing your command. Please try again later.' }
       : { content: '❌ An error occurred while processing your command. Please try again later.', ephemeral: true };
-    
+
     try {
       if (interaction.deferred) {
         await interaction.editReply(errorMessage);
@@ -2021,24 +2029,24 @@ async function getOrCreateChannel(guild, channelName, options = {}) {
     let channel = guild.channels.cache.find(
       ch => ch.name.toLowerCase() === channelName.toLowerCase() && ch.type === 0
     );
-    
+
     if (!channel) {
       // Try to find channel with name in it
       channel = guild.channels.cache.find(
         ch => ch.name.toLowerCase().includes(channelName.toLowerCase()) && ch.type === 0
       );
     }
-    
+
     if (!channel && options.create !== false) {
       log(`⚠️ Channel #${channelName} not found in ${guild.name}, creating one...`);
-      const category = options.category 
+      const category = options.category
         ? guild.channels.cache.find(
-            cat => cat.name.toLowerCase().includes(options.category.toLowerCase()) && cat.type === 4
-          )
+          cat => cat.name.toLowerCase().includes(options.category.toLowerCase()) && cat.type === 4
+        )
         : guild.channels.cache.find(
-            cat => cat.name.toLowerCase().includes('information') && cat.type === 4
-          );
-      
+          cat => cat.name.toLowerCase().includes('information') && cat.type === 4
+        );
+
       channel = await guild.channels.create({
         name: channelName,
         type: 0, // Text channel
@@ -2048,7 +2056,7 @@ async function getOrCreateChannel(guild, channelName, options = {}) {
       });
       log(`✅ Created channel: #${channel.name}`);
     }
-    
+
     return channel;
   } catch (error) {
     log(`❌ Error getting/creating channel ${channelName}: ${error.message}`);
@@ -2114,19 +2122,19 @@ async function setupWelcomeMessage(guild) {
   try {
     const welcomeChannel = await getWelcomeChannel(guild);
     if (!welcomeChannel) return;
-    
+
     // Get all channels we need to mention
     const rulesChannel = await getRulesChannel(guild);
     const generalChannel = await getGeneralChannel(guild);
     const faqChannel = await getFAQChannel(guild);
     const supportChannel = await getSupportChannel(guild);
-    
+
     // Check if welcome message already exists (look for bot's recent messages)
     const messages = await welcomeChannel.messages.fetch({ limit: 10 });
     const existingMessage = messages.find(
       msg => msg.author.id === client.user.id && msg.embeds.length > 0
     );
-    
+
     if (existingMessage) {
       log('✅ Welcome message already exists');
       // Update it with correct channel mentions
@@ -2149,7 +2157,7 @@ async function setupWelcomeMessage(guild) {
         .setThumbnail('https://skinvaults.online/icon.png')
         .setFooter({ text: 'SkinVaults Community', iconURL: 'https://skinvaults.online/icon.png' })
         .setTimestamp();
-      
+
       try {
         await existingMessage.edit({ embeds: [welcomeEmbed] });
         log('✅ Updated welcome message with correct channel mentions');
@@ -2158,7 +2166,7 @@ async function setupWelcomeMessage(guild) {
       }
       return existingMessage;
     }
-    
+
     // Create welcome embed with proper channel mentions
     const welcomeEmbed = new EmbedBuilder()
       .setTitle('✨ Welcome to SkinVaults Community!')
@@ -2179,7 +2187,7 @@ async function setupWelcomeMessage(guild) {
       .setThumbnail('https://skinvaults.online/icon.png')
       .setFooter({ text: 'SkinVaults Community', iconURL: 'https://skinvaults.online/icon.png' })
       .setTimestamp();
-    
+
     const message = await welcomeChannel.send({ embeds: [welcomeEmbed] });
     log('✅ Welcome message posted in #welcome');
     return message;
@@ -2194,18 +2202,18 @@ async function setupRules(guild) {
   try {
     const rulesChannel = await getRulesChannel(guild);
     if (!rulesChannel) return;
-    
+
     // Check if rules already exist
     const messages = await rulesChannel.messages.fetch({ limit: 10 });
     const existingMessage = messages.find(
       msg => msg.author.id === client.user.id && msg.embeds.length > 0
     );
-    
+
     if (existingMessage) {
       log('✅ Rules message already exists');
       return existingMessage;
     }
-    
+
     // Create rules embed
     const rulesEmbed = new EmbedBuilder()
       .setTitle('📋 Server Rules')
@@ -2255,7 +2263,7 @@ async function setupRules(guild) {
       )
       .setFooter({ text: 'Breaking these rules may result in warnings, mutes, or bans', iconURL: 'https://skinvaults.online/icon.png' })
       .setTimestamp();
-    
+
     const message = await rulesChannel.send({ embeds: [rulesEmbed] });
     log('✅ Rules posted in #rules');
     return message;
@@ -2270,22 +2278,22 @@ async function setupFAQ(guild) {
   try {
     const faqChannel = await getFAQChannel(guild);
     if (!faqChannel) return;
-    
+
     // Check if FAQ already exists
     const messages = await faqChannel.messages.fetch({ limit: 10 });
     const existingMessage = messages.find(
       msg => msg.author.id === client.user.id && msg.embeds.length > 0
     );
-    
+
     if (existingMessage) {
       log('✅ FAQ message already exists');
       return existingMessage;
     }
-    
+
     // Get channels for mentions
     const supportChannel = await getSupportChannel(guild);
     const generalChannel = await getGeneralChannel(guild);
-    
+
     // Create FAQ embed
     const faqEmbed = new EmbedBuilder()
       .setTitle('❓ Frequently Asked Questions (FAQ)')
@@ -2350,7 +2358,7 @@ async function setupFAQ(guild) {
       )
       .setFooter({ text: 'Have a question not listed here? Ask in #support!', iconURL: 'https://skinvaults.online/icon.png' })
       .setTimestamp();
-    
+
     const message = await faqChannel.send({ embeds: [faqEmbed] });
     log('✅ FAQ posted in #faq');
     return message;
@@ -2367,7 +2375,7 @@ async function sendWelcomeDM(member) {
     const rulesChannel = await getRulesChannel(guild);
     const supportChannel = await getSupportChannel(guild);
     const generalChannel = await getGeneralChannel(guild);
-    
+
     const welcomeDM = new EmbedBuilder()
       .setTitle('👋 Welcome to SkinVaults Community!')
       .setDescription(
@@ -2390,7 +2398,7 @@ async function sendWelcomeDM(member) {
       .setThumbnail('https://skinvaults.online/icon.png')
       .setFooter({ text: 'SkinVaults Community', iconURL: 'https://skinvaults.online/icon.png' })
       .setTimestamp();
-    
+
     await member.send({ embeds: [welcomeDM] });
     log(`✅ Sent welcome DM to ${member.user.tag}`);
   } catch (error) {
@@ -2409,10 +2417,10 @@ async function sendWelcomeChannelMessage(member) {
     const guild = member.guild;
     const welcomeChannel = await getWelcomeChannel(guild);
     if (!welcomeChannel) return;
-    
+
     const rulesChannel = await getRulesChannel(guild);
     const generalChannel = await getGeneralChannel(guild);
-    
+
     const welcomeMessage = new EmbedBuilder()
       .setTitle('🎉 New Member Joined!')
       .setDescription(
@@ -2427,7 +2435,7 @@ async function sendWelcomeChannelMessage(member) {
       .setThumbnail(member.user.displayAvatarURL())
       .setFooter({ text: `Member #${guild.memberCount}`, iconURL: 'https://skinvaults.online/icon.png' })
       .setTimestamp();
-    
+
     await welcomeChannel.send({ embeds: [welcomeMessage] });
     log(`✅ Posted welcome message for ${member.user.tag} in #welcome`);
   } catch (error) {
@@ -2443,7 +2451,7 @@ async function getOrCreateRole(guild, roleName, options = {}) {
     let role = guild.roles.cache.find(
       r => r.name.toLowerCase() === roleName.toLowerCase()
     );
-    
+
     if (!role && options.create !== false) {
       log(`⚠️ Role "${roleName}" not found in ${guild.name}, creating one...`);
       role = await guild.roles.create({
@@ -2454,7 +2462,7 @@ async function getOrCreateRole(guild, roleName, options = {}) {
       });
       log(`✅ Created role: ${role.name}`);
     }
-    
+
     return role;
   } catch (error) {
     log(`❌ Error getting/creating role ${roleName}: ${error.message}`);
@@ -2467,12 +2475,12 @@ async function assignRoles(member) {
   try {
     const guild = member.guild;
     const discordId = member.user.id;
-    
+
     log(`🔍 Checking roles for ${member.user.tag} (${discordId})...`);
-    
+
     // Get Steam ID from Discord ID
     const steamId = await getSteamIdFromDiscord(discordId);
-    
+
     // Always assign Member role
     const memberRole = await getOrCreateRole(guild, 'Member', { color: 0x808080 });
     if (memberRole) {
@@ -2483,11 +2491,11 @@ async function assignRoles(member) {
         log(`⚠️ Could not assign Member role: ${error.message}`);
       }
     }
-    
+
     // If user has connected Discord, check for other roles
     if (steamId) {
       log(`✅ Found Steam ID for ${member.user.tag}: ${steamId}`);
-      
+
       // Check if owner
       const isOwner = OWNER_STEAM_IDS.includes(steamId);
       if (isOwner) {
@@ -2501,7 +2509,7 @@ async function assignRoles(member) {
           }
         }
       }
-      
+
       // Check Pro status
       const isPro = await checkProStatus(steamId);
       if (isPro) {
@@ -2515,7 +2523,7 @@ async function assignRoles(member) {
           }
         }
       }
-      
+
       // Assign Verified role if Discord is connected
       const verifiedRole = await getOrCreateRole(guild, 'Verified', { color: 0x5865F2 }); // Discord blue
       if (verifiedRole) {
@@ -2529,7 +2537,7 @@ async function assignRoles(member) {
     } else {
       log(`ℹ️ No Steam ID found for ${member.user.tag} - Discord not connected yet`);
     }
-    
+
   } catch (error) {
     log(`❌ Error assigning roles: ${error.message}`);
     console.error(error);
@@ -2540,27 +2548,41 @@ async function assignRoles(member) {
 client.on('guildMemberAdd', async (member) => {
   try {
     log(`👤 New member joined: ${member.user.tag} (${member.user.id})`);
-    
+
     // Only process for the main guild
     if (member.guild.id !== GUILD_ID) {
       log(`⚠️ Member joined different guild: ${member.guild.id}, skipping`);
       return;
     }
-    
+
     // Assign roles based on status (Pro, Owner, Verified, Member)
     await assignRoles(member);
-    
+
     // Send welcome DM (optional, might fail if DMs disabled)
     await sendWelcomeDM(member);
-    
+
     // Send welcome message in channel
     await sendWelcomeChannelMessage(member);
-    
+
   } catch (error) {
     log(`❌ Error handling new member: ${error.message}`);
     console.error(error);
   }
 });
+
+// Periodic role sync (if needed)
+async function syncAllRoles() {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) return;
+  const members = await guild.members.fetch();
+  for (const m of members.values()) {
+    await assignRoles(m);
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+// Run role sync periodically
+setInterval(syncAllRoles, 5 * 60 * 1000);
 
 // Fetch role sync queue from API
 async function fetchRoleSyncQueue() {
@@ -2570,9 +2592,9 @@ async function fetchRoleSyncQueue() {
       headers['Authorization'] = `Bearer ${API_TOKEN}`;
     }
     headers['Content-Type'] = 'application/json';
-    
+
     log(`🔍 Fetching role sync queue from ${API_BASE_URL}/api/discord/sync-roles...`);
-    
+
     // Get sync queue from database via API (we'll create a GET endpoint or use the queue directly)
     // For now, we'll check the database directly via a simple endpoint
     const response = await fetch(`${API_BASE_URL}/api/discord/get-sync-queue`, {
@@ -2609,24 +2631,24 @@ async function processRoleSyncQueue() {
     // For now, we'll sync roles for all members periodically
     // In the future, we can check a queue
     // This is simpler and ensures roles stay in sync
-    
+
     // Only sync every 5 minutes to avoid rate limits
     const lastSyncKey = 'last_role_sync';
     const lastSync = client.lastRoleSync || 0;
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
-    
+
     if (now - lastSync < fiveMinutes) {
       return; // Don't sync too often
     }
-    
+
     client.lastRoleSync = now;
-    
+
     log('🔄 Syncing roles for all members...');
     const members = await guild.members.fetch();
     let synced = 0;
     let errors = 0;
-    
+
     for (const [id, member] of members) {
       try {
         await assignRoles(member);
@@ -2640,7 +2662,7 @@ async function processRoleSyncQueue() {
         }
       }
     }
-    
+
     if (synced > 0 || errors > 0) {
       log(`✅ Synced roles for ${synced} members (${errors} errors)`);
     }
@@ -2659,7 +2681,7 @@ setInterval(processRoleSyncQueue, 5 * 60 * 1000);
 client.once('clientReady', async () => {
   log(`✅ Discord bot logged in as ${client.user.tag}!`);
   log(`Bot is in ${client.guilds.cache.size} guild(s)`);
-  
+
   // Set bot presence/status to show as online
   try {
     client.user.setPresence({
@@ -2673,28 +2695,28 @@ client.once('clientReady', async () => {
   } catch (error) {
     log(`⚠️ Failed to set bot presence: ${error.message}`);
   }
-  
+
   // Register commands
   await registerCommands();
-  
+
   // Setup guild-specific features
   try {
     const guild = client.guilds.cache.get(GUILD_ID);
     if (guild) {
       log(`🏠 Setting up features for guild: ${guild.name}`);
-      
+
       // Setup welcome message, rules, and FAQ
       await setupWelcomeMessage(guild);
       await setupRules(guild);
       await setupFAQ(guild);
-      
+
       // Sync roles for all existing members (optional - can be disabled if too slow)
       log(`🔄 Syncing roles for existing members...`);
       try {
         const members = await guild.members.fetch();
         let synced = 0;
         let errors = 0;
-        
+
         for (const [id, member] of members) {
           try {
             await assignRoles(member);
@@ -2706,12 +2728,12 @@ client.once('clientReady', async () => {
             log(`⚠️ Error syncing roles for ${member.user.tag}: ${error.message}`);
           }
         }
-        
+
         log(`✅ Synced roles for ${synced} members (${errors} errors)`);
       } catch (error) {
         log(`⚠️ Error syncing roles for existing members: ${error.message}`);
       }
-      
+
       log(`✅ Guild setup complete for ${guild.name}`);
     } else {
       log(`⚠️ Guild ${GUILD_ID} not found. Make sure the bot is in the server.`);
@@ -2720,11 +2742,11 @@ client.once('clientReady', async () => {
     log(`❌ Error setting up guild features: ${error.message}`);
     console.error(error);
   }
-  
+
   // Process any queued messages immediately
   log('🔄 Checking for queued messages...');
   processQueuedMessages();
-  
+
   log('🤖 Bot is ready and processing messages!');
   log('⏰ Bot will check for queued messages every 5 seconds...');
 });
