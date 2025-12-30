@@ -944,7 +944,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -952,8 +952,19 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
         if (!invResponse.ok) {
+          const errorText = await invResponse.text().catch(() => 'Unknown error');
+          let errorMessage = 'Could not fetch your inventory.';
+          
+          if (invResponse.status === 403 || invResponse.status === 401) {
+            errorMessage = 'Your Steam inventory is private. Set your Steam profile to public to view your inventory.';
+          } else if (invResponse.status === 404) {
+            errorMessage = 'Inventory not found. Make sure you have CS2 items in your Steam inventory.';
+          } else if (invResponse.status === 429) {
+            errorMessage = 'Too many requests. Please wait a moment and try again.';
+          }
+          
           await interaction.editReply({
-            content: '❌ **Failed to Load Inventory**\n\nCould not fetch your inventory. Please try again later.',
+            content: `❌ **Failed to Load Inventory**\n\n${errorMessage}\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit https://skinvaults.online/inventory to sync\n• Wait a moment and try again`,
           });
           return;
         }
@@ -1045,7 +1056,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -1053,15 +1064,45 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
         if (!invResponse.ok) {
+          const errorText = await invResponse.text().catch(() => 'Unknown error');
+          let errorMessage = 'Could not fetch your inventory.';
+          
+          if (invResponse.status === 403 || invResponse.status === 401) {
+            errorMessage = 'Your Steam inventory is private. Set your Steam profile to public to view your inventory.';
+          } else if (invResponse.status === 404) {
+            errorMessage = 'Inventory not found. Make sure you have CS2 items in your Steam inventory.';
+          } else if (invResponse.status === 429) {
+            errorMessage = 'Too many requests. Please wait a moment and try again.';
+          }
+          
           await interaction.editReply({
-            content: '❌ **Failed to Load Inventory**\n\nCould not fetch your inventory. Please try again later.',
+            content: `❌ **Failed to Load Inventory**\n\n${errorMessage}\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit https://skinvaults.online/inventory to sync\n• Wait a moment and try again`,
           });
           return;
         }
 
         const invData = await invResponse.json();
+        
+        // Check if inventory is empty or private
+        if (!invData.success || !invData.assets || invData.assets.length === 0) {
+          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          await interaction.editReply({
+            content: `📦 **No Items Found**\n\nYour inventory appears to be empty or private.\n\n**Possible reasons:**\n• Your Steam inventory is empty\n• Your Steam profile is set to private\n• Inventory hasn't loaded yet\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit [your vault](${vaultUrl}) to sync your inventory\n• Make sure you have CS2 items in your inventory`,
+          });
+          return;
+        }
+        
         const assets = invData.assets || [];
         const descriptions = invData.descriptions || [];
+        
+        // Check if we have descriptions
+        if (!descriptions || descriptions.length === 0) {
+          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          await interaction.editReply({
+            content: `⚠️ **Inventory Data Incomplete**\n\nCould not load item details from your inventory.\n\n💡 **Try:**\n• Visit [your vault](${vaultUrl}) to refresh your inventory\n• Make sure your Steam profile is public\n• Try again in a few moments`,
+          });
+          return;
+        }
         
         // Create a map of classid_instanceid to descriptions
         const descMap = new Map();
@@ -1093,16 +1134,20 @@ client.on('interactionCreate', async (interaction) => {
           let price = null;
           let priceValue = 0;
           if (isMarketable && (desc.market_hash_name || desc.market_name)) {
-            price = await getItemPrice(desc.market_hash_name || desc.market_name, '3');
-            if (price) {
-              const priceStr = price.lowest_price || price.lowest || price.median_price;
-              if (priceStr) {
-                // Parse price (handles formats like "€0,78" or "$1.23")
-                const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
-                priceValue = parseFloat(cleaned) || 0;
-                totalValue += priceValue * (asset.amount || 1);
-                pricedCount++;
+            try {
+              price = await getItemPrice(desc.market_hash_name || desc.market_name, '3');
+              if (price) {
+                const priceStr = price.lowest_price || price.lowest || price.median_price;
+                if (priceStr) {
+                  // Parse price (handles formats like "€0,78" or "$1.23")
+                  const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
+                  priceValue = parseFloat(cleaned) || 0;
+                  totalValue += priceValue * (asset.amount || 1);
+                  pricedCount++;
+                }
               }
+            } catch (priceError) {
+              // Ignore individual price fetch errors
             }
           }
 
@@ -1214,14 +1259,15 @@ client.on('interactionCreate', async (interaction) => {
             embed.setDescription(`[View Full Vault](${vaultUrl})`);
           }
         } else {
-          embed.setDescription(`No items found.\n\n[View Vault](${vaultUrl})`);
+          embed.setDescription(`📦 **No Items Found**\n\nYour inventory appears to be empty or items couldn't be processed.\n\n[View Vault](${vaultUrl})`);
         }
 
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
         console.error('Error getting vault:', error);
+        const errorMessage = error?.message || 'Unknown error';
         await interaction.editReply({
-          content: '❌ **Error**\n\nFailed to load vault data. Please try again later.',
+          content: `❌ **Error Loading Vault**\n\nFailed to load vault data: ${errorMessage}\n\n💡 **Try:**\n• Make sure your Steam profile is public\n• Visit https://skinvaults.online/inventory to sync\n• Try again in a few moments`,
         });
       }
 
@@ -1232,7 +1278,7 @@ client.on('interactionCreate', async (interaction) => {
       
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
         });
         return;
       }

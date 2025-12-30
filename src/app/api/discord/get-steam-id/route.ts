@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet } from '@/app/utils/database';
 
 // Get Steam ID from Discord ID
 export async function GET(request: Request) {
@@ -12,11 +12,11 @@ export async function GET(request: Request) {
     }
 
     const discordConnectionsKey = 'discord_connections';
-    const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
     
     // Find Steam ID by Discord ID
     for (const [steamId, connection] of Object.entries(connections)) {
-      if (connection.discordId === discordId) {
+      if (connection && connection.discordId === discordId) {
         // Check if connection is still valid
         if (connection.expiresAt && Date.now() > connection.expiresAt) {
           continue; // Skip expired connections
