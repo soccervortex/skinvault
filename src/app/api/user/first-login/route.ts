@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { recordFirstLogin } from '@/app/utils/pro-storage';
 import { updateUserCount } from '@/app/lib/user-milestones';
+import { notifyNewUser, notifyUserLogin } from '@/app/utils/discord-webhook';
 
 // Record first login date when user logs in via Steam
 export async function POST(request: Request) {
   try {
-    const { steamId } = await request.json();
+    const { steamId, steamName } = await request.json();
 
     if (!steamId || typeof steamId !== 'string') {
       return NextResponse.json({ error: 'Missing or invalid steamId' }, { status: 400 });
@@ -23,6 +24,16 @@ export async function POST(request: Request) {
     // Update user count if this is a new user
     if (isNewUser) {
       await updateUserCount();
+      
+      // Send Discord notification for new user
+      notifyNewUser(steamId, steamName).catch(error => {
+        console.error('Failed to send new user notification:', error);
+      });
+    } else {
+      // Send Discord notification for regular login (existing user)
+      notifyUserLogin(steamId, steamName).catch(error => {
+        console.error('Failed to send login notification:', error);
+      });
     }
 
     return NextResponse.json({ success: true });

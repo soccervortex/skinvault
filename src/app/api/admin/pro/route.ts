@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { grantPro, getProUntil, getAllProUsers } from '@/app/utils/pro-storage';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
+import { notifyNewProUser } from '@/app/utils/discord-webhook';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
 
     const rawSteamId = body?.steamId as string | undefined;
     const months = Number(body?.months ?? 0);
+    const grantedBy = body?.grantedBy as string | undefined; // Optional: who granted it
 
     // Sanitize and validate SteamID
     const steamId = rawSteamId ? sanitizeSteamId(rawSteamId) : null;
@@ -39,6 +41,12 @@ export async function POST(request: Request) {
     }
 
     const proUntil = await grantPro(steamId, months);
+    
+    // Send Discord notification for new Pro user
+    notifyNewProUser(steamId, months, proUntil, grantedBy).catch(error => {
+      console.error('Failed to send Pro user notification:', error);
+    });
+    
     return NextResponse.json({ steamId, proUntil });
   } catch (error) {
     console.error('Failed to grant Pro:', error);

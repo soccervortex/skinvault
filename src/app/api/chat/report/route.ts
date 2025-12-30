@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
+import { notifyChatReport } from '@/app/utils/discord-webhook';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 
@@ -120,10 +121,26 @@ export async function POST(request: Request) {
     await reportsCollection.insertOne(report);
     // Don't close connection - it's from shared pool
 
+    const reportId = report._id?.toString() || '';
+    
+    // Send Discord notification for chat report
+    if (reportId) {
+      notifyChatReport(
+        reporterSteamId,
+        reporterName || 'Unknown',
+        reportedSteamId,
+        reportedName || 'Unknown',
+        reportType,
+        reportId
+      ).catch(error => {
+        console.error('Failed to send chat report notification:', error);
+      });
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: 'Report submitted successfully',
-      reportId: report._id?.toString(),
+      reportId,
     });
   } catch (error) {
     console.error('Failed to create report:', error);

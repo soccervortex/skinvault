@@ -4,6 +4,7 @@ import { grantPro } from '@/app/utils/pro-storage';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { captureError, captureMessage } from '@/app/lib/error-handler';
 import { sendInngestEvent } from '@/app/lib/inngest';
+import { notifyProPurchase, notifyConsumablePurchase } from '@/app/utils/discord-webhook';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -100,12 +101,15 @@ export async function POST(request: Request) {
         
         // Record purchase history with fulfillment status
         try {
+          const amount = session.amount_total ? (session.amount_total / 100) : 0;
+          const currency = session.currency || 'eur';
+          
           existingPurchases.push({
             steamId,
             type: 'pro',
             months,
-            amount: session.amount_total ? (session.amount_total / 100) : 0,
-            currency: session.currency || 'eur',
+            amount,
+            currency,
             sessionId: session.id,
             timestamp: new Date().toISOString(),
             proUntil,
@@ -119,6 +123,11 @@ export async function POST(request: Request) {
           const recentPurchases = existingPurchases.slice(-1000);
           await dbSet(purchasesKey, recentPurchases);
           console.log(`✅ Purchase ${session.id} recorded in history`);
+          
+          // Send Discord notification for Pro purchase
+          notifyProPurchase(steamId, months, amount, currency, proUntil, session.id).catch(error => {
+            console.error('Failed to send Pro purchase notification:', error);
+          });
           
           // Trigger Discord role sync if user has Discord connected
           try {
@@ -208,13 +217,16 @@ export async function POST(request: Request) {
 
           // Record purchase history with fulfillment status
           try {
+            const amount = session.amount_total ? (session.amount_total / 100) : 0;
+            const currency = session.currency || 'eur';
+            
             existingPurchases.push({
               steamId,
               type: 'consumable',
               consumableType,
               quantity,
-              amount: session.amount_total ? (session.amount_total / 100) : 0,
-              currency: session.currency || 'eur',
+              amount,
+              currency,
               sessionId: session.id,
               timestamp: new Date().toISOString(),
               fulfilled: true,
@@ -227,6 +239,11 @@ export async function POST(request: Request) {
             const recentPurchases = existingPurchases.slice(-1000);
             await dbSet(purchasesKey, recentPurchases);
             console.log(`✅ Purchase ${session.id} recorded in history`);
+            
+            // Send Discord notification for consumable purchase
+            notifyConsumablePurchase(steamId, consumableType, quantity, amount, currency, session.id).catch(error => {
+              console.error('Failed to send consumable purchase notification:', error);
+            });
           } catch (error) {
             console.error('Failed to record purchase history:', error);
             // Still continue - rewards were granted

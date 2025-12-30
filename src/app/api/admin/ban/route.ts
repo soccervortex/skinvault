@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
 import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { notifyUserBan, notifyUserUnban } from '@/app/utils/discord-webhook';
 
 const ADMIN_HEADER = 'x-admin-key';
 const BANNED_KEY = 'banned_steam_ids';
@@ -40,6 +41,12 @@ export async function POST(request: Request) {
       if (!banned.includes(steamId)) {
         banned.push(steamId);
         await dbSet(BANNED_KEY, banned);
+        
+        // Send Discord notification for user ban
+        const bannedBy = body?.bannedBy as string | undefined;
+        notifyUserBan(steamId, bannedBy).catch(error => {
+          console.error('Failed to send ban notification:', error);
+        });
       }
       return NextResponse.json({ steamId, banned: true });
     } catch (error) {
@@ -103,8 +110,19 @@ export async function DELETE(request: Request) {
 
     try {
       const banned = await dbGet<string[]>(BANNED_KEY) || [];
+      const wasBanned = banned.includes(steamId);
       const updatedBanned = banned.filter(id => id !== steamId);
       await dbSet(BANNED_KEY, updatedBanned);
+      
+      // Send Discord notification for user unban
+      if (wasBanned) {
+        const url = new URL(request.url);
+        const unbannedBy = url.searchParams.get('unbannedBy') || undefined;
+        notifyUserUnban(steamId, unbannedBy).catch(error => {
+          console.error('Failed to send unban notification:', error);
+        });
+      }
+      
       return NextResponse.json({ steamId, banned: false, message: 'User has been unbanned' });
     } catch (error) {
       console.error('Failed to unban Steam ID:', error);

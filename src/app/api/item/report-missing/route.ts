@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbSet } from '@/app/utils/database';
 import { API_FILES, BASE_URL } from '@/data/api-endpoints';
+import { notifyItemReport } from '@/app/utils/discord-webhook';
 
-const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1454721539315470376/o8WS6sffMhdYgsPMZq8u0j1hhfVfak88AqoBc8nrngkMxK0rEOu39gzEYSfCFEobf4Lz';
+// Using centralized Discord webhook utility
 
 interface ReportData {
   itemName: string;
@@ -47,61 +48,7 @@ async function checkItemExists(itemId: string, itemName: string): Promise<boolea
   }
 }
 
-// Send Discord webhook notification
-async function sendDiscordNotification(report: ReportData, existsInAPI: boolean) {
-  try {
-    const embed = {
-      title: '🔍 Missing Item Report',
-      description: existsInAPI 
-        ? '⚠️ **Item exists in API but may have issues**'
-        : '❌ **Item not found in API**',
-      color: existsInAPI ? 0xffaa00 : 0xff0000,
-      fields: [
-        {
-          name: 'Item Name',
-          value: report.itemName || 'N/A',
-          inline: true,
-        },
-        {
-          name: 'Item ID',
-          value: `\`${report.itemId}\``,
-          inline: true,
-        },
-        {
-          name: 'Reason',
-          value: report.reason || 'No reason provided',
-          inline: false,
-        },
-        {
-          name: 'Status',
-          value: existsInAPI ? '✅ Found in API' : '❌ Not in API',
-          inline: true,
-        },
-        {
-          name: 'Timestamp',
-          value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
-          inline: true,
-        },
-      ],
-      ...(report.itemImage && {
-        thumbnail: {
-          url: report.itemImage,
-        },
-      }),
-      footer: {
-        text: 'SkinVaults Item Report System',
-      },
-    };
-
-    await fetch(DISCORD_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ embeds: [embed] }),
-    });
-  } catch (error) {
-    console.error('Failed to send Discord notification:', error);
-  }
-}
+// Discord notification is now handled by centralized utility
 
 export async function POST(request: Request) {
   try {
@@ -145,13 +92,16 @@ export async function POST(request: Request) {
       // Continue even if DB fails
     }
 
-    // Send Discord notification
-    await sendDiscordNotification({
-      itemName: report.itemName,
-      itemId: report.itemId,
-      itemImage: report.itemImage || undefined,
-      reason: report.reason,
-    }, existsInAPI);
+    // Send Discord notification using centralized utility
+    notifyItemReport(
+      report.itemName,
+      report.itemId,
+      report.reason,
+      existsInAPI,
+      report.itemImage || undefined
+    ).catch(error => {
+      console.error('Failed to send item report notification:', error);
+    });
 
     return NextResponse.json({ 
       success: true, 

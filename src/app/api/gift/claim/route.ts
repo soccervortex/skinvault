@@ -3,6 +3,7 @@ import { hasUserClaimedGift, saveUserGiftClaim, getUserGiftReward } from '@/app/
 import { getRandomReward } from '@/app/utils/theme-rewards';
 import { getProUntil, grantPro } from '@/app/utils/pro-storage';
 import { ThemeType } from '@/app/utils/theme-storage';
+import { notifyNewProUser } from '@/app/utils/discord-webhook';
 
 export async function POST(request: Request) {
   try {
@@ -32,7 +33,12 @@ export async function POST(request: Request) {
     // If Pro extension reward, apply it immediately
     if (reward.type === 'pro_extension' && reward.value) {
       const months = reward.value;
-      await grantPro(steamId, months);
+      const proUntil = await grantPro(steamId, months);
+      
+      // Send Discord notification for Pro granted via gift
+      notifyNewProUser(steamId, months, proUntil, 'gift_claim').catch(error => {
+        console.error('Failed to send gift Pro notification:', error);
+      });
     }
 
     // Save claim

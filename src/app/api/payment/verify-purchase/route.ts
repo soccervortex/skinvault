@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { notifyProPurchase, notifyConsumablePurchase } from '@/app/utils/discord-webhook';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -113,6 +114,13 @@ export async function POST(request: Request) {
       
       await dbSet(purchasesKey, existingPurchases.slice(-1000));
       
+      // Send Discord notification for manually verified Pro purchase
+      const amount = session.amount_total ? (session.amount_total / 100) : 0;
+      const currency = session.currency || 'eur';
+      notifyProPurchase(steamId, months, amount, currency, proUntil, session.id).catch(error => {
+        console.error('Failed to send Pro purchase notification:', error);
+      });
+      
       return NextResponse.json({ 
         fulfilled: true,
         type: 'pro',
@@ -171,6 +179,13 @@ export async function POST(request: Request) {
         });
         
         await dbSet(purchasesKey, existingPurchases.slice(-1000));
+
+        // Send Discord notification for manually verified consumable purchase
+        const amount = session.amount_total ? (session.amount_total / 100) : 0;
+        const currency = session.currency || 'eur';
+        notifyConsumablePurchase(steamId, consumableType, quantity, amount, currency, session.id).catch(error => {
+          console.error('Failed to send consumable purchase notification:', error);
+        });
 
         return NextResponse.json({ 
           fulfilled: true,
