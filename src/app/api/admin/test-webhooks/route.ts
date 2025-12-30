@@ -42,12 +42,12 @@ export async function GET(request: Request) {
       results['New User'] = { success: false, error: error.message };
     }
 
-    // Test 2: User Login
+    // Test 2: User Login (goes to events channel)
     try {
       await notifyUserLogin('76561198000000000', 'Test User');
-      results['User Login'] = { success: true };
+      results['User Login (Events)'] = { success: true };
     } catch (error: any) {
-      results['User Login'] = { success: false, error: error.message };
+      results['User Login (Events)'] = { success: false, error: error.message };
     }
 
     // Test 3: Pro Grant

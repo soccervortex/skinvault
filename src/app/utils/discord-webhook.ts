@@ -6,6 +6,7 @@
 // Webhook categories - each can have its own Discord channel
 export type WebhookCategory = 
   | 'users'           // New user registrations
+  | 'events'          // User logins and other events
   | 'pro'             // Pro grants (admin) and purchases
   | 'purchases'       // All purchases (Pro and consumables)
   | 'moderation'      // User bans/unbans
@@ -14,6 +15,7 @@ export type WebhookCategory =
 // Default webhook URLs (can be overridden by environment variables)
 const DEFAULT_WEBHOOKS: Record<WebhookCategory, string> = {
   users: 'https://discord.com/api/webhooks/1455368741062967327/FP9ky0VAlS0mptl5R8c4S5_SGCwfkTqe6rw0As7Ejq5xjvoBc3-AxUQZelEzQ0sOTonc',
+  events: 'https://discord.com/api/webhooks/1455371861582938157/kHRb3FjF645160e8LrccCbUDjUZYGEHYPqUuciBUs9aJpwfNXTt-YKfUd66oDW4cAClg',
   pro: 'https://discord.com/api/webhooks/1455368871564415142/M_aHYhMBAnCO0AW7MP023FN1ZBskivJfJ0iu7M78wAplgw7ooDC4vl8F6M4f_xMj5hQx',
   purchases: 'https://discord.com/api/webhooks/1455369022769074432/iz6AU1xg1bHRddES_zQZ9ZsV3_FNko4vZR2-uAi8pSxkmD_9RSURN6CXNjaQfI9cW7xL',
   moderation: 'https://discord.com/api/webhooks/1455369157129277686/8XumBuRF7bxbZVW2rsEhv9zAEHmSjiqypP0aT8kk8DxDJrimyBTt5Rgr9WYJPB1vYLpi',
@@ -150,7 +152,7 @@ export async function notifyUserLogin(steamId: string, steamName?: string): Prom
     timestamp: new Date().toISOString(),
   };
 
-  await sendDiscordWebhook([embed], 'users');
+  await sendDiscordWebhook([embed], 'events');
 }
 
 /**

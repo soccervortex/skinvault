@@ -1562,23 +1562,45 @@ export default function AdminPage() {
           <form onSubmit={async (e) => { 
             e.preventDefault(); 
             e.stopPropagation();
-            const trimmedId = searchSteamId?.trim();
-            if (trimmedId && trimmedId.length >= 17 && /^\d{17}$/.test(trimmedId)) {
-              // Navigate directly - API will handle validation
-              router.push(`/admin/user/${trimmedId}`);
-            } else {
-              toast.error('Please enter a valid Steam ID (17 digits)');
+            const trimmedQuery = searchSteamId?.trim();
+            if (!trimmedQuery) {
+              toast.error('Please enter a Steam ID or username');
+              return;
+            }
+
+            // If it's a Steam64 ID (17 digits), navigate directly
+            if (/^\d{17}$/.test(trimmedQuery)) {
+              router.push(`/admin/user/${trimmedQuery}`);
+              return;
+            }
+
+            // Otherwise, try to resolve username to Steam ID
+            try {
+              const resolveRes = await fetch(`/api/steam/resolve-username?query=${encodeURIComponent(trimmedQuery)}`);
+              if (resolveRes.ok) {
+                const data = await resolveRes.json();
+                if (data.steamId) {
+                  router.push(`/admin/user/${data.steamId}`);
+                } else {
+                  toast.error('Could not resolve Steam username');
+                }
+              } else {
+                const errorData = await resolveRes.json();
+                toast.error(errorData.error || 'Could not resolve Steam username');
+              }
+            } catch (error) {
+              toast.error('Failed to resolve Steam username');
             }
           }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
               <label htmlFor="admin-search-steam-id" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
-                SteamID64
+                SteamID64 or Username
               </label>
               <input
                 id="admin-search-steam-id"
                 value={searchSteamId}
                 onChange={(e) => setSearchSteamId(e.target.value)}
-                placeholder="7656119..."
+                placeholder="7656119... or TheRembler"
                 className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
               />
             </div>
