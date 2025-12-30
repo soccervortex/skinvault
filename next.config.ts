@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withBotId } from 'botid/next/config';
 import { withSentryConfig } from '@sentry/nextjs';
 import path from 'path';
 
@@ -42,7 +43,7 @@ const nextConfig: NextConfig = {
   // Reduce legacy JavaScript - target modern browsers
   transpilePackages: [],
   // Turbopack configuration
-    turbopack: {
+  turbopack: {
     root: path.resolve(__dirname),
   },
   // Performance optimizations
@@ -60,10 +61,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Wrap with Sentry if DSN is configured
-export default process.env.SENTRY_DSN
+// 1. Determine the base config (either plain or wrapped by Sentry)
+const sentryWrappedConfig = process.env.SENTRY_DSN
   ? withSentryConfig(nextConfig, {
-      // Sentry options
       silent: true,
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
@@ -72,3 +72,6 @@ export default process.env.SENTRY_DSN
       automaticVercelMonitors: true,
     })
   : nextConfig;
+
+// 2. Wrap the final result with BotId
+export default withBotId(sentryWrappedConfig);
