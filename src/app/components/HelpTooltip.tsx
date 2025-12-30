@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { HelpCircle, X } from 'lucide-react';
 
 interface HelpTooltipProps {
@@ -12,166 +13,158 @@ interface HelpTooltipProps {
 
 export default function HelpTooltip({ content, title, position = 'top', className = '' }: HelpTooltipProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Handle mounting for Portals (Next.js SSR safety)
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   // Close on escape key
   useEffect(() => {
     if (!isOpen) return;
-    
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false);
-      }
+      if (e.key === 'Escape') setIsOpen(false);
     };
-    
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  // Position tooltip responsively
+  // Prevent background scroll when open on mobile
   useEffect(() => {
+    if (isOpen && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
+  const updatePosition = () => {
     if (!isOpen || !tooltipRef.current || !buttonRef.current) return;
 
     const tooltip = tooltipRef.current;
     const button = buttonRef.current;
     const rect = button.getBoundingClientRect();
-    const tooltipRect = tooltip.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const spacing = 12;
 
-    // Reset positioning
+    // Reset styles
     tooltip.style.top = '';
     tooltip.style.bottom = '';
     tooltip.style.left = '';
     tooltip.style.right = '';
     tooltip.style.transform = '';
 
-    // Mobile: center on screen
+    // MOBILE: Absolute Center
     if (viewportWidth < 768) {
-      tooltip.style.position = 'fixed';
       tooltip.style.top = '50%';
       tooltip.style.left = '50%';
       tooltip.style.transform = 'translate(-50%, -50%)';
-      tooltip.style.right = 'auto';
-      tooltip.style.bottom = 'auto';
-      tooltip.style.maxWidth = 'calc(100vw - 2rem)';
       tooltip.style.width = '90vw';
+      tooltip.style.maxWidth = '400px';
       return;
     }
 
-    // Desktop: position relative to button
-    let top = '';
-    let bottom = '';
-    let left = '';
-    let right = '';
-    let transform = '';
+    // DESKTOP: Relative to Button
+    let top = 0;
+    let left = 0;
 
-    switch (position) {
-      case 'top':
-        bottom = `${viewportHeight - rect.top + spacing}px`;
-        left = `${rect.left + rect.width / 2}px`;
-        transform = 'translateX(-50%)';
-        break;
-      case 'bottom':
-        top = `${rect.bottom + spacing}px`;
-        left = `${rect.left + rect.width / 2}px`;
-        transform = 'translateX(-50%)';
-        break;
-      case 'left':
-        right = `${viewportWidth - rect.left + spacing}px`;
-        top = `${rect.top + rect.height / 2}px`;
-        transform = 'translateY(-50%)';
-        break;
-      case 'right':
-        left = `${rect.right + spacing}px`;
-        top = `${rect.top + rect.height / 2}px`;
-        transform = 'translateY(-50%)';
-        break;
+    if (position === 'top') {
+      top = rect.top - tooltip.offsetHeight - spacing;
+      left = rect.left + rect.width / 2 - tooltip.offsetWidth / 2;
+    } else if (position === 'bottom') {
+      top = rect.bottom + spacing;
+      left = rect.left + rect.width / 2 - tooltip.offsetWidth / 2;
+    } else if (position === 'left') {
+      top = rect.top + rect.height / 2 - tooltip.offsetHeight / 2;
+      left = rect.left - tooltip.offsetWidth - spacing;
+    } else if (position === 'right') {
+      top = rect.top + rect.height / 2 - tooltip.offsetHeight / 2;
+      left = rect.right + spacing;
     }
 
-    // Adjust if tooltip goes off screen
-    const tooltipWidth = tooltipRect.width;
-    const tooltipHeight = tooltipRect.height;
-
-    if (position === 'left' || position === 'right') {
-      if (parseFloat(top) + tooltipHeight > viewportHeight) {
-        top = `${viewportHeight - tooltipHeight - 20}px`;
-      }
-      if (parseFloat(top) < 20) {
-        top = '20px';
-      }
-    } else {
-      if (parseFloat(left) - tooltipWidth / 2 < 20) {
-        left = `${tooltipWidth / 2 + 20}px`;
-      }
-      if (parseFloat(left) + tooltipWidth / 2 > viewportWidth - 20) {
-        left = `${viewportWidth - tooltipWidth / 2 - 20}px`;
-      }
+    // Edge Detection (Keep on screen)
+    if (left < 10) left = 10;
+    if (left + tooltip.offsetWidth > viewportWidth - 10) {
+      left = viewportWidth - tooltip.offsetWidth - 10;
+    }
+    if (top < 10) top = 10;
+    if (top + tooltip.offsetHeight > viewportHeight - 10) {
+      top = viewportHeight - tooltip.offsetHeight - 10;
     }
 
-    tooltip.style.top = top || '';
-    tooltip.style.bottom = bottom || '';
-    tooltip.style.left = left || '';
-    tooltip.style.right = right || '';
-    tooltip.style.transform = transform || '';
-  }, [isOpen, position]);
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+  };
+
+  useEffect(() => {
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
+  }, [isOpen]);
+
+  const tooltipContent = (
+    <>
+      {/* Backdrop: High Z-index to cover everything */}
+      <div
+        className="fixed inset-0 z-[9998] bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={() => setIsOpen(false)}
+      />
+      
+      {/* Tooltip Container */}
+      <div
+        ref={tooltipRef}
+        className="fixed z-[9999] bg-[#11141d] border border-white/10 rounded-2xl p-5 md:p-6 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 mb-4">
+          {title && (
+            <h3 className="text-[11px] md:text-xs font-black uppercase tracking-[0.2em] text-blue-400">
+              {title}
+            </h3>
+          )}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="p-1 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        
+        {/* Body */}
+        <div className="text-xs md:text-sm text-gray-300 leading-relaxed">
+          {typeof content === 'string' ? (
+            <p className="whitespace-pre-line">{content}</p>
+          ) : (
+            content
+          )}
+        </div>
+      </div>
+    </>
+  );
 
   return (
-    <div className={`relative inline-flex items-center ${className}`}>
+    <div className={`inline-flex items-center ${className}`}>
       <button
         ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-1.5 md:p-2 rounded-lg md:rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 text-blue-400 hover:text-blue-300 transition-all duration-200 shrink-0"
-        aria-label="Show help information"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/50 text-blue-400 transition-all active:scale-95"
         type="button"
       >
-        <HelpCircle size={14} className="md:w-4 md:h-4" />
+        <HelpCircle size={16} />
       </button>
-      
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* Tooltip */}
-          <div
-            ref={tooltipRef}
-            className="fixed z-[9999] bg-[#11141d] border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-2xl max-w-xs md:max-w-sm w-[90vw] md:w-auto animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-3 md:mb-4">
-              {title && (
-                <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-blue-400 flex-1">
-                  {title}
-                </h3>
-              )}
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all shrink-0"
-                aria-label="Close help"
-              >
-                <X size={14} className="md:w-4 md:h-4" />
-              </button>
-            </div>
-            
-            {/* Content */}
-            <div className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed space-y-2">
-              {typeof content === 'string' ? (
-                <p>{content}</p>
-              ) : (
-                content
-              )}
-            </div>
-          </div>
-        </>
-      )}
+
+      {/* Render to body to escape parent overflow/z-index issues */}
+      {isOpen && mounted && createPortal(tooltipContent, document.body)}
     </div>
   );
 }
-
