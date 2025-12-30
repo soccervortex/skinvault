@@ -1600,7 +1600,7 @@ export default function AdminPage() {
                 id="admin-search-steam-id"
                 value={searchSteamId}
                 onChange={(e) => setSearchSteamId(e.target.value)}
-                placeholder="7656119... or TheRembler"
+                placeholder="7656119... or ExampleUser"
                 className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
               />
             </div>

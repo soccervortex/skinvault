@@ -22,7 +22,17 @@ export async function GET(request: Request) {
     }
 
     // Try to resolve as custom URL/username
-    const cleanUsername = query.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    // Clean username: extract first part before | or special chars
+    // "xottikmw | skinvaults.online" -> "xottikmw"
+    let cleanUsername = query.trim();
+    
+    // If it contains |, take the part before it
+    if (cleanUsername.includes('|')) {
+      cleanUsername = cleanUsername.split('|')[0].trim();
+    }
+    
+    // Remove special chars that aren't allowed in Steam URLs (keep alphanumeric, underscore, hyphen)
+    cleanUsername = cleanUsername.replace(/[^a-zA-Z0-9_-]/g, '');
     
     if (!cleanUsername || cleanUsername.length < 3) {
       return NextResponse.json({ error: 'Invalid username format' }, { status: 400 });

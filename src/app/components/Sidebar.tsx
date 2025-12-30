@@ -736,7 +736,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 autoFocus
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
-                placeholder="e.g. 76561199235618867 or TheRembler"
+                placeholder="e.g. 76561199235618867 or ExampleUser"
                 className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-4 md:py-5 px-6 md:px-8 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-800"
               />
               <button type="submit" className="w-full bg-blue-600 py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20">Analyze Combat Record</button>

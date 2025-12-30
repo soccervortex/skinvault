@@ -380,7 +380,7 @@ async function getSteamProfile(steamId) {
 async function resolveSteamUsername(username) {
   try {
     // Clean username: extract first part before | or special chars
-    // "TheRembler | Bloodycase.com" -> "TheRembler"
+    // "ExampleUser | Website.com" -> "ExampleUser"
     let cleanUsername = username.trim();
     
     // If it contains |, take the part before it
@@ -1382,7 +1382,7 @@ client.on('interactionCreate', async (interaction) => {
             searchMethod = 'Steam username';
           } else {
             await interaction.editReply({
-              content: `❌ **Steam Username Not Found**\n\nCould not find Steam profile for: "${query}"\n\n💡 **Tips:**\n• Use just the username part (e.g., "TheRembler" instead of "TheRembler | Bloodycase.com")\n• Make sure the Steam custom URL is correct\n• Try using Steam64 ID instead`,
+              content: `❌ **Steam Username Not Found**\n\nCould not find Steam profile for: "${query}"\n\n💡 **Tips:**\n• Use just the username part (e.g., "ExampleUser" instead of "ExampleUser | Website.com")\n• Make sure the Steam custom URL is correct\n• Try using Steam64 ID instead`,
             });
             return;
           }
