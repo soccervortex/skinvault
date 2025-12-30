@@ -224,14 +224,39 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     window.location.href = '/'; // Reset de gehele app state
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchId) {
-      // Use 'steamId' parameter for searches, not 'openid.claimed_id' 
-      // to avoid being treated as a login callback
-      router.push(`/inventory?steamId=${searchId}`);
+    const trimmedQuery = searchId?.trim();
+    if (!trimmedQuery) return;
+
+    // If it's a Steam64 ID (17 digits), navigate directly
+    if (/^\d{17}$/.test(trimmedQuery)) {
+      router.push(`/inventory?steamId=${trimmedQuery}`);
       setIsSearchOpen(false);
       setSearchId("");
+      return;
+    }
+
+    // Otherwise, try to resolve username to Steam ID
+    try {
+      const resolveRes = await fetch(`/api/steam/resolve-username?query=${encodeURIComponent(trimmedQuery)}`);
+      if (resolveRes.ok) {
+        const data = await resolveRes.json();
+        if (data.steamId) {
+          router.push(`/inventory?steamId=${data.steamId}`);
+          setIsSearchOpen(false);
+          setSearchId("");
+        } else {
+          // Show error - could not resolve
+          alert('Could not find Steam profile. Please check the username or use a Steam64 ID.');
+        }
+      } else {
+        const errorData = await resolveRes.json();
+        alert(errorData.error || 'Could not resolve Steam username. Please try a Steam64 ID instead.');
+      }
+    } catch (error) {
+      console.error('Failed to resolve Steam username:', error);
+      alert('Failed to resolve Steam username. Please try a Steam64 ID instead.');
     }
   };
 
@@ -703,15 +728,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <div className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative">
             <button onClick={() => setIsSearchOpen(false)} className="absolute top-4 md:top-8 right-4 md:right-8 text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
             <h2 className="text-2xl md:text-3xl font-black italic uppercase mb-2 tracking-tighter">Stalk Profile</h2>
-            <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mb-6 md:mb-8 tracking-[0.2em]">Enter a SteamID64 to see stats and vault</p>
+            <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mb-6 md:mb-8 tracking-[0.2em]">Enter a SteamID64 or username to see stats and vault</p>
             <form onSubmit={handleSearch} className="space-y-3 md:space-y-4">
-              <label htmlFor="sidebar-steam-search" className="sr-only">Steam ID search</label>
+              <label htmlFor="sidebar-steam-search" className="sr-only">Steam ID or username search</label>
               <input
                 id="sidebar-steam-search"
                 autoFocus
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
-                placeholder="e.g. 76561199235618867"
+                placeholder="e.g. 76561199235618867 or TheRembler"
                 className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-4 md:py-5 px-6 md:px-8 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-800"
               />
               <button type="submit" className="w-full bg-blue-600 py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20">Analyze Combat Record</button>

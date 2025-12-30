@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         const steamId64Matches = [
           html.match(/steamID64[^>]*>[\s\S]{0,200}?(\d{17})/i),
           html.match(/7656\d{13}/),
-        ].filter(Boolean);
+        ].filter((match): match is RegExpMatchArray => match !== null);
         
         for (const match of steamId64Matches) {
           const steamId64 = match[1] || match[0];
