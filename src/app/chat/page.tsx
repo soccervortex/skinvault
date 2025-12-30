@@ -105,7 +105,6 @@ export default function ChatPage() {
   const [newUserSteamId, setNewUserSteamId] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
   const [reportUser, setReportUser] = useState<{ steamId: string; name: string; type: 'global' | 'dm'; dmId?: string } | null>(null);
-  const [reportSteamId, setReportSteamId] = useState('');
   const [reporting, setReporting] = useState(false);
   const [globalChatDisabled, setGlobalChatDisabled] = useState(false);
   const [dmChatDisabled, setDmChatDisabled] = useState(false);
@@ -1311,48 +1310,29 @@ export default function ChatPage() {
 
   const handleReport = async () => {
     if (!reportUser || !user?.steamId || reporting) return;
-
-    // Validate reported Steam ID
-    if (!reportSteamId.trim() || !/^\d{17}$/.test(reportSteamId.trim())) {
-      toast.error('Please enter a valid Steam ID (17 digits)');
-      return;
-    }
-
-    if (reportSteamId.trim() !== reportUser.steamId) {
-      toast.error('Steam ID does not match the user you are reporting');
-      return;
-    }
-
+  
     setReporting(true);
     try {
-      const res = await fetch('/api/chat/report', {
+      await fetch('/api/chat/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reporterSteamId: user.steamId,
+          reporterSteamId: user.steamId, // Your ID
           reporterName: user.name,
-          reportedSteamId: reportUser.steamId,
+          reportedSteamId: reportUser.steamId, // The user you picked
           reportedName: reportUser.name,
           reportType: reportUser.type,
           dmId: reportUser.dmId,
         }),
       });
-
-      if (res.ok) {
-        toast.success('Report submitted successfully. Thank you for helping keep the community safe.');
-        setReportUser(null);
-        setReportSteamId('');
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to submit report');
-      }
+      toast.success('Report submitted successfully.');
+      setReportUser(null);
     } catch (error) {
-      console.error('Failed to submit report:', error);
       toast.error('Failed to submit report');
     } finally {
       setReporting(false);
     }
-  };
+  }
 
   const handleDeleteMessage = async (messageId: string, messageType: 'global' | 'dm' = 'global') => {
     if (!user?.steamId || !messageId) return;
@@ -2674,7 +2654,6 @@ export default function ChatPage() {
                 <button
                   onClick={() => {
                     setReportUser(null);
-                    setReportSteamId('');
                   }}
                   className="text-gray-500 hover:text-white"
                 >
@@ -2688,18 +2667,9 @@ export default function ChatPage() {
                 Please enter the Steam ID of the user you are reporting to confirm:
               </p>
               <label htmlFor="report-steam-id" className="sr-only">Steam ID for report confirmation</label>
-              <input
-                id="report-steam-id"
-                type="text"
-                value={reportSteamId}
-                onChange={(e) => setReportSteamId(e.target.value)}
-                placeholder="7656119..."
-                className="w-full bg-[#08090d] border border-white/10 rounded-lg px-4 py-2 mb-4 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
-              />
               <div className="flex gap-3">
                 <button
                   onClick={handleReport}
-                  disabled={!reportSteamId.trim() || reporting}
                   className="flex-1 bg-orange-600 hover:bg-orange-500 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50"
                 >
                   {reporting ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'Submit Report'}
@@ -2707,7 +2677,6 @@ export default function ChatPage() {
                 <button
                   onClick={() => {
                     setReportUser(null);
-                    setReportSteamId('');
                   }}
                   className="flex-1 bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg font-bold transition-colors"
                 >
