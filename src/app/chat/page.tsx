@@ -2663,9 +2663,6 @@ export default function ChatPage() {
               <p className="text-gray-400 mb-4">
                 You are reporting <strong>{reportUser.name}</strong> ({reportUser.type === 'global' ? 'Global Chat' : 'Direct Message'}).
               </p>
-              <p className="text-sm text-gray-500 mb-4">
-                Please enter the Steam ID of the user you are reporting to confirm:
-              </p>
               <label htmlFor="report-steam-id" className="sr-only">Steam ID for report confirmation</label>
               <div className="flex gap-3">
                 <button
