@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, AlertCircle, Bell } from 'lucide-react';
 import { getPriceTrackerLimitSync, preloadRewards } from '@/app/utils/pro-limits';
+import HelpTooltip from './HelpTooltip';
 
 interface PriceAlert {
   id: string;
@@ -110,10 +111,26 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
             <div className="p-2 rounded-xl bg-blue-600/20 border border-blue-500/40">
               <Bell className="text-blue-400" size={20} />
             </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
-                Manage Price Trackers
-              </h2>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+                  Manage Price Trackers
+                </h2>
+                <HelpTooltip
+                  title="Price Trackers"
+                  content={
+                    <>
+                      <p className="mb-2">Get notified when item prices hit your targets:</p>
+                      <p className="mb-1">• Set alerts on item pages using the Tracker button</p>
+                      <p className="mb-1">• Receive Discord DM notifications when triggered</p>
+                      <p className="mb-1">• Free users: Limited trackers (requires Discord access)</p>
+                      <p className="mb-1">• Pro users: Unlimited trackers</p>
+                      <p className="text-blue-400 mt-2">💡 Tip: Connect Discord to receive notifications</p>
+                    </>
+                  }
+                  position="bottom"
+                />
+              </div>
               <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">
                 {alerts.length} active tracker{alerts.length !== 1 ? 's' : ''}
               </p>

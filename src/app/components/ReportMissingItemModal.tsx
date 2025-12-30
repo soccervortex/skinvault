@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
+import HelpTooltip from './HelpTooltip';
 
 interface ReportMissingItemModalProps {
   isOpen: boolean;
@@ -105,9 +106,25 @@ export default function ReportMissingItemModal({
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                  Why is this item missing? *
-                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Why is this item missing? *
+                  </label>
+                  <HelpTooltip
+                    title="Reporting Items"
+                    content={
+                      <>
+                        <p className="mb-2">Help us improve SkinVaults by reporting issues:</p>
+                        <p className="mb-1">• Item not found in search</p>
+                        <p className="mb-1">• Wrong price displayed</p>
+                        <p className="mb-1">• Missing or incorrect image</p>
+                        <p className="mb-1">• Item exists in game but not in our database</p>
+                        <p className="text-blue-400 mt-2">We review all reports and add missing items regularly</p>
+                      </>
+                    }
+                    position="top"
+                  />
+                </div>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}

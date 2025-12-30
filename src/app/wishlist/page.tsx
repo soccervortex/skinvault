@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
+import HelpTooltip from '@/app/components/HelpTooltip';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync, getWishlistBatchSize, getWishlistBatchSizeSync, preloadRewards, clearRewardsCache } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
@@ -229,8 +230,24 @@ export default function WishlistPage() {
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
             <div className="flex items-center gap-4 md:gap-6">
               <Heart className="text-rose-500 shrink-0" size={28} />
-              <div>
-                <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">My Wishlist</h2>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">My Wishlist</h2>
+                  <HelpTooltip
+                    title="Wishlist Feature"
+                    content={
+                      <>
+                        <p className="mb-2">Save items you want to track or buy:</p>
+                        <p className="mb-1">• Click the heart icon on any item page</p>
+                        <p className="mb-1">• View all saved items and their prices here</p>
+                        <p className="mb-1">• Free users: {wishlistLimit} items max</p>
+                        <p className="mb-1">• Pro users: Unlimited items</p>
+                        <p className="text-blue-400 mt-2">💡 Tip: Prices update automatically when you visit this page</p>
+                      </>
+                    }
+                    position="bottom"
+                  />
+                </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">
                     {items.length} / {isPro ? '∞' : wishlistLimit} {items.length === 1 ? 'item' : 'items'} saved

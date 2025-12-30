@@ -24,6 +24,7 @@ import {
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
 import { useToast } from "@/app/components/Toast";
+import HelpTooltip from "@/app/components/HelpTooltip";
 
 type ProEntry = {
   steamId: string;
@@ -907,9 +908,24 @@ export default function AdminPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-[1.1fr,1.5fr] gap-6 md:gap-8 items-start">
           <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px]">
-            <p className="font-black uppercase tracking-[0.3em] text-gray-500">
-              Grant / extend Pro
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-black uppercase tracking-[0.3em] text-gray-500">
+                Grant / extend Pro
+              </p>
+              <HelpTooltip
+                title="Pro Management"
+                content={
+                  <>
+                    <p className="mb-2">Grant or extend Pro subscription for users:</p>
+                    <p className="mb-1">• Enter a 17-digit Steam64 ID</p>
+                    <p className="mb-1">• Enter months to add (e.g., 1, 3, 12)</p>
+                    <p className="mb-1">• Pro automatically expires when the date passes</p>
+                    <p className="text-blue-400 mt-2">💡 Tip: Use the dashboard to view all Pro users and edit expiration dates</p>
+                  </>
+                }
+                position="top"
+              />
+            </div>
             <div>
               <label htmlFor="admin-pro-steam-id" className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
                 SteamID64
@@ -1253,9 +1269,24 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
-            Enter a Steam ID to view their purchases and fix any that weren't fulfilled properly.
-          </p>
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <p className="text-[10px] md:text-[11px] text-gray-400">
+              Enter a Steam ID to view their purchases and fix any that weren't fulfilled properly.
+            </p>
+            <HelpTooltip
+              title="Fix Purchases"
+              content={
+                <>
+                  <p className="mb-2">Fix purchases that failed to fulfill:</p>
+                  <p className="mb-1">• Enter a 17-digit Steam64 ID</p>
+                  <p className="mb-1">• View all purchases for that user</p>
+                  <p className="mb-1">• Click "Fix" on failed purchases to retry fulfillment</p>
+                  <p className="text-blue-400 mt-2">💡 Tip: This is useful when Stripe webhooks fail or payments don't process correctly</p>
+                </>
+              }
+              position="left"
+            />
+          </div>
 
           <form onSubmit={handleLoadUserPurchases} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
@@ -1370,9 +1401,24 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
-            Enter a Steam ID to check their ban status and ban or unban them.
-          </p>
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <p className="text-[10px] md:text-[11px] text-gray-400">
+              Enter a Steam ID to check their ban status and ban or unban them.
+            </p>
+            <HelpTooltip
+              title="Ban Management"
+              content={
+                <>
+                  <p className="mb-2">Manage user bans:</p>
+                  <p className="mb-1">• Enter a 17-digit Steam64 ID</p>
+                  <p className="mb-1">• Check current ban status</p>
+                  <p className="mb-1">• Ban or unban users as needed</p>
+                  <p className="text-blue-400 mt-2">💡 Tip: Banned users cannot access the site and will see a ban notification</p>
+                </>
+              }
+              position="left"
+            />
+          </div>
 
           <form onSubmit={handleCheckBanStatus} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">
             <div>
@@ -1555,9 +1601,23 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
-            Search for a user by Steam ID to view their profile, chats, and manage their account.
-          </p>
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <p className="text-[10px] md:text-[11px] text-gray-400">
+              Search for a user by Steam ID or username to view their profile, chats, and manage their account.
+            </p>
+            <HelpTooltip
+              title="User Search"
+              content={
+                <>
+                  <p className="mb-2"><strong>Steam ID:</strong> Enter a 17-digit Steam64 ID (e.g., 76561199235618867)</p>
+                  <p className="mb-2"><strong>Username:</strong> Enter a Steam custom URL or username (e.g., ExampleUser)</p>
+                  <p className="mb-2">You can paste full profile names - we'll extract the username automatically</p>
+                  <p className="text-blue-400">💡 Tip: Search results show user profile, chat history, and account management options</p>
+                </>
+              }
+              position="left"
+            />
+          </div>
 
           <form onSubmit={async (e) => { 
             e.preventDefault(); 

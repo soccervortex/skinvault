@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle } from 'lucide-react';
+import HelpTooltip from './HelpTooltip';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -727,7 +728,21 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative">
             <button onClick={() => setIsSearchOpen(false)} className="absolute top-4 md:top-8 right-4 md:right-8 text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
-            <h2 className="text-2xl md:text-3xl font-black italic uppercase mb-2 tracking-tighter">Stalk Profile</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Stalk Profile</h2>
+              <HelpTooltip
+                title="How to Search"
+                content={
+                  <>
+                    <p className="mb-2"><strong>Steam ID:</strong> Enter a 17-digit Steam64 ID (e.g., 76561199235618867)</p>
+                    <p className="mb-2"><strong>Username:</strong> Enter a Steam custom URL or username (e.g., ExampleUser)</p>
+                    <p className="mb-2"><strong>With extra text:</strong> You can paste full profile names like "ExampleUser | Website.com" - we'll extract the username automatically</p>
+                    <p className="text-blue-400">💡 Tip: You can find your Steam ID in your Steam profile URL</p>
+                  </>
+                }
+                position="left"
+              />
+            </div>
             <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mb-6 md:mb-8 tracking-[0.2em]">Enter a SteamID64 or username to see stats and vault</p>
             <form onSubmit={handleSearch} className="space-y-3 md:space-y-4">
               <label htmlFor="sidebar-steam-search" className="sr-only">Steam ID or username search</label>

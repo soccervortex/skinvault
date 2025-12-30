@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, Bell, TrendingUp, TrendingDown, Loader2, User, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { getPriceTrackerLimitSync, preloadRewards } from '@/app/utils/pro-limits';
+import HelpTooltip from './HelpTooltip';
 
 interface PriceTrackerModalProps {
   isOpen: boolean;
@@ -330,7 +331,21 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
               {/* Create New Alert */}
               {canCreateMore && (
                 <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-400">Create Alert</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-400">Create Alert</h3>
+                    <HelpTooltip
+                      title="Price Alerts"
+                      content={
+                        <>
+                          <p className="mb-2"><strong>Below:</strong> Get notified when the price drops to or below your target</p>
+                          <p className="mb-2"><strong>Above:</strong> Get notified when the price rises to or above your target</p>
+                          <p className="mb-2">You'll receive Discord DM notifications when your alert triggers</p>
+                          <p className="text-blue-400">💡 Tip: Set alerts for items you want to buy or sell</p>
+                        </>
+                      }
+                      position="top"
+                    />
+                  </div>
                   
                   <div className="space-y-3">
                     <label htmlFor="price-tracker-target" className="sr-only">Target price</label>

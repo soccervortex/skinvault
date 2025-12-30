@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, Trash2, Scale, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import HelpTooltip from './HelpTooltip';
 
 interface CompareItem {
   id: string;
@@ -309,10 +310,25 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
         <div className="flex items-center justify-between p-6 md:p-8 border-b border-white/5">
           <div className="flex items-center gap-4">
             <Scale className="text-blue-400" size={24} />
-            <div>
-              <h2 id="compare-modal-title" className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
-                Compare Items
-              </h2>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 id="compare-modal-title" className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+                  Compare Items
+                </h2>
+                <HelpTooltip
+                  title="Compare Feature"
+                  content={
+                    <>
+                      <p className="mb-2">Compare up to 2 CS2 skins side by side:</p>
+                      <p className="mb-1">• Search and select items to compare</p>
+                      <p className="mb-1">• View prices, statistics, and details</p>
+                      <p className="mb-1">• Perfect for deciding which skin to buy</p>
+                      <p className="text-blue-400 mt-2">💡 Tip: Click "Compare Now" when you have 2 items selected</p>
+                    </>
+                  }
+                  position="bottom"
+                />
+              </div>
               <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">
                 Select up to 2 items to compare
               </p>
