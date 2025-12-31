@@ -140,29 +140,6 @@ export default async function ItemLayout({
   const decodedId = decodeURIComponent(id);
   const itemInfo = await getItemInfo(decodedId);
   
-  // Fetch price data for schema
-  const priceData = await getPriceData(itemInfo.marketHashName);
-  
-  // Build AggregateOffer with price data
-  const aggregateOffer: any = {
-    "@type": "AggregateOffer",
-    "availability": "https://schema.org/InStock",
-    "priceCurrency": "EUR",
-    "url": `${SITE_CONFIG.url}/item/${encodeURIComponent(decodedId)}`
-  };
-  
-  if (priceData?.lowPrice) {
-    aggregateOffer.lowPrice = priceData.lowPrice.toString();
-  }
-  
-  if (priceData?.highPrice) {
-    aggregateOffer.highPrice = priceData.highPrice.toString();
-  }
-  
-  if (priceData?.offerCount !== undefined) {
-    aggregateOffer.offerCount = priceData.offerCount;
-  }
-  
   // Product structured data for better Google search results
   const productSchema: any = {
     "@context": "https://schema.org",
@@ -174,7 +151,6 @@ export default async function ItemLayout({
       "@type": "Brand",
       "name": "Counter-Strike 2"
     },
-    "offers": aggregateOffer,
   };
   
   // Add image if available

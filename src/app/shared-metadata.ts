@@ -11,14 +11,14 @@ export const defaultMetadata: Metadata = {
   },
   // 3. The "Elevator Pitch" for Google
   description: 'The safest way to track your CS2 skins. Monitor daily price changes, analyze your portfolio value, and manage your investments without logging into trading sites.',
-  
+
   // 4. Keywords: The "Tags" for your site
-  keywords: ['CS2 Skins', 'Inventory Tracker', 'Steam Portfolio', 'Skin Valuation', 'CS2 Investment', 'Float Value Checker'],
-  
+  keywords: ['CS2 Skins', 'CS2', 'CSGO2', 'Counter Striker', 'Counter Strike 2', 'Counter Strike Skins', 'Counter Strike 2 Skins', 'CS2 Inventory', 'CS2 Inventory Tracker', 'CS2 Skin Valuation', 'CS2 Skin Prices', 'CS2 Skin Float Value', 'CS2 Skin Float Value Checker', 'CS2 Skin Tracker', 'CS2 Skin Portfolio', 'CS2 Skin Portfolio Tracker', 'CS2 Skin Portfolio Valuation', 'Steam Portfolio', 'Skin Valuation', 'Csgo', 'CS2 Investment', 'Float Value Checker', 'SkinVaults', 'Skinvault', 'CS2 Float Value Checker', 'CS2 Skin Valuation', 'CS2 Skin Tracker', 'CS2 Skin Portfolio', 'CS2 Skin Portfolio Tracker', 'CS2 Skin Portfolio Valuation', 'CS2 Skin Portfolio Tracker'],
+
   // 5. Authors & Creator info
   authors: [{ name: 'SkinVaults Team', url: BASE_URL }],
   creator: 'SkinVaults',
-  
+
   // 6. Robots: Telling Google it's okay to read this
   robots: {
     index: true,
@@ -57,7 +57,7 @@ export const defaultMetadata: Metadata = {
     description: 'Track your CS2 skin portfolio safely. Read-only access, real-time prices.',
     images: [`${BASE_URL}/icons/og-image.jpg`], // Same image as above
   },
-  
+
   // 9. Icons: The tiny logo in the browser tab
   icons: {
     icon: '/icons/favicon.ico',
