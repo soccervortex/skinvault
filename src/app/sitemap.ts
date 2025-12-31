@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { getAllItems, weaponsList } from '@/data/weapons';
 
 /**
- * CACHING: Cache for 24 hours to handle the heavy load of 14,000+ items.
+ * CACHING: Cache for 24 hours to handle 14,000+ items efficiently.
  */
 export const revalidate = 86400;
 
@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // --- SECTION B: Dynamic Item Routes ---
-  let allItems: any[] = []; // Changed to any[] to allow flexible property access
+  let allItems: any[] = []; 
   
   try {
     const itemsPromise = getAllItems();
@@ -46,9 +46,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const itemRoutes: MetadataRoute.Sitemap = allItems.map((item) => {
     const itemId = item.id || item.marketHashName || item.slug;
-    
-    // Check for common image property names used in CS2 APIs
-    // Usually it is 'image'.
     const imageUrl = item.image || item.icon_url || '';
 
     return {
@@ -56,7 +53,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.6,
-      // Add image metadata if found
       ...(imageUrl ? { images: [imageUrl] } : {}),
     };
   });
