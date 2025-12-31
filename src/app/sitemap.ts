@@ -27,28 +27,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // --- SECTION B: Dynamic Item Routes ---
-  let allItems: typeof weaponsList = [];
+  let allItems: any[] = []; // Changed to any[] to allow flexible property access
   
   try {
     const itemsPromise = getAllItems();
-    const timeoutPromise = new Promise<typeof weaponsList>((resolve) => 
+    const timeoutPromise = new Promise<any[]>((resolve) => 
       setTimeout(() => {
         console.warn('[Sitemap] Fetch timeout: Using fallback');
-        resolve(weaponsList);
+        resolve(weaponsList as any[]);
       }, 30000)
     );
     
     allItems = await Promise.race([itemsPromise, timeoutPromise]);
   } catch (error) {
     console.error('[Sitemap] Critical error:', error);
-    allItems = weaponsList;
+    allItems = weaponsList as any[];
   }
 
   const itemRoutes: MetadataRoute.Sitemap = allItems.map((item) => {
     const itemId = item.id || item.marketHashName || item.slug;
-    const itemName = item.name || item.marketHashName || 'CS2 Skin';
     
-    // Determine the image URL. Ensure this points to your actual image source.
+    // Check for common image property names used in CS2 APIs
+    // Usually it is 'image'.
     const imageUrl = item.image || item.icon_url || '';
 
     return {
@@ -56,8 +56,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.6,
-      // Add image metadata here
-      images: imageUrl ? [imageUrl] : [],
+      // Add image metadata if found
+      ...(imageUrl ? { images: [imageUrl] } : {}),
     };
   });
 
