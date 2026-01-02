@@ -77,14 +77,34 @@ function isNonTradable(item: InventoryItem): boolean {
   return item.tradable === 0 || item.tradable === false;
 }
 
+function isNonMarketable(item: InventoryItem): boolean {
+  return item.marketable === 0 || item.marketable === false;
+}
+
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
+  const hasValue = (() => {
+    if (val === null || val === undefined) return false;
+    if (typeof val === 'number') return Number.isFinite(val);
+    if (typeof val === 'string') {
+      const s = val.trim();
+      if (!s) return false;
+      if (s === '---' || s === '--' || s === '—') return false;
+      if (/^[-—]+%?$/.test(s)) return false;
+      if (s.toLowerCase() === 'nan') return false;
+      return true;
+    }
+    return true;
+  })();
+
+  if (!hasValue) return null;
+
   return (
     <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
       <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
         {icon} {label}
       </div>
       <div className={`text-lg md:text-xl font-black italic tracking-tighter ${color}`}>
-        {val ?? '---'}{unit}
+        {val}{unit}
       </div>
     </div>
   );
@@ -1015,10 +1035,15 @@ function InventoryContent() {
   const sortedInv = useMemo(() => {
     const arr = [...filteredInv];
     arr.sort((a, b) => {
-      // Always show non-tradable items first (then tradable), regardless of the selected sort mode.
-      const ntA = isNonTradable(a) ? 0 : 1;
-      const ntB = isNonTradable(b) ? 0 : 1;
-      if (ntA !== ntB) return ntA - ntB;
+      // Always show tradable items first, then non-tradable.
+      // And within that, show marketable items first, then non-marketable.
+      const tA = isNonTradable(a) ? 0 : 1;
+      const tB = isNonTradable(b) ? 0 : 1;
+      if (tA !== tB) return tB - tA;
+
+      const mA = isNonMarketable(a) ? 0 : 1;
+      const mB = isNonMarketable(b) ? 0 : 1;
+      if (mA !== mB) return mB - mA;
 
       if (sortMode === 'name-asc') {
         return getItemDisplayName(a).localeCompare(getItemDisplayName(b));
@@ -1028,6 +1053,11 @@ function InventoryContent() {
       const priceA = parsePriceToNumber(keyA ? itemPrices[keyA] : undefined);
       const keyB = getMarketKey(b);
       const priceB = parsePriceToNumber(keyB ? itemPrices[keyB] : undefined);
+
+      // When sorting by price, always push items with no price to the bottom.
+      const hasPriceA = !!(keyA && itemPrices[keyA]);
+      const hasPriceB = !!(keyB && itemPrices[keyB]);
+      if (hasPriceA !== hasPriceB) return hasPriceA ? -1 : 1;
 
       if (sortMode === 'price-asc') {
         return priceA - priceB;
@@ -1529,23 +1559,27 @@ function InventoryContent() {
                           prefetch={false}
                           className="block"
                         >
-                          <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
-                            <img 
-                              src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
-                              className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
-                              alt="skin" 
-                            />
+                          <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col h-48 md:h-64 group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                            <div className="w-full h-24 md:h-32 mb-4 md:mb-6 z-10 flex items-center justify-center">
+                              <img 
+                                src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
+                                className="max-w-full max-h-full object-contain drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
+                                alt="skin" 
+                              />
+                            </div>
                             <div className="mt-auto space-y-1.5 md:space-y-2">
                               <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{getItemDisplayName(item)}</p>
-                              <p className="text-[10px] md:text-[11px] font-black text-emerald-500 italic">
-                                {getPriceForItem(item, itemPrices) 
-                                  ? getPriceForItem(item, itemPrices) 
-                                  : priceScanDone 
-                                    ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500 text-[8px] md:text-[9px]">NOT MARKETABLE</span> : <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>)
-                                    : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
-                                        {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
-                                      </span>}
-                              </p>
+                              <div className="min-h-[14px] md:min-h-[16px] flex items-center">
+                                <div className="text-[10px] md:text-[11px] font-black italic">
+                                  {getPriceForItem(item, itemPrices) 
+                                    ? <span className="text-emerald-500">{getPriceForItem(item, itemPrices)}</span>
+                                    : priceScanDone 
+                                      ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
+                                      : <span className="text-gray-600 animate-pulse">
+                                          {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
+                                        </span>}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </Link>

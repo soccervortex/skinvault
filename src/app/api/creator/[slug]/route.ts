@@ -161,6 +161,34 @@ async function fetchTikTokStatusApi(username: string): Promise<TikTokStatusApiRe
   return await attempt(20000);
 }
 
+async function fetchTikTokStatusApiFast(username: string): Promise<TikTokStatusApiResponse | null> {
+  const base = process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421';
+  const u = String(username || '').trim().replace(/^@/, '');
+  if (!base || !u) return null;
+
+  const url = `${String(base).replace(/\/$/, '')}/${encodeURIComponent(u)}`;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 2500);
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json,*/*',
+        'User-Agent': 'Mozilla/5.0',
+      },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as TikTokStatusApiResponse;
+    if (!json || typeof json !== 'object') return null;
+    return json;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot> {
   const sources: CreatorSnapshot['sources'] = {};
   sources.tiktokStatusApi = process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421';
@@ -180,6 +208,9 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
     const clean = String(creator.tiktokUsername).trim().replace(/^@/, '');
     links.tiktok = `https://www.tiktok.com/@${clean}`;
     links.tiktokLive = `https://www.tiktok.com/@${clean}/live`;
+
+    // Default to offline when configured so the UI always has a stable boolean.
+    live.tiktok = false;
 
     const status = await fetchTikTokStatusApi(creator.tiktokUsername);
     if (status?.is_live) {
@@ -221,11 +252,8 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
 }
 
 function buildMinimalSnapshot(creator: CreatorProfile): CreatorSnapshot {
-  const now = new Date().toISOString();
   const live: CreatorSnapshot['live'] = { twitch: null, tiktok: null, youtube: null };
   const links: CreatorSnapshot['links'] = {};
-  const items: FeedItem[] = [];
-
   if (creator.tiktokUsername) {
     const clean = String(creator.tiktokUsername).trim().replace(/^@/, '');
     links.tiktok = `https://www.tiktok.com/@${clean}`;
@@ -237,11 +265,12 @@ function buildMinimalSnapshot(creator: CreatorProfile): CreatorSnapshot {
     links.twitchLive = links.twitch;
   }
 
+  const now = new Date().toISOString();
   return {
     creator,
-    live,
+    live: { twitch: null, tiktok: creator.tiktokUsername ? false : null, youtube: null },
     links,
-    items,
+    items: [],
     updatedAt: now,
     lastCheckedAt: now,
     lastFastCheckedAt: now,
@@ -267,7 +296,15 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
     items: Array.isArray(cached.items) ? [...cached.items] : [],
   };
 
+  // Ensure a stable boolean when configured.
+  if (creator.tiktokUsername && next.live.tiktok === null) next.live.tiktok = false;
+
   const status = await fetchTikTokStatusApi(creator.tiktokUsername);
+  // If the status API is unreachable, keep the previous cached state so the badge doesn't disappear.
+  if (!status) {
+    next.lastFastCheckedAt = new Date().toISOString();
+    return next;
+  }
   if (status?.is_live) {
     const v = String(status.is_live).trim().toUpperCase();
     if (v === 'YES') next.live.tiktok = true;
@@ -301,18 +338,45 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
   return next;
 }
 
-export async function GET(_: Request, context: { params: Promise<{ slug: string }> }) {
-  const { slug } = await context.params;
-
-  const storedCreators = await dbGet<CreatorProfile[]>('creators_v1', true);
-  const creatorList = Array.isArray(storedCreators) && storedCreators.length > 0 ? storedCreators : CREATORS;
-  const creator = creatorList.find((c) => c.slug.toLowerCase() === String(slug).toLowerCase()) || null;
-  if (!creator) {
-    return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
-  }
+export async function GET(
+  request: Request,
+  { params }: { params: { slug: string } }
+) {
+  const creator = CREATORS.find((c) => c.slug === params.slug);
+  if (!creator) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const snapshotKey = `creator_snapshot_${creator.slug}`;
   const cached = await dbGet<CreatorSnapshot>(snapshotKey, true);
+
+  const url = new URL(request.url);
+  const realtime = url.searchParams.get('realtime') === '1';
+
+  // Optional realtime mode: do a quick TikTok status check (2.5s max) and merge it into the response.
+  // This lets the UI poll for accurate live status without waiting for background refreshes.
+  if (realtime && cached && creator.tiktokUsername) {
+    const updated: CreatorSnapshot = {
+      ...cached,
+      live: { ...cached.live },
+      links: { ...cached.links },
+      items: Array.isArray(cached.items) ? [...cached.items] : [],
+    };
+    if (updated.live.tiktok === null) updated.live.tiktok = false;
+
+    const status = await fetchTikTokStatusApiFast(creator.tiktokUsername);
+    if (status?.is_live) {
+      const v = String(status.is_live).trim().toUpperCase();
+      if (v === 'YES') updated.live.tiktok = true;
+      else if (v === 'NO') updated.live.tiktok = false;
+    }
+    if (status?.live_url) {
+      const u = String(status.live_url).trim();
+      if (u) updated.links.tiktokLive = u;
+    }
+
+    // Persist in background.
+    void dbSet(snapshotKey, { ...updated, lastFastCheckedAt: new Date().toISOString() }).catch(() => {});
+    return NextResponse.json(updated);
+  }
 
   // Always respond fast: if no cached snapshot, return a minimal snapshot immediately
   // and refresh full data in the background.

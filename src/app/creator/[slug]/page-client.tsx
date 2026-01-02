@@ -67,10 +67,11 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
 
   const canManage = useMemo(() => isOwner(adminSteamId), [adminSteamId]);
 
-  const tiktokLive = data?.live?.tiktok ?? null;
+  const tiktokLive = data?.live?.tiktok ?? false;
   const tiktokHandle = data?.creator?.tiktokUsername
     ? String(data.creator.tiktokUsername).trim().replace(/^@/, '')
     : '';
+  const tiktokConfigured = !!tiktokHandle;
   const tiktokProfileUrl =
     data?.links?.tiktok || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}` : undefined);
   const tiktokLiveUrl =
@@ -187,6 +188,31 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     };
   }, [slug]);
 
+  useEffect(() => {
+    if (!tiktokConfigured) return;
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/creator/${encodeURIComponent(slug)}?realtime=1`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (stopped) return;
+        setData(json);
+      } catch {
+        // ignore
+      }
+    };
+
+    const id = setInterval(() => {
+      void tick();
+    }, 30000);
+    void tick();
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [slug, tiktokConfigured]);
+
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -215,7 +241,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
               </div>
 
               <div className="flex items-center gap-2 sm:ml-auto">
-                {tiktokLive !== null && (
+                {tiktokConfigured && (
                   <div
                     className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${tiktokLive
                         ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
