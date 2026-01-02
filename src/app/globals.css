@@ -118,6 +118,15 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e2230; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Focus indicators for accessibility */
 *:focus-visible {
   outline: 2px solid #3b82f6;
