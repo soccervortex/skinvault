@@ -1,44 +1,72 @@
-import { kv } from '@vercel/kv';
+import { getCollection, executeWithFailover } from './mongodb';
 
 const OWNER_STEAM_ID = '76561199235618867';
-const PRO_USERS_KEY = 'pro_users';
+const COLLECTION_NAME = 'pro_users';
 
-// Fallback to in-memory storage if KV is not available (local dev)
-let fallbackStorage: Record<string, string> = {};
+interface ProUserDocument {
+  _id: string; // steamId
+  proUntil: string; // ISO date string
+  updatedAt: Date;
+}
 
 async function readProData(): Promise<Record<string, string>> {
   try {
-    // Try Vercel KV first (only if credentials are set)
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<Record<string, string>>(PRO_USERS_KEY);
-      return data || {};
+    const collection = await getCollection<ProUserDocument>(COLLECTION_NAME);
+    const docs = await collection.find({}).toArray();
+    
+    const result: Record<string, string> = {};
+    for (const doc of docs) {
+      result[doc._id] = doc.proUntil;
     }
+    
+    return result;
   } catch (error) {
-    console.warn('KV read failed, using fallback:', error);
+    console.error('MongoDB read failed:', error);
+    return {};
   }
-  
-  // Fallback to in-memory storage for local dev
-  return fallbackStorage;
 }
 
-async function writeProData(data: Record<string, string>): Promise<void> {
+async function readSingleProData(steamId: string): Promise<string | null> {
   try {
-    // Try Vercel KV first (only if credentials are set)
-    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set(PRO_USERS_KEY, data);
-      return;
+    const collection = await getCollection<ProUserDocument>(COLLECTION_NAME);
+    const doc = await collection.findOne({ _id: steamId });
+    return doc?.proUntil || null;
+  } catch (error) {
+    console.error('MongoDB read single failed:', error);
+    return null;
+  }
+}
+
+export async function writeProData(data: Record<string, string>): Promise<void> {
+  try {
+    const collection = await getCollection<ProUserDocument>(COLLECTION_NAME);
+    
+    // Use bulk write for efficiency
+    const operations = Object.entries(data).map(([steamId, proUntil]) => ({
+      updateOne: {
+        filter: { _id: steamId },
+        update: {
+          $set: {
+            _id: steamId,
+            proUntil,
+            updatedAt: new Date(),
+          },
+        },
+        upsert: true,
+      },
+    }));
+    
+    if (operations.length > 0) {
+      await collection.bulkWrite(operations);
     }
   } catch (error) {
-    console.warn('KV write failed, using fallback:', error);
+    console.error('MongoDB write failed:', error);
+    throw error;
   }
-  
-  // Fallback to in-memory storage for local dev
-  fallbackStorage = data;
 }
 
 export async function getProUntil(steamId: string): Promise<string | null> {
-  const data = await readProData();
-  let proUntil = data[steamId] || null;
+  let proUntil = await readSingleProData(steamId);
 
   // Owner account has Pro forever
   if (steamId === OWNER_STEAM_ID && !proUntil) {
@@ -49,17 +77,28 @@ export async function getProUntil(steamId: string): Promise<string | null> {
 }
 
 export async function grantPro(steamId: string, months: number): Promise<string> {
-  const data = await readProData();
   const now = new Date();
-  const existing = data[steamId] ? new Date(data[steamId]) : null;
-  const base = existing && existing > now ? existing : now;
+  const existing = await readSingleProData(steamId);
+  const existingDate = existing ? new Date(existing) : null;
+  const base = existingDate && existingDate > now ? existingDate : now;
 
   const newDate = new Date(base);
   newDate.setMonth(newDate.getMonth() + months);
   const proUntil = newDate.toISOString();
 
-  data[steamId] = proUntil;
-  await writeProData(data);
+  // Write single record
+  const collection = await getCollection<ProUserDocument>(COLLECTION_NAME);
+  await collection.updateOne(
+    { _id: steamId },
+    {
+      $set: {
+        _id: steamId,
+        proUntil,
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true }
+  );
 
   return proUntil;
 }

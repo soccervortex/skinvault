@@ -47,6 +47,7 @@ function InventoryContent() {
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
     [viewedUser?.proUntil]
   );
+  const [isPrime, setIsPrime] = useState(false);
 
   // --- PROXY ROTATION SETUP ---
   const PROXY_LIST = [
@@ -309,6 +310,9 @@ function InventoryContent() {
       const proPromise = fetch(`/api/user/pro?id=${viewedSteamId}`)
         .then((res) => (res.ok ? res.json() : { proUntil: null }))
         .catch(() => ({ proUntil: null }));
+      const primePromise = fetch(`/api/user/prime?id=${viewedSteamId}`)
+        .then((res) => (res.ok ? res.json() : { primeUntil: null }))
+        .catch(() => ({ primeUntil: null }));
       
       // These can load in background
       fetchPlayerStats(viewedSteamId).catch(() => {});
@@ -316,18 +320,19 @@ function InventoryContent() {
 
       // Wait for profile and Pro info with timeout - these are critical
       try {
-        const [profile, proInfo] = await Promise.race([
-          Promise.all([profilePromise, proPromise]),
+        const [profile, proInfo, primeInfo] = await Promise.race([
+          Promise.all([profilePromise, proPromise, primePromise]),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Timeout')), 12000)
           )
-        ]) as [any, any];
+        ]) as [any, any, any];
 
         const combinedUser = profile
           ? { ...profile, proUntil: proInfo?.proUntil || null }
           : null;
 
         setViewedUser(combinedUser);
+        setIsPrime(!!(primeInfo?.primeUntil && new Date(primeInfo.primeUntil) > new Date()));
 
         // Only update logged-in user in localStorage when:
         // 1. It's a Steam login callback (OpenID redirect) - always update
@@ -524,6 +529,11 @@ function InventoryContent() {
                     {isPro && (
                       <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400">
                         Pro
+                      </span>
+                    )}
+                    {isPrime && (
+                      <span className="px-3 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400/60 text-[9px] font-black uppercase tracking-[0.25em] text-purple-300 shadow-lg shadow-purple-500/20">
+                        Prime
                       </span>
                     )}
                   </div>

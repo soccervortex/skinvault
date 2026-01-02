@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { grantPro, getAllProUsers } from '@/app/utils/pro-storage';
+import { getAllProUsers, grantPro } from '@/app/utils/pro-storage';
 
-// One-time migration script to move data from pro-users.json to Vercel KV
-// Run this once after setting up KV: GET /api/migrate-pro-data
+// One-time migration script to move data from pro-users.json to MongoDB
+// Run this once after setting up MongoDB: GET /api/migrate-pro-data
 
 export async function GET() {
   try {
-    // Check if KV is configured
-    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-      return NextResponse.json(
-        { error: 'KV not configured. Set KV_REST_API_URL and KV_REST_API_TOKEN in environment variables.' },
-        { status: 400 }
-      );
-    }
-
     // Read existing JSON file
     const PRO_DATA_PATH = path.join(process.cwd(), 'pro-users.json');
     let jsonData: Record<string, string> = {};
@@ -27,20 +19,19 @@ export async function GET() {
       return NextResponse.json({ message: 'No pro-users.json file found or already migrated' });
     }
 
-    // Check what's already in KV
-    const kvData = await getAllProUsers();
+    // Check what's already in MongoDB
+    const mongoData = await getAllProUsers();
 
     // Migrate each user - preserve exact expiry dates
     const results = [];
-    const { kv } = await import('@vercel/kv');
-    const allData = { ...kvData }; // Start with existing KV data
+    const allData = { ...mongoData }; // Start with existing MongoDB data
     
     for (const [steamId, proUntil] of Object.entries(jsonData)) {
       const expiry = new Date(proUntil);
       const now = new Date();
       
-      // Only migrate if not already in KV or if JSON has a later date
-      const existing = kvData[steamId];
+      // Only migrate if not already in MongoDB or if JSON has a later date
+      const existing = mongoData[steamId];
       if (!existing || expiry > new Date(existing)) {
         if (expiry > now) {
           // Preserve the exact expiry date
@@ -50,14 +41,16 @@ export async function GET() {
           results.push({ steamId, migrated: false, proUntil, reason: 'Already expired' });
         }
       } else {
-        results.push({ steamId, migrated: false, reason: 'Already in KV with same or later date' });
+        results.push({ steamId, migrated: false, reason: 'Already in MongoDB with same or later date' });
       }
     }
     
-    // Write all data to KV at once (preserving exact dates)
-    if (Object.keys(allData).length > Object.keys(kvData).length || 
-        Object.entries(allData).some(([id, date]) => kvData[id] !== date)) {
-      await kv.set('pro_users', allData);
+    // Write all data to MongoDB at once (preserving exact dates)
+    if (Object.keys(allData).length > Object.keys(mongoData).length || 
+        Object.entries(allData).some(([id, date]) => mongoData[id] !== date)) {
+      // Use writeProData from pro-storage
+      const { writeProData } = await import('@/app/utils/pro-storage');
+      await writeProData(allData);
     }
 
     return NextResponse.json({

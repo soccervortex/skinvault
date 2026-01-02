@@ -10,10 +10,9 @@
   },
   "dependencies": {
     "@stripe/stripe-js": "^8.6.0",
-    "@upstash/redis": "^1.35.8",
-    "@vercel/kv": "^3.0.0",
     "fuse.js": "^7.1.0",
     "lucide-react": "^0.561.0",
+    "mongodb": "^6.0.0",
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1",

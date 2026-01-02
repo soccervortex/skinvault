@@ -12,6 +12,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const [user, setUser] = useState<any>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchId, setSearchId] = useState("");
+  const [isPrime, setIsPrime] = useState(false);
 
   // 1. Sync User state met LocalStorage & andere tabbladen
   useEffect(() => {
@@ -24,6 +25,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     window.addEventListener('storage', checkUser);
     return () => window.removeEventListener('storage', checkUser);
   }, []);
+
+  // Check Prime status
+  useEffect(() => {
+    if (user?.steamId) {
+      fetch(`/api/user/prime?id=${user.steamId}`)
+        .then((res) => (res.ok ? res.json() : { primeUntil: null }))
+        .then((data) => setIsPrime(!!(data?.primeUntil && new Date(data.primeUntil) > new Date())))
+        .catch(() => setIsPrime(false));
+    } else {
+      setIsPrime(false);
+    }
+  }, [user?.steamId]);
 
   // 2. Steam Login Handler
   const handleSteamLogin = () => {
@@ -103,13 +116,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <div className="bg-[#11141d] p-4 rounded-[2rem] border border-white/5 flex items-center gap-4 group">
               <img src={user.avatar} className="w-10 h-10 rounded-full border border-blue-500/50" alt="Avatar" />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest truncate">
                     {user.name}
                   </p>
                   {user.proUntil && new Date(user.proUntil) > new Date() && (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] font-black uppercase tracking-widest text-emerald-400 shrink-0">
                       Pro
+                    </span>
+                  )}
+                  {isPrime && (
+                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400/60 text-[8px] font-black uppercase tracking-widest text-purple-300 shadow-lg shadow-purple-500/20 shrink-0">
+                      Prime
                     </span>
                   )}
                 </div>
