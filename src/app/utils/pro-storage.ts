@@ -1,9 +1,10 @@
 import { getCollection, executeWithFailover } from './mongodb';
+import { Document } from 'mongodb';
 
 const OWNER_STEAM_ID = '76561199235618867';
 const COLLECTION_NAME = 'pro_users';
 
-interface ProUserDocument {
+interface ProUserDocument extends Document {
   _id: string; // steamId
   proUntil: string; // ISO date string
   updatedAt: Date;

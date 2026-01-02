@@ -1,9 +1,10 @@
 import { getCollection } from './mongodb';
+import { Document } from 'mongodb';
 
 const OWNER_STEAM_ID = '76561199235618867';
 const COLLECTION_NAME = 'prime_users';
 
-interface PrimeUserDocument {
+interface PrimeUserDocument extends Document {
   _id: string; // steamId
   primeUntil: string; // ISO date string
   updatedAt: Date;

@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, Document } from 'mongodb';
 
 // Multi-cluster MongoDB configuration
 const CLUSTERS = [
@@ -166,7 +166,7 @@ export async function getConnectedClient(): Promise<{ client: MongoClient; db: D
 /**
  * Get a collection with automatic failover
  */
-export async function getCollection<T = any>(collectionName: string): Promise<Collection<T>> {
+export async function getCollection<T extends Document = Document>(collectionName: string): Promise<Collection<T>> {
   const { db } = await getConnectedClient();
   return db.collection<T>(collectionName);
 }
