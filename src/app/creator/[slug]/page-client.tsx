@@ -330,17 +330,18 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                         </a>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 break-all">{twitchHandle ? `@${twitchHandle}` : ''}</div>
-
                     {twitchEmbedUrl && (
-                      <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                        <iframe
-                          title="Twitch Stream Preview"
-                          src={twitchEmbedUrl}
-                          className="w-full h-36"
-                          allow="autoplay; fullscreen"
-                          loading="lazy"
-                        />
+                      <div>
+                        <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">Stream preview</div>
+                        <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                          <iframe
+                            title="Twitch Stream Preview"
+                            src={twitchEmbedUrl}
+                            className="w-full h-36"
+                            allow="autoplay; fullscreen"
+                            loading="lazy"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

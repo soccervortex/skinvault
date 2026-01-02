@@ -77,16 +77,24 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
 async function fetchTwitchIsLive(login: string): Promise<boolean | null> {
   const l = String(login || '').trim().replace(/^@/, '');
   if (!l) return null;
-  const url = `https://www.twitch.tv/${encodeURIComponent(l)}`;
-  const html = await fetchText(url, 8000);
-  if (!html) return null;
 
-  // Twitch embeds a large JSON blob containing isLiveBroadcast.
+  // Fast path: public uptime endpoint (no API key).
+  // Returns either "offline" or a human-readable uptime when live.
+  const uptimeText = await fetchText(`https://decapi.me/twitch/uptime/${encodeURIComponent(l)}`, 3000);
+  if (uptimeText) {
+    const s = uptimeText.trim().toLowerCase();
+    if (s.includes('offline')) return false;
+    // If it doesn't say offline, treat as live (examples: "1 hour 2 minutes")
+    return true;
+  }
+
+  // Fallback: parse channel HTML (best-effort)
+  const url = `https://www.twitch.tv/${encodeURIComponent(l)}`;
+  const html = await fetchText(url, 4000);
+  if (!html) return null;
   const m = html.match(/"isLiveBroadcast"\s*:\s*(true|false)/i);
   if (m && m[1]) return m[1].toLowerCase() === 'true';
 
-  // If we fetched the page but couldn't locate the field, treat as Offline rather than Unknown.
-  // (This avoids showing null for configured streamers.)
   return false;
 }
 
@@ -212,6 +220,37 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
   };
 }
 
+function buildMinimalSnapshot(creator: CreatorProfile): CreatorSnapshot {
+  const now = new Date().toISOString();
+  const live: CreatorSnapshot['live'] = { twitch: null, tiktok: null, youtube: null };
+  const links: CreatorSnapshot['links'] = {};
+  const items: FeedItem[] = [];
+
+  if (creator.tiktokUsername) {
+    const clean = String(creator.tiktokUsername).trim().replace(/^@/, '');
+    links.tiktok = `https://www.tiktok.com/@${clean}`;
+    links.tiktokLive = `https://www.tiktok.com/@${clean}/live`;
+  }
+  if (creator.twitchLogin) {
+    const clean = String(creator.twitchLogin).trim().replace(/^@/, '');
+    links.twitch = `https://www.twitch.tv/${clean}`;
+    links.twitchLive = links.twitch;
+  }
+
+  return {
+    creator,
+    live,
+    links,
+    items,
+    updatedAt: now,
+    lastCheckedAt: now,
+    lastFastCheckedAt: now,
+    sources: {
+      tiktokStatusApi: process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421',
+    },
+  };
+}
+
 async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfile): Promise<CreatorSnapshot> {
   if (!creator.tiktokUsername) return cached;
 
@@ -275,14 +314,26 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
   const snapshotKey = `creator_snapshot_${creator.slug}`;
   const cached = await dbGet<CreatorSnapshot>(snapshotKey, true);
 
+  // Always respond fast: if no cached snapshot, return a minimal snapshot immediately
+  // and refresh full data in the background.
+  if (!cached) {
+    const minimal = buildMinimalSnapshot(creator);
+    await dbSet(snapshotKey, minimal);
+    void refreshSnapshot(creator)
+      .then((fresh) => dbSet(snapshotKey, fresh))
+      .catch(() => {});
+    return NextResponse.json(minimal);
+  }
+
   // If the TikTok status API config changed (or was newly enabled), refresh immediately
   // so the page can pick up latest_video/live without waiting for TTL.
   const currentStatusApi = process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421';
   const cachedStatusApi = cached?.sources?.tiktokStatusApi || '';
   if (cached && currentStatusApi && cachedStatusApi !== currentStatusApi) {
-    const fresh = await refreshSnapshot(creator);
-    await dbSet(snapshotKey, fresh);
-    return NextResponse.json(fresh);
+    void refreshSnapshot(creator)
+      .then((fresh) => dbSet(snapshotKey, fresh))
+      .catch(() => {});
+    return NextResponse.json(cached);
   }
 
   // If creator has TikTok configured but cached snapshot has no latest video yet, refresh now.
@@ -293,17 +344,19 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
       : false;
     const hasTikTokLiveUrl = !!cached.links?.tiktokLive;
     if (!hasLatestTikTok || !hasTikTokLiveUrl) {
-      const fresh = await refreshSnapshot(creator);
-      await dbSet(snapshotKey, fresh);
-      return NextResponse.json(fresh);
+      void refreshSnapshot(creator)
+        .then((fresh) => dbSet(snapshotKey, fresh))
+        .catch(() => {});
+      return NextResponse.json(cached);
     }
   }
 
   // If we have an older cached snapshot missing new fields, refresh now.
   if (cached && (!cached.links || !Array.isArray(cached.items))) {
-    const fresh = await refreshSnapshot(creator);
-    await dbSet(snapshotKey, fresh);
-    return NextResponse.json(fresh);
+    void refreshSnapshot(creator)
+      .then((fresh) => dbSet(snapshotKey, fresh))
+      .catch(() => {});
+    return NextResponse.json(cached);
   }
 
   // If missing or too old, refresh synchronously.
@@ -313,27 +366,26 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
     return NextResponse.json(fresh);
   }
 
-  // Fast path: keep TikTok latest_video/live fresh even when full snapshot TTL hasn't expired.
+  // Fast path: keep TikTok latest_video/live fresh, but do it in the background
+  // so requests return instantly.
   if (cached && creator.tiktokUsername) {
     const lastFast = cached.lastFastCheckedAt || cached.lastCheckedAt;
     const fastAge = Date.now() - new Date(lastFast).getTime();
     if (Number.isFinite(fastAge) && fastAge >= FAST_TIKTOK_REFRESH_MS) {
-      try {
-        const updated = await refreshTikTokOnly(cached, creator);
-        await dbSet(snapshotKey, updated);
-        return NextResponse.json(updated);
-      } catch {
-        // ignore fast refresh errors; fall through to normal cached response
-      }
+      void refreshTikTokOnly(cached, creator)
+        .then((updated) => dbSet(snapshotKey, updated))
+        .catch(() => {});
     }
   }
 
   const age = Date.now() - new Date(cached.lastCheckedAt).getTime();
 
   if (!Number.isFinite(age) || age < 0 || age > TTL_REFRESH_MS) {
-    const fresh = await refreshSnapshot(creator);
-    await dbSet(snapshotKey, fresh);
-    return NextResponse.json(fresh);
+    // Don't block response; refresh in background.
+    void refreshSnapshot(creator)
+      .then((fresh) => dbSet(snapshotKey, fresh))
+      .catch(() => {});
+    return NextResponse.json(cached);
   }
 
   // Stale-while-revalidate: return cached immediately, but refresh in the background when stale.
