@@ -6,6 +6,7 @@ export type CreatorProfile = {
   tiktokUsername?: string;
   youtubeChannelId?: string;
   twitchLogin?: string;
+  partnerSteamId?: string;
 };
 
 export const CREATORS: CreatorProfile[] = [
@@ -17,6 +18,7 @@ export const CREATORS: CreatorProfile[] = [
     tiktokUsername: 'stinssssss',
     youtubeChannelId: '',
     twitchLogin: '',
+    partnerSteamId: '',
   },
 ];
 

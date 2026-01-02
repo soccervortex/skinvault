@@ -21,6 +21,13 @@ function sanitizeHandle(input: unknown): string {
   return s.replace(/^@/, '');
 }
 
+function sanitizeSteamId64(input: unknown): string {
+  const s = String(input || '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{17})$/);
+  return m ? m[1] : '';
+}
+
 export async function readCreators(): Promise<CreatorProfile[]> {
   const stored = await dbGet<CreatorProfile[]>(CREATORS_KEY, false);
   if (Array.isArray(stored) && stored.length > 0) return stored;
@@ -63,6 +70,7 @@ export async function POST(request: Request) {
       tiktokUsername: sanitizeHandle(body?.tiktokUsername),
       youtubeChannelId: sanitizeHandle(body?.youtubeChannelId),
       twitchLogin: sanitizeHandle(body?.twitchLogin),
+      partnerSteamId: sanitizeSteamId64(body?.partnerSteamId),
     };
 
     const creators = await readCreators();
@@ -147,6 +155,7 @@ export async function PATCH(request: Request) {
       tiktokUsername: typeof body?.tiktokUsername !== 'undefined' ? sanitizeHandle(body?.tiktokUsername) : existing.tiktokUsername,
       youtubeChannelId: typeof body?.youtubeChannelId !== 'undefined' ? sanitizeHandle(body?.youtubeChannelId) : existing.youtubeChannelId,
       twitchLogin: typeof body?.twitchLogin !== 'undefined' ? sanitizeHandle(body?.twitchLogin) : existing.twitchLogin,
+      partnerSteamId: typeof body?.partnerSteamId !== 'undefined' ? sanitizeSteamId64(body?.partnerSteamId) : existing.partnerSteamId,
     };
 
     const updated = [...creators];

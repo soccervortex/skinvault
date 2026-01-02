@@ -318,7 +318,7 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
   // and refresh full data in the background.
   if (!cached) {
     const minimal = buildMinimalSnapshot(creator);
-    await dbSet(snapshotKey, minimal);
+    void dbSet(snapshotKey, minimal);
     void refreshSnapshot(creator)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
@@ -359,11 +359,13 @@ export async function GET(_: Request, context: { params: Promise<{ slug: string 
     return NextResponse.json(cached);
   }
 
-  // If missing or too old, refresh synchronously.
+  // If cached snapshot is missing lastCheckedAt, don't block the response.
+  // Schedule a background refresh and return cached immediately.
   if (!cached?.lastCheckedAt) {
-    const fresh = await refreshSnapshot(creator);
-    await dbSet(snapshotKey, fresh);
-    return NextResponse.json(fresh);
+    void refreshSnapshot(creator)
+      .then((fresh) => dbSet(snapshotKey, fresh))
+      .catch(() => {});
+    return NextResponse.json(cached);
   }
 
   // Fast path: keep TikTok latest_video/live fresh, but do it in the background

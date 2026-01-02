@@ -21,6 +21,7 @@ type CreatorProfile = {
   tiktokUsername?: string;
   youtubeChannelId?: string;
   twitchLogin?: string;
+  partnerSteamId?: string;
 };
 
 type CreatorSnapshot = {
@@ -47,6 +48,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     tiktokUsername: '',
     youtubeChannelId: '',
     twitchLogin: '',
+    partnerSteamId: '',
   });
 
   useEffect(() => {
@@ -107,6 +109,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
       tiktokUsername: data.creator.tiktokUsername || '',
       youtubeChannelId: data.creator.youtubeChannelId || '',
       twitchLogin: data.creator.twitchLogin || '',
+      partnerSteamId: data.creator.partnerSteamId || '',
     });
     setShowEdit(true);
   };
@@ -138,6 +141,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
           tiktokUsername: edit.tiktokUsername || undefined,
           youtubeChannelId: edit.youtubeChannelId || undefined,
           twitchLogin: edit.twitchLogin || undefined,
+          partnerSteamId: edit.partnerSteamId || undefined,
         };
         const cleanTikTok = String(edit.tiktokUsername || '').trim().replace(/^@/, '');
         const cleanTwitch = String(edit.twitchLogin || '').trim().replace(/^@/, '');
@@ -236,6 +240,14 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                   >
                     Twitch {twitchLive ? 'Live' : 'Offline'}
                   </div>
+                )}
+                {data?.creator?.partnerSteamId && (
+                  <a
+                    href={`/inventory?steamId=${encodeURIComponent(String(data.creator.partnerSteamId))}`}
+                    className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10"
+                  >
+                    Inventory
+                  </a>
                 )}
                 {canManage && (
                   <button
@@ -382,6 +394,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                   <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="TikTok username" value={edit.tiktokUsername} onChange={(e) => setEdit((f) => ({ ...f, tiktokUsername: e.target.value }))} />
                   <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="YouTube channel ID" value={edit.youtubeChannelId} onChange={(e) => setEdit((f) => ({ ...f, youtubeChannelId: e.target.value }))} />
                   <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Twitch login" value={edit.twitchLogin} onChange={(e) => setEdit((f) => ({ ...f, twitchLogin: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Partner SteamID (17 digits)" value={edit.partnerSteamId} onChange={(e) => setEdit((f) => ({ ...f, partnerSteamId: e.target.value }))} />
                 </div>
 
                 <div className="flex items-center justify-end gap-3 mt-5">

@@ -114,6 +114,7 @@ function InventoryContent() {
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedInUserPro, setLoggedInUserPro] = useState(false);
+  const [isPartner, setIsPartner] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
@@ -123,6 +124,33 @@ function InventoryContent() {
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
     [viewedUser?.proUntil]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (!viewedUser?.steamId) {
+          if (!cancelled) setIsPartner(false);
+          return;
+        }
+        const res = await fetch('/api/creators');
+        if (!res.ok) {
+          if (!cancelled) setIsPartner(false);
+          return;
+        }
+        const json = await res.json();
+        const creators = Array.isArray(json?.creators) ? json.creators : [];
+        const match = creators.some((c: any) => String(c?.partnerSteamId || '') === String(viewedUser.steamId));
+        if (!cancelled) setIsPartner(!!match);
+      } catch {
+        if (!cancelled) setIsPartner(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser?.steamId]);
 
   // Proxy rotation will use Pro status to determine proxy count
 
@@ -1090,6 +1118,11 @@ function InventoryContent() {
                     {isPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
+                      </span>
+                    )}
+                    {isPartner && (
+                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-yellow-500/10 border border-yellow-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-yellow-300 shrink-0">
+                        Partner
                       </span>
                     )}
                     {/* Discord Connection Status (Show if Pro or has Discord access AND connected) */}
