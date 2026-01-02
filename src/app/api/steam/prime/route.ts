@@ -9,12 +9,33 @@ type PrimeCache = {
 
 const CACHE_MS = 1000 * 60 * 60 * 6; // 6 hours
 
-function looksLikeServiceMedal(name: string): boolean {
-  const s = String(name || '').toLowerCase();
-  if (!s) return false;
-  // "Service Medal" is strong evidence of Prime (earned via XP rank-ups).
-  if (s.includes('service medal')) return true;
-  return false;
+function normalizeItemName(name: string): string {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function primeEvidenceReasonFromItemName(name: string): string | null {
+  const s = normalizeItemName(name);
+  if (!s) return null;
+
+  // Annual Service Medals are strong Prime evidence (earned via XP rank-ups).
+  if (s.includes('service medal')) return 'service_medal';
+
+  // Legacy/account badges/coins that are effectively Prime-gated in practice.
+  // We keep these as strict full-phrase checks to avoid false positives.
+  if (s.includes('loyalty badge')) return 'loyalty_badge';
+  if (s.includes('global offensive badge')) return 'global_offensive_badge';
+
+  // Veteran coins are account/steam-age bound and not tradable. Not strictly Prime-only,
+  // but they correlate strongly with established accounts and help catch missing Prime flags.
+  if (s.includes('5-year veteran coin') || s.includes('10-year veteran coin')) return 'veteran_coin';
+
+  // CS:GO 10-year coin (commemorative). Treated as Prime evidence.
+  if (s.includes('10-year birthday coin') || s.includes('10 year birthday coin')) return '10_year_coin';
+
+  return null;
 }
 
 export async function GET(request: Request) {
@@ -62,9 +83,10 @@ export async function GET(request: Request) {
 
     for (const d of descriptions) {
       const name = String(d?.market_hash_name || d?.market_name || d?.name || '');
-      if (looksLikeServiceMedal(name)) {
+      const r = primeEvidenceReasonFromItemName(name);
+      if (r) {
         isPrime = true;
-        reason = 'service_medal';
+        reason = r;
         break;
       }
     }

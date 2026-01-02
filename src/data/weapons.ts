@@ -30,7 +30,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise
   try {
     const response = await fetch(url, {
       signal: controller.signal,
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      cache: 'no-store',
     });
     clearTimeout(timeoutId);
     return response;

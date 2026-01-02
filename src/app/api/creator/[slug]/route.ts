@@ -25,6 +25,26 @@ type TikTokOEmbedResponse = {
   thumbnail_url?: string;
 };
 
+function getTikTokLatestVideoUrl(status: TikTokStatusApiResponse | null, username: string): string {
+  if (!status) return '';
+  const raw = (status as any)?.latest_video ?? (status as any)?.latestVideo ?? (status as any)?.latest_video_url;
+  const v = String(raw || '').trim();
+  if (!v) return '';
+  if (/^https?:\/\//i.test(v)) return v;
+
+  // Some status APIs return only the video ID.
+  if (/^\d+$/.test(v)) {
+    const clean = String(username || '').trim().replace(/^@/, '');
+    if (!clean) return '';
+    return `https://www.tiktok.com/@${clean}/video/${v}`;
+  }
+
+  // If it already looks like a TikTok path, attempt to normalize.
+  if (v.startsWith('/')) return `https://www.tiktok.com${v}`;
+  if (v.includes('tiktok.com/')) return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  return '';
+}
+
 type CreatorSnapshot = {
   creator: CreatorProfile;
   live: {
@@ -238,18 +258,16 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
       if (u) links.tiktokLive = u;
     }
 
-    if (status?.latest_video) {
-      const url = String(status.latest_video).trim();
-      if (url) {
-        const oembed = await fetchTikTokOEmbed(url);
-        items.push({
-          id: safeId(`tiktok_latest_${url}`),
-          platform: 'tiktok',
-          title: (oembed?.title && String(oembed.title).trim()) || 'Latest TikTok',
-          url,
-          thumbnailUrl: oembed?.thumbnail_url,
-        });
-      }
+    const latestUrl = getTikTokLatestVideoUrl(status, clean);
+    if (latestUrl) {
+      const oembed = await fetchTikTokOEmbed(latestUrl);
+      items.push({
+        id: safeId(`tiktok_latest_${latestUrl}`),
+        platform: 'tiktok',
+        title: (oembed?.title && String(oembed.title).trim()) || 'Latest TikTok',
+        url: latestUrl,
+        thumbnailUrl: oembed?.thumbnail_url,
+      });
     }
   }
 
@@ -330,7 +348,7 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
     if (u) next.links.tiktokLive = u;
   }
 
-  const latestUrl = status?.latest_video ? String(status.latest_video).trim() : '';
+  const latestUrl = getTikTokLatestVideoUrl(status, clean);
   if (latestUrl) {
     const existingIdx = next.items.findIndex((i) => i.platform === 'tiktok');
     const existingUrl = existingIdx >= 0 ? String(next.items[existingIdx]?.url || '') : '';
@@ -388,6 +406,23 @@ export async function GET(
     if (status?.live_url) {
       const u = String(status.live_url).trim();
       if (u) updated.links.tiktokLive = u;
+    }
+
+    const clean = String(creator.tiktokUsername).trim().replace(/^@/, '');
+    const latestUrl = getTikTokLatestVideoUrl(status, clean);
+    if (latestUrl) {
+      const existingIdx = updated.items.findIndex((i) => i.platform === 'tiktok');
+      const existingUrl = existingIdx >= 0 ? String(updated.items[existingIdx]?.url || '') : '';
+      if (existingUrl !== latestUrl) {
+        const item: FeedItem = {
+          id: safeId(`tiktok_latest_${latestUrl}`),
+          platform: 'tiktok',
+          title: 'Latest TikTok',
+          url: latestUrl,
+        };
+        if (existingIdx >= 0) updated.items[existingIdx] = item;
+        else updated.items.unshift(item);
+      }
     }
 
     // Persist in background.
