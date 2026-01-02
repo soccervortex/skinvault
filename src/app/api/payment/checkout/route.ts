@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-12-15.clover',
-});
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(key, {
+    apiVersion: '2025-12-15.clover',
+  });
+}
 
 const PRICES: Record<string, { amount: number; months: number }> = {
   '1month': { amount: 999, months: 1 }, // €9.99 in cents
@@ -36,6 +42,7 @@ export async function POST(request: Request) {
 
     const priceInfo = PRICES[plan];
     const origin = request.headers.get('origin') || 'http://localhost:3000';
+    const stripe = getStripe();
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
