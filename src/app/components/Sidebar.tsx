@@ -332,6 +332,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
                 <ShoppingCart size={16} /> Shop
               </Link>
+              <Link href="/creators" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
+                <Star size={16} /> Creators
+              </Link>
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact
               </Link>
@@ -547,6 +550,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
           <Link href="/shop" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
             <ShoppingCart size={16} /> Shop
+          </Link>
+          <Link href="/creators" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
+            <Star size={16} /> Creators
           </Link>
               <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact

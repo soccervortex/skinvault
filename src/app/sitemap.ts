@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getAllItems, weaponsList } from '@/data/weapons';
+import { CREATORS } from '@/data/creators';
 
 /**
  * CACHING: Cache for 24 hours to handle 14,000+ items efficiently.
@@ -18,6 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/chat`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${BASE_URL}/inventory`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${BASE_URL}/wishlist`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${BASE_URL}/creators`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.6 },
     { url: `${BASE_URL}/terms`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${BASE_URL}/privacy`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${BASE_URL}/reviews`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
@@ -25,6 +27,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/contact`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${BASE_URL}/faq`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
   ];
+
+  const creatorRoutes: MetadataRoute.Sitemap = CREATORS.map((c) => ({
+    url: `${BASE_URL}/creator/${encodeURIComponent(c.slug)}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.6,
+  }));
 
   // --- SECTION B: Dynamic Item Routes ---
   let allItems: any[] = []; 
@@ -57,5 +66,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  return [...staticRoutes, ...itemRoutes];
+  return [...staticRoutes, ...creatorRoutes, ...itemRoutes];
 }
