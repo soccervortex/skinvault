@@ -142,14 +142,28 @@ function InventoryContent() {
       clearTimeout(timeoutId);
       
       if (!res.ok) {
-        console.warn("Stats API error", await res.text());
+        const errorText = await res.text();
+        console.warn("Stats API error", res.status, errorText);
+        setStatsPrivate(false);
+        setPlayerStats(null);
         return;
       }
+      
       const data = await res.json();
+      console.log("Stats API response:", data);
+      
+      // Check for error in response
+      if (data.error) {
+        console.warn("Stats API returned error:", data.error);
+        setStatsPrivate(false);
+        setPlayerStats(null);
+        return;
+      }
+      
       const ps = data?.playerstats;
       const s = ps?.stats;
 
-      if (s && Array.isArray(s)) {
+      if (s && Array.isArray(s) && s.length > 0) {
         const statsObj: any = {};
         s.forEach((item: any) => statsObj[item.name] = item.value);
         const kills = Number(statsObj.total_kills ?? 0);
@@ -171,15 +185,20 @@ function InventoryContent() {
         });
         setStatsPrivate(false);
       } else {
-        // Only flag as private when Steam explicitly says so
+        // Check if stats are private
         const errMsg = typeof ps?.error === 'string' ? ps.error.toLowerCase() : '';
         if (errMsg.includes('private') || errMsg.includes('not allowed')) {
           setStatsPrivate(true);
         } else {
           setStatsPrivate(false);
         }
+        setPlayerStats(null);
       }
-    } catch (e) { console.error("Stats failed", e); }
+    } catch (e) { 
+      console.error("Stats failed", e);
+      setStatsPrivate(false);
+      setPlayerStats(null);
+    }
   };
 
   const mergeAndStorePrices = (next: Record<string, string>) => {
@@ -247,6 +266,8 @@ function InventoryContent() {
       const assets = data?.assets || [];
       const descriptions = data?.descriptions || [];
       
+      console.log("Inventory data:", { assetsCount: assets.length, descriptionsCount: descriptions.length });
+      
       // Create a map of classid_instanceid to descriptions
       const descMap = new Map<string, any>();
       descriptions.forEach((desc: any) => {
@@ -258,14 +279,29 @@ function InventoryContent() {
       const items: InventoryItem[] = assets.map((asset: any) => {
         const key = `${asset.classid}_${asset.instanceid || '0'}`;
         const desc = descMap.get(key) || {};
+        
+        // Check trade lock status - Steam uses 0 for tradeable, 1 for not tradeable
+        // Also check for trade_restriction in description
+        const isTradeable = asset.tradable === 1 || asset.tradable === true;
+        const hasTradeRestriction = desc.trade_restriction || desc.tradable === 0 || desc.tradable === false;
+        
         return {
           ...desc,
           assetid: asset.assetid,
           tradable: asset.tradable,
           marketable: asset.marketable,
           trade_restriction: desc.trade_restriction,
+          isTradeable,
+          hasTradeRestriction,
         };
       });
+      
+      console.log("Processed items with trade status:", items.map(i => ({
+        name: i.market_hash_name,
+        tradable: i.tradable,
+        isTradeable: i.isTradeable,
+        hasTradeRestriction: i.hasTradeRestriction
+      })));
       
       setInventory(items);
     } catch (e) { 
@@ -339,8 +375,21 @@ function InventoryContent() {
         .then((res) => (res.ok ? res.json() : { proUntil: null }))
         .catch(() => ({ proUntil: null }));
       const primePromise = fetch(`/api/user/prime?id=${viewedSteamId}`)
-        .then((res) => (res.ok ? res.json() : { primeUntil: null }))
-        .catch(() => ({ primeUntil: null }));
+        .then((res) => {
+          if (!res.ok) {
+            console.warn("Prime API error:", res.status);
+            return { primeUntil: null };
+          }
+          return res.json();
+        })
+        .then((data) => {
+          console.log("Prime API response:", data);
+          return data;
+        })
+        .catch((e) => {
+          console.error("Prime API failed:", e);
+          return { primeUntil: null };
+        });
       
       // These can load in background
       fetchPlayerStats(viewedSteamId).catch((e) => {
@@ -362,12 +411,16 @@ function InventoryContent() {
         const primeUntil = primeInfo?.primeUntil || null;
         const isPrimeActive = !!(primeUntil && new Date(primeUntil) > new Date());
         
+        console.log("Prime status check:", { primeUntil, isPrimeActive, primeInfo });
+        
         const combinedUser = profile
           ? { ...profile, proUntil: proInfo?.proUntil || null, primeUntil }
           : null;
 
         setViewedUser(combinedUser);
         setIsPrime(isPrimeActive);
+        
+        console.log("Set Prime state:", isPrimeActive, "User object:", combinedUser);
 
         // Only update logged-in user in localStorage when:
         // 1. It's a Steam login callback (OpenID redirect) - always update
@@ -742,8 +795,8 @@ function InventoryContent() {
                     >
                       <div className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
                         {/* Trade Lock Badge */}
-                        {(!item.tradable || item.trade_restriction) && (
-                          <div className="absolute top-3 right-3 z-20 bg-amber-500/20 border border-amber-500/50 px-2 py-1 rounded-lg">
+                        {((item.tradable === 0 || item.tradable === false) || item.hasTradeRestriction || item.trade_restriction) && (
+                          <div className="absolute top-3 right-3 z-20 bg-amber-500/20 border border-amber-500/50 px-2 py-1 rounded-lg backdrop-blur-sm">
                             <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">TRADE LOCKED</span>
                           </div>
                         )}
