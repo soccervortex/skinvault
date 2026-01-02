@@ -11,6 +11,8 @@ type FeedItem = {
   publishedAt?: string;
 };
 
+const CREATORS_KEY = 'creators_v1';
+
 type TikTokStatusApiResponse = {
   is_live?: string;
   latest_video?: string;
@@ -51,6 +53,18 @@ const FAST_TIKTOK_REFRESH_MS = 1000 * 60 * 2; // quick TikTok-only refresh caden
 
 function safeId(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 200);
+}
+
+function findCreatorInList(creators: CreatorProfile[], slug: string): CreatorProfile | null {
+  const s = String(slug || '').trim().toLowerCase();
+  if (!s) return null;
+  return (
+    creators.find((c) => {
+      if (String(c?.slug || '').toLowerCase() === s) return true;
+      const aliases = Array.isArray((c as any)?.slugAliases) ? (c as any).slugAliases : [];
+      return aliases.some((a: unknown) => String(a || '').toLowerCase() === s);
+    }) || null
+  );
 }
 
 async function fetchText(url: string, timeoutMs: number): Promise<string> {
@@ -343,7 +357,9 @@ export async function GET(
   context: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await context.params;
-  const creator = getCreatorBySlug(slug);
+  const storedCreators = await dbGet<CreatorProfile[]>(CREATORS_KEY, false);
+  const creatorFromDb = Array.isArray(storedCreators) ? findCreatorInList(storedCreators, slug) : null;
+  const creator = creatorFromDb || getCreatorBySlug(slug);
   if (!creator) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const snapshotKey = `creator_snapshot_${creator.slug}`;
