@@ -77,6 +77,43 @@ function isNonTradable(item: InventoryItem): boolean {
   return Number(item.tradable) === 0;
 }
 
+function getTradeUnlockTimestampMs(item: InventoryItem): number | null {
+  const v = (item as any).tradable_after;
+  if (v == null) return null;
+
+  if (typeof v === 'number') {
+    // Steam sometimes uses unix seconds
+    return v > 10_000_000_000 ? v : v * 1000;
+  }
+
+  if (typeof v === 'string') {
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? t : null;
+  }
+
+  if (typeof v === 'object' && v && '$date' in v) {
+    const t = Date.parse((v as any).$date);
+    return Number.isFinite(t) ? t : null;
+  }
+
+  return null;
+}
+
+function isTradeLocked(item: InventoryItem): boolean {
+  const unlockAt = getTradeUnlockTimestampMs(item);
+  if (unlockAt && unlockAt > Date.now()) return true;
+
+  const restrictionDays = Number((item as any).market_tradable_restriction);
+  if (Number.isFinite(restrictionDays) && restrictionDays > 0) return true;
+
+  const restrictionSeconds = Number((item as any).trade_restriction);
+  if (Number.isFinite(restrictionSeconds) && restrictionSeconds > 0) return true;
+
+  // Do NOT treat permanently untradable items (coins/pins etc.) as "trade locked".
+  // Those items typically have tradable=0 but no unlock/restriction fields.
+  return false;
+}
+
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   return (
     <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
@@ -1529,7 +1566,7 @@ function InventoryContent() {
                           className="block"
                         >
                           <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
-                            {isNonTradable(item) && (
+                            {isTradeLocked(item) && (
                               <div className="absolute top-3 right-3 z-20 bg-amber-500/20 border border-amber-500/50 px-2 py-1 rounded-lg backdrop-blur-sm">
                                 <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">TRADE LOCKED</span>
                               </div>

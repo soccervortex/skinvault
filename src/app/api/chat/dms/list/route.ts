@@ -3,10 +3,9 @@ import { getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { getDatabase } from '@/app/utils/mongodb-client';
 
 // Fetch Steam profile helper using server-side API route
-async function fetchSteamProfile(steamId: string): Promise<{ name: string; avatar: string }> {
+async function fetchSteamProfile(baseUrl: string, steamId: string): Promise<{ name: string; avatar: string }> {
   try {
     // Use internal server-side fetch (no proxies needed)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const res = await fetch(`${baseUrl}/api/steam/profile?steamId=${steamId}`, {
       cache: 'no-store', // Don't cache in API routes
     });
@@ -49,12 +48,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
     }
 
-    // Get user blocks to filter out blocked users
-    const { dbGet } = await import('@/app/utils/database');
-    const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+    const baseUrl = new URL(request.url).origin;
 
-    // Use connection pool
-    const db = await getDatabase();
+    const timeoutMs = 8000;
+    const work = (async () => {
+      // Get user blocks to filter out blocked users
+      const { dbGet } = await import('@/app/utils/database');
+      const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+
+      // Use connection pool
+      const db = await getDatabase();
 
     // Get all accepted DM invites for this user
     // Use index for faster query
@@ -71,9 +74,11 @@ export async function GET(request: Request) {
     
     console.log(`[DM List API] Found ${invites.length} accepted invites for ${steamId}`);
 
-    // Get latest message for each DM
-    const threeHundredSixtyFiveDaysAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const collectionNames = getDMCollectionNamesForDays(365);
+      // Get latest message for each DM
+      const lookbackDays = 30;
+      const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+      const collectionNames = getDMCollectionNamesForDays(lookbackDays);
+      const collectionNamesNewestFirst = [...collectionNames].reverse();
     
     const dmList: Array<{
       dmId: string;
@@ -85,23 +90,20 @@ export async function GET(request: Request) {
       unreadCount?: number;
     }> = [];
 
-    // Also find DMs from messages (in case invite is missing but messages exist)
-    const dmIdsFromMessages = new Set<string>();
-    for (const collectionName of collectionNames) {
-      const collection = db.collection<DMMessage>(collectionName);
-      const messages = await collection
-        .find({ 
+      // Also find DMs from messages (in case invite is missing but messages exist)
+      const dmIdsFromMessages = new Set<string>();
+      for (const collectionName of collectionNames) {
+        const collection = db.collection<DMMessage>(collectionName);
+        const ids = await collection.distinct('dmId', {
           $or: [
-            { senderId: steamId, timestamp: { $gte: threeHundredSixtyFiveDaysAgo } },
-            { receiverId: steamId, timestamp: { $gte: threeHundredSixtyFiveDaysAgo } }
+            { senderId: steamId, timestamp: { $gte: since } },
+            { receiverId: steamId, timestamp: { $gte: since } }
           ]
-        })
-        .toArray();
-      
-      messages.forEach(msg => {
-        dmIdsFromMessages.add(msg.dmId);
-      });
-    }
+        });
+        ids.forEach((id: any) => {
+          if (id) dmIdsFromMessages.add(String(id));
+        });
+      }
 
     // Combine invites and message-based DMs
     const allDmIds = new Set<string>();
@@ -125,9 +127,9 @@ export async function GET(request: Request) {
     });
     const uniqueOtherUserIds = [...new Set(otherUserIds)];
 
-    const userProfilePromises = uniqueOtherUserIds.map(async (otherUserId) => {
+      const userProfilePromises = uniqueOtherUserIds.map(async (otherUserId) => {
       try {
-        const profile = await fetchSteamProfile(otherUserId);
+        const profile = await fetchSteamProfile(baseUrl, otherUserId);
         return { otherUserId, profile };
       } catch (error) {
         console.error(`Failed to fetch profile for ${otherUserId}:`, error);
@@ -159,18 +161,15 @@ export async function GET(request: Request) {
         return invOtherUserId === otherUserId;
       });
 
-      // Find latest message in this DM (check all 365 days)
-      // Optimize by checking recent collections first, then older ones
+      // Find latest message in this DM (check recent collections first)
       let latestMessage: DMMessage | null = null;
       
-      // Check all collections in reverse order (newest first) to find latest message
-      // This ensures we find messages from the full 365-day period
-      for (const collectionName of collectionNames.reverse()) {
+      for (const collectionName of collectionNamesNewestFirst) {
         const collection = db.collection<DMMessage>(collectionName);
         const messages = await collection
           .find({ 
             dmId,
-            timestamp: { $gte: threeHundredSixtyFiveDaysAgo }
+            timestamp: { $gte: since }
           })
           .sort({ timestamp: -1 })
           .limit(1)
@@ -224,6 +223,14 @@ export async function GET(request: Request) {
     dmList.sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
 
     return NextResponse.json({ dms: dmList });
+    })();
+
+    return await Promise.race([
+      work,
+      new Promise<NextResponse>((resolve) => {
+        setTimeout(() => resolve(NextResponse.json({ dms: [] })), timeoutMs);
+      }),
+    ]);
   } catch (error: any) {
     console.error('Failed to get DM list:', error);
     // If MongoDB connection fails, return empty list instead of error

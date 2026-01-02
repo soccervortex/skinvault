@@ -17,7 +17,8 @@ export async function GET(req: Request) {
     }
 
     // Check if user owns the CS:GO Prime Status Upgrade (appid 624820)
-    const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${steamId}&include_played_free_games=1&appids_filter[0]=${PRIME_UPGRADE_APPID}`;
+    // Use CheckAppOwnership since it works even when the user's games list is private.
+    const url = `https://api.steampowered.com/ISteamUser/CheckAppOwnership/v0001/?key=${apiKey}&steamid=${steamId}&appid=${PRIME_UPGRADE_APPID}`;
 
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) {
@@ -28,10 +29,7 @@ export async function GET(req: Request) {
     }
 
     const json = await res.json();
-    const games = json?.response?.games;
-
-    // If profile is private, Steam may omit games; treat as unknown/non-prime for UI.
-    const prime = Array.isArray(games) && games.some((g: any) => Number(g?.appid) === PRIME_UPGRADE_APPID);
+    const prime = json?.appownership?.ownsapp === true;
 
     return NextResponse.json({ prime });
   } catch (e) {
