@@ -6,11 +6,6 @@ export type CreatorProfile = {
   tiktokUsername?: string;
   youtubeChannelId?: string;
   twitchLogin?: string;
-  links?: {
-    website?: string;
-    discord?: string;
-    x?: string;
-  };
 };
 
 export const CREATORS: CreatorProfile[] = [
@@ -18,6 +13,7 @@ export const CREATORS: CreatorProfile[] = [
     slug: 'stins',
     displayName: 'Stins',
     tagline: 'Featured Creator',
+    avatarUrl: 'https://i.imgur.com/9B9QZQv.png',
     tiktokUsername: 'stinssssss',
     youtubeChannelId: '',
     twitchLogin: '',

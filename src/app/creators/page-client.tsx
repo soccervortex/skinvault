@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
 import { isOwner } from '@/app/utils/owner-ids';
-import { Plus, X } from 'lucide-react';
 
 type CreatorProfile = {
   slug: string;
@@ -18,20 +17,18 @@ type CreatorProfile = {
 
 export default function CreatorsIndexClient() {
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [busy, setBusy] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
-    displayName: '',
     slug: '',
+    displayName: '',
     tagline: '',
     avatarUrl: '',
     tiktokUsername: '',
     youtubeChannelId: '',
     twitchLogin: '',
   });
-  const [submitting, setSubmitting] = useState(false);
 
   const adminSteamId = useMemo(() => {
     try {
@@ -47,18 +44,15 @@ export default function CreatorsIndexClient() {
   const canManage = isOwner(adminSteamId);
 
   const fetchCreators = async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/creators', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`Failed to fetch creators (${res.status})`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed');
       setCreators(Array.isArray(data?.creators) ? data.creators : []);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load creators');
+      setError(e?.message || 'Failed to load');
       setCreators([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -66,28 +60,66 @@ export default function CreatorsIndexClient() {
     fetchCreators();
   }, []);
 
-  const submit = async () => {
-    if (!adminSteamId) {
-      setError('Login as owner required');
-      return;
-    }
-    setSubmitting(true);
+  const handleCreate = async () => {
+    if (!canManage || !adminSteamId) return;
+    setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/creators?adminSteamId=${encodeURIComponent(adminSteamId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || `Failed to create creator (${res.status})`);
+      const res = await fetch(`/api/creators?adminSteamId=${encodeURIComponent(adminSteamId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: form.slug,
+            displayName: form.displayName,
+            tagline: form.tagline,
+            avatarUrl: form.avatarUrl,
+            tiktokUsername: form.tiktokUsername,
+            youtubeChannelId: form.youtubeChannelId,
+            twitchLogin: form.twitchLogin,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to create');
+
       setShowAdd(false);
-      setForm({ displayName: '', slug: '', tagline: '', avatarUrl: '', tiktokUsername: '', youtubeChannelId: '', twitchLogin: '' });
+      setForm({
+        slug: '',
+        displayName: '',
+        tagline: '',
+        avatarUrl: '',
+        tiktokUsername: '',
+        youtubeChannelId: '',
+        twitchLogin: '',
+      });
       await fetchCreators();
     } catch (e: any) {
-      setError(e?.message || 'Failed to create creator');
+      setError(e?.message || 'Failed to create');
     } finally {
-      setSubmitting(false);
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (slug: string) => {
+    if (!canManage || !adminSteamId) return;
+    const ok = window.confirm(`Delete creator "${slug}"?`);
+    if (!ok) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/creators?adminSteamId=${encodeURIComponent(adminSteamId)}&slug=${encodeURIComponent(slug)}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to delete');
+      await fetchCreators();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to delete');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -95,151 +127,105 @@ export default function CreatorsIndexClient() {
     <div className="flex min-h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <div className="flex-1 p-4 md:p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.5em] text-blue-500">Creators</p>
-              <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Featured Creators</h1>
-              <p className="text-xs text-gray-500">Partner creators on SkinVaults.</p>
-            </div>
+        <div className="max-w-4xl mx-auto space-y-4">
+          <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Creators</h1>
+          {error && <div className="text-sm text-red-300">{error}</div>}
 
-            {canManage && (
+          {canManage && (
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-gray-400">Owner tools</div>
               <button
                 onClick={() => setShowAdd(true)}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition text-[10px] font-black uppercase tracking-[0.35em] flex items-center gap-2"
+                disabled={busy}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50"
               >
-                <Plus size={14} /> Add creator
+                Add Creator
               </button>
-            )}
-          </div>
-
-          {loading && (
-            <div className="text-xs uppercase tracking-[0.4em] text-blue-500 font-black animate-pulse">Loading creators…</div>
-          )}
-
-          {error && (
-            <div className="bg-[#11141d] border border-red-500/30 rounded-2xl p-4 text-xs text-red-300">{error}</div>
-          )}
-
-          {!loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {creators.map((c) => (
-                <Link
-                  key={c.slug}
-                  href={`/creator/${encodeURIComponent(c.slug)}`}
-                  className="group bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5 hover:border-blue-500/30 transition shadow-xl"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center">
-                      {c.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-sm font-black text-gray-500">SV</span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-tight text-white/90 truncate">{c.displayName}</p>
-                      <p className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-500 truncate">{c.tagline || 'Creator'}</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
             </div>
           )}
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {creators.map((c) => (
+              <Link key={c.slug} href={`/creator/${encodeURIComponent(c.slug)}`} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
+                  {c.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.avatarUrl} alt={c.displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-xs font-black text-gray-300 uppercase">{c.displayName.slice(0, 2)}</div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase tracking-widest text-gray-400 truncate">{c.slug}</div>
+                  <div className="text-lg font-black truncate">{c.displayName}</div>
+                  {c.tagline && <div className="text-xs text-gray-400 truncate">{c.tagline}</div>}
+                </div>
+                {canManage && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void handleDelete(c.slug);
+                    }}
+                    disabled={busy}
+                    className="ml-auto px-3 py-2 rounded-xl bg-red-600/20 border border-red-500/40 text-red-300 text-[10px] font-black uppercase tracking-widest hover:bg-red-600/30 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                )}
+              </Link>
+            ))}
+          </div>
+
           {showAdd && (
-            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-xl bg-[#0f111a] border border-white/10 rounded-[2rem] shadow-2xl p-5 md:p-7">
-                <div className="flex items-center justify-between mb-4">
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !busy && setShowAdd(false)}>
+              <div className="w-full max-w-lg rounded-3xl bg-[#0f111a] border border-white/10 p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.5em] text-blue-500">Owner</p>
-                    <h2 className="text-lg font-black uppercase tracking-tight">Add creator</h2>
+                    <div className="text-lg font-black uppercase tracking-widest">Add Creator</div>
+                    <div className="text-xs text-gray-400">Stored in DB and refreshed by cron.</div>
                   </div>
-                  <button onClick={() => setShowAdd(false)} className="p-2 text-gray-400 hover:text-white">
-                    <X size={18} />
+                  <button className="text-gray-400 hover:text-white" disabled={busy} onClick={() => setShowAdd(false)}>
+                    Close
                   </button>
                 </div>
 
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 rounded-2xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
                     {form.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.avatarUrl} alt="avatar preview" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                      <img src={form.avatarUrl} alt={form.displayName || 'Avatar'} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-sm font-black text-gray-500">SV</span>
+                      <div className="text-sm font-black text-gray-300 uppercase">{(form.displayName || '??').slice(0, 2)}</div>
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-500">Preview</p>
-                    <p className="text-xs font-black uppercase tracking-tight text-white/90 truncate">
-                      {form.displayName || 'Creator name'}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {form.tagline || 'Tagline'}
-                    </p>
-                  </div>
+                  <div className="text-xs text-gray-400 break-all">{form.avatarUrl || 'Avatar preview (paste URL)'}</div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <input
-                    value={form.displayName}
-                    onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
-                    placeholder="Display name (e.g. Stins)"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={form.slug}
-                    onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                    placeholder="Slug (optional, e.g. stins)"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={form.tiktokUsername}
-                    onChange={(e) => setForm((f) => ({ ...f, tiktokUsername: e.target.value }))}
-                    placeholder="TikTok @username"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={form.youtubeChannelId}
-                    onChange={(e) => setForm((f) => ({ ...f, youtubeChannelId: e.target.value }))}
-                    placeholder="YouTube channel id (UC...)"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={form.twitchLogin}
-                    onChange={(e) => setForm((f) => ({ ...f, twitchLogin: e.target.value }))}
-                    placeholder="Twitch username"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={form.avatarUrl}
-                    onChange={(e) => setForm((f) => ({ ...f, avatarUrl: e.target.value }))}
-                    placeholder="Avatar URL (optional)"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={form.tagline}
-                    onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
-                    placeholder="Tagline (optional)"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm md:col-span-2"
-                  />
+                <div className="grid grid-cols-1 gap-3">
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Display name (required)" value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Slug (optional, auto from name)" value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Tagline" value={form.tagline} onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Avatar URL" value={form.avatarUrl} onChange={(e) => setForm((f) => ({ ...f, avatarUrl: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="TikTok username" value={form.tiktokUsername} onChange={(e) => setForm((f) => ({ ...f, tiktokUsername: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="YouTube channel ID" value={form.youtubeChannelId} onChange={(e) => setForm((f) => ({ ...f, youtubeChannelId: e.target.value }))} />
+                  <input className="w-full px-4 py-3 rounded-2xl bg-black/20 border border-white/10 text-sm" placeholder="Twitch login" value={form.twitchLogin} onChange={(e) => setForm((f) => ({ ...f, twitchLogin: e.target.value }))} />
                 </div>
 
                 <div className="flex items-center justify-end gap-3 mt-5">
                   <button
+                    disabled={busy}
+                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest disabled:opacity-50"
                     onClick={() => setShowAdd(false)}
-                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition text-[10px] font-black uppercase tracking-[0.35em]"
-                    disabled={submitting}
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={submit}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition text-[10px] font-black uppercase tracking-[0.35em]"
-                    disabled={submitting}
+                    disabled={busy || !form.displayName.trim()}
+                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                    onClick={() => void handleCreate()}
                   >
-                    {submitting ? 'Saving…' : 'Save'}
+                    {busy ? 'Saving...' : 'Save'}
                   </button>
                 </div>
               </div>

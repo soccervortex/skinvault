@@ -68,13 +68,13 @@ function getMarketKey(item: InventoryItem): string | null {
   return k ? String(k) : null;
 }
 
-function getPriceForItem(item: InventoryItem, prices: Record<string, any>): string | undefined {
+function getPriceForItem(item: InventoryItem, prices: Record<string, string>): string | undefined {
   const k = getMarketKey(item);
   return k ? prices[k] : undefined;
 }
 
 function isNonTradable(item: InventoryItem): boolean {
-  return Number(item.tradable) === 0;
+  return item.tradable === 0 || item.tradable === false;
 }
 
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
@@ -107,7 +107,6 @@ function InventoryContent() {
   const [copied, setCopied] = useState(false);
   const [discordStatus, setDiscordStatus] = useState<any>(null);
   const [hasDiscordAccess, setHasDiscordAccess] = useState(false);
-  const [primeApi, setPrimeApi] = useState<boolean | null>(null);
   const [showManageTrackers, setShowManageTrackers] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [wishlist, setWishlist] = useState<any[]>([]);
@@ -167,12 +166,12 @@ function InventoryContent() {
     try {
       // Use server-side API route instead of proxies
       const res = await fetch(`/api/steam/profile?steamId=${id}`, {
-        cache: 'no-store',
+        cache: 'force-cache', // Cache profile data for faster subsequent loads
       });
 
       if (res.ok) {
-        const profileData = await res.json();
-        return { steamId: id, name: profileData.name || "User", avatar: profileData.avatar || "" };
+        const data = await res.json();
+        return { steamId: id, name: data.name || "User", avatar: data.avatar || "" };
       } else {
         // Silently return null for expected errors (404, 408, etc.)
         return null;
@@ -798,7 +797,8 @@ function InventoryContent() {
             steamId: viewedSteamId, 
             name: "User", 
             avatar: "",
-            proUntil: null 
+            // Preserve Pro status we already fetched earlier
+            proUntil: proInfo?.proUntil || null 
           };
         }
         
@@ -913,47 +913,6 @@ function InventoryContent() {
     
     checkDiscordAccess();
   }, [viewedUser?.steamId, isPro]);
-
-  useEffect(() => {
-    if (!viewedUser?.steamId) {
-      setPrimeApi(null);
-      return;
-    }
-
-    const checkPrime = async () => {
-      try {
-        const res = await fetch(`/api/steam/prime?steamId=${viewedUser.steamId}`, { cache: 'no-store' });
-        if (!res.ok) {
-          setPrimeApi(null);
-          return;
-        }
-        const data = await res.json();
-        // prime can be true/false/null
-        setPrimeApi(typeof data?.prime === 'boolean' ? data.prime : null);
-      } catch {
-        setPrimeApi(null);
-      }
-    };
-
-    checkPrime();
-  }, [viewedUser?.steamId]);
-
-  const primeFromInventory = useMemo(() => {
-    if (!inventory.length) return false;
-    return inventory.some((item) => {
-      const name = String(getItemDisplayName(item) || '').toLowerCase();
-      // "Global Offensive Badge" / "Loyalty Badge" / Service medals are strong Prime indicators.
-      if (name.includes('global offensive badge')) return true;
-      if (name.includes('loyalty badge')) return true;
-      if (name.includes('service medal')) return true;
-      // Some localizations may just contain "prime".
-      if (name.includes('prime-status')) return true;
-      if (name.includes('prime')) return true;
-      return false;
-    });
-  }, [inventory]);
-
-  const isPrime = primeApi === true || primeFromInventory;
 
   // Handle discord=connected URL parameter (refresh status after OAuth callback)
   useEffect(() => {
@@ -1139,15 +1098,6 @@ function InventoryContent() {
                         <MessageSquare size={10} className="text-indigo-400" />
                         <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
                           Discord
-                        </span>
-                      </div>
-                    )}
-
-                    {isPrime && (
-                      <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-yellow-500/10 border border-yellow-500/40 shrink-0">
-                        <Trophy size={10} className="text-yellow-400" />
-                        <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-yellow-400">
-                          Prime
                         </span>
                       </div>
                     )}
@@ -1558,7 +1508,7 @@ function InventoryContent() {
                                 {getPriceForItem(item, itemPrices) 
                                   ? getPriceForItem(item, itemPrices) 
                                   : priceScanDone 
-                                    ? ((Number(item.marketable) === 0) ? <span className="text-gray-500 text-[8px] md:text-[9px]">NOT MARKETABLE</span> : <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>)
+                                    ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500 text-[8px] md:text-[9px]">NOT MARKETABLE</span> : <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>)
                                     : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
                                         {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
                                       </span>}

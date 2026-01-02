@@ -27,7 +27,6 @@ export default function GlobalChatService() {
 
     let isActive = true;
     let lastCheck = getLastCheckTime();
-    let lastDmListFailure = 0;
 
     const pollForUpdates = async () => {
       if (!isActive || !currentUserId) return;
@@ -55,18 +54,17 @@ export default function GlobalChatService() {
 
         // Poll for DM list to check for new messages (only if not on chat page)
         if (window.location.pathname !== '/chat') {
-          if (Date.now() - lastDmListFailure > 30000) {
-            const dmListRes = await fetch(`/api/chat/dms/list?steamId=${currentUserId}`);
-            if (dmListRes.ok) {
-              const dmListData = await dmListRes.json();
-              const dms = dmListData.dms || [];
+          const dmListRes = await fetch(`/api/chat/dms/list?steamId=${currentUserId}`);
+          if (dmListRes.ok) {
+            const dmListData = await dmListRes.json();
+            const dms = dmListData.dms || [];
             
-              // For each DM, check if there are new messages (limit to 5 most recent for performance)
-              const recentDms = dms.slice(0, 5);
-              for (const dm of recentDms) {
-                try {
-                  const [steamId1, steamId2] = dm.dmId.split('_');
-                  const dmRes: Response = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${currentUserId}`);
+            // For each DM, check if there are new messages (limit to 5 most recent for performance)
+            const recentDms = dms.slice(0, 5);
+            for (const dm of recentDms) {
+              try {
+                const [steamId1, steamId2] = dm.dmId.split('_');
+                const dmRes: Response = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${currentUserId}`);
                 
                 if (dmRes.ok) {
                   const dmData = await dmRes.json();
@@ -92,9 +90,6 @@ export default function GlobalChatService() {
               } catch (error) {
                 // Ignore individual DM errors
               }
-            }
-            } else {
-              lastDmListFailure = Date.now();
             }
           }
         }

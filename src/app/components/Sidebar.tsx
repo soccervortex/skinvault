@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users } from 'lucide-react';
 import HelpTooltip from './HelpTooltip';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
@@ -333,7 +333,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 <ShoppingCart size={16} /> Shop
               </Link>
               <Link href="/creators" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
-                <Star size={16} /> Creators
+                <Users size={16} /> Creators
               </Link>
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact
@@ -552,7 +552,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <ShoppingCart size={16} /> Shop
           </Link>
           <Link href="/creators" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
-            <Star size={16} /> Creators
+            <Users size={16} /> Creators
           </Link>
               <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact

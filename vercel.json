@@ -39,7 +39,10 @@
     {
       "path": "/api/cron/indexnow",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/creators-refresh",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
-

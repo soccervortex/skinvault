@@ -28,10 +28,9 @@ async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    const isByMykelDataset = url.includes('raw.githubusercontent.com/ByMykel/CSGO-API');
     const response = await fetch(url, {
       signal: controller.signal,
-      ...(isByMykelDataset ? { cache: 'no-store' as const } : { next: { revalidate: 3600 } }),
+      next: { revalidate: 3600 }, // Cache for 1 hour
     });
     clearTimeout(timeoutId);
     return response;
