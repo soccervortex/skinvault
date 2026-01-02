@@ -194,12 +194,12 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   }, [slug]);
 
   return (
-    <div className="flex min-h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 p-4 md:p-10">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
+        <div className="max-w-6xl mx-auto space-y-6 pb-24">
           <div className="rounded-3xl bg-white/5 border border-white/10 p-5 md:p-7">
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
             <div className="w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
               {data?.creator?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -220,7 +220,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:ml-auto">
                 {tiktokLive !== null && (
                   <div
                     className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${tiktokLive
@@ -417,7 +417,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
