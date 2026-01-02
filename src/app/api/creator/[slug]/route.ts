@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { CREATORS, type CreatorProfile } from '@/data/creators';
 
@@ -339,10 +339,11 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: { slug: string } }
+  request: NextRequest,
+  context: { params: Promise<{ slug: string }> }
 ) {
-  const creator = CREATORS.find((c) => c.slug === params.slug);
+  const { slug } = await context.params;
+  const creator = CREATORS.find((c) => c.slug === slug);
   if (!creator) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const snapshotKey = `creator_snapshot_${creator.slug}`;
