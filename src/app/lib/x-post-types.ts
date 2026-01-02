@@ -73,6 +73,17 @@ function topEntryText(counts: Record<string, number>, maxLabelLen: number = 34):
   return `${label} (${top[1]}x)`;
 }
 
+function topEntryKey(counts: Record<string, number>): string {
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return top?.[0] || '';
+}
+
+function itemUrlFromId(itemId: string): string {
+  const id = String(itemId || '').trim();
+  if (!id) return '';
+  return `https://skinvaults.online/item/${encodeURIComponent(id)}`;
+}
+
 interface PostContext {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
   hour: number;
@@ -180,46 +191,38 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const recentPosts = postHistory.filter(p => new Date(p.date) >= sevenDaysAgo);
 
-    // Count by item name (for actual items, not types)
-    const itemCounts: Record<string, number> = {};
-    recentPosts.forEach(p => {
-      // Only count actual items (not post types like 'item_highlight', 'weekly_summary', etc.)
-      if (p.itemName && p.itemName !== p.itemType && !['item_highlight', 'weekly_summary', 'monthly_stats', 'milestone', 'alert', 'new_user'].includes(p.itemName)) {
-        itemCounts[p.itemName] = (itemCounts[p.itemName] || 0) + 1;
-      }
+    const highlightPosts = recentPosts.filter((p) => p.itemType === 'item_highlight' && p.itemName && p.itemName !== p.itemType);
+    const skinIdCounts: Record<string, number> = {};
+    const skinNameById: Record<string, string> = {};
+    highlightPosts.forEach((p) => {
+      const id = String(p.itemId || '').trim();
+      const name = String(p.itemName || '').trim();
+      if (!id || !name) return;
+      skinIdCounts[id] = (skinIdCounts[id] || 0) + 1;
+      if (!skinNameById[id]) skinNameById[id] = name;
     });
 
-    // Get most featured item (by name)
-    const mostFeaturedItem = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0];
-    
-    // If no actual items found, try to get most popular type (but format it better)
-    let mostFeaturedText = 'N/A';
-    if (mostFeaturedItem) {
-      // Truncate long item names
-      const itemName = mostFeaturedItem[0].length > 30 
-        ? mostFeaturedItem[0].substring(0, 27) + '...' 
-        : mostFeaturedItem[0];
-      mostFeaturedText = `${itemName} (${mostFeaturedItem[1]}x)`;
-    } else {
-      // Fallback: count by type but format better
-      const typeCounts: Record<string, number> = {};
-      recentPosts.forEach(p => {
-        typeCounts[p.itemType] = (typeCounts[p.itemType] || 0) + 1;
-      });
-      const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
-      if (mostPopularType) {
-        // Format type names better
-        const typeName = formatPostTypeLabel(mostPopularType[0]);
-        mostFeaturedText = `${typeName} (${mostPopularType[1]}x)`;
-      }
-    }
+    const typeCounts: Record<string, number> = {};
+    recentPosts.forEach(p => {
+      typeCounts[p.itemType] = (typeCounts[p.itemType] || 0) + 1;
+    });
+
+    const topSkinId = topEntryKey(skinIdCounts);
+    const topSkinName = topSkinId ? (skinNameById[topSkinId] || '') : '';
+    const topSkinText = topSkinId ? topEntryText({ [topSkinName]: skinIdCounts[topSkinId] }, 38) : 'N/A';
+    const topSkinUrl = topSkinId ? itemUrlFromId(topSkinId) : '';
+
+    const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+    const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
     
     // Get top 5 movers (gainers and losers) from last 7 days
     const { gainers, losers } = await getTopMovers('7d', 5);
     
     let summaryText = `📊 Weekly CS2 Market Summary\n\n`;
     summaryText += `📈 Posts this week: ${recentPosts.length}\n`;
-    summaryText += `🎮 Most featured: ${mostFeaturedText}\n\n`;
+    summaryText += `🎮 Top skin: ${topSkinText}\n`;
+    if (topSkinUrl) summaryText += `🔗 ${topSkinUrl}\n`;
+    summaryText += `🗂️ Top category: ${topCategoryText}\n\n`;
     
     // Add top gainers
     if (gainers.length > 0) {
@@ -240,7 +243,7 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
     }
     
     summaryText += `Track your CS2 inventory:\nhttps://skinvaults.online\n\n`;
-    summaryText += `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+    summaryText += `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins\n@counterstrike`;
 
     // Post the summary
     const X_API_KEY = process.env.X_API_KEY;
@@ -330,12 +333,14 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
 
     const highlightPosts = lastMonthPosts.filter((p) => p.itemType === 'item_highlight' && p.itemName && p.itemName !== p.itemType);
 
-    // Top skin (from itemName)
-    const skinCounts: Record<string, number> = {};
+    const skinIdCounts: Record<string, number> = {};
+    const skinNameById: Record<string, string> = {};
     highlightPosts.forEach((p) => {
+      const id = String(p.itemId || '').trim();
       const name = String(p.itemName || '').trim();
-      if (!name) return;
-      skinCounts[name] = (skinCounts[name] || 0) + 1;
+      if (!id || !name) return;
+      skinIdCounts[id] = (skinIdCounts[id] || 0) + 1;
+      if (!skinNameById[id]) skinNameById[id] = name;
     });
 
     // Top weapon (derived from itemName)
@@ -353,7 +358,10 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
     });
 
     const totalPosts = lastMonthPosts.length;
-    const topSkinText = Object.keys(skinCounts).length ? topEntryText(skinCounts, 38) : 'N/A';
+    const topSkinId = topEntryKey(skinIdCounts);
+    const topSkinName = topSkinId ? (skinNameById[topSkinId] || '') : '';
+    const topSkinText = topSkinId ? topEntryText({ [topSkinName]: skinIdCounts[topSkinId] }, 38) : 'N/A';
+    const topSkinUrl = topSkinId ? itemUrlFromId(topSkinId) : '';
     const topWeaponText = Object.keys(weaponCounts).length ? topEntryText(weaponCounts, 28) : 'N/A';
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
     const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
@@ -361,11 +369,12 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
     const statsText = `📊 Monthly CS2 Market Stats\n\n` +
       `📈 Total posts: ${totalPosts}\n` +
       `🎮 Top skin: ${topSkinText}\n` +
+      (topSkinUrl ? `🔗 ${topSkinUrl}\n` : '') +
       `🔫 Top weapon: ${topWeaponText}\n` +
       (topSkinText === 'N/A' ? `🗂️ Top category: ${topCategoryText}\n` : '') +
       `📅 Month: ${lastMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}\n\n` +
       `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +
-      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins\n@counterstrike`;
 
     // Post the stats (same OAuth logic as weekly summary)
     const X_API_KEY = process.env.X_API_KEY;
@@ -537,12 +546,14 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
 
     const highlightPosts = todayPosts.filter((p) => p.itemType === 'item_highlight' && p.itemName && p.itemName !== p.itemType);
 
-    // Top skin
-    const skinCounts: Record<string, number> = {};
+    const skinIdCounts: Record<string, number> = {};
+    const skinNameById: Record<string, string> = {};
     highlightPosts.forEach((p) => {
+      const id = String(p.itemId || '').trim();
       const name = String(p.itemName || '').trim();
-      if (!name) return;
-      skinCounts[name] = (skinCounts[name] || 0) + 1;
+      if (!id || !name) return;
+      skinIdCounts[id] = (skinIdCounts[id] || 0) + 1;
+      if (!skinNameById[id]) skinNameById[id] = name;
     });
 
     // Top weapon
@@ -563,7 +574,10 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
     const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
 
-    const topSkinText = Object.keys(skinCounts).length ? topEntryText(skinCounts, 38) : 'N/A';
+    const topSkinId = topEntryKey(skinIdCounts);
+    const topSkinName = topSkinId ? (skinNameById[topSkinId] || '') : '';
+    const topSkinText = topSkinId ? topEntryText({ [topSkinName]: skinIdCounts[topSkinId] }, 38) : 'N/A';
+    const topSkinUrl = topSkinId ? itemUrlFromId(topSkinId) : '';
     const topWeaponText = Object.keys(weaponCounts).length ? topEntryText(weaponCounts, 28) : 'N/A';
     
     // Get top 3 movers from today
@@ -572,13 +586,14 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
     const dailyText = `📊 Daily CS2 Market Summary\n\n` +
       `📈 Posts today: ${todayPosts.length}\n` +
       `🎮 Top skin: ${topSkinText}\n` +
+      (topSkinUrl ? `🔗 ${topSkinUrl}\n` : '') +
       `🔫 Top weapon: ${topWeaponText}\n` +
       (topSkinText === 'N/A' ? `🗂️ Top category: ${topCategoryText}\n` : '') +
       `\n` +
       (gainers.length > 0 ? `📈 Top Gainers:\n${gainers.slice(0, 3).map((g, i) => `${i + 1}. ${g.marketHashName} +${g.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
       (losers.length > 0 ? `📉 Top Losers:\n${losers.slice(0, 3).map((l, i) => `${i + 1}. ${l.marketHashName} ${l.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
       `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +
-      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
+      `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins\n@counterstrike`;
 
     // Post the daily summary (same OAuth logic)
     const X_API_KEY = process.env.X_API_KEY;
