@@ -11,6 +11,9 @@ const STEAM_API_KEYS = ["0FC9C1CEBB016CB0B78642A67680F500"];
 type InventoryItem = {
   market_hash_name: string;
   icon_url: string;
+  tradable?: number;
+  marketable?: number;
+  trade_restriction?: number;
   [key: string]: any;
 };
 
@@ -238,7 +241,32 @@ function InventoryContent() {
       ]) as any;
       
       clearTimeout(timeoutId);
-      const items = (data?.descriptions || []) as InventoryItem[];
+      
+      // Steam inventory API returns items in assets and descriptions
+      // We need to match them up to get full item info including trade status
+      const assets = data?.assets || [];
+      const descriptions = data?.descriptions || [];
+      
+      // Create a map of classid_instanceid to descriptions
+      const descMap = new Map<string, any>();
+      descriptions.forEach((desc: any) => {
+        const key = `${desc.classid}_${desc.instanceid || '0'}`;
+        descMap.set(key, desc);
+      });
+      
+      // Combine assets with their descriptions
+      const items: InventoryItem[] = assets.map((asset: any) => {
+        const key = `${asset.classid}_${asset.instanceid || '0'}`;
+        const desc = descMap.get(key) || {};
+        return {
+          ...desc,
+          assetid: asset.assetid,
+          tradable: asset.tradable,
+          marketable: asset.marketable,
+          trade_restriction: desc.trade_restriction,
+        };
+      });
+      
       setInventory(items);
     } catch (e) { 
       console.error("Inventory failed", e);
@@ -315,7 +343,11 @@ function InventoryContent() {
         .catch(() => ({ primeUntil: null }));
       
       // These can load in background
-      fetchPlayerStats(viewedSteamId).catch(() => {});
+      fetchPlayerStats(viewedSteamId).catch((e) => {
+        console.warn('Stats fetch failed:', e);
+        setPlayerStats(null);
+        setStatsPrivate(false);
+      });
       fetchInventory(viewedSteamId).catch(() => {});
 
       // Wait for profile and Pro info with timeout - these are critical
@@ -327,12 +359,15 @@ function InventoryContent() {
           )
         ]) as [any, any, any];
 
+        const primeUntil = primeInfo?.primeUntil || null;
+        const isPrimeActive = !!(primeUntil && new Date(primeUntil) > new Date());
+        
         const combinedUser = profile
-          ? { ...profile, proUntil: proInfo?.proUntil || null }
+          ? { ...profile, proUntil: proInfo?.proUntil || null, primeUntil }
           : null;
 
         setViewedUser(combinedUser);
-        setIsPrime(!!(primeInfo?.primeUntil && new Date(primeInfo.primeUntil) > new Date()));
+        setIsPrime(isPrimeActive);
 
         // Only update logged-in user in localStorage when:
         // 1. It's a Steam login callback (OpenID redirect) - always update
@@ -346,10 +381,11 @@ function InventoryContent() {
               // Trigger storage event so sidebar updates
               window.dispatchEvent(new Event('storage'));
             } else if (isViewingOwnProfile && loggedInUser) {
-              // Viewing your own profile - only update Pro status, keep your account info
+              // Viewing your own profile - only update Pro and Prime status, keep your account info
               const updatedUser = {
                 ...loggedInUser,
                 proUntil: combinedUser.proUntil, // Update Pro status
+                primeUntil: combinedUser.primeUntil, // Update Prime status
               };
               window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
               // Trigger storage event so sidebar updates
@@ -377,7 +413,8 @@ function InventoryContent() {
             steamId: viewedSteamId, 
             name: "User", 
             avatar: "",
-            proUntil: null 
+            proUntil: null,
+            primeUntil: null
           };
         }
         
@@ -531,7 +568,7 @@ function InventoryContent() {
                         Pro
                       </span>
                     )}
-                    {isPrime && (
+                    {(isPrime || (viewedUser?.primeUntil && new Date(viewedUser.primeUntil) > new Date())) && (
                       <span className="px-3 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-400/60 text-[9px] font-black uppercase tracking-[0.25em] text-purple-300 shadow-lg shadow-purple-500/20">
                         Prime
                       </span>
@@ -643,10 +680,21 @@ function InventoryContent() {
             )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={playerStats?.kd} />
-              <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
-              <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
-              <StatCard label="HS %" icon={<Target size={12}/>} val={playerStats?.hs} unit="%" />
+              {playerStats ? (
+                <>
+                  <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={playerStats.kd} />
+                  <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats.kills} color="text-blue-500" />
+                  <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats.wins} color="text-emerald-500" />
+                  <StatCard label="HS %" icon={<Target size={12}/>} val={playerStats.hs} unit="%" />
+                </>
+              ) : !statsPrivate ? (
+                <>
+                  <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val="---" />
+                  <StatCard label="Total Kills" icon={<Swords size={12}/>} val="---" color="text-blue-500" />
+                  <StatCard label="Wins" icon={<Award size={12}/>} val="---" color="text-emerald-500" />
+                  <StatCard label="HS %" icon={<Target size={12}/>} val="---" unit="%" />
+                </>
+              ) : null}
               <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
               <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
             </div>
@@ -693,6 +741,12 @@ function InventoryContent() {
                       className="group"
                     >
                       <div className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                        {/* Trade Lock Badge */}
+                        {(!item.tradable || item.trade_restriction) && (
+                          <div className="absolute top-3 right-3 z-20 bg-amber-500/20 border border-amber-500/50 px-2 py-1 rounded-lg">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">TRADE LOCKED</span>
+                          </div>
+                        )}
                         <img 
                           src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
                           className="w-full h-32 object-contain mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
