@@ -108,6 +108,17 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
   }
 }
 
+async function fetchTikTokOEmbedFast(videoUrl: string, timeoutMs: number = 2500): Promise<TikTokOEmbedResponse | null> {
+  const u = String(videoUrl || '').trim();
+  if (!u) return null;
+
+  // Use a strict timeout so the snapshot response isn't blocked by TikTok oEmbed slowness.
+  return await Promise.race([
+    fetchTikTokOEmbed(u),
+    new Promise<TikTokOEmbedResponse | null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]);
+}
+
 async function fetchTwitchIsLive(login: string): Promise<boolean | null> {
   const l = String(login || '').trim().replace(/^@/, '');
   if (!l) return null;
@@ -260,7 +271,7 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
 
     const latestUrl = getTikTokLatestVideoUrl(status, clean);
     if (latestUrl) {
-      const oembed = await fetchTikTokOEmbed(latestUrl);
+      const oembed = await fetchTikTokOEmbedFast(latestUrl, 2500);
       items.push({
         id: safeId(`tiktok_latest_${latestUrl}`),
         platform: 'tiktok',
@@ -353,7 +364,7 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
     const existingIdx = next.items.findIndex((i) => i.platform === 'tiktok');
     const existingUrl = existingIdx >= 0 ? String(next.items[existingIdx]?.url || '') : '';
     if (existingUrl !== latestUrl) {
-      const oembed = await fetchTikTokOEmbed(latestUrl);
+      const oembed = await fetchTikTokOEmbedFast(latestUrl, 2500);
       const item: FeedItem = {
         id: safeId(`tiktok_latest_${latestUrl}`),
         platform: 'tiktok',

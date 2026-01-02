@@ -1177,7 +1177,7 @@ function InventoryContent() {
                       </span>
                     )}
                     {isPrime && (
-                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-blue-500/10 border border-blue-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-blue-300 shrink-0">
+                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-blue-500/15 border border-blue-500/50 text-[8px] md:text-[9px] font-black uppercase tracking-[0.12em] text-blue-400 shrink-0">
                         Prime
                       </span>
                     )}
