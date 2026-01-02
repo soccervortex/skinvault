@@ -77,43 +77,6 @@ function isNonTradable(item: InventoryItem): boolean {
   return Number(item.tradable) === 0;
 }
 
-function getTradeUnlockTimestampMs(item: InventoryItem): number | null {
-  const v = (item as any).tradable_after;
-  if (v == null) return null;
-
-  if (typeof v === 'number') {
-    // Steam sometimes uses unix seconds
-    return v > 10_000_000_000 ? v : v * 1000;
-  }
-
-  if (typeof v === 'string') {
-    const t = Date.parse(v);
-    return Number.isFinite(t) ? t : null;
-  }
-
-  if (typeof v === 'object' && v && '$date' in v) {
-    const t = Date.parse((v as any).$date);
-    return Number.isFinite(t) ? t : null;
-  }
-
-  return null;
-}
-
-function isTradeLocked(item: InventoryItem): boolean {
-  const unlockAt = getTradeUnlockTimestampMs(item);
-  if (unlockAt && unlockAt > Date.now()) return true;
-
-  const restrictionDays = Number((item as any).market_tradable_restriction);
-  if (Number.isFinite(restrictionDays) && restrictionDays > 0) return true;
-
-  const restrictionSeconds = Number((item as any).trade_restriction);
-  if (Number.isFinite(restrictionSeconds) && restrictionSeconds > 0) return true;
-
-  // Do NOT treat permanently untradable items (coins/pins etc.) as "trade locked".
-  // Those items typically have tradable=0 but no unlock/restriction fields.
-  return false;
-}
-
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   return (
     <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5">
@@ -144,7 +107,7 @@ function InventoryContent() {
   const [copied, setCopied] = useState(false);
   const [discordStatus, setDiscordStatus] = useState<any>(null);
   const [hasDiscordAccess, setHasDiscordAccess] = useState(false);
-  const [isPrime, setIsPrime] = useState(false);
+  const [primeApi, setPrimeApi] = useState<boolean | null>(null);
   const [showManageTrackers, setShowManageTrackers] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [wishlist, setWishlist] = useState<any[]>([]);
@@ -204,12 +167,12 @@ function InventoryContent() {
     try {
       // Use server-side API route instead of proxies
       const res = await fetch(`/api/steam/profile?steamId=${id}`, {
-        cache: 'force-cache', // Cache profile data for faster subsequent loads
+        cache: 'no-store',
       });
 
       if (res.ok) {
-        const data = await res.json();
-        return { steamId: id, name: data.name || "User", avatar: data.avatar || "" };
+        const profileData = await res.json();
+        return { steamId: id, name: profileData.name || "User", avatar: profileData.avatar || "" };
       } else {
         // Silently return null for expected errors (404, 408, etc.)
         return null;
@@ -953,7 +916,7 @@ function InventoryContent() {
 
   useEffect(() => {
     if (!viewedUser?.steamId) {
-      setIsPrime(false);
+      setPrimeApi(null);
       return;
     }
 
@@ -961,18 +924,36 @@ function InventoryContent() {
       try {
         const res = await fetch(`/api/steam/prime?steamId=${viewedUser.steamId}`, { cache: 'no-store' });
         if (!res.ok) {
-          setIsPrime(false);
+          setPrimeApi(null);
           return;
         }
         const data = await res.json();
-        setIsPrime(!!data?.prime);
+        // prime can be true/false/null
+        setPrimeApi(typeof data?.prime === 'boolean' ? data.prime : null);
       } catch {
-        setIsPrime(false);
+        setPrimeApi(null);
       }
     };
 
     checkPrime();
   }, [viewedUser?.steamId]);
+
+  const primeFromInventory = useMemo(() => {
+    if (!inventory.length) return false;
+    return inventory.some((item) => {
+      const name = String(getItemDisplayName(item) || '').toLowerCase();
+      // "Global Offensive Badge" / "Loyalty Badge" / Service medals are strong Prime indicators.
+      if (name.includes('global offensive badge')) return true;
+      if (name.includes('loyalty badge')) return true;
+      if (name.includes('service medal')) return true;
+      // Some localizations may just contain "prime".
+      if (name.includes('prime-status')) return true;
+      if (name.includes('prime')) return true;
+      return false;
+    });
+  }, [inventory]);
+
+  const isPrime = primeApi === true || primeFromInventory;
 
   // Handle discord=connected URL parameter (refresh status after OAuth callback)
   useEffect(() => {
@@ -1566,11 +1547,6 @@ function InventoryContent() {
                           className="block"
                         >
                           <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
-                            {isTradeLocked(item) && (
-                              <div className="absolute top-3 right-3 z-20 bg-amber-500/20 border border-amber-500/50 px-2 py-1 rounded-lg backdrop-blur-sm">
-                                <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">TRADE LOCKED</span>
-                              </div>
-                            )}
                             <img 
                               src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
                               className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 

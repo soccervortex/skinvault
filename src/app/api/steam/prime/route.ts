@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 
 const PRIME_UPGRADE_APPID = 624820;
 
+function parseOverrideSteamIds(raw: string | undefined): Set<string> {
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -9,6 +19,11 @@ export async function GET(req: Request) {
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId parameter' }, { status: 400 });
+    }
+
+    const overrideIds = parseOverrideSteamIds(process.env.PRIME_OVERRIDE_STEAMIDS);
+    if (overrideIds.has(steamId)) {
+      return NextResponse.json({ prime: true, source: 'override' });
     }
 
     const apiKey = process.env.STEAM_API_KEY;
@@ -34,9 +49,12 @@ export async function GET(req: Request) {
 
       const json = await res.json();
       const games = json?.response?.games;
-      const prime = Array.isArray(games) && games.some((g: any) => Number(g?.appid) === PRIME_UPGRADE_APPID);
+      if (!Array.isArray(games)) {
+        return NextResponse.json({ prime: null, source: 'steam_owned_games' });
+      }
 
-      return NextResponse.json({ prime });
+      const prime = games.some((g: any) => Number(g?.appid) === PRIME_UPGRADE_APPID);
+      return NextResponse.json({ prime, source: 'steam_owned_games' });
     } finally {
       clearTimeout(timeoutId);
     }
