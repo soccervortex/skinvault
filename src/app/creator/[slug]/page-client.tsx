@@ -40,7 +40,6 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
-  const [embedParent, setEmbedParent] = useState<string | null>(null);
   const [edit, setEdit] = useState({
     displayName: '',
     tagline: '',
@@ -65,14 +64,6 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     }
   }, []);
 
-  useEffect(() => {
-    try {
-      setEmbedParent(window.location.hostname);
-    } catch {
-      setEmbedParent(null);
-    }
-  }, []);
-
   const canManage = useMemo(() => isOwner(adminSteamId), [adminSteamId]);
 
   const tiktokLive = data?.live?.tiktok ?? null;
@@ -90,12 +81,12 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const twitchHandle = data?.creator?.twitchLogin ? String(data.creator.twitchLogin).trim().replace(/^@/, '') : '';
   const twitchProfileUrl = data?.links?.twitch || (twitchHandle ? `https://www.twitch.tv/${twitchHandle}` : undefined);
   const twitchLiveUrl = data?.links?.twitchLive || twitchProfileUrl;
-  const twitchEmbedUrl = useMemo(() => {
-    if (!twitchHandle || !embedParent) return null;
-    const parent = encodeURIComponent(embedParent);
-    const channel = encodeURIComponent(twitchHandle);
-    return `https://player.twitch.tv/?channel=${channel}&parent=${parent}&muted=true`;
-  }, [embedParent, twitchHandle]);
+  const twitchPreviewUrl = useMemo(() => {
+    if (!twitchHandle) return null;
+    // Cache-bust once per minute so it updates when live.
+    const t = Math.floor(Date.now() / 60000);
+    return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${encodeURIComponent(twitchHandle)}-640x360.jpg?t=${t}`;
+  }, [twitchHandle]);
 
   const ytConfigured = !!data?.creator?.youtubeChannelId;
   const twitchConfigured = !!data?.creator?.twitchLogin;
@@ -342,18 +333,20 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                         </a>
                       )}
                     </div>
-                    {twitchEmbedUrl && (
+                    {twitchPreviewUrl && twitchLiveUrl && (
                       <div className="rounded-xl bg-black/20 border border-white/10 p-3">
                         <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Stream preview</div>
-                        <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                          <iframe
-                            title="Twitch Stream Preview"
-                            src={twitchEmbedUrl}
-                            className="w-full h-36"
-                            allow="autoplay; fullscreen"
-                            loading="lazy"
-                          />
-                        </div>
+                        <a href={twitchLiveUrl} target="_blank" rel="noreferrer" className="mt-3 block group">
+                          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={twitchPreviewUrl} alt="Twitch Stream Preview" className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                            <div className="absolute bottom-2 left-2 right-2">
+                              <div className="text-xs font-black text-white line-clamp-2">{twitchLive ? 'Live on Twitch' : 'Twitch stream'}</div>
+                              <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-blue-300">Open stream</div>
+                            </div>
+                          </div>
+                        </a>
                       </div>
                     )}
                   </div>
