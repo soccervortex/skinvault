@@ -38,10 +38,44 @@ function primeEvidenceReasonFromItemName(name: string): string | null {
   return null;
 }
 
+async function fetchCommunityDescriptions(steamId: string): Promise<any[] | null> {
+  const id = String(steamId || '').trim();
+  if (!id) return null;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  try {
+    const invUrl = `https://steamcommunity.com/inventory/${encodeURIComponent(id)}/730/2?l=english&count=2000`;
+    const res = await fetch(invUrl, {
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        Accept: 'application/json,text/plain,*/*',
+        Referer: 'https://steamcommunity.com/',
+      },
+    });
+
+    const text = await res.text();
+    if (!res.ok) return null;
+    if (!text) return null;
+    if (/<html|<!doctype/i.test(text)) return null;
+
+    const json = JSON.parse(text);
+    const descriptions: any[] = Array.isArray(json?.descriptions) ? json.descriptions : [];
+    return descriptions;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const steamId = url.searchParams.get('steamId');
+    const refresh = url.searchParams.get('refresh') === '1';
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
@@ -49,7 +83,7 @@ export async function GET(request: Request) {
 
     const cacheKey = `prime_status_${steamId}`;
     const cached = await dbGet<PrimeCache>(cacheKey, true);
-    if (cached?.checkedAt) {
+    if (!refresh && cached?.checkedAt) {
       const age = Date.now() - new Date(cached.checkedAt).getTime();
       if (Number.isFinite(age) && age >= 0 && age < CACHE_MS) {
         return NextResponse.json(cached);
@@ -58,25 +92,25 @@ export async function GET(request: Request) {
 
     // Use our own inventory API (server-side) to avoid CORS.
     // Prime detection should be lightweight and resilient.
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-    let inv: any = null;
-    try {
-      const invRes = await fetch(
-        `${url.origin}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&isPro=false`,
-        { signal: controller.signal, cache: 'no-store' }
-      );
-      if (invRes.ok) {
-        inv = await invRes.json();
+    let descriptions: any[] = (await fetchCommunityDescriptions(steamId)) || [];
+    if (!descriptions.length) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      try {
+        const invRes = await fetch(
+          `${url.origin}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&isPro=false`,
+          { signal: controller.signal, cache: 'no-store' }
+        );
+        if (invRes.ok) {
+          const inv = await invRes.json();
+          descriptions = Array.isArray(inv?.descriptions) ? inv.descriptions : [];
+        }
+      } catch {
+        // ignore
+      } finally {
+        clearTimeout(timeoutId);
       }
-    } catch {
-      // ignore
-    } finally {
-      clearTimeout(timeoutId);
     }
-
-    const descriptions: any[] = Array.isArray(inv?.descriptions) ? inv.descriptions : [];
 
     let isPrime = false;
     let reason: string | undefined;
