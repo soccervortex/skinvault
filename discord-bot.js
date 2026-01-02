@@ -9,7 +9,7 @@ function log(message) {
 
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const API_BASE_URL = process.env.API_BASE_URL || 'https://skinvaults.online';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://www.skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 const GUILD_ID = process.env.DISCORD_GUILD_ID || '1453751539792347304'; // SkinVaults Community server
 
@@ -44,6 +44,10 @@ const commands = [
   new SlashCommandBuilder()
     .setName('wishlist')
     .setDescription('View your wishlist with current prices')
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('guild')
+    .setDescription('Get an invite link to add SkinVault bot to your server')
     .toJSON(),
   new SlashCommandBuilder()
     .setName('help')
@@ -790,6 +794,20 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       await interaction.editReply({ embeds: [embed] });
+
+    } else if (commandName === 'guild') {
+      const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&scope=${encodeURIComponent('bot applications.commands')}&permissions=0`;
+      await interaction.reply({
+        ephemeral: true,
+        content:
+          `🔗 **Invite SkinVault Bot to your server**\n\n` +
+          `${inviteUrl}\n\n` +
+          `Scopes:\n` +
+          `- bot\n` +
+          `- applications.commands\n\n` +
+          `If Discord says the redirect URI is invalid, make sure your app has this redirect URI configured:\n` +
+          `https://www.skinvaults.online/api/discord/callback`,
+      });
 
     } else if (commandName === 'alerts') {
       await interaction.deferReply({ ephemeral: true });

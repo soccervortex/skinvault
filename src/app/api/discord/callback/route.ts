@@ -3,7 +3,8 @@ import { dbGet, dbSet } from '@/app/utils/database';
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/api/discord/callback`;
+const DEFAULT_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${DEFAULT_BASE_URL}/api/discord/callback`;
 
 // Discord OAuth callback - exchange code for token and link to Steam account
 export async function GET(request: Request) {
@@ -22,9 +23,16 @@ export async function GET(request: Request) {
     console.log('[Discord Callback] Code present:', !!code);
     console.log('[Discord Callback] State present:', !!state);
     
-    if (!code || !state) {
-      console.error('[Discord Callback] ❌ Missing code or state parameter');
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_auth_failed`);
+    if (!code) {
+      console.error('[Discord Callback] ❌ Missing code parameter');
+      return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_auth_failed`);
+    }
+
+    // If state is missing, this is most likely a generic Discord install callback (guild install)
+    // and not a Steam-account linking flow. In that case we just finish successfully.
+    if (!state) {
+      console.log('[Discord Callback] ℹ️ No state provided. Treating as install-only callback.');
+      return NextResponse.redirect(`${DEFAULT_BASE_URL}/inventory?discord=installed`);
     }
 
     // Decode state to get steamId
@@ -40,11 +48,11 @@ export async function GET(request: Request) {
       console.log('[Discord Callback] State age:', stateAge, 'ms');
       if (stateAge > 10 * 60 * 1000) {
         console.error('[Discord Callback] ❌ State expired');
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_auth_expired`);
+        return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_auth_expired`);
       }
     } catch (error) {
       console.error('[Discord Callback] ❌ Failed to decode state:', error);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_auth_invalid`);
+      return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_auth_invalid`);
     }
 
     // Exchange code for access token
@@ -66,7 +74,7 @@ export async function GET(request: Request) {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('[Discord Callback] ❌ Token exchange failed:', tokenResponse.status, errorText);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_token_failed`);
+      return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_token_failed`);
     }
     
     console.log('[Discord Callback] ✅ Token exchange successful');
@@ -85,7 +93,7 @@ export async function GET(request: Request) {
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
       console.error('[Discord Callback] ❌ Failed to fetch user info:', userResponse.status, errorText);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_user_failed`);
+      return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_user_failed`);
     }
     
     console.log('[Discord Callback] ✅ User info fetched successfully');
@@ -234,16 +242,16 @@ Happy trading! 🚀`;
     } catch (error) {
       console.error('[Discord Callback] ❌ Failed to store Discord connection:', error);
       console.error('[Discord Callback] Error details:', error instanceof Error ? error.stack : String(error));
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_storage_failed`);
+      return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_storage_failed`);
     }
 
     console.log('[Discord Callback] ===== SUCCESS - Redirecting to /inventory =====');
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/inventory?discord=connected`);
+    return NextResponse.redirect(`${DEFAULT_BASE_URL}/inventory?discord=connected`);
   } catch (error) {
     console.error('[Discord Callback] ===== FATAL ERROR =====');
     console.error('[Discord Callback] Error:', error);
     console.error('[Discord Callback] Error details:', error instanceof Error ? error.stack : String(error));
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/pro?error=discord_callback_failed`);
+    return NextResponse.redirect(`${DEFAULT_BASE_URL}/pro?error=discord_callback_failed`);
   }
 }
 
