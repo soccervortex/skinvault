@@ -315,7 +315,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                 )}
 
                 {twitchConfigured && (
-                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-black uppercase tracking-widest text-gray-400">Twitch</div>
                       {twitchLive !== null && (
