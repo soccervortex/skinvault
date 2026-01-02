@@ -27,7 +27,7 @@ type CreatorProfile = {
 type CreatorSnapshot = {
   creator: CreatorProfile;
   live: { twitch: boolean | null; tiktok: boolean | null; youtube: boolean | null };
-  links: { tiktok?: string; tiktokLive?: string; twitch?: string; twitchLive?: string };
+  links: { tiktok?: string; tiktokLive?: string; twitch?: string; twitchLive?: string; youtube?: string; youtubeLive?: string };
   items: FeedItem[];
   updatedAt: string;
   lastCheckedAt: string;
@@ -93,6 +93,12 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const showTwitchPreviewImage = !!(twitchPreviewUrl && twitchLive === true && !twitchPreviewFailed);
 
   const ytConfigured = !!data?.creator?.youtubeChannelId;
+  const ytLive = data?.live?.youtube ?? null;
+  const ytChannelId = data?.creator?.youtubeChannelId ? String(data.creator.youtubeChannelId).trim() : '';
+  const ytChannelUrl = data?.links?.youtube || (ytChannelId ? `https://www.youtube.com/channel/${ytChannelId}` : undefined);
+  const ytLiveUrl = data?.links?.youtubeLive || (ytChannelId ? `https://www.youtube.com/channel/${ytChannelId}/live` : undefined);
+  const latestYouTubeItem = data?.items?.find((i) => i.platform === 'youtube');
+  const latestYouTubeUrl = latestYouTubeItem?.url;
   const twitchConfigured = !!data?.creator?.twitchLogin;
 
   const openEdit = () => {
@@ -140,6 +146,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
         };
         const cleanTikTok = String(edit.tiktokUsername || '').trim().replace(/^@/, '');
         const cleanTwitch = String(edit.twitchLogin || '').trim().replace(/^@/, '');
+        const cleanYt = String(edit.youtubeChannelId || '').trim();
         return {
           ...prev,
           creator: nextCreator,
@@ -149,6 +156,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
             tiktokLive: cleanTikTok ? `https://www.tiktok.com/@${cleanTikTok}/live` : prev.links.tiktokLive,
             twitch: cleanTwitch ? `https://www.twitch.tv/${cleanTwitch}` : prev.links.twitch,
             twitchLive: cleanTwitch ? `https://www.twitch.tv/${cleanTwitch}` : prev.links.twitchLive,
+            youtube: cleanYt ? `https://www.youtube.com/channel/${cleanYt}` : prev.links.youtube,
           },
         };
       });
@@ -339,9 +347,58 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                 </div>
 
                 {ytConfigured && (
-                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-                    <div className="text-xs font-black uppercase tracking-widest text-gray-400">YouTube</div>
-                    <div className="text-sm text-gray-400">Configured (feed support coming next)</div>
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-black uppercase tracking-widest text-gray-400">YouTube</div>
+                      {ytLive !== null && (
+                        <div className={`px-2 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest ${ytLive ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-300'}`}>
+                          {ytLive ? 'Live' : 'Offline'}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {ytChannelUrl && (
+                        <a href={ytChannelUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10">
+                          Channel
+                        </a>
+                      )}
+                      {ytLiveUrl && (
+                        <a href={ytLiveUrl} target="_blank" rel="noreferrer" className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${ytLive ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20' : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`}>
+                          Watch Live
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl bg-black/20 border border-white/10 p-3">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Latest video</div>
+                      {latestYouTubeUrl ? (
+                        <a href={latestYouTubeUrl} target="_blank" rel="noreferrer" className="mt-3 block group">
+                          {latestYouTubeItem?.thumbnailUrl ? (
+                            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={latestYouTubeItem.thumbnailUrl} alt={latestYouTubeItem.title} className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                              <div className="absolute bottom-2 left-2 right-2">
+                                <div className="text-xs font-black text-white line-clamp-2">{latestYouTubeItem.title || 'Latest YouTube'}</div>
+                                <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-blue-300">Open video</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                              <div className="w-full h-36 bg-gradient-to-br from-[#1a1c27] via-[#10121a] to-[#0b0c11] flex items-center justify-center" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                              <div className="absolute bottom-2 left-2 right-2">
+                                <div className="text-xs font-black text-white line-clamp-2">{latestYouTubeItem?.title || 'Latest YouTube'}</div>
+                                <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-blue-300">Open video</div>
+                              </div>
+                            </div>
+                          )}
+                        </a>
+                      ) : (
+                        <div className="mt-2 text-sm text-gray-400">No latest video found yet.</div>
+                      )}
+                    </div>
                   </div>
                 )}
 

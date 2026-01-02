@@ -24,6 +24,31 @@ function formatPostTypeLabel(type: string): string {
          type;
 }
 
+function extractWeaponFromItemName(name: string): string {
+  // Example:
+  // "🎮 ★ StatTrak™ Shadow Daggers | Autotronic (Factory New)"
+  // -> "Shadow Daggers"
+  const raw = String(name || '').trim();
+  if (!raw) return '';
+
+  const withoutEmoji = raw.replace(/^🎮\s*/g, '');
+  const left = withoutEmoji.includes('|') ? withoutEmoji.split('|')[0] : withoutEmoji;
+  const cleaned = left
+    .replace(/[★☆]/g, '')
+    .replace(/StatTrak™/gi, '')
+    .replace(/Souvenir/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned;
+}
+
+function topEntryText(counts: Record<string, number>, maxLabelLen: number = 34): string {
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  if (!top) return 'N/A';
+  const label = top[0].length > maxLabelLen ? `${top[0].slice(0, Math.max(0, maxLabelLen - 3))}...` : top[0];
+  return `${label} (${top[1]}x)`;
+}
+
 interface PostContext {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
   hour: number;
@@ -279,6 +304,24 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
     const monthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthPosts = postHistory.filter(p => new Date(p.date) >= monthStart && new Date(p.date) < monthEnd);
 
+    const highlightPosts = lastMonthPosts.filter((p) => p.itemType === 'item_highlight' && p.itemName && p.itemName !== p.itemType);
+
+    // Top skin (from itemName)
+    const skinCounts: Record<string, number> = {};
+    highlightPosts.forEach((p) => {
+      const name = String(p.itemName || '').trim();
+      if (!name) return;
+      skinCounts[name] = (skinCounts[name] || 0) + 1;
+    });
+
+    // Top weapon (derived from itemName)
+    const weaponCounts: Record<string, number> = {};
+    highlightPosts.forEach((p) => {
+      const weapon = extractWeaponFromItemName(p.itemName);
+      if (!weapon) return;
+      weaponCounts[weapon] = (weaponCounts[weapon] || 0) + 1;
+    });
+
     // Count by type
     const typeCounts: Record<string, number> = {};
     lastMonthPosts.forEach(p => {
@@ -286,12 +329,16 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
     });
 
     const totalPosts = lastMonthPosts.length;
+    const topSkinText = Object.keys(skinCounts).length ? topEntryText(skinCounts, 38) : 'N/A';
+    const topWeaponText = Object.keys(weaponCounts).length ? topEntryText(weaponCounts, 28) : 'N/A';
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
     const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
 
     const statsText = `📊 Monthly CS2 Market Stats\n\n` +
       `📈 Total posts: ${totalPosts}\n` +
-      `🎮 Top category: ${topCategoryText}\n` +
+      `🎮 Top skin: ${topSkinText}\n` +
+      `🔫 Top weapon: ${topWeaponText}\n` +
+      (topSkinText === 'N/A' ? `🗂️ Top category: ${topCategoryText}\n` : '') +
       `📅 Month: ${lastMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}\n\n` +
       `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
@@ -464,6 +511,24 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayPosts = postHistory.filter(p => new Date(p.date) >= todayStart);
 
+    const highlightPosts = todayPosts.filter((p) => p.itemType === 'item_highlight' && p.itemName && p.itemName !== p.itemType);
+
+    // Top skin
+    const skinCounts: Record<string, number> = {};
+    highlightPosts.forEach((p) => {
+      const name = String(p.itemName || '').trim();
+      if (!name) return;
+      skinCounts[name] = (skinCounts[name] || 0) + 1;
+    });
+
+    // Top weapon
+    const weaponCounts: Record<string, number> = {};
+    highlightPosts.forEach((p) => {
+      const weapon = extractWeaponFromItemName(p.itemName);
+      if (!weapon) return;
+      weaponCounts[weapon] = (weaponCounts[weapon] || 0) + 1;
+    });
+
     // Count by type
     const typeCounts: Record<string, number> = {};
     todayPosts.forEach(p => {
@@ -473,13 +538,19 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
     // Get most popular item type today
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
     const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
+
+    const topSkinText = Object.keys(skinCounts).length ? topEntryText(skinCounts, 38) : 'N/A';
+    const topWeaponText = Object.keys(weaponCounts).length ? topEntryText(weaponCounts, 28) : 'N/A';
     
     // Get top 3 movers from today
     const { gainers, losers } = await getTopMovers('24h', 3);
     
     const dailyText = `📊 Daily CS2 Market Summary\n\n` +
       `📈 Posts today: ${todayPosts.length}\n` +
-      `🎮 Top category: ${topCategoryText}\n\n` +
+      `🎮 Top skin: ${topSkinText}\n` +
+      `🔫 Top weapon: ${topWeaponText}\n` +
+      (topSkinText === 'N/A' ? `🗂️ Top category: ${topCategoryText}\n` : '') +
+      `\n` +
       (gainers.length > 0 ? `📈 Top Gainers:\n${gainers.slice(0, 3).map((g, i) => `${i + 1}. ${g.marketHashName} +${g.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
       (losers.length > 0 ? `📉 Top Losers:\n${losers.slice(0, 3).map((l, i) => `${i + 1}. ${l.marketHashName} ${l.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
       `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +

@@ -39,6 +39,43 @@ function extractMetaContent(html: string, property: string): string {
   return v;
 }
 
+async function fetchYouTubeLiveVideoIdFast(channelId: string): Promise<string> {
+  const id = String(channelId || '').trim();
+  if (!id) return '';
+
+  const html = await fetchText(`https://www.youtube.com/channel/${encodeURIComponent(id)}/live`, 4000);
+  if (!html) return '';
+
+  // Heuristic: YouTube sets isLiveNow for live streams.
+  if (!/"isLiveNow"\s*:\s*true/i.test(html)) return '';
+
+  // Find a videoId (first occurrence is usually the live stream).
+  const m = html.match(/"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/);
+  return m && m[1] ? String(m[1]) : '';
+}
+
+async function fetchYouTubeLatestVideoFast(channelId: string): Promise<{ videoId: string; title: string; publishedAt?: string; thumbnailUrl?: string } | null> {
+  const id = String(channelId || '').trim();
+  if (!id) return null;
+
+  const xml = await fetchText(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(id)}`, 4000);
+  if (!xml) return null;
+
+  const videoId = (xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)?.[1] || '').trim();
+  if (!videoId) return null;
+
+  const title = (xml.match(/<title>([^<]+)<\/title>/i)?.[1] || '').trim();
+  const publishedAt = (xml.match(/<published>([^<]+)<\/published>/i)?.[1] || '').trim();
+  const thumb = (xml.match(/<media:thumbnail[^>]+url="([^"]+)"/i)?.[1] || '').trim();
+
+  return {
+    videoId,
+    title: title || 'Latest YouTube',
+    publishedAt: publishedAt || undefined,
+    thumbnailUrl: thumb || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+  };
+}
+
 async function fetchTikTokOgPreviewFast(videoUrl: string): Promise<TikTokOEmbedResponse | null> {
   const u = String(videoUrl || '').trim();
   if (!u) return null;
@@ -95,6 +132,8 @@ type CreatorSnapshot = {
     tiktokLive?: string;
     twitch?: string;
     twitchLive?: string;
+    youtube?: string;
+    youtubeLive?: string;
   };
   items: FeedItem[];
   updatedAt: string;
@@ -272,7 +311,7 @@ async function fetchTikTokStatusApiFast(username: string): Promise<TikTokStatusA
   }
 }
 
-async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot> {
+async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot | null): Promise<CreatorSnapshot> {
   const sources: CreatorSnapshot['sources'] = {};
   sources.tiktokStatusApi = process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421';
 
@@ -317,6 +356,58 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
         url: latestUrl,
         thumbnailUrl: oembed?.thumbnail_url,
       });
+    }
+  }
+
+  if (creator.youtubeChannelId) {
+    const clean = String(creator.youtubeChannelId).trim();
+    if (clean) {
+      links.youtube = `https://www.youtube.com/channel/${clean}`;
+
+      const liveId = await fetchYouTubeLiveVideoIdFast(clean);
+      if (liveId) {
+        live.youtube = true;
+        links.youtubeLive = `https://www.youtube.com/watch?v=${liveId}`;
+        items.push({
+          id: safeId(`youtube_live_${liveId}`),
+          platform: 'youtube',
+          title: 'Live on YouTube',
+          url: links.youtubeLive,
+          thumbnailUrl: `https://i.ytimg.com/vi/${liveId}/hqdefault.jpg`,
+        });
+      } else {
+        live.youtube = false;
+        const latest = await fetchYouTubeLatestVideoFast(clean);
+        if (latest?.videoId) {
+          const latestUrl = `https://www.youtube.com/watch?v=${latest.videoId}`;
+          items.push({
+            id: safeId(`youtube_latest_${latest.videoId}`),
+            platform: 'youtube',
+            title: latest.title || 'Latest YouTube',
+            url: latestUrl,
+            thumbnailUrl: latest.thumbnailUrl,
+            publishedAt: latest.publishedAt,
+          });
+        }
+      }
+    }
+  }
+
+  // Preserve last-known TikTok/YouTube items when external fetches are flaky.
+  if (cached && Array.isArray(cached.items)) {
+    if (creator.tiktokUsername) {
+      const hasTikTok = items.some((i) => i.platform === 'tiktok' && i.url);
+      if (!hasTikTok) {
+        const prev = cached.items.find((i) => i.platform === 'tiktok' && i.url);
+        if (prev) items.push(prev);
+      }
+    }
+    if (creator.youtubeChannelId) {
+      const hasYT = items.some((i) => i.platform === 'youtube' && i.url);
+      if (!hasYT) {
+        const prev = cached.items.find((i) => i.platform === 'youtube' && i.url);
+        if (prev) items.push(prev);
+      }
     }
   }
 
@@ -486,7 +577,7 @@ export async function GET(
   if (!cached) {
     const minimal = buildMinimalSnapshot(creator);
     void dbSet(snapshotKey, minimal);
-    void refreshSnapshot(creator)
+    void refreshSnapshot(creator, minimal)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
     return NextResponse.json(minimal);
@@ -497,7 +588,7 @@ export async function GET(
   const currentStatusApi = process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421';
   const cachedStatusApi = cached?.sources?.tiktokStatusApi || '';
   if (cached && currentStatusApi && cachedStatusApi !== currentStatusApi) {
-    void refreshSnapshot(creator)
+    void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
     return NextResponse.json(cached);
@@ -511,7 +602,7 @@ export async function GET(
       : false;
     const hasTikTokLiveUrl = !!cached.links?.tiktokLive;
     if (!hasLatestTikTok || !hasTikTokLiveUrl) {
-      void refreshSnapshot(creator)
+      void refreshSnapshot(creator, cached)
         .then((fresh) => dbSet(snapshotKey, fresh))
         .catch(() => {});
       return NextResponse.json(cached);
@@ -520,7 +611,7 @@ export async function GET(
 
   // If we have an older cached snapshot missing new fields, refresh now.
   if (cached && (!cached.links || !Array.isArray(cached.items))) {
-    void refreshSnapshot(creator)
+    void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
     return NextResponse.json(cached);
@@ -529,7 +620,7 @@ export async function GET(
   // If cached snapshot is missing lastCheckedAt, don't block the response.
   // Schedule a background refresh and return cached immediately.
   if (!cached?.lastCheckedAt) {
-    void refreshSnapshot(creator)
+    void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
     return NextResponse.json(cached);
@@ -551,7 +642,7 @@ export async function GET(
 
   if (!Number.isFinite(age) || age < 0 || age > TTL_REFRESH_MS) {
     // Don't block response; refresh in background.
-    void refreshSnapshot(creator)
+    void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
     return NextResponse.json(cached);
@@ -559,7 +650,7 @@ export async function GET(
 
   // Stale-while-revalidate: return cached immediately, but refresh in the background when stale.
   if (age > STALE_REVALIDATE_MS) {
-    void refreshSnapshot(creator)
+    void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
   }
