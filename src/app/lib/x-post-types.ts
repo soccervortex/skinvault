@@ -39,6 +39,30 @@ function extractWeaponFromItemName(name: string): string {
     .replace(/Souvenir/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // Exclude non-weapon item categories that commonly appear in item highlights.
+  const normalized = cleaned.toLowerCase();
+  const nonWeapons = [
+    'sticker',
+    'patch',
+    'graffiti',
+    'music kit',
+    'agent',
+    'collectible',
+    'case',
+    'key',
+    'capsule',
+    'souvenir package',
+    'pin',
+    'storage unit',
+    'name tag',
+    'tag',
+    'ticket',
+    'pass',
+    'charm',
+  ];
+  if (nonWeapons.some((t) => normalized === t || normalized.startsWith(`${t} `))) return '';
+
   return cleaned;
 }
 
