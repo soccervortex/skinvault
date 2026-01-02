@@ -107,6 +107,7 @@ function InventoryContent() {
   const [copied, setCopied] = useState(false);
   const [discordStatus, setDiscordStatus] = useState<any>(null);
   const [hasDiscordAccess, setHasDiscordAccess] = useState(false);
+  const [isPrime, setIsPrime] = useState(false);
   const [showManageTrackers, setShowManageTrackers] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [wishlist, setWishlist] = useState<any[]>([]);
@@ -913,6 +914,29 @@ function InventoryContent() {
     checkDiscordAccess();
   }, [viewedUser?.steamId, isPro]);
 
+  useEffect(() => {
+    if (!viewedUser?.steamId) {
+      setIsPrime(false);
+      return;
+    }
+
+    const checkPrime = async () => {
+      try {
+        const res = await fetch(`/api/steam/prime?steamId=${viewedUser.steamId}`, { cache: 'no-store' });
+        if (!res.ok) {
+          setIsPrime(false);
+          return;
+        }
+        const data = await res.json();
+        setIsPrime(!!data?.prime);
+      } catch {
+        setIsPrime(false);
+      }
+    };
+
+    checkPrime();
+  }, [viewedUser?.steamId]);
+
   // Handle discord=connected URL parameter (refresh status after OAuth callback)
   useEffect(() => {
     const discordParam = searchParams.get('discord');
@@ -1097,6 +1121,15 @@ function InventoryContent() {
                         <MessageSquare size={10} className="text-indigo-400" />
                         <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
                           Discord
+                        </span>
+                      </div>
+                    )}
+
+                    {isPrime && (
+                      <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-yellow-500/10 border border-yellow-500/40 shrink-0">
+                        <Trophy size={10} className="text-yellow-400" />
+                        <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-yellow-400">
+                          Prime
                         </span>
                       </div>
                     )}
@@ -1496,6 +1529,11 @@ function InventoryContent() {
                           className="block"
                         >
                           <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                            {isNonTradable(item) && (
+                              <div className="absolute top-3 right-3 z-20 bg-amber-500/20 border border-amber-500/50 px-2 py-1 rounded-lg backdrop-blur-sm">
+                                <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">TRADE LOCKED</span>
+                              </div>
+                            )}
                             <img 
                               src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
                               className="w-full h-24 md:h-32 object-contain mb-4 md:mb-6 z-10 drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
