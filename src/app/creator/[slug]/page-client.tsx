@@ -322,8 +322,13 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                             </div>
                           </div>
                         ) : (
-                          <div className="mt-2 text-sm font-black text-blue-400 break-all group-hover:text-blue-300">
-                            {latestTiktokUrl}
+                          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                            <div className="w-full h-36 bg-gradient-to-br from-[#1a1c27] via-[#10121a] to-[#0b0c11] flex items-center justify-center" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                            <div className="absolute bottom-2 left-2 right-2">
+                              <div className="text-xs font-black text-white line-clamp-2">{latestTikTokItem?.title || 'Latest TikTok'}</div>
+                              <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-blue-300">Open video</div>
+                            </div>
                           </div>
                         )}
                       </a>

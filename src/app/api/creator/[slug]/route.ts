@@ -25,6 +25,44 @@ type TikTokOEmbedResponse = {
   thumbnail_url?: string;
 };
 
+function extractMetaContent(html: string, property: string): string {
+  const h = String(html || '');
+  if (!h) return '';
+
+  // Match either <meta property="og:image" content="..."> or <meta content="..." property="og:image">
+  const re = new RegExp(
+    `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["'][^>]*>`,
+    'i'
+  );
+  const m = h.match(re);
+  const v = (m && (m[1] || m[2])) ? String(m[1] || m[2]).trim() : '';
+  return v;
+}
+
+async function fetchTikTokOgPreviewFast(videoUrl: string): Promise<TikTokOEmbedResponse | null> {
+  const u = String(videoUrl || '').trim();
+  if (!u) return null;
+
+  // TikTok oEmbed can rate-limit or be blocked. As a fallback, try to scrape OpenGraph tags.
+  const html = await fetchText(u, 2500);
+  if (!html) return null;
+
+  const thumbnail_url = extractMetaContent(html, 'og:image');
+  const title = extractMetaContent(html, 'og:title') || extractMetaContent(html, 'twitter:title');
+  if (!thumbnail_url && !title) return null;
+
+  return {
+    title: title || undefined,
+    thumbnail_url: thumbnail_url || undefined,
+  };
+}
+
+async function fetchTikTokPreviewFast(videoUrl: string): Promise<TikTokOEmbedResponse | null> {
+  const oembed = await fetchTikTokOEmbedFast(videoUrl, 2500);
+  if (oembed?.thumbnail_url || oembed?.title) return oembed;
+  return await fetchTikTokOgPreviewFast(videoUrl);
+}
+
 function getTikTokLatestVideoUrl(status: TikTokStatusApiResponse | null, username: string): string {
   if (!status) return '';
   const raw = (status as any)?.latest_video ?? (status as any)?.latestVideo ?? (status as any)?.latest_video_url;
@@ -271,7 +309,7 @@ async function refreshSnapshot(creator: CreatorProfile): Promise<CreatorSnapshot
 
     const latestUrl = getTikTokLatestVideoUrl(status, clean);
     if (latestUrl) {
-      const oembed = await fetchTikTokOEmbedFast(latestUrl, 2500);
+      const oembed = await fetchTikTokPreviewFast(latestUrl);
       items.push({
         id: safeId(`tiktok_latest_${latestUrl}`),
         platform: 'tiktok',
@@ -364,7 +402,7 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
     const existingIdx = next.items.findIndex((i) => i.platform === 'tiktok');
     const existingUrl = existingIdx >= 0 ? String(next.items[existingIdx]?.url || '') : '';
     if (existingUrl !== latestUrl) {
-      const oembed = await fetchTikTokOEmbedFast(latestUrl, 2500);
+      const oembed = await fetchTikTokPreviewFast(latestUrl);
       const item: FeedItem = {
         id: safeId(`tiktok_latest_${latestUrl}`),
         platform: 'tiktok',
@@ -425,11 +463,13 @@ export async function GET(
       const existingIdx = updated.items.findIndex((i) => i.platform === 'tiktok');
       const existingUrl = existingIdx >= 0 ? String(updated.items[existingIdx]?.url || '') : '';
       if (existingUrl !== latestUrl) {
+        const oembed = await fetchTikTokPreviewFast(latestUrl);
         const item: FeedItem = {
           id: safeId(`tiktok_latest_${latestUrl}`),
           platform: 'tiktok',
-          title: 'Latest TikTok',
+          title: (oembed?.title && String(oembed.title).trim()) || 'Latest TikTok',
           url: latestUrl,
+          thumbnailUrl: oembed?.thumbnail_url,
         };
         if (existingIdx >= 0) updated.items[existingIdx] = item;
         else updated.items.unshift(item);

@@ -13,6 +13,17 @@ import crypto from 'crypto';
 
 export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert' | 'new_user';
 
+function formatPostTypeLabel(type: string): string {
+  return type === 'item_highlight' ? 'Item Highlights' :
+         type === 'weekly_summary' ? 'Weekly Summaries' :
+         type === 'monthly_stats' ? 'Monthly Stats' :
+         type === 'daily_summary' ? 'Daily Summaries' :
+         type === 'new_user' ? 'New Users' :
+         type === 'milestone' ? 'Milestones' :
+         type === 'alert' ? 'Alerts' :
+         type;
+}
+
 interface PostContext {
   dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
   hour: number;
@@ -149,13 +160,7 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
       const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
       if (mostPopularType) {
         // Format type names better
-        const typeName = mostPopularType[0] === 'item_highlight' ? 'Item Highlights' :
-                         mostPopularType[0] === 'weekly_summary' ? 'Weekly Summaries' :
-                         mostPopularType[0] === 'monthly_stats' ? 'Monthly Stats' :
-                         mostPopularType[0] === 'new_user' ? 'New Users' :
-                         mostPopularType[0] === 'milestone' ? 'Milestones' :
-                         mostPopularType[0] === 'alert' ? 'Alerts' :
-                         mostPopularType[0];
+        const typeName = formatPostTypeLabel(mostPopularType[0]);
         mostFeaturedText = `${typeName} (${mostPopularType[1]}x)`;
       }
     }
@@ -185,7 +190,7 @@ export async function createWeeklySummaryPost(): Promise<{ success: boolean; pos
       summaryText += `\n`;
     }
     
-    summaryText += `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n`;
+    summaryText += `Track your CS2 inventory:\nhttps://skinvaults.online\n\n`;
     summaryText += `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the summary
@@ -270,7 +275,9 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
     // Get posts from last month
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthPosts = postHistory.filter(p => new Date(p.date) >= lastMonth && new Date(p.date) < new Date(now.getFullYear(), now.getMonth(), 1));
+    const monthStart = lastMonth;
+    const monthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthPosts = postHistory.filter(p => new Date(p.date) >= monthStart && new Date(p.date) < monthEnd);
 
     // Count by type
     const typeCounts: Record<string, number> = {};
@@ -280,12 +287,13 @@ export async function createMonthlyStatsPost(): Promise<{ success: boolean; post
 
     const totalPosts = lastMonthPosts.length;
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+    const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
 
     const statsText = `📊 Monthly CS2 Market Stats\n\n` +
       `📈 Total posts: ${totalPosts}\n` +
-      `🎮 Top category: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n` +
-      `📅 Month: ${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })}\n\n` +
-      `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
+      `🎮 Top category: ${topCategoryText}\n` +
+      `📅 Month: ${lastMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}\n\n` +
+      `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the stats (same OAuth logic as weekly summary)
@@ -464,16 +472,17 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
 
     // Get most popular item type today
     const mostPopularType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+    const topCategoryText = mostPopularType ? `${formatPostTypeLabel(mostPopularType[0])} (${mostPopularType[1]}x)` : 'N/A';
     
     // Get top 3 movers from today
     const { gainers, losers } = await getTopMovers('24h', 3);
     
     const dailyText = `📊 Daily CS2 Market Summary\n\n` +
       `📈 Posts today: ${todayPosts.length}\n` +
-      `🎮 Top category: ${mostPopularType ? `${mostPopularType[0]} (${mostPopularType[1]}x)` : 'N/A'}\n\n` +
+      `🎮 Top category: ${topCategoryText}\n\n` +
       (gainers.length > 0 ? `📈 Top Gainers:\n${gainers.slice(0, 3).map((g, i) => `${i + 1}. ${g.marketHashName} +${g.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
       (losers.length > 0 ? `📉 Top Losers:\n${losers.slice(0, 3).map((l, i) => `${i + 1}. ${l.marketHashName} ${l.changePercent.toFixed(1)}%`).join('\n')}\n\n` : '') +
-      `Track your CS2 inventory:\nhttps://www.skinvaults.online\n\n` +
+      `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins @counterstrike`;
 
     // Post the daily summary (same OAuth logic)
