@@ -17,21 +17,29 @@ export async function GET(req: Request) {
     }
 
     // Check if user owns the CS:GO Prime Status Upgrade (appid 624820)
-    // Use CheckAppOwnership since it works even when the user's games list is private.
-    const url = `https://api.steampowered.com/ISteamUser/CheckAppOwnership/v0001/?key=${apiKey}&steamid=${steamId}&appid=${PRIME_UPGRADE_APPID}`;
+    // NOTE: CheckAppOwnership is publisher-restricted and returns 403 for normal keys.
+    // GetOwnedGames works with normal Steam Web API keys, but may return empty if the profile's game details are private.
+    const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${steamId}&include_played_free_games=1&appids_filter[0]=${PRIME_UPGRADE_APPID}`;
 
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: 'Steam API error', status: res.status },
-        { status: 502 }
-      );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+
+      if (!res.ok) {
+        // Return a non-fatal response so the UI doesn't break/spam errors.
+        return NextResponse.json({ prime: null, error: 'Steam API error', status: res.status });
+      }
+
+      const json = await res.json();
+      const games = json?.response?.games;
+      const prime = Array.isArray(games) && games.some((g: any) => Number(g?.appid) === PRIME_UPGRADE_APPID);
+
+      return NextResponse.json({ prime });
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const json = await res.json();
-    const prime = json?.appownership?.ownsapp === true;
-
-    return NextResponse.json({ prime });
   } catch (e) {
     console.error('Steam prime proxy failed', e);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

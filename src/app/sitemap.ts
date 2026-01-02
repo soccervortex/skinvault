@@ -4,7 +4,7 @@ import { getAllItems, weaponsList } from '@/data/weapons';
 /**
  * CACHING: Cache for 24 hours to handle 14,000+ items efficiently.
  */
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
 
