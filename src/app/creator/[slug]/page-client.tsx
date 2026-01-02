@@ -26,7 +26,7 @@ type CreatorProfile = {
 type CreatorSnapshot = {
   creator: CreatorProfile;
   live: { twitch: boolean | null; tiktok: boolean | null; youtube: boolean | null };
-  links: { tiktok?: string; tiktokLive?: string };
+  links: { tiktok?: string; tiktokLive?: string; twitch?: string; twitchLive?: string };
   items: FeedItem[];
   updatedAt: string;
   lastCheckedAt: string;
@@ -39,6 +39,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
+  const [embedParent, setEmbedParent] = useState<string | null>(null);
   const [edit, setEdit] = useState({
     displayName: '',
     tagline: '',
@@ -62,6 +63,14 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     }
   }, []);
 
+  useEffect(() => {
+    try {
+      setEmbedParent(window.location.hostname);
+    } catch {
+      setEmbedParent(null);
+    }
+  }, []);
+
   const canManage = useMemo(() => isOwner(adminSteamId), [adminSteamId]);
 
   const tiktokLive = data?.live?.tiktok ?? null;
@@ -74,6 +83,17 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     data?.links?.tiktokLive || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}/live` : undefined);
   const latestTikTokItem = data?.items?.find((i) => i.platform === 'tiktok');
   const latestTiktokUrl = latestTikTokItem?.url;
+
+  const twitchLive = data?.live?.twitch ?? null;
+  const twitchHandle = data?.creator?.twitchLogin ? String(data.creator.twitchLogin).trim().replace(/^@/, '') : '';
+  const twitchProfileUrl = data?.links?.twitch || (twitchHandle ? `https://www.twitch.tv/${twitchHandle}` : undefined);
+  const twitchLiveUrl = data?.links?.twitchLive || twitchProfileUrl;
+  const twitchEmbedUrl = useMemo(() => {
+    if (!twitchHandle || !embedParent) return null;
+    const parent = encodeURIComponent(embedParent);
+    const channel = encodeURIComponent(twitchHandle);
+    return `https://player.twitch.tv/?channel=${channel}&parent=${parent}&muted=true`;
+  }, [embedParent, twitchHandle]);
 
   const ytConfigured = !!data?.creator?.youtubeChannelId;
   const twitchConfigured = !!data?.creator?.twitchLogin;
@@ -107,10 +127,40 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed to update');
 
-      // Reload creator snapshot after update
-      const res2 = await fetch(`/api/creator/${encodeURIComponent(slug)}`, { cache: 'no-store' });
-      const json2 = await res2.json();
-      if (res2.ok) setData(json2);
+      // Optimistic UI update (instant)
+      setData((prev) => {
+        if (!prev) return prev;
+        const nextCreator = {
+          ...prev.creator,
+          displayName: edit.displayName,
+          tagline: edit.tagline || undefined,
+          avatarUrl: edit.avatarUrl || undefined,
+          tiktokUsername: edit.tiktokUsername || undefined,
+          youtubeChannelId: edit.youtubeChannelId || undefined,
+          twitchLogin: edit.twitchLogin || undefined,
+        };
+        const cleanTikTok = String(edit.tiktokUsername || '').trim().replace(/^@/, '');
+        const cleanTwitch = String(edit.twitchLogin || '').trim().replace(/^@/, '');
+        return {
+          ...prev,
+          creator: nextCreator,
+          links: {
+            ...prev.links,
+            tiktok: cleanTikTok ? `https://www.tiktok.com/@${cleanTikTok}` : prev.links.tiktok,
+            tiktokLive: cleanTikTok ? `https://www.tiktok.com/@${cleanTikTok}/live` : prev.links.tiktokLive,
+            twitch: cleanTwitch ? `https://www.twitch.tv/${cleanTwitch}` : prev.links.twitch,
+            twitchLive: cleanTwitch ? `https://www.twitch.tv/${cleanTwitch}` : prev.links.twitchLive,
+          },
+        };
+      });
+
+      // Refresh snapshot in background (can be slow; don't block the modal)
+      void fetch(`/api/creator/${encodeURIComponent(slug)}`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j) setData(j);
+        })
+        .catch(() => {});
 
       setShowEdit(false);
     } catch (e: any) {
@@ -175,6 +225,16 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                       }`}
                   >
                     TikTok {tiktokLive ? 'Live' : 'Offline'}
+                  </div>
+                )}
+                {twitchConfigured && twitchLive !== null && (
+                  <div
+                    className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${twitchLive
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                        : 'bg-white/5 border-white/10 text-gray-300'
+                      }`}
+                  >
+                    Twitch {twitchLive ? 'Live' : 'Offline'}
                   </div>
                 )}
                 {canManage && (
@@ -250,8 +310,39 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
 
                 {twitchConfigured && (
                   <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-                    <div className="text-xs font-black uppercase tracking-widest text-gray-400">Twitch</div>
-                    <div className="text-sm text-gray-400">Configured (live support coming next)</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-black uppercase tracking-widest text-gray-400">Twitch</div>
+                      {twitchLive !== null && (
+                        <div className={`px-2 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest ${twitchLive ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-300'}`}>
+                          {twitchLive ? 'Live' : 'Offline'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {twitchProfileUrl && (
+                        <a href={twitchProfileUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10">
+                          Channel
+                        </a>
+                      )}
+                      {twitchLiveUrl && (
+                        <a href={twitchLiveUrl} target="_blank" rel="noreferrer" className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${twitchLive ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20' : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`}>
+                          Watch Live
+                        </a>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 break-all">{twitchHandle ? `@${twitchHandle}` : ''}</div>
+
+                    {twitchEmbedUrl && (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                        <iframe
+                          title="Twitch Stream Preview"
+                          src={twitchEmbedUrl}
+                          className="w-full h-36"
+                          allow="autoplay; fullscreen"
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
