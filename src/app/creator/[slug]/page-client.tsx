@@ -40,6 +40,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
+  const [twitchPreviewFailed, setTwitchPreviewFailed] = useState(false);
   const [edit, setEdit] = useState({
     displayName: '',
     tagline: '',
@@ -87,6 +88,8 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     const t = Math.floor(Date.now() / 60000);
     return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${encodeURIComponent(twitchHandle)}-640x360.jpg?t=${t}`;
   }, [twitchHandle]);
+
+  const showTwitchPreviewImage = !!(twitchPreviewUrl && twitchLive === true && !twitchPreviewFailed);
 
   const ytConfigured = !!data?.creator?.youtubeChannelId;
   const twitchConfigured = !!data?.creator?.twitchLogin;
@@ -338,11 +341,26 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                         <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Stream preview</div>
                         <a href={twitchLiveUrl} target="_blank" rel="noreferrer" className="mt-3 block group">
                           <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={twitchPreviewUrl} alt="Twitch Stream Preview" className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform" />
+                            {showTwitchPreviewImage ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={twitchPreviewUrl}
+                                alt="Twitch Stream Preview"
+                                className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform"
+                                onError={() => setTwitchPreviewFailed(true)}
+                              />
+                            ) : (
+                              <div className="w-full h-36 bg-gradient-to-br from-[#1a1c27] via-[#10121a] to-[#0b0c11] flex items-center justify-center">
+                                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-60">
+                                  <path d="M4 3h16v12.5l-4 4H9l-2.5 2.5H5v-2.5H4V3Z" stroke="white" strokeWidth="1.5" />
+                                  <path d="M9 8v5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                                  <path d="M15 8v5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                              </div>
+                            )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                             <div className="absolute bottom-2 left-2 right-2">
-                              <div className="text-xs font-black text-white line-clamp-2">{twitchLive ? 'Live on Twitch' : 'Twitch stream'}</div>
+                              <div className="text-xs font-black text-white line-clamp-2">{twitchLive ? 'Live on Twitch' : 'Twitch (Offline)'}</div>
                               <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-blue-300">Open stream</div>
                             </div>
                           </div>
