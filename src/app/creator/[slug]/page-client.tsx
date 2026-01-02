@@ -343,8 +343,8 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                       )}
                     </div>
                     {twitchEmbedUrl && (
-                      <div>
-                        <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">Stream preview</div>
+                      <div className="rounded-xl bg-black/20 border border-white/10 p-3">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Stream preview</div>
                         <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
                           <iframe
                             title="Twitch Stream Preview"
