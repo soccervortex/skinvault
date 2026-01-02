@@ -11,17 +11,7 @@ export type CreatorProfile = {
 };
 
 export const CREATORS: CreatorProfile[] = [
-  {
-    slug: 'stins',
-    slugAliases: ['stinss'],
-    displayName: 'Stins',
-    tagline: 'Featured Creator',
-    avatarUrl: 'https://i.imgur.com/9B9QZQv.png',
-    tiktokUsername: 'stinssssss',
-    youtubeChannelId: '',
-    twitchLogin: '',
-    partnerSteamId: '',
-  },
+  
 ];
 
 export function getCreatorBySlug(slug: string): CreatorProfile | null {
