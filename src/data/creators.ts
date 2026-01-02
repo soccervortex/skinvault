@@ -1,5 +1,6 @@
 export type CreatorProfile = {
   slug: string;
+  slugAliases?: string[];
   displayName: string;
   tagline?: string;
   avatarUrl?: string;
@@ -12,6 +13,7 @@ export type CreatorProfile = {
 export const CREATORS: CreatorProfile[] = [
   {
     slug: 'stins',
+    slugAliases: ['stinss'],
     displayName: 'Stins',
     tagline: 'Featured Creator',
     avatarUrl: 'https://i.imgur.com/9B9QZQv.png',
@@ -24,5 +26,11 @@ export const CREATORS: CreatorProfile[] = [
 
 export function getCreatorBySlug(slug: string): CreatorProfile | null {
   const s = String(slug || '').toLowerCase();
-  return CREATORS.find((c) => c.slug.toLowerCase() === s) || null;
+  return (
+    CREATORS.find((c) => {
+      if (String(c.slug || '').toLowerCase() === s) return true;
+      const aliases = Array.isArray(c.slugAliases) ? c.slugAliases : [];
+      return aliases.some((a) => String(a || '').toLowerCase() === s);
+    }) || null
+  );
 }

@@ -135,6 +135,7 @@ function InventoryContent() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedInUserPro, setLoggedInUserPro] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
+  const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
@@ -164,6 +165,31 @@ function InventoryContent() {
         if (!cancelled) setIsPartner(!!match);
       } catch {
         if (!cancelled) setIsPartner(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser?.steamId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (!viewedUser?.steamId) {
+          if (!cancelled) setIsPrime(false);
+          return;
+        }
+        const res = await fetch(`/api/steam/prime?steamId=${encodeURIComponent(viewedUser.steamId)}`);
+        if (!res.ok) {
+          if (!cancelled) setIsPrime(false);
+          return;
+        }
+        const json = await res.json();
+        if (!cancelled) setIsPrime(!!json?.isPrime);
+      } catch {
+        if (!cancelled) setIsPrime(false);
       }
     };
     run();
@@ -1148,6 +1174,11 @@ function InventoryContent() {
                     {isPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
+                      </span>
+                    )}
+                    {isPrime && (
+                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-blue-500/10 border border-blue-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-blue-300 shrink-0">
+                        Prime
                       </span>
                     )}
                     {isPartner && (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { CREATORS, type CreatorProfile } from '@/data/creators';
+import { getCreatorBySlug, type CreatorProfile } from '@/data/creators';
 
 type FeedItem = {
   id: string;
@@ -343,7 +343,7 @@ export async function GET(
   context: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await context.params;
-  const creator = CREATORS.find((c) => c.slug === slug);
+  const creator = getCreatorBySlug(slug);
   if (!creator) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const snapshotKey = `creator_snapshot_${creator.slug}`;
