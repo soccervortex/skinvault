@@ -68,13 +68,13 @@ function getMarketKey(item: InventoryItem): string | null {
   return k ? String(k) : null;
 }
 
-function getPriceForItem(item: InventoryItem, prices: Record<string, string>): string | undefined {
+function getPriceForItem(item: InventoryItem, prices: Record<string, any>): string | undefined {
   const k = getMarketKey(item);
   return k ? prices[k] : undefined;
 }
 
 function isNonTradable(item: InventoryItem): boolean {
-  return item.tradable === 0 || item.tradable === false;
+  return Number(item.tradable) === 0;
 }
 
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
@@ -1507,7 +1507,7 @@ function InventoryContent() {
                                 {getPriceForItem(item, itemPrices) 
                                   ? getPriceForItem(item, itemPrices) 
                                   : priceScanDone 
-                                    ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500 text-[8px] md:text-[9px]">NOT MARKETABLE</span> : <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>)
+                                    ? ((Number(item.marketable) === 0) ? <span className="text-gray-500 text-[8px] md:text-[9px]">NOT MARKETABLE</span> : <span className="text-gray-500 text-[8px] md:text-[9px]">NO PRICE</span>)
                                     : <span className="text-gray-600 animate-pulse text-[8px] md:text-[9px]">
                                         {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
                                       </span>}
