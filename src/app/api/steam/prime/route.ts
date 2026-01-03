@@ -16,6 +16,13 @@ function normalizeItemName(name: string): string {
     .replace(/\s+/g, ' ');
 }
 
+function normalizeText(input: unknown): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
 function primeEvidenceReasonFromItemName(name: string): string | null {
   const s = normalizeItemName(name);
   if (!s) return null;
@@ -35,7 +42,35 @@ function primeEvidenceReasonFromItemName(name: string): string | null {
   // CS:GO 10-year coin (commemorative). Treated as Prime evidence.
   if (s.includes('10-year birthday coin') || s.includes('10 year birthday coin')) return '10_year_coin';
 
+  // Major/tournament/operation coins and similar XP progression items.
+  // Example: "Budapest 2025 Silver Coin"
+  if (/\b\d{4}\b/.test(s) && s.includes(' coin')) return 'xp_coin';
+  if (s.includes('silver coin') || s.includes('gold coin') || s.includes('bronze coin') || s.includes('diamond coin')) return 'xp_coin';
+
   return null;
+}
+
+function primeEvidenceReasonFromDescriptionText(text: string): string | null {
+  const s = normalizeText(text);
+  if (!s) return null;
+
+  // Any explicit XP grant/progression strongly indicates the account has CS progression,
+  // which correlates with Prime in practice.
+  if (s.includes('xp') || s.includes('experience points') || s.includes('profile rank')) return 'xp_item';
+  if (s.includes('rank up') || s.includes('rank-up')) return 'xp_item';
+  if (s.includes('watching') && s.includes('coin')) return 'xp_coin';
+  return null;
+}
+
+function getAllDescriptionText(d: any): string {
+  const parts: string[] = [];
+  const name = d?.market_hash_name || d?.market_name || d?.name;
+  if (name) parts.push(String(name));
+  const descriptions = Array.isArray(d?.descriptions) ? d.descriptions : [];
+  for (const it of descriptions) {
+    if (it?.value) parts.push(String(it.value));
+  }
+  return parts.join(' | ');
 }
 
 async function fetchCommunityDescriptions(steamId: string): Promise<any[] | null> {
@@ -117,7 +152,7 @@ export async function GET(request: Request) {
 
     for (const d of descriptions) {
       const name = String(d?.market_hash_name || d?.market_name || d?.name || '');
-      const r = primeEvidenceReasonFromItemName(name);
+      const r = primeEvidenceReasonFromItemName(name) || primeEvidenceReasonFromDescriptionText(getAllDescriptionText(d));
       if (r) {
         isPrime = true;
         reason = r;

@@ -42,6 +42,15 @@ function parsePriceNumber(value: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function makeMinMax(min: string, max: string): { minNum?: number; maxNum?: number } {
+  const minNum = min && min !== '' ? parseFloat(min) : undefined;
+  const maxNum = max && max !== '' ? parseFloat(max) : undefined;
+  return {
+    minNum: Number.isFinite(minNum as any) ? minNum : undefined,
+    maxNum: Number.isFinite(maxNum as any) ? maxNum : undefined,
+  };
+}
+
 export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseMeModalProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -52,31 +61,35 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   const [customMax, setCustomMax] = useState('');
   const [filteredCount, setFilteredCount] = useState(0);
 
+  const matchesFilters = (item: any, minNum?: number, maxNum?: number) => {
+    const name = (item.name || '').toLowerCase();
+    const weapon = (item.weapon?.name || '').toLowerCase();
+    const q = query.trim().toLowerCase();
+
+    if (q && !name.includes(q) && !weapon.includes(q)) return false;
+    if (wear && item.wear?.name !== wear) return false;
+
+    const priceNum = parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
+
+    // If a price filter is active, require an actual numeric price.
+    const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
+    if (hasPriceFilter && priceNum === null) return false;
+
+    if (priceNum !== null) {
+      if (minNum !== undefined && priceNum < minNum) return false;
+      if (maxNum !== undefined && priceNum > maxNum) return false;
+    }
+
+    return true;
+  };
+
   // Count matching items whenever filters change
   useEffect(() => {
     const min = customMin || priceMin;
     const max = customMax || priceMax;
-    const minNum = min && min !== '' ? parseFloat(min) : undefined;
-    const maxNum = max && max !== '' ? parseFloat(max) : undefined;
+    const { minNum, maxNum } = makeMinMax(min, max);
 
-    const matches = allItems.filter((item) => {
-      const name = (item.name || '').toLowerCase();
-      const weapon = (item.weapon?.name || '').toLowerCase();
-      const q = query.trim().toLowerCase();
-
-      if (q && !name.includes(q) && !weapon.includes(q)) return false;
-
-      if (wear && item.wear?.name !== wear) return false;
-
-      const priceNum = parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
-      // If the dataset doesn't provide a price, don't accidentally filter everything out.
-      if (priceNum !== null) {
-        if (minNum !== undefined && priceNum < minNum) return false;
-        if (maxNum !== undefined && priceNum > maxNum) return false;
-      }
-
-      return true;
-    });
+    const matches = allItems.filter((item) => matchesFilters(item, minNum, maxNum));
 
     setFilteredCount(matches.length);
   }, [query, wear, priceMin, priceMax, customMin, customMax, allItems]);
@@ -84,26 +97,9 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   const handleSurprise = () => {
     const min = customMin || priceMin;
     const max = customMax || priceMax;
-    const minNum = min && min !== '' ? parseFloat(min) : undefined;
-    const maxNum = max && max !== '' ? parseFloat(max) : undefined;
+    const { minNum, maxNum } = makeMinMax(min, max);
 
-    const matches = allItems.filter((item) => {
-      const name = (item.name || '').toLowerCase();
-      const weapon = (item.weapon?.name || '').toLowerCase();
-      const q = query.trim().toLowerCase();
-
-      if (q && !name.includes(q) && !weapon.includes(q)) return false;
-
-      if (wear && item.wear?.name !== wear) return false;
-
-      const priceNum = parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
-      if (priceNum !== null) {
-        if (minNum !== undefined && priceNum < minNum) return false;
-        if (maxNum !== undefined && priceNum > maxNum) return false;
-      }
-
-      return true;
-    });
+    const matches = allItems.filter((item) => matchesFilters(item, minNum, maxNum));
 
     if (matches.length === 0) {
       alert('No items match your filters. Try adjusting them.');
