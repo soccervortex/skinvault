@@ -23,7 +23,20 @@ type PriceDoc = {
   source: string;
 };
 
-async function getAllMarketHashNames(): Promise<string[]> {
+async function getAllMarketHashNames(db: any): Promise<string[]> {
+  // Cache names in Mongo to avoid refetching all datasets every invocation.
+  const cacheCol = db.collection('market_price_names');
+  const cacheKey = 'all_market_hash_names_v1';
+  try {
+    const cached = await cacheCol.findOne({ _id: cacheKey } as any);
+    const updatedAt = cached?.updatedAt ? new Date(String(cached.updatedAt)) : null;
+    const names = Array.isArray(cached?.names) ? cached.names : null;
+    const fresh = updatedAt && Date.now() - updatedAt.getTime() < 1000 * 60 * 60 * 24;
+    if (names && fresh) return Array.from(new Set(names.map((n: any) => String(n || '').trim()).filter(Boolean)));
+  } catch {
+    // ignore
+  }
+
   const names: string[] = [];
 
   const results = await Promise.all(
@@ -49,7 +62,18 @@ async function getAllMarketHashNames(): Promise<string[]> {
 
   for (const arr of results) names.push(...arr);
 
-  return Array.from(new Set(names));
+  const unique = Array.from(new Set(names));
+  try {
+    await cacheCol.updateOne(
+      { _id: cacheKey } as any,
+      { $set: { _id: cacheKey, names: unique, updatedAt: new Date().toISOString() } },
+      { upsert: true }
+    );
+  } catch {
+    // ignore
+  }
+
+  return unique;
 }
 
 async function fetchSteamPrice(origin: string, currency: string, marketHashName: string): Promise<number | null> {
@@ -77,13 +101,12 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const origin = url.origin;
     const currency = String(url.searchParams.get('currency') || '3').trim();
-    const limit = Math.min(Math.max(parseInt(String(url.searchParams.get('limit') || '200'), 10) || 200, 1), 1000);
+    const limit = Math.min(Math.max(parseInt(String(url.searchParams.get('limit') || '80'), 10) || 80, 1), 500);
     const startParamRaw = url.searchParams.get('start');
     const startParam = startParamRaw !== null ? (parseInt(String(startParamRaw), 10) || 0) : null;
-
-    const allNames = await getAllMarketHashNames();
-
     const db = await getDatabase();
+
+    const allNames = await getAllMarketHashNames(db);
     const cursorKey = `market_prices_cursor_${currency}`;
     const cursorCol = db.collection('market_price_cursors');
     const cursorDoc = await cursorCol.findOne({ _id: cursorKey } as any);
@@ -99,40 +122,53 @@ export async function GET(req: NextRequest) {
     let ok = 0;
     let failed = 0;
 
-    const concurrency = 6;
+    const startedAt = Date.now();
+    const timeBudgetMs = 7000;
+
+    const concurrency = 4;
+    let processed = 0;
     for (let i = 0; i < slice.length; i += concurrency) {
+      if (Date.now() - startedAt > timeBudgetMs) break;
+
       const batch = slice.slice(i, i + concurrency);
       const results = await Promise.all(
         batch.map(async (name) => {
           const price = await fetchSteamPrice(origin, currency, name);
-          if (price === null) return { name, price: null };
           return { name, price };
         })
       );
 
+      const ops: any[] = [];
       for (const r of results) {
+        processed++;
         if (r.price === null) {
           failed++;
           continue;
         }
-        await col.updateOne(
-          { currency, market_hash_name: r.name },
-          {
-            $set: {
-              currency,
-              market_hash_name: r.name,
-              price: r.price,
-              updatedAt: now,
-              source: 'steam_priceoverview',
+        ops.push({
+          updateOne: {
+            filter: { currency, market_hash_name: r.name },
+            update: {
+              $set: {
+                currency,
+                market_hash_name: r.name,
+                price: r.price,
+                updatedAt: now,
+                source: 'steam_priceoverview',
+              },
             },
+            upsert: true,
           },
-          { upsert: true }
-        );
+        });
         ok++;
+      }
+
+      if (ops.length) {
+        await col.bulkWrite(ops, { ordered: false });
       }
     }
 
-    const nextStart = start + slice.length;
+    const nextStart = start + processed;
 
     // Persist cursor for next run
     await cursorCol.updateOne(
@@ -146,7 +182,7 @@ export async function GET(req: NextRequest) {
       currency,
       total: allNames.length,
       start,
-      processed: slice.length,
+      processed,
       ok,
       failed,
       nextStart: nextStart >= allNames.length ? 0 : nextStart,

@@ -60,6 +60,27 @@ function makeMinMax(min: string, max: string): { minNum?: number; maxNum?: numbe
   };
 }
 
+function getMarketHashNameForPrice(item: any): string {
+  const raw =
+    (item?.market_hash_name ??
+      item?.marketHashName ??
+      item?.market_name ??
+      item?.marketName ??
+      item?.market_hash ??
+      item?.name ??
+      '') as any;
+
+  let key = String(raw || '').trim();
+  const wearName = String(item?.wear?.name || '').trim();
+
+  // Some datasets store `name` without wear, while Steam prices include wear in parentheses.
+  if (key && wearName && !key.includes(`(${wearName})`)) {
+    key = `${key} (${wearName})`;
+  }
+
+  return key;
+}
+
 export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseMeModalProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -150,7 +171,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     if (q && !name.includes(q) && !weapon.includes(q)) return false;
     if (wear && item.wear?.name !== wear) return false;
 
-    const key = String((item as any)?.market_hash_name || (item as any)?.name || '').trim();
+    const key = getMarketHashNameForPrice(item);
     const indexed = key && priceIndex && Number.isFinite((priceIndex as any)[key]) ? Number((priceIndex as any)[key]) : null;
     const priceNum = indexed !== null
       ? indexed
@@ -181,7 +202,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
     if (hasPriceFilter) {
       const priced = allItems.reduce((acc, item) => {
-        const key = String((item as any)?.market_hash_name || (item as any)?.name || '').trim();
+        const key = getMarketHashNameForPrice(item);
         const indexed = key && priceIndex && Number.isFinite((priceIndex as any)[key]) ? Number((priceIndex as any)[key]) : null;
         const priceNum = indexed !== null
           ? indexed
