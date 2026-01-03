@@ -28,6 +28,20 @@ function makeSessionCookieValue(steamId: string, secret: string): string {
   return `${payload}.${sig}`;
 }
 
+function getCookieDomain(req: NextRequest): string | undefined {
+  const envDomain = String(process.env.COOKIE_DOMAIN || '').trim();
+  if (envDomain) return envDomain;
+
+  const host = String(req.headers.get('host') || '').trim().toLowerCase();
+  if (!host) return undefined;
+  if (host.includes('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0')) return undefined;
+
+  // Allow Steam session to work across www/non-www in production.
+  if (host === 'skinvaults.online' || host.endsWith('.skinvaults.online')) return '.skinvaults.online';
+
+  return undefined;
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const params = url.searchParams;
@@ -87,6 +101,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true,
         secure: getProtocol(req) === 'https',
         sameSite: 'lax',
+        domain: getCookieDomain(req),
         maxAge: COOKIE_TTL_SECONDS,
         path: '/',
       });

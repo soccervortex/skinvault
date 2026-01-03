@@ -37,10 +37,29 @@ function readSteamSession(req: NextRequest): string {
   }
 }
 
+function getPublicOrigin(url: URL): string {
+  const raw =
+    process.env.PUBLIC_ORIGIN ||
+    process.env.SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    '';
+  const cleaned = String(raw).trim().replace(/\/$/, '');
+  if (cleaned) return cleaned;
+  return `${url.protocol}//${url.host}`;
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const slug = String(url.searchParams.get('slug') || '').trim();
   if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+
+  const publicOrigin = getPublicOrigin(url);
+  const requestOrigin = `${url.protocol}//${url.host}`;
+  if (publicOrigin && publicOrigin !== requestOrigin) {
+    const forward = new URL('/api/auth/tiktok', publicOrigin);
+    forward.search = url.search;
+    return NextResponse.redirect(forward);
+  }
 
   const steamId = readSteamSession(req);
   if (!steamId) return NextResponse.json({ error: 'Not signed in with Steam' }, { status: 401 });
@@ -62,8 +81,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const origin = `${url.protocol}//${url.host}`;
-  const redirectUri = `${origin}/api/auth/tiktok/callback`;
+  const redirectUri = `${publicOrigin}/api/auth/tiktok/callback`;
 
   const secret = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || '';
   if (!secret) return NextResponse.json({ error: 'SESSION_SECRET not configured' }, { status: 500 });

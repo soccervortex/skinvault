@@ -29,6 +29,17 @@ function verifyState(state: string, secret: string): { slug: string; steamId: st
   }
 }
 
+function getPublicOrigin(url: URL): string {
+  const raw =
+    process.env.PUBLIC_ORIGIN ||
+    process.env.SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    '';
+  const cleaned = String(raw).trim().replace(/\/$/, '');
+  if (cleaned) return cleaned;
+  return `${url.protocol}//${url.host}`;
+}
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
 
@@ -53,8 +64,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'TikTok not configured' }, { status: 500 });
   }
 
-  const origin = `${url.protocol}//${url.host}`;
-  const redirectUri = `${origin}/api/auth/tiktok/callback`;
+  const redirectUri = `${getPublicOrigin(url)}/api/auth/tiktok/callback`;
 
   if (!code) {
     return NextResponse.json({ error: 'Missing code' }, { status: 400 });

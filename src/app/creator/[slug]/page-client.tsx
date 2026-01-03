@@ -27,6 +27,7 @@ type CreatorProfile = {
 type CreatorSnapshot = {
   creator: CreatorProfile;
   live: { twitch: boolean | null; tiktok: boolean | null; youtube: boolean | null };
+  connections?: { twitchConnected: boolean; tiktokConnected: boolean };
   links: { tiktok?: string; tiktokLive?: string; twitch?: string; twitchLive?: string; youtube?: string; youtubeLive?: string };
   items: FeedItem[];
   updatedAt: string;
@@ -94,7 +95,11 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     data?.links?.tiktok || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}` : undefined);
   const tiktokLiveUrl =
     data?.links?.tiktokLive || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}/live` : undefined);
-  const canConnectTikTok = !!(data?.creator?.partnerSteamId && (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId))));
+  const canConnectTikTok = !!(
+    data?.creator?.partnerSteamId &&
+    (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
+  );
+  const tiktokConnected = !!data?.connections?.tiktokConnected;
   const latestTikTokItem = data?.items?.find((i) => i.platform === 'tiktok');
   const latestTiktokUrl = latestTikTokItem?.url;
 
@@ -102,7 +107,11 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const twitchHandle = data?.creator?.twitchLogin ? String(data.creator.twitchLogin).trim().replace(/^@/, '') : '';
   const twitchProfileUrl = data?.links?.twitch || (twitchHandle ? `https://www.twitch.tv/${twitchHandle}` : undefined);
   const twitchLiveUrl = data?.links?.twitchLive || twitchProfileUrl;
-  const canConnectTwitch = !!(data?.creator?.partnerSteamId && (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId))));
+  const canConnectTwitch = !!(
+    data?.creator?.partnerSteamId &&
+    (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
+  );
+  const twitchConnected = !!data?.connections?.twitchConnected;
   const twitchPreviewUrl = useMemo(() => {
     if (!twitchHandle) return null;
     // Cache-bust once per minute so it updates when live.
@@ -297,7 +306,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                     Inventory
                   </a>
                 )}
-                {canConnectTikTok && (
+                {canConnectTikTok && !tiktokConnected && (
                   <a
                     href={`/api/auth/tiktok?slug=${encodeURIComponent(slug)}`}
                     className="px-3 py-2 rounded-xl bg-pink-600/20 border border-pink-500/40 text-pink-200 text-[10px] font-black uppercase tracking-widest hover:bg-pink-600/30"
@@ -305,7 +314,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                     Connect TikTok
                   </a>
                 )}
-                {canConnectTwitch && (
+                {canConnectTwitch && !twitchConnected && (
                   <a
                     href={`/api/auth/twitch?slug=${encodeURIComponent(slug)}`}
                     className="px-3 py-2 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-200 text-[10px] font-black uppercase tracking-widest hover:bg-purple-600/30"

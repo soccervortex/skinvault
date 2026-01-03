@@ -67,6 +67,20 @@ function extractMetaContent(html: string, property: string): string {
   return v;
 }
 
+async function fetchTikTokLatestVideoWithOAuthOrFallback(
+  conn: TikTokConnection,
+  usernameFallback: string
+): Promise<{ url: string; title: string; thumbnailUrl?: string } | null> {
+  const token = String(conn?.accessToken || '').trim();
+  const username = String(conn?.username || '').trim().replace(/^@/, '');
+  const fallback = String(usernameFallback || '').trim().replace(/^@/, '');
+  if (!token || (!username && !fallback)) return null;
+
+  const latest = await fetchTikTokLatestVideoWithOAuth({ ...conn, username: username || fallback });
+  if (latest?.url) return latest;
+  return null;
+}
+
 async function fetchTikTokLatestVideoWithOAuth(conn: TikTokConnection): Promise<{ url: string; title: string; thumbnailUrl?: string } | null> {
   const token = String(conn?.accessToken || '').trim();
   const username = String(conn?.username || '').trim().replace(/^@/, '');
@@ -270,6 +284,10 @@ type CreatorSnapshot = {
     tiktok: boolean | null;
     youtube: boolean | null;
   };
+  connections: {
+    twitchConnected: boolean;
+    tiktokConnected: boolean;
+  };
   links: {
     tiktok?: string;
     tiktokLive?: string;
@@ -463,6 +481,7 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
   sources.tiktokStatusApi = process.env.TIKTOK_STATUS_API_BASE_URL || 'http://faashuis.ddns.net:8421';
 
   const live: CreatorSnapshot['live'] = { twitch: null, tiktok: null, youtube: null };
+  const connections: CreatorSnapshot['connections'] = { twitchConnected: false, tiktokConnected: false };
   const links: CreatorSnapshot['links'] = {};
   const items: FeedItem[] = [];
 
@@ -475,6 +494,7 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
       const conn = await dbGet<any>(`${TWITCH_CONNECTION_PREFIX}${creator.slug}`, true);
       const token = String(conn?.accessToken || '').trim();
       if (token) {
+        connections.twitchConnected = true;
         sources.twitch = 'helix_oauth';
         liveFromOAuth = await fetchTwitchIsLiveWithOAuth(clean, token);
       }
@@ -497,15 +517,24 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
     // Prefer official TikTok API when the creator connected via Login Kit.
     try {
       const conn = await dbGet<TikTokConnection>(`${TIKTOK_CONNECTION_PREFIX}${creator.slug}`, true);
-      const latest = await fetchTikTokLatestVideoWithOAuth(conn || {});
+      const token = String(conn?.accessToken || '').trim();
+      if (token) connections.tiktokConnected = true;
+      const latest = await fetchTikTokLatestVideoWithOAuthOrFallback(conn || {}, clean);
       if (latest?.url) {
         sources.tiktok = 'official_oauth';
+        let title = latest.title || 'Latest TikTok';
+        let thumbnailUrl = latest.thumbnailUrl;
+        if (!thumbnailUrl || !title) {
+          const preview = await fetchTikTokPreviewFast(latest.url);
+          if (!title) title = (preview?.title && String(preview.title).trim()) || 'Latest TikTok';
+          if (!thumbnailUrl) thumbnailUrl = preview?.thumbnail_url;
+        }
         items.push({
           id: safeId(`tiktok_latest_${latest.url}`),
           platform: 'tiktok',
-          title: latest.title || 'Latest TikTok',
+          title,
           url: latest.url,
-          thumbnailUrl: latest.thumbnailUrl,
+          thumbnailUrl,
         });
       }
     } catch {
@@ -616,6 +645,7 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
   return {
     creator,
     live,
+    connections,
     links,
     items,
     updatedAt: now,
@@ -626,6 +656,7 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
 
 function buildMinimalSnapshot(creator: CreatorProfile): CreatorSnapshot {
   const live: CreatorSnapshot['live'] = { twitch: null, tiktok: null, youtube: null };
+  const connections: CreatorSnapshot['connections'] = { twitchConnected: false, tiktokConnected: false };
   const links: CreatorSnapshot['links'] = {};
   if (creator.tiktokUsername) {
     const clean = String(creator.tiktokUsername).trim().replace(/^@/, '');
@@ -642,6 +673,7 @@ function buildMinimalSnapshot(creator: CreatorProfile): CreatorSnapshot {
   return {
     creator,
     live: { twitch: null, tiktok: creator.tiktokUsername ? false : null, youtube: null },
+    connections,
     links,
     items: [],
     updatedAt: now,
@@ -812,7 +844,7 @@ export async function GET(
   }
 
   // If we have an older cached snapshot missing new fields, refresh now.
-  if (cached && (!cached.links || !Array.isArray(cached.items))) {
+  if (cached && (!cached.links || !Array.isArray(cached.items) || !(cached as any).connections)) {
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
