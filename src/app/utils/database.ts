@@ -17,7 +17,9 @@ import { MongoClient, Db, Collection } from 'mongodb';
 import { getMongoClient, getDatabase as getSharedDatabase } from './mongodb-client';
 
 // Database status
-let dbStatus: 'kv' | 'mongodb' | 'fallback' = 'kv';
+// If KV isn't configured, default to MongoDB to avoid unnecessary KV calls.
+let dbStatus: 'kv' | 'mongodb' | 'fallback' =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN ? 'kv' : 'mongodb';
 let previousKVAvailable: boolean | null = null; // Track KV availability to detect recovery
 
 // Cache to reduce KV reads (simple in-memory cache)
@@ -29,10 +31,19 @@ const MAX_CACHE_SIZE = 1000; // Max cached items
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
+function hasMongoConfig(): boolean {
+  if (MONGODB_URI && String(MONGODB_URI).trim()) return true;
+  for (let i = 1; i <= 5; i++) {
+    const v = (process.env as any)[`MONGODB_CLUSTER_${i}`];
+    if (v && String(v).trim()) return true;
+  }
+  return false;
+}
+
 // Initialize MongoDB connection using shared connection pool
 async function initMongoDB(): Promise<Db | null> {
-  if (!MONGODB_URI) {
-    console.warn('[Database] ⚠️ MONGODB_URI not configured');
+  if (!hasMongoConfig()) {
+    console.warn('[Database] ⚠️ MongoDB not configured');
     return null;
   }
 

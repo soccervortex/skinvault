@@ -9,18 +9,33 @@ import { MongoClient, Db } from 'mongodb';
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
 
+function getMongoUriCandidates(): string[] {
+  const candidates: string[] = [];
+
+  for (let i = 1; i <= 5; i++) {
+    const v = (process.env as any)[`MONGODB_CLUSTER_${i}`];
+    if (v && String(v).trim()) candidates.push(String(v).trim());
+  }
+
+  if (MONGODB_URI && String(MONGODB_URI).trim()) candidates.push(String(MONGODB_URI).trim());
+
+  // De-duplicate while preserving order
+  return Array.from(new Set(candidates));
+}
+
 // Global connection pool
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
+let cachedUri: string | null = null;
+let lastGoodUriIndex: number = 0;
 
 /**
  * Get or create MongoDB client (connection pooling)
  * Reuses existing connection instead of creating new ones
  */
 export async function getMongoClient(): Promise<MongoClient> {
-  if (!MONGODB_URI) {
-    throw new Error('MongoDB URI not configured');
-  }
+  const candidates = getMongoUriCandidates();
+  if (candidates.length === 0) throw new Error('MongoDB URI not configured');
 
   // Return cached client if available and connected
   if (cachedClient) {
@@ -32,28 +47,53 @@ export async function getMongoClient(): Promise<MongoClient> {
       // Connection is dead, create new one
       cachedClient = null;
       cachedDb = null;
+      cachedUri = null;
     }
   }
 
   // Create new client with connection pooling settings
   // Reduced pool size for M0 cluster (500 connection limit)
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000,
-    connectTimeoutMS: 5000,
-    maxPoolSize: 5, // Reduced from 10 to prevent hitting M0 limit (500 connections)
-    minPoolSize: 1, // Reduced from 2 to minimize connections
-    maxIdleTimeMS: 30000, // Close connections after 30s of inactivity
-    socketTimeoutMS: 45000, // Close idle sockets after 45s
-  });
+  const startIndex = Math.min(Math.max(lastGoodUriIndex, 0), Math.max(candidates.length - 1, 0));
+  const ordered = [...candidates.slice(startIndex), ...candidates.slice(0, startIndex)];
 
-  await client.connect();
-  cachedClient = client;
+  let lastError: any = null;
+  for (let i = 0; i < ordered.length; i++) {
+    const uri = ordered[i];
+    const client = new MongoClient(uri, {
+      // Vercel/Serverless can be slow to establish TLS + DNS; allow a bit more time.
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
+      maxPoolSize: 5,
+      minPoolSize: 1,
+      maxIdleTimeMS: 30000,
+      socketTimeoutMS: 45000,
+    });
+
+    try {
+      await client.connect();
+      cachedClient = client;
+      cachedUri = uri;
+      lastGoodUriIndex = candidates.indexOf(uri);
+      break;
+    } catch (e: any) {
+      lastError = e;
+      try {
+        await client.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (!cachedClient) {
+    throw lastError || new Error('MongoDB connection failed');
+  }
 
   // Auto-setup indexes on first connection
   const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
   autoSetupIndexes().catch(() => {});
 
-  return client;
+  return cachedClient;
 }
 
 /**
