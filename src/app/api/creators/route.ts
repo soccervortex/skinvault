@@ -24,7 +24,11 @@ function sanitizeHandle(input: unknown): string {
 function sanitizeSteamId64(input: unknown): string {
   const s = String(input || '').trim();
   if (!s) return '';
-  const m = s.match(/^(\d{17})$/);
+
+  // Accept common inputs (raw SteamID64, with spaces, or a Steam profile URL)
+  // while still ensuring we store only a valid 17-digit SteamID64.
+  const digitsOnly = s.replace(/\D+/g, '');
+  const m = digitsOnly.match(/(\d{17})/);
   return m ? m[1] : '';
 }
 
