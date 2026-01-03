@@ -7,7 +7,8 @@ type PrimeCache = {
   reason?: string;
 };
 
-const CACHE_MS = 1000 * 60 * 60 * 6; // 6 hours
+const PRIME_TRUE_CACHE_MS = 1000 * 60 * 60 * 6; // 6 hours
+const PRIME_FALSE_CACHE_MS = 1000 * 60 * 10; // 10 minutes
 
 function normalizeItemName(name: string): string {
   return String(name || '')
@@ -120,7 +121,8 @@ export async function GET(request: Request) {
     const cached = await dbGet<PrimeCache>(cacheKey, true);
     if (!refresh && cached?.checkedAt) {
       const age = Date.now() - new Date(cached.checkedAt).getTime();
-      if (Number.isFinite(age) && age >= 0 && age < CACHE_MS) {
+      const ttl = cached.isPrime ? PRIME_TRUE_CACHE_MS : PRIME_FALSE_CACHE_MS;
+      if (Number.isFinite(age) && age >= 0 && age < ttl) {
         return NextResponse.json(cached);
       }
     }

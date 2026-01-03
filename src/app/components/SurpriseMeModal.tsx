@@ -60,6 +60,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   const [customMin, setCustomMin] = useState('');
   const [customMax, setCustomMax] = useState('');
   const [filteredCount, setFilteredCount] = useState(0);
+  const [pricedCount, setPricedCount] = useState(0);
 
   const matchesFilters = (item: any, minNum?: number, maxNum?: number) => {
     const name = (item.name || '').toLowerCase();
@@ -92,6 +93,17 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     const matches = allItems.filter((item) => matchesFilters(item, minNum, maxNum));
 
     setFilteredCount(matches.length);
+
+    const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
+    if (hasPriceFilter) {
+      const priced = allItems.reduce((acc, item) => {
+        const priceNum = parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
+        return acc + (priceNum === null ? 0 : 1);
+      }, 0);
+      setPricedCount(priced);
+    } else {
+      setPricedCount(0);
+    }
   }, [query, wear, priceMin, priceMax, customMin, customMax, allItems]);
 
   const handleSurprise = () => {
@@ -206,6 +218,19 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
             <p className="text-xs text-gray-400">
               {filteredCount} item{filteredCount !== 1 ? 's' : ''} match your filters
             </p>
+            {(() => {
+              const min = customMin || priceMin;
+              const max = customMax || priceMax;
+              const { minNum, maxNum } = makeMinMax(min, max);
+              const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
+              if (!hasPriceFilter) return null;
+              if (pricedCount > 0) return null;
+              return (
+                <p className="mt-2 text-[10px] text-gray-500">
+                  Prices are still loading for this dataset. Try again in a moment.
+                </p>
+              );
+            })()}
           </div>
 
           {/* Action */}

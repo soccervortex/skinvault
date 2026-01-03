@@ -830,6 +830,14 @@ export async function GET(
 
   const url = new URL(request.url);
   const realtime = url.searchParams.get('realtime') === '1';
+  const refresh = url.searchParams.get('refresh') === '1';
+
+  // Force refresh: bypass cache and return freshly fetched snapshot immediately.
+  if (refresh) {
+    const fresh = await refreshSnapshot(creator, cached);
+    void dbSet(snapshotKey, fresh).catch(() => {});
+    return NextResponse.json(fresh);
+  }
 
   // Optional realtime mode: do a quick TikTok status check (2.5s max) and merge it into the response.
   // This lets the UI poll for accurate live status without waiting for background refreshes.

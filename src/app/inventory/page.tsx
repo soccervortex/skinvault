@@ -181,13 +181,27 @@ function InventoryContent() {
           if (!cancelled) setIsPrime(false);
           return;
         }
-        const res = await fetch(`/api/steam/prime?steamId=${encodeURIComponent(viewedUser.steamId)}`);
+        const steamId = String(viewedUser.steamId);
+        const res = await fetch(`/api/steam/prime?steamId=${encodeURIComponent(steamId)}`);
         if (!res.ok) {
           if (!cancelled) setIsPrime(false);
           return;
         }
         const json = await res.json();
-        if (!cancelled) setIsPrime(!!json?.isPrime);
+        const prime = !!json?.isPrime;
+        if (!cancelled) setIsPrime(prime);
+
+        // If we got a cached/false result, retry once with refresh=1 to pick up
+        // XP coins / medals that indicate Prime.
+        if (!prime) {
+          const res2 = await fetch(`/api/steam/prime?steamId=${encodeURIComponent(steamId)}&refresh=1`, {
+            cache: 'no-store',
+          });
+          if (res2.ok) {
+            const json2 = await res2.json();
+            if (!cancelled) setIsPrime(!!json2?.isPrime);
+          }
+        }
       } catch {
         if (!cancelled) setIsPrime(false);
       }
