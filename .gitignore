@@ -42,5 +42,6 @@ next-env.d.ts
 
 ENV_SETUP.md
 API_KEYS_SETUP.md
+UpdatePrices.ps1
 service_log.txt
 env.txt

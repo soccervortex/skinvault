@@ -1,4 +1,71 @@
 import { NextResponse } from 'next/server';
+import { getMongoClient } from '@/app/utils/mongodb-client';
+
+// Helper function to calculate total inventory value
+async function enrichInventoryWithTotalValue(data: any): Promise<any> {
+  try {
+    // Default currency to EUR (3) if not specified
+    const currency = 3; // EUR
+    
+    // Get price index from MongoDB
+    const mongoClient = await getMongoClient();
+    const db = mongoClient.db('skinvault');
+    const priceCollection = db.collection('market_prices');
+    
+    const priceIndex = await priceCollection.findOne({ currency });
+    const prices = priceIndex?.prices || {};
+    
+    let totalValue = 0;
+    let valuedItemCount = 0;
+    
+    // Process descriptions to calculate total value
+    if (data.descriptions && Array.isArray(data.descriptions)) {
+      for (const item of data.descriptions) {
+        if (item.marketable && item.market_hash_name) {
+          const price = prices[item.market_hash_name];
+          if (price && typeof price === 'string') {
+            const numericPrice = parseFloat(price.replace(',', ''));
+            if (!isNaN(numericPrice) && numericPrice > 0) {
+              totalValue += numericPrice;
+              valuedItemCount++;
+            }
+          }
+        }
+      }
+    }
+    
+    // Process rgInventory format if present
+    if (data.rgInventory && typeof data.rgInventory === 'object') {
+      for (const item of Object.values(data.rgInventory) as any[]) {
+        if (item.market_hash_name) {
+          const price = prices[item.market_hash_name];
+          if (price && typeof price === 'string') {
+            const numericPrice = parseFloat(price.replace(',', ''));
+            if (!isNaN(numericPrice) && numericPrice > 0) {
+              totalValue += numericPrice;
+              valuedItemCount++;
+            }
+          }
+        }
+      }
+    }
+    
+    return {
+      ...data,
+      totalInventoryValue: totalValue.toFixed(2),
+      valuedItemCount,
+      currency: currency === 3 ? 'EUR' : 'USD'
+    };
+  } catch (error) {
+    console.warn('Failed to calculate total inventory value:', error);
+    return {
+      ...data,
+      totalInventoryValue: '0.00',
+      valuedItemCount: 0,
+      currency: 'EUR'
+    };
+  }
+}
 
 // Scraping service proxies (more reliable than free proxies)
 function getScrapingProxies(): Array<(url: string) => string> {
@@ -387,11 +454,12 @@ export async function GET(request: Request) {
     try {
       const steamWebAPIData = await fetchInventoryViaSteamWebAPI(steamId);
       if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
-        console.log('âœ… Inventory fetched via Official Steam Web API');
-        return NextResponse.json(steamWebAPIData);
+        console.log('✅ Inventory fetched via Official Steam Web API');
+        const enrichedData = await enrichInventoryWithTotalValue(steamWebAPIData);
+        return NextResponse.json(enrichedData);
       }
     } catch (error) {
-      console.warn('âš ï¸ Official Steam Web API failed, trying next method:', error);
+      console.warn('⚠️ Official Steam Web API failed, trying next method:', error);
     }
 
     // METHOD 2: Try third-party APIs (SteamWebAPI, CSInventoryAPI, SteamApis)
@@ -401,8 +469,9 @@ export async function GET(request: Request) {
       try {
         const data = await fetchInventoryViaAPI(steamId, apiType);
         if (data && (data.assets || data.descriptions)) {
-          console.log(`âœ… Inventory fetched via third-party API: ${apiType}`);
-          return NextResponse.json(data);
+          console.log(`✅ Inventory fetched via third-party API: ${apiType}`);
+          const enrichedData = await enrichInventoryWithTotalValue(data);
+          return NextResponse.json(enrichedData);
         }
       } catch (error) {
         console.warn(`âš ï¸ Third-party API ${apiType} failed, trying next...`);
@@ -473,11 +542,12 @@ export async function GET(request: Request) {
         }
 
         if (Array.isArray(direct.assets) || Array.isArray(direct.descriptions)) {
-          return NextResponse.json({
+          const enrichedData = await enrichInventoryWithTotalValue({
             ...direct,
             assets: Array.isArray(direct.assets) ? direct.assets : [],
             descriptions: Array.isArray(direct.descriptions) ? direct.descriptions : [],
           });
+          return NextResponse.json(enrichedData);
         }
       }
     } catch {
@@ -519,8 +589,9 @@ export async function GET(request: Request) {
           
           // Check for valid inventory structure
           if (data.descriptions || data.assets || data.rgDescriptions || data.rgInventory) {
-            // Success - return the data
-            return NextResponse.json(data);
+            // Success - calculate total value and return the data
+            const enrichedData = await enrichInventoryWithTotalValue(data);
+            return NextResponse.json(enrichedData);
           }
           
           // Check if it's an empty inventory (valid response)
