@@ -154,11 +154,16 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const handleCopyObsOverlay = async () => {
     if (!canUseObsOverlay) return;
     setObsBusy(true);
+    setError(null);
     try {
       const res = await fetch(`/api/obs/token?slug=${encodeURIComponent(slug)}`, { cache: 'no-store' });
       const json = await res.json().catch(() => null);
       const link = json?.url ? String(json.url) : '';
-      if (!res.ok || !link) throw new Error(json?.error || 'Failed');
+      if (!res.ok || !link) {
+        const msg = json?.error ? String(json.error) : 'Failed to generate overlay link';
+        setError(msg);
+        throw new Error(msg);
+      }
 
       if (typeof navigator !== 'undefined' && (navigator as any).clipboard && typeof window !== 'undefined' && (window as any).isSecureContext) {
         await (navigator as any).clipboard.writeText(link);
@@ -176,7 +181,8 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
 
       setObsCopied(true);
       setTimeout(() => setObsCopied(false), 1500);
-    } catch {
+    } catch (e: any) {
+      setError(e?.message || 'Failed to generate overlay link');
       setObsCopied(false);
     } finally {
       setObsBusy(false);
@@ -353,32 +359,34 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                 <div className="mt-2 text-sm text-gray-400">
                   {data?.creator?.tagline || 'Featured Creator'}
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {tiktokConfigured && (
+                    <div
+                      className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${tiktokLive
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                          : 'bg-white/5 border-white/10 text-gray-300'
+                        }`}
+                    >
+                      TikTok {tiktokLive ? 'Live' : 'Offline'}
+                    </div>
+                  )}
+                  {twitchConfigured && twitchLive !== null && (
+                    <div
+                      className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${twitchLive
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                          : 'bg-white/5 border-white/10 text-gray-300'
+                        }`}
+                    >
+                      Twitch {twitchLive ? 'Live' : 'Offline'}
+                    </div>
+                  )}
+                </div>
                 {data?.lastCheckedAt && (
                   <div className="mt-3 text-xs text-gray-500">Last checked: {new Date(data.lastCheckedAt).toLocaleString()}</div>
                 )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 lg:ml-auto justify-start lg:justify-end">
-                {tiktokConfigured && (
-                  <div
-                    className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${tiktokLive
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'bg-white/5 border-white/10 text-gray-300'
-                      }`}
-                  >
-                    TikTok {tiktokLive ? 'Live' : 'Offline'}
-                  </div>
-                )}
-                {twitchConfigured && twitchLive !== null && (
-                  <div
-                    className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${twitchLive
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'bg-white/5 border-white/10 text-gray-300'
-                      }`}
-                  >
-                    Twitch {twitchLive ? 'Live' : 'Offline'}
-                  </div>
-                )}
                 {data?.creator?.partnerSteamId && (
                   <a
                     href={`/inventory?steamId=${encodeURIComponent(String(data.creator.partnerSteamId))}`}

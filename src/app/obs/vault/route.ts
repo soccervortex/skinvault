@@ -2,6 +2,34 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const token = String(url.searchParams.get('token') || '').trim();
 
+  const baseW = 520;
+  const baseH = 150;
+
+  const wParamRaw = String(url.searchParams.get('w') || '').trim();
+  const hParamRaw = String(url.searchParams.get('h') || '').trim();
+  const sParamRaw = String(url.searchParams.get('scale') || '').trim();
+
+  const wParam = wParamRaw ? Number.parseInt(wParamRaw, 10) : NaN;
+  const hParam = hParamRaw ? Number.parseInt(hParamRaw, 10) : NaN;
+  const sParam = sParamRaw ? Number.parseFloat(sParamRaw) : NaN;
+
+  const clampScale = (v: number) => {
+    if (!Number.isFinite(v)) return 1;
+    if (v < 0.25) return 0.25;
+    if (v > 3) return 3;
+    return v;
+  };
+
+  let scale = Number.isFinite(sParam) ? clampScale(sParam) : NaN;
+  if (!Number.isFinite(scale) && (Number.isFinite(wParam) || Number.isFinite(hParam))) {
+    const derived = Number.isFinite(wParam) ? wParam / baseW : (hParam / baseH);
+    scale = clampScale(derived);
+  }
+  if (!Number.isFinite(scale)) scale = 1;
+
+  const viewportW = Number.isFinite(wParam) ? wParam : Math.round(baseW * scale);
+  const viewportH = Number.isFinite(hParam) ? hParam : Math.round(baseH * scale);
+
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -10,7 +38,8 @@ export async function GET(request: Request) {
   <title>SkinVaults Overlay</title>
   <style>
     html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; overflow: hidden; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    .wrap { width: 520px; height: 150px; }
+    .viewport { width: ${viewportW}px; height: ${viewportH}px; }
+    .wrap { width: ${baseW}px; height: ${baseH}px; transform: scale(${scale}); transform-origin: top left; }
     .card { width: 100%; height: 100%; border-radius: 18px; background: rgba(8,9,13,0.88); border: 1px solid rgba(59,130,246,0.55); box-shadow: 0 20px 60px rgba(0,0,0,0.55); position: relative; padding: 14px 16px; box-sizing: border-box; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .brand { display: flex; align-items: center; gap: 10px; }
@@ -29,8 +58,9 @@ export async function GET(request: Request) {
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
+  <div class="viewport">
+    <div class="wrap">
+      <div class="card">
       <div class="row">
         <div class="brand">
           <div class="logo">SV</div>
@@ -56,6 +86,7 @@ export async function GET(request: Request) {
       <div class="live">
         <div class="dot"></div>
         <div>LIVE <span id="time">--:--</span></div>
+      </div>
       </div>
     </div>
   </div>
