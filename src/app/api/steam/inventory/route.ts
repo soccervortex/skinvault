@@ -13,7 +13,13 @@ async function enrichInventoryWithTotalValue(data: any): Promise<any> {
     const priceCollection = db.collection('market_prices');
     
     const priceIndex = await priceCollection.findOne({ currency });
-    const prices = priceIndex?.prices || {};
+    let prices = priceIndex?.prices || {};
+    
+    // If price index is empty or missing, fetch prices on-the-fly for items in inventory
+    if (!prices || Object.keys(prices).length === 0) {
+      console.warn('Price index empty, fetching prices dynamically for inventory items');
+      prices = await fetchPricesForInventory(data);
+    }
     
     let totalValue = 0;
     let valuedItemCount = 0;
@@ -65,6 +71,55 @@ async function enrichInventoryWithTotalValue(data: any): Promise<any> {
       currency: 'EUR'
     };
   }
+}
+
+// Helper function to fetch prices for specific items in inventory
+async function fetchPricesForInventory(data: any): Promise<Record<string, string>> {
+  const prices: Record<string, string> = {};
+  const marketHashNames = new Set<string>();
+  
+  // Collect all unique market_hash_names from inventory
+  if (data.descriptions && Array.isArray(data.descriptions)) {
+    for (const item of data.descriptions) {
+      if (item.marketable && item.market_hash_name) {
+        marketHashNames.add(item.market_hash_name);
+      }
+    }
+  }
+  
+  if (data.rgInventory && typeof data.rgInventory === 'object') {
+    for (const item of Object.values(data.rgInventory) as any[]) {
+      if (item.market_hash_name) {
+        marketHashNames.add(item.market_hash_name);
+      }
+    }
+  }
+  
+  // Fetch prices for each unique item (limit to first 20 to avoid timeout)
+  const itemsToFetch = Array.from(marketHashNames).slice(0, 20);
+  console.log(`Fetching prices for ${itemsToFetch.length} items`);
+  
+  for (const marketHashName of itemsToFetch) {
+    try {
+      // Use your existing Steam price API
+      const priceUrl = `https://www.skinvaults.online/api/steam/price?market_hash_name=${encodeURIComponent(marketHashName)}&currency=3`;
+      const res = await fetch(priceUrl, { 
+        signal: AbortSignal.timeout(3000),
+        cache: 'no-store'
+      });
+      
+      if (res.ok) {
+        const priceData = await res.json();
+        if (priceData?.success && priceData?.lowest_price) {
+          prices[marketHashName] = priceData.lowest_price;
+        }
+      }
+    } catch (error) {
+      // Silently continue if price fetch fails for one item
+    }
+  }
+  
+  return prices;
 }
 
 // Scraping service proxies (more reliable than free proxies)
