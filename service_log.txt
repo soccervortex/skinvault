@@ -389,3 +389,17 @@ USD: start=10068 processed=20 ok=20 failed=0 nextStart=10088 finished=False
 USD: start=10088 processed=12 ok=12 failed=0 nextStart=10100 finished=False
 USD: start=10100 processed=16 ok=16 failed=0 nextStart=10116 finished=False
 USD: start=10116 processed=12 ok=12 failed=0 nextStart=10128 finished=False
+USD: start=10128 processed=64 ok=64 failed=0 nextStart=10192 finished=False
+USD: start=10192 processed=12 ok=12 failed=0 nextStart=10204 finished=False
+USD: start=10204 processed=12 ok=11 failed=1 nextStart=10216 finished=False
+USD: start=10216 processed=12 ok=12 failed=0 nextStart=10228 finished=False
+USD: start=10228 processed=12 ok=12 failed=0 nextStart=10240 finished=False
+USD: start=10240 processed=12 ok=12 failed=0 nextStart=10252 finished=False
+USD: start=10252 processed=72 ok=69 failed=3 nextStart=10324 finished=False
+USD: start=10324 processed=72 ok=67 failed=5 nextStart=10396 finished=False
+USD: start=10396 processed=44 ok=44 failed=0 nextStart=10440 finished=False
+Cycle complete. Sleeping for 5 minutes...
+Starting update cycle at 01/03/2026 10:25:47
+Processing EUR...
+EUR: start=14060 processed=56 ok=55 failed=1 nextStart=14116 finished=False
+EUR: start=14116 processed=28 ok=28 failed=0 nextStart=14144 finished=False

@@ -5,7 +5,7 @@ export const PRO_LIMITS = {
   WISHLIST_PRO: Infinity, // Pro users have unlimited
   PRICE_TRACKER_FREE: 0, // Price trackers require Pro subscription (Discord integration)
   PRICE_TRACKER_PRO: Infinity, // Pro users have unlimited
-} as const;
+};
 
 // Cache for rewards to avoid multiple API calls
 let rewardsCache: { steamId: string | null; rewards: any[]; timestamp: number } = {
