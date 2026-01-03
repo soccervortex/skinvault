@@ -403,3 +403,20 @@ Starting update cycle at 01/03/2026 10:25:47
 Processing EUR...
 EUR: start=14060 processed=56 ok=55 failed=1 nextStart=14116 finished=False
 EUR: start=14116 processed=28 ok=28 failed=0 nextStart=14144 finished=False
+EUR: start=300 processed=20 ok=19 failed=1 nextStart=320 finished=False
+EUR: start=14144 processed=12 ok=12 failed=0 nextStart=14156 finished=False
+EUR: start=14156 processed=12 ok=12 failed=0 nextStart=14168 finished=False
+EUR: start=14168 processed=12 ok=12 failed=0 nextStart=14180 finished=False
+EUR: start=14180 processed=24 ok=24 failed=0 nextStart=14204 finished=False
+EUR: start=14204 processed=36 ok=34 failed=2 nextStart=14240 finished=False
+EUR: start=320 processed=28 ok=28 failed=0 nextStart=348 finished=False
+EUR: start=14240 processed=60 ok=59 failed=1 nextStart=14300 finished=False
+EUR: start=14300 processed=48 ok=44 failed=4 nextStart=14348 finished=False
+EUR: start=14348 processed=12 ok=11 failed=1 nextStart=14360 finished=False
+EUR: start=14360 processed=12 ok=11 failed=1 nextStart=14372 finished=False
+EUR: start=14372 processed=12 ok=12 failed=0 nextStart=14384 finished=False
+EUR: start=14384 processed=12 ok=12 failed=0 nextStart=14396 finished=False
+EUR: start=14396 processed=72 ok=71 failed=1 nextStart=14468 finished=False
+EUR: start=14468 processed=16 ok=16 failed=0 nextStart=14484 finished=False
+EUR: start=14484 processed=8 ok=6 failed=2 nextStart=14492 finished=False
+EUR: start=14492 processed=8 ok=5 failed=3 nextStart=14500 finished=False
