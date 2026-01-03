@@ -306,21 +306,39 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                     Inventory
                   </a>
                 )}
-                {canConnectTikTok && !tiktokConnected && (
-                  <a
-                    href={`/api/auth/tiktok?slug=${encodeURIComponent(slug)}`}
-                    className="px-3 py-2 rounded-xl bg-pink-600/20 border border-pink-500/40 text-pink-200 text-[10px] font-black uppercase tracking-widest hover:bg-pink-600/30"
-                  >
-                    Connect TikTok
-                  </a>
+                {canConnectTikTok && (
+                  tiktokConnected ? (
+                    <a
+                      href={`/api/auth/tiktok/disconnect?slug=${encodeURIComponent(slug)}`}
+                      className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10"
+                    >
+                      Disconnect TikTok
+                    </a>
+                  ) : (
+                    <a
+                      href={`/api/auth/tiktok?slug=${encodeURIComponent(slug)}`}
+                      className="px-3 py-2 rounded-xl bg-pink-600/20 border border-pink-500/40 text-pink-200 text-[10px] font-black uppercase tracking-widest hover:bg-pink-600/30"
+                    >
+                      Connect TikTok
+                    </a>
+                  )
                 )}
-                {canConnectTwitch && !twitchConnected && (
-                  <a
-                    href={`/api/auth/twitch?slug=${encodeURIComponent(slug)}`}
-                    className="px-3 py-2 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-200 text-[10px] font-black uppercase tracking-widest hover:bg-purple-600/30"
-                  >
-                    Connect Twitch
-                  </a>
+                {canConnectTwitch && (
+                  twitchConnected ? (
+                    <a
+                      href={`/api/auth/twitch/disconnect?slug=${encodeURIComponent(slug)}`}
+                      className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10"
+                    >
+                      Disconnect Twitch
+                    </a>
+                  ) : (
+                    <a
+                      href={`/api/auth/twitch?slug=${encodeURIComponent(slug)}`}
+                      className="px-3 py-2 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-200 text-[10px] font-black uppercase tracking-widest hover:bg-purple-600/30"
+                    >
+                      Connect Twitch
+                    </a>
+                  )
                 )}
                 {canManage && (
                   <button

@@ -97,12 +97,16 @@ export async function fetchWithProxyRotation(
   isPro: boolean,
   options: { parallel?: boolean; marketHashName?: string; currency?: string } = {}
 ): Promise<any> {
-  // Pro users: Try direct Steam API first (fastest, live prices)
-  if (isPro) {
-    const directResult = await fetchDirectSteamAPI(steamUrl, options.marketHashName, options.currency);
-    if (directResult) return directResult;
-    // Fallback to proxies if direct API fails
+  // IMPORTANT: Never call public CORS proxies from the browser.
+  // Always route Steam Market requests through our own server API to avoid CORS failures.
+  const isBrowser = typeof window !== 'undefined';
+  if (isBrowser) {
+    return await fetchDirectSteamAPI(steamUrl, options.marketHashName, options.currency);
   }
+
+  // Server-side: try direct Steam API first (fastest), then fall back.
+  const directResult = await fetchDirectSteamAPI(steamUrl, options.marketHashName, options.currency);
+  if (directResult) return directResult;
   
   const proxyList = getProxyList(isPro);
   const { parallel = false } = options;

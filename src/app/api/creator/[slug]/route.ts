@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbGet, dbSet } from '@/app/utils/database';
+import { dbDelete, dbGet, dbSet } from '@/app/utils/database';
 import { getCreatorBySlug, type CreatorProfile } from '@/data/creators';
 
 type FeedItem = {
@@ -67,18 +67,79 @@ function extractMetaContent(html: string, property: string): string {
   return v;
 }
 
+async function fetchTwitchIsLiveWithOAuthDetailed(
+  login: string,
+  accessToken: string
+): Promise<{ isLive: boolean | null; unauthorized: boolean }> {
+  const l = String(login || '').trim().replace(/^@/, '');
+  const token = String(accessToken || '').trim();
+  const clientId = process.env.TWITCH_CLIENT_ID || '';
+  if (!l || !token || !clientId) return { isLive: null, unauthorized: false };
+
+  try {
+    const res = await fetch(`https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(l)}`, {
+      headers: {
+        'Client-ID': clientId,
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    });
+    if (res.status === 401 || res.status === 403) return { isLive: null, unauthorized: true };
+    if (!res.ok) return { isLive: null, unauthorized: false };
+    const json = await res.json().catch(() => ({} as any));
+    const data = Array.isArray(json?.data) ? json.data : [];
+    return { isLive: data.length > 0, unauthorized: false };
+  } catch {
+    return { isLive: null, unauthorized: false };
+  }
+}
+
 async function fetchTikTokLatestVideoWithOAuthOrFallback(
   conn: TikTokConnection,
   usernameFallback: string
-): Promise<{ url: string; title: string; thumbnailUrl?: string } | null> {
+): Promise<{ url: string; title: string; thumbnailUrl?: string; unauthorized?: boolean } | null> {
   const token = String(conn?.accessToken || '').trim();
   const username = String(conn?.username || '').trim().replace(/^@/, '');
   const fallback = String(usernameFallback || '').trim().replace(/^@/, '');
   if (!token || (!username && !fallback)) return null;
 
-  const latest = await fetchTikTokLatestVideoWithOAuth({ ...conn, username: username || fallback });
-  if (latest?.url) return latest;
-  return null;
+  const url = 'https://open.tiktokapis.com/v2/video/list/?fields=cover_image_url,id,title';
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 2500);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+      },
+      body: JSON.stringify({ max_count: 1 }),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      return { url: '', title: '', unauthorized: true };
+    }
+
+    const json = (await res.json().catch(() => ({} as any))) as TikTokVideoListResponse;
+    const videos = Array.isArray(json?.data?.videos) ? json.data.videos : [];
+    const v = videos[0] || null;
+    const videoId = v?.id ? String(v.id) : '';
+    if (!res.ok || !videoId) return null;
+
+    const useName = username || fallback;
+    const videoUrl = `https://www.tiktok.com/@${encodeURIComponent(useName)}/video/${encodeURIComponent(videoId)}`;
+    const title = v?.title ? String(v.title) : 'Latest TikTok';
+    const thumbnailUrl = v?.cover_image_url ? String(v.cover_image_url) : undefined;
+    return { url: videoUrl, title, thumbnailUrl };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 async function fetchTikTokLatestVideoWithOAuth(conn: TikTokConnection): Promise<{ url: string; title: string; thumbnailUrl?: string } | null> {
@@ -496,7 +557,14 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
       if (token) {
         connections.twitchConnected = true;
         sources.twitch = 'helix_oauth';
-        liveFromOAuth = await fetchTwitchIsLiveWithOAuth(clean, token);
+        const detailed = await fetchTwitchIsLiveWithOAuthDetailed(clean, token);
+        if (detailed.unauthorized) {
+          connections.twitchConnected = false;
+          sources.twitch = 'public_fallback';
+          await dbDelete(`${TWITCH_CONNECTION_PREFIX}${creator.slug}`);
+        } else {
+          liveFromOAuth = detailed.isLive;
+        }
       }
     } catch {
       // ignore
@@ -520,7 +588,10 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
       const token = String(conn?.accessToken || '').trim();
       if (token) connections.tiktokConnected = true;
       const latest = await fetchTikTokLatestVideoWithOAuthOrFallback(conn || {}, clean);
-      if (latest?.url) {
+      if (latest && latest.unauthorized) {
+        connections.tiktokConnected = false;
+        await dbDelete(`${TIKTOK_CONNECTION_PREFIX}${creator.slug}`);
+      } else if (latest?.url) {
         sources.tiktok = 'official_oauth';
         let title = latest.title || 'Latest TikTok';
         let thumbnailUrl = latest.thumbnailUrl;
