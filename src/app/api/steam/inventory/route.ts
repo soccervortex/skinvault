@@ -1,6 +1,35 @@
 import { NextResponse } from 'next/server';
 import { getMongoClient } from '@/app/utils/mongodb-client';
 
+// Helper function to parse price strings correctly (handles EUR/USD formats)
+function parsePriceString(priceStr: string): number {
+  if (!priceStr || typeof priceStr !== 'string') return 0;
+  
+  // Remove currency symbols and whitespace
+  let clean = priceStr.replace(/[€$£¥₹]/g, '').trim();
+  
+  // Handle European format: "70.991,00" -> 70991.00 (wrong) should be 70.991
+  // Handle US format: "70.99" -> 70.99
+  if (clean.includes(',') && clean.includes('.')) {
+    // European format: remove dots, replace comma with dot
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  } else if (clean.includes(',')) {
+    // Could be European "70,99" or US "70,991"
+    // If comma is the last separator, it's likely European decimal
+    const parts = clean.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      // Likely "70,99" format
+      clean = clean.replace(',', '.');
+    } else {
+      // Likely "70,991" format (US thousand separator)
+      clean = clean.replace(/,/g, '');
+    }
+  }
+  
+  const parsed = parseFloat(clean);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 // Helper function to calculate total inventory value
 async function enrichInventoryWithTotalValue(data: any): Promise<any> {
   try {
@@ -30,8 +59,8 @@ async function enrichInventoryWithTotalValue(data: any): Promise<any> {
         if (item.marketable && item.market_hash_name) {
           const price = prices[item.market_hash_name];
           if (price && typeof price === 'string') {
-            const numericPrice = parseFloat(price.replace(',', ''));
-            if (!isNaN(numericPrice) && numericPrice > 0) {
+            const numericPrice = parsePriceString(price);
+            if (numericPrice > 0) {
               totalValue += numericPrice;
               valuedItemCount++;
             }
@@ -46,8 +75,8 @@ async function enrichInventoryWithTotalValue(data: any): Promise<any> {
         if (item.market_hash_name) {
           const price = prices[item.market_hash_name];
           if (price && typeof price === 'string') {
-            const numericPrice = parseFloat(price.replace(',', ''));
-            if (!isNaN(numericPrice) && numericPrice > 0) {
+            const numericPrice = parsePriceString(price);
+            if (numericPrice > 0) {
               totalValue += numericPrice;
               valuedItemCount++;
             }

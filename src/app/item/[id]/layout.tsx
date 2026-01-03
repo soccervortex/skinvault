@@ -62,12 +62,32 @@ async function getPriceData(marketHashName: string) {
     const data = await response.json();
     
     if (data.success) {
-      // Parse prices - Steam returns strings like "€1,234.56"
+      // Parse prices - Steam returns strings like "€1,234.56" or "€ 3,48"
       const parsePrice = (priceStr: string): number | null => {
         if (!priceStr) return null;
-        // Remove currency symbols and spaces, replace comma with dot
-        const cleaned = priceStr.replace(/[€$£¥,\s]/g, '').replace(',', '.');
-        const num = parseFloat(cleaned);
+        
+        // Remove currency symbols and whitespace
+        let clean = priceStr.replace(/[€$£¥]/g, '').trim();
+        
+        // Handle European format: "70.991,00" -> 70991.00 (wrong) should be 70.991
+        // Handle US format: "70.99" -> 70.99
+        if (clean.includes(',') && clean.includes('.')) {
+          // European format: remove dots, replace comma with dot
+          clean = clean.replace(/\./g, '').replace(',', '.');
+        } else if (clean.includes(',')) {
+          // Could be European "70,99" or US "70,991"
+          // If comma is the last separator, it's likely European decimal
+          const parts = clean.split(',');
+          if (parts.length === 2 && parts[1].length <= 2) {
+            // Likely "70,99" format
+            clean = clean.replace(',', '.');
+          } else {
+            // Likely "70,991" format (US thousand separator)
+            clean = clean.replace(/,/g, '');
+          }
+        }
+        
+        const num = parseFloat(clean);
         return isNaN(num) ? null : num;
       };
 

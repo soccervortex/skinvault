@@ -1041,7 +1041,7 @@ function InventoryContent() {
       const key = getMarketKey(item);
       const priceStr = key ? itemPrices[key] : undefined;
       if (priceStr) {
-        const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+        const num = parsePriceToNumber(priceStr);
         if (!isNaN(num) && isFinite(num)) {
           total += num * Number(item.amount ?? 1);
         }
@@ -1061,9 +1061,32 @@ function InventoryContent() {
     [inventory, itemPrices]
   );
 
+  // Parse price strings correctly (handles EUR/USD formats)
   const parsePriceToNumber = (priceStr?: string) => {
     if (!priceStr) return 0;
-    const num = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+    
+    // Remove currency symbols and whitespace
+    let clean = priceStr.replace(/[€$£¥]/g, '').trim();
+    
+    // Handle European format: "70.991,00" -> 70991.00 (wrong) should be 70.991
+    // Handle US format: "70.99" -> 70.99
+    if (clean.includes(',') && clean.includes('.')) {
+      // European format: remove dots, replace comma with dot
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else if (clean.includes(',')) {
+      // Could be European "70,99" or US "70,991"
+      // If comma is the last separator, it's likely European decimal
+      const parts = clean.split(',');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        // Likely "70,99" format
+        clean = clean.replace(',', '.');
+      } else {
+        // Likely "70,991" format (US thousand separator)
+        clean = clean.replace(/,/g, '');
+      }
+    }
+    
+    const num = parseFloat(clean);
     return isNaN(num) ? 0 : num;
   };
 
