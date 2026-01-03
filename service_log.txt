@@ -319,3 +319,5 @@ USD: start=8372 processed=28 ok=28 failed=0 nextStart=8400 finished=False
 USD: start=8400 processed=16 ok=16 failed=0 nextStart=8416 finished=False
 USD: start=8416 processed=8 ok=8 failed=0 nextStart=8424 finished=False
 USD: start=8424 processed=12 ok=12 failed=0 nextStart=8436 finished=False
+USD: start=8436 processed=20 ok=17 failed=3 nextStart=8456 finished=False
+USD: start=8456 processed=20 ok=20 failed=0 nextStart=8476 finished=False
