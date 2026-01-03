@@ -1062,7 +1062,7 @@ function InventoryContent() {
   );
 
   // Parse price strings correctly (handles EUR/USD formats)
-  const parsePriceToNumber = (priceStr?: string) => {
+  function parsePriceToNumber(priceStr?: string) {
     if (!priceStr) return 0;
     
     // Remove currency symbols and whitespace
@@ -1088,7 +1088,7 @@ function InventoryContent() {
     
     const num = parseFloat(clean);
     return isNaN(num) ? 0 : num;
-  };
+  }
 
   const filteredInv = useMemo(() => 
     inventory.filter(i => getItemDisplayName(i).toLowerCase().includes(searchQuery.toLowerCase())), 
