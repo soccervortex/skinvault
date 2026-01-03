@@ -31,11 +31,8 @@ function parsePriceString(priceStr: string): number {
 }
 
 // Helper function to calculate total inventory value
-async function enrichInventoryWithTotalValue(data: any): Promise<any> {
+async function enrichInventoryWithTotalValue(data: any, currency: number): Promise<any> {
   try {
-    // Default currency to EUR (3) if not specified
-    const currency = 3; // EUR
-    
     // Get price index from MongoDB
     const mongoClient = await getMongoClient();
     const db = mongoClient.db('skinvault');
@@ -47,7 +44,7 @@ async function enrichInventoryWithTotalValue(data: any): Promise<any> {
     // If price index is empty or missing, fetch prices on-the-fly for items in inventory
     if (!prices || Object.keys(prices).length === 0) {
       console.warn('Price index empty, fetching prices dynamically for inventory items');
-      prices = await fetchPricesForInventory(data);
+      prices = await fetchPricesForInventory(data, currency);
     }
     
     let totalValue = 0;
@@ -97,13 +94,13 @@ async function enrichInventoryWithTotalValue(data: any): Promise<any> {
       ...data,
       totalInventoryValue: '0.00',
       valuedItemCount: 0,
-      currency: 'EUR'
+      currency: currency === 3 ? 'EUR' : 'USD'
     };
   }
 }
 
 // Helper function to fetch prices for specific items in inventory
-async function fetchPricesForInventory(data: any): Promise<Record<string, string>> {
+async function fetchPricesForInventory(data: any, currency: number): Promise<Record<string, string>> {
   const prices: Record<string, string> = {};
   const marketHashNames = new Set<string>();
   
@@ -131,7 +128,7 @@ async function fetchPricesForInventory(data: any): Promise<Record<string, string
   for (const marketHashName of itemsToFetch) {
     try {
       // Use your existing Steam price API
-      const priceUrl = `https://www.skinvaults.online/api/steam/price?market_hash_name=${encodeURIComponent(marketHashName)}&currency=3`;
+      const priceUrl = `https://www.skinvaults.online/api/steam/price?market_hash_name=${encodeURIComponent(marketHashName)}&currency=${currency}`;
       const res = await fetch(priceUrl, { 
         signal: AbortSignal.timeout(3000),
         cache: 'no-store'
@@ -516,6 +513,8 @@ export async function GET(request: Request) {
     let steamId = url.searchParams.get('steamId');
     const startAssetId = url.searchParams.get('start_assetid');
     const isPro = url.searchParams.get('isPro') === 'true';
+    const currencyParam = String(url.searchParams.get('currency') || '').trim();
+    const currency = currencyParam === '1' ? 1 : 3;
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
@@ -539,7 +538,7 @@ export async function GET(request: Request) {
       const steamWebAPIData = await fetchInventoryViaSteamWebAPI(steamId);
       if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
         console.log('✅ Inventory fetched via Official Steam Web API');
-        const enrichedData = await enrichInventoryWithTotalValue(steamWebAPIData);
+        const enrichedData = await enrichInventoryWithTotalValue(steamWebAPIData, currency);
         return NextResponse.json(enrichedData);
       }
     } catch (error) {
@@ -554,7 +553,7 @@ export async function GET(request: Request) {
         const data = await fetchInventoryViaAPI(steamId, apiType);
         if (data && (data.assets || data.descriptions)) {
           console.log(`✅ Inventory fetched via third-party API: ${apiType}`);
-          const enrichedData = await enrichInventoryWithTotalValue(data);
+          const enrichedData = await enrichInventoryWithTotalValue(data, currency);
           return NextResponse.json(enrichedData);
         }
       } catch (error) {
@@ -630,7 +629,7 @@ export async function GET(request: Request) {
             ...direct,
             assets: Array.isArray(direct.assets) ? direct.assets : [],
             descriptions: Array.isArray(direct.descriptions) ? direct.descriptions : [],
-          });
+          }, currency);
           return NextResponse.json(enrichedData);
         }
       }
@@ -674,7 +673,7 @@ export async function GET(request: Request) {
           // Check for valid inventory structure
           if (data.descriptions || data.assets || data.rgDescriptions || data.rgInventory) {
             // Success - calculate total value and return the data
-            const enrichedData = await enrichInventoryWithTotalValue(data);
+            const enrichedData = await enrichInventoryWithTotalValue(data, currency);
             return NextResponse.json(enrichedData);
           }
           

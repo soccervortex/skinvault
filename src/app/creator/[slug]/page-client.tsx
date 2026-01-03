@@ -39,6 +39,8 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [data, setData] = useState<CreatorSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [obsBusy, setObsBusy] = useState(false);
+  const [obsCopied, setObsCopied] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
   const [sessionSteamId, setSessionSteamId] = useState<string | null>(null);
@@ -113,6 +115,10 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
   );
   const twitchConnected = !!data?.connections?.twitchConnected;
+  const canUseObsOverlay = !!(
+    data?.creator?.partnerSteamId &&
+    (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
+  );
   const twitchPreviewUrl = useMemo(() => {
     if (!twitchHandle) return null;
     // Cache-bust once per minute so it updates when live.
@@ -143,6 +149,38 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
       partnerSteamId: data.creator.partnerSteamId || '',
     });
     setShowEdit(true);
+  };
+
+  const handleCopyObsOverlay = async () => {
+    if (!canUseObsOverlay) return;
+    setObsBusy(true);
+    try {
+      const res = await fetch(`/api/obs/token?slug=${encodeURIComponent(slug)}`, { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      const link = json?.url ? String(json.url) : '';
+      if (!res.ok || !link) throw new Error(json?.error || 'Failed');
+
+      if (typeof navigator !== 'undefined' && (navigator as any).clipboard && typeof window !== 'undefined' && (window as any).isSecureContext) {
+        await (navigator as any).clipboard.writeText(link);
+      } else if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = link;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
+      setObsCopied(true);
+      setTimeout(() => setObsCopied(false), 1500);
+    } catch {
+      setObsCopied(false);
+    } finally {
+      setObsBusy(false);
+    }
   };
 
   const saveEdit = async () => {
@@ -348,6 +386,15 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                   >
                     Inventory
                   </a>
+                )}
+                {canUseObsOverlay && (
+                  <button
+                    onClick={handleCopyObsOverlay}
+                    disabled={obsBusy}
+                    className="px-3 py-2 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-100 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600/30 disabled:opacity-50"
+                  >
+                    {obsBusy ? 'Generating...' : (obsCopied ? 'Copied!' : 'OBS Overlay')}
+                  </button>
                 )}
                 {canConnectTikTok && (
                   tiktokConnected ? (
