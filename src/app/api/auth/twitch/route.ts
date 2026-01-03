@@ -53,6 +53,16 @@ export async function GET(req: NextRequest) {
   const slug = String(url.searchParams.get('slug') || '').trim();
   if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
 
+  // Ensure the OAuth flow starts on the canonical host so the state cookie is
+  // available on the callback domain (avoids www vs non-www cookie mismatch).
+  const publicOrigin = getPublicOrigin(url);
+  const requestOrigin = `${url.protocol}//${url.host}`;
+  if (publicOrigin && publicOrigin !== requestOrigin) {
+    const forward = new URL('/api/auth/twitch', publicOrigin);
+    forward.search = url.search;
+    return NextResponse.redirect(forward);
+  }
+
   const steamId = readSteamSession(req);
   if (!steamId) return NextResponse.json({ error: 'Not signed in with Steam' }, { status: 401 });
 
@@ -71,7 +81,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const redirectUri = `${getPublicOrigin(url)}/api/auth/twitch/callback`;
+  const redirectUri = `${publicOrigin}/api/auth/twitch/callback`;
 
   const secret = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || '';
   if (!secret) return NextResponse.json({ error: 'SESSION_SECRET not configured' }, { status: 500 });
