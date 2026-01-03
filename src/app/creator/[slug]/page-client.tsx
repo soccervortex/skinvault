@@ -43,6 +43,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
   const [sessionSteamId, setSessionSteamId] = useState<string | null>(null);
   const [twitchPreviewFailed, setTwitchPreviewFailed] = useState(false);
+  const [pauseRealtimeUntil, setPauseRealtimeUntil] = useState(0);
   const [edit, setEdit] = useState({
     displayName: '',
     tagline: '',
@@ -226,7 +227,49 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   }, [slug]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let cancelled = false;
+    const params = new URLSearchParams(window.location.search);
+    const tiktok = String(params.get('tiktok') || '').trim();
+    const twitch = String(params.get('twitch') || '').trim();
+    const hasAction =
+      tiktok === 'connected' ||
+      tiktok === 'disconnected' ||
+      twitch === 'connected' ||
+      twitch === 'disconnected';
+
+    if (!hasAction) return;
+
+    const run = async () => {
+      try {
+        setBusy(true);
+        setPauseRealtimeUntil(Date.now() + 20000);
+        const res = await fetch(`/api/creator/${encodeURIComponent(slug)}?refresh=1`, { cache: 'no-store' });
+        const json = await res.json();
+        if (!cancelled && res.ok) setData(json);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setBusy(false);
+        try {
+          params.delete('tiktok');
+          params.delete('twitch');
+          const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+          window.history.replaceState({}, '', next);
+        } catch {
+          // ignore
+        }
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  useEffect(() => {
     if (!tiktokConfigured) return;
+    if (Date.now() < pauseRealtimeUntil) return;
     let stopped = false;
     const tick = async () => {
       try {
@@ -242,13 +285,13 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
 
     const id = setInterval(() => {
       void tick();
-    }, 30000);
+    }, 10000);
     void tick();
     return () => {
       stopped = true;
       clearInterval(id);
     };
-  }, [slug, tiktokConfigured]);
+  }, [slug, tiktokConfigured, pauseRealtimeUntil]);
 
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">

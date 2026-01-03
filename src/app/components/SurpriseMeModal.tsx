@@ -20,13 +20,22 @@ const WEAR_OPTIONS = [
 ];
 
 const PRICE_PRESETS = [
-  { label: 'Any', min: undefined, max: undefined },
-  { label: 'Under €5', min: undefined, max: 5 },
-  { label: '€5 – €20', min: 5, max: 20 },
-  { label: '€20 – €100', min: 20, max: 100 },
-  { label: '€100 – €500', min: 100, max: 500 },
-  { label: 'Over €500', min: 500, max: undefined },
-];
+  { key: 'any', min: undefined, max: undefined },
+  { key: 'under_5', min: undefined, max: 5 },
+  { key: '5_20', min: 5, max: 20 },
+  { key: '20_100', min: 20, max: 100 },
+  { key: '100_500', min: 100, max: 500 },
+  { key: 'over_500', min: 500, max: undefined },
+] as const;
+
+function presetLabel(preset: (typeof PRICE_PRESETS)[number], symbol: string): string {
+  if (preset.key === 'any') return 'Any';
+  if (preset.key === 'under_5') return `Under ${symbol}5`;
+  if (preset.key === '5_20') return `${symbol}5 – ${symbol}20`;
+  if (preset.key === '20_100') return `${symbol}20 – ${symbol}100`;
+  if (preset.key === '100_500') return `${symbol}100 – ${symbol}500`;
+  return `Over ${symbol}500`;
+}
 
 function parsePriceNumber(value: any): number | null {
   if (value === null || value === undefined) return null;
@@ -61,6 +70,77 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   const [customMax, setCustomMax] = useState('');
   const [filteredCount, setFilteredCount] = useState(0);
   const [pricedCount, setPricedCount] = useState(0);
+  const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
+  const [priceIndex, setPriceIndex] = useState<Record<string, number> | null>(null);
+  const [priceIndexLoaded, setPriceIndexLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const storedCurrency = window.localStorage.getItem('sv_currency');
+      if (storedCurrency === '1') setCurrency({ code: '1', symbol: '$' });
+      else setCurrency({ code: '3', symbol: '€' });
+    } catch {
+      setCurrency({ code: '3', symbol: '€' });
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!isOpen) return;
+      setPriceIndexLoaded(false);
+      try {
+        if (typeof window !== 'undefined') {
+          const cacheKey = `sv_price_index_${currency.code}`;
+          const cachedRaw = window.localStorage.getItem(cacheKey);
+          if (cachedRaw) {
+            try {
+              const cached = JSON.parse(cachedRaw);
+              const ts = Number(cached?.timestamp || 0);
+              const fresh = ts && Date.now() - ts < 1000 * 60 * 60 * 12;
+              if (fresh && cached?.prices && typeof cached.prices === 'object') {
+                if (!cancelled) {
+                  setPriceIndex(cached.prices);
+                  setPriceIndexLoaded(true);
+                }
+                return;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        const res = await fetch(`/api/market/price-index?currency=${encodeURIComponent(currency.code)}`, {
+          cache: 'no-store',
+        });
+        const json = await res.json();
+        const prices = (json?.prices && typeof json.prices === 'object') ? json.prices : null;
+        if (!cancelled) {
+          setPriceIndex(prices);
+          setPriceIndexLoaded(true);
+        }
+        try {
+          if (typeof window !== 'undefined' && prices) {
+            const cacheKey = `sv_price_index_${currency.code}`;
+            window.localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), prices }));
+          }
+        } catch {
+          // ignore
+        }
+      } catch {
+        if (!cancelled) {
+          setPriceIndex(null);
+          setPriceIndexLoaded(true);
+        }
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, currency.code]);
 
   const matchesFilters = (item: any, minNum?: number, maxNum?: number) => {
     const name = (item.name || '').toLowerCase();
@@ -70,7 +150,11 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     if (q && !name.includes(q) && !weapon.includes(q)) return false;
     if (wear && item.wear?.name !== wear) return false;
 
-    const priceNum = parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
+    const key = String((item as any)?.market_hash_name || (item as any)?.name || '').trim();
+    const indexed = key && priceIndex && Number.isFinite((priceIndex as any)[key]) ? Number((priceIndex as any)[key]) : null;
+    const priceNum = indexed !== null
+      ? indexed
+      : parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
 
     // If a price filter is active, require an actual numeric price.
     const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
@@ -97,14 +181,18 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
     if (hasPriceFilter) {
       const priced = allItems.reduce((acc, item) => {
-        const priceNum = parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
+        const key = String((item as any)?.market_hash_name || (item as any)?.name || '').trim();
+        const indexed = key && priceIndex && Number.isFinite((priceIndex as any)[key]) ? Number((priceIndex as any)[key]) : null;
+        const priceNum = indexed !== null
+          ? indexed
+          : parsePriceNumber((item as any)?.price ?? (item as any)?.lowest_price ?? (item as any)?.median_price);
         return acc + (priceNum === null ? 0 : 1);
       }, 0);
       setPricedCount(priced);
     } else {
       setPricedCount(0);
     }
-  }, [query, wear, priceMin, priceMax, customMin, customMax, allItems]);
+  }, [query, wear, priceMin, priceMax, customMin, customMax, allItems, priceIndex]);
 
   const handleSurprise = () => {
     const min = customMin || priceMin;
@@ -123,7 +211,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     onClose();
   };
 
-  const selectPricePreset = (preset: typeof PRICE_PRESETS[0]) => {
+  const selectPricePreset = (preset: (typeof PRICE_PRESETS)[number]) => {
     setPriceMin(preset.min?.toString() || '');
     setPriceMax(preset.max?.toString() || '');
     setCustomMin('');
@@ -179,7 +267,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
 
           {/* Price filter */}
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Price Range (€)</label>
+            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Price Range ({currency.symbol})</label>
             <div className="grid grid-cols-2 gap-2 mb-3">
               <input
                 type="number"
@@ -199,7 +287,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
             <div className="grid grid-cols-3 gap-2">
               {PRICE_PRESETS.map((preset) => (
                 <button
-                  key={preset.label}
+                  key={preset.key}
                   onClick={() => selectPricePreset(preset)}
                   className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase border transition-all ${
                     priceMin === (preset.min?.toString() || '') && priceMax === (preset.max?.toString() || '')
@@ -207,7 +295,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
                       : 'bg-[#11141d] border-white/5 text-gray-500 hover:text-white'
                   }`}
                 >
-                  {preset.label}
+                  {presetLabel(preset, currency.symbol)}
                 </button>
               ))}
             </div>
@@ -224,6 +312,13 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
               const { minNum, maxNum } = makeMinMax(min, max);
               const hasPriceFilter = minNum !== undefined || maxNum !== undefined;
               if (!hasPriceFilter) return null;
+              if (!priceIndexLoaded) {
+                return (
+                  <p className="mt-2 text-[10px] text-gray-500">
+                    Loading price index…
+                  </p>
+                );
+              }
               if (pricedCount > 0) return null;
               return (
                 <p className="mt-2 text-[10px] text-gray-500">

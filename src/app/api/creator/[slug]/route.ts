@@ -850,6 +850,23 @@ export async function GET(
     };
     if (updated.live.tiktok === null) updated.live.tiktok = false;
 
+    // Also refresh Twitch live status quickly for a more "live" creator page.
+    if (creator.twitchLogin) {
+      const cleanTwitch = String(creator.twitchLogin).trim().replace(/^@/, '');
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 2500);
+        try {
+          const liveNow = await fetchTwitchIsLive(cleanTwitch);
+          if (liveNow !== null) updated.live.twitch = liveNow;
+        } finally {
+          clearTimeout(id);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     const status = await fetchTikTokStatusApiFast(creator.tiktokUsername);
     if (status?.is_live) {
       const v = String(status.is_live).trim().toUpperCase();

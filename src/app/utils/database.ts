@@ -407,7 +407,7 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   }
 
   // ALWAYS write to MongoDB (even if KV fails)
-  if (MONGODB_URI) {
+  if (hasMongoConfig()) {
     writePromises.push(
       mongoSet(key, value)
         .then((success) => {
@@ -425,7 +425,7 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
         })
     );
   } else {
-    console.warn(`[Database] ⚠️ MONGODB_URI not configured, skipping MongoDB write for ${key}`);
+    console.warn(`[Database] ⚠️ MongoDB not configured, skipping MongoDB write for ${key}`);
   }
 
   // Wait for both writes (don't fail if one fails)
@@ -433,7 +433,7 @@ export async function dbSet<T>(key: string, value: T): Promise<boolean> {
   
   // Log summary (handle cases where only one write promise exists)
   const kvResult = writePromises.length > 0 && results[0]?.status === 'fulfilled' ? '✅' : (writePromises.length > 0 && results[0]?.status === 'rejected' ? '❌' : '⏭️');
-  const mongoResult = writePromises.length > 1 && results[1]?.status === 'fulfilled' ? '✅' : (writePromises.length > 1 && results[1]?.status === 'rejected' ? '❌' : (MONGODB_URI ? '⏭️' : '🚫'));
+  const mongoResult = writePromises.length > 1 && results[1]?.status === 'fulfilled' ? '✅' : (writePromises.length > 1 && results[1]?.status === 'rejected' ? '❌' : (hasMongoConfig() ? '⏭️' : '🚫'));
   console.log(`[Database] Write summary for ${key}: KV ${kvResult} | MongoDB ${mongoResult}`);
 
   // If KV failed but MongoDB succeeded, try to sync back to KV when it recovers
