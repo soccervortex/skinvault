@@ -48,7 +48,7 @@ export default function ProInfoPage() {
 
   const handleClaimFreeMonth = async () => {
     if (!user?.steamId) {
-      toast.error('You must be signed in with Steam to claim the free two weeks.');
+      toast.error('Please sign in with Steam to claim the new user Pro bonus.');
       setTimeout(() => window.location.href = '/inventory', 2000);
       return;
     }
@@ -64,7 +64,7 @@ export default function ProInfoPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to claim free two weeks');
+        toast.error(data.error || 'Failed to claim the Pro bonus');
         setClaimingFreeMonth(false);
         return;
       }
@@ -76,11 +76,11 @@ export default function ProInfoPage() {
         setUser(updatedUser);
         window.dispatchEvent(new Event('storage'));
         setFreeMonthEligible(false);
-        toast.success(data.message || 'Free two weeks claimed successfully!');
+        toast.success(data.message || 'Pro bonus activated successfully!');
       }
       setClaimingFreeMonth(false);
     } catch (error) {
-      toast.error('Failed to claim free two weeks. Please try again.');
+      toast.error('Failed to claim the Pro bonus. Please try again.');
       setClaimingFreeMonth(false);
     }
   };
@@ -186,7 +186,7 @@ export default function ProInfoPage() {
           </div>
         )}
 
-        {/* First Week Free Promotion Banner */}
+        {/* New user bonus banner */}
         {user && !isPro && freeMonthEligible && (
           <div className="bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-purple-500/20 border-2 border-emerald-500/40 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-blue-500/5 to-purple-500/5 animate-pulse" />
@@ -199,13 +199,12 @@ export default function ProInfoPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Sparkles className="text-amber-400" size={16} />
                     <h3 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white">
-                      Limited Time Offer
+                      New User Bonus
                     </h3>
                   </div>
                   <p className="text-[11px] md:text-[12px] text-gray-300 mb-4 leading-relaxed">
-                    Claim <span className="font-black text-emerald-400">two weeks FREE</span> of Pro! 
-                    This special offer is available for new users in their first week. 
-                    Unlock unlimited wishlist, advanced stats, and all Pro features.
+                    Activate <span className="font-black text-emerald-400">2 weeks of Pro access</span> as a one-time new user bonus.
+                    Available during your first week after signing in.
                   </p>
                   <button
                     onClick={handleClaimFreeMonth}
@@ -218,7 +217,7 @@ export default function ProInfoPage() {
                       </>
                     ) : (
                       <>
-                        <Gift size={16} /> Claim Free Two Weeks Now
+                        <Gift size={16} /> Activate Pro Bonus
                       </>
                     )}
                   </button>

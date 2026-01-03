@@ -40,6 +40,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
+  const [sessionSteamId, setSessionSteamId] = useState<string | null>(null);
   const [twitchPreviewFailed, setTwitchPreviewFailed] = useState(false);
   const [edit, setEdit] = useState({
     displayName: '',
@@ -65,6 +66,23 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch('/api/auth/steam/session', { cache: 'no-store' });
+        const json = await res.json();
+        if (!cancelled) setSessionSteamId(json?.steamId || null);
+      } catch {
+        if (!cancelled) setSessionSteamId(null);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const canManage = useMemo(() => isOwner(adminSteamId), [adminSteamId]);
 
   const tiktokLive = data?.live?.tiktok ?? false;
@@ -83,6 +101,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const twitchHandle = data?.creator?.twitchLogin ? String(data.creator.twitchLogin).trim().replace(/^@/, '') : '';
   const twitchProfileUrl = data?.links?.twitch || (twitchHandle ? `https://www.twitch.tv/${twitchHandle}` : undefined);
   const twitchLiveUrl = data?.links?.twitchLive || twitchProfileUrl;
+  const canConnectTwitch = !!(data?.creator?.partnerSteamId && (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId))));
   const twitchPreviewUrl = useMemo(() => {
     if (!twitchHandle) return null;
     // Cache-bust once per minute so it updates when live.
@@ -275,6 +294,14 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                     className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10"
                   >
                     Inventory
+                  </a>
+                )}
+                {canConnectTwitch && (
+                  <a
+                    href={`/api/auth/twitch?slug=${encodeURIComponent(slug)}`}
+                    className="px-3 py-2 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-200 text-[10px] font-black uppercase tracking-widest hover:bg-purple-600/30"
+                  >
+                    Connect Twitch
                   </a>
                 )}
                 {canManage && (

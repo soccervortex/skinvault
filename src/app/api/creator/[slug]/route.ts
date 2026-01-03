@@ -12,6 +12,7 @@ type FeedItem = {
 };
 
 const CREATORS_KEY = 'creators_v1';
+const TWITCH_CONNECTION_PREFIX = 'creator_twitch_connection_';
 
 type TikTokStatusApiResponse = {
   is_live?: string;
@@ -39,11 +40,34 @@ function extractMetaContent(html: string, property: string): string {
   return v;
 }
 
+async function fetchTwitchIsLiveWithOAuth(login: string, accessToken: string): Promise<boolean | null> {
+  const l = String(login || '').trim().replace(/^@/, '');
+  const token = String(accessToken || '').trim();
+  const clientId = process.env.TWITCH_CLIENT_ID || '';
+  if (!l || !token || !clientId) return null;
+
+  try {
+    const res = await fetch(`https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(l)}`, {
+      headers: {
+        'Client-ID': clientId,
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const data = Array.isArray(json?.data) ? json.data : [];
+    return data.length > 0;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchYouTubeLiveVideoIdFast(channelId: string): Promise<string> {
   const id = String(channelId || '').trim();
   if (!id) return '';
 
-  const html = await fetchText(`https://www.youtube.com/channel/${encodeURIComponent(id)}/live`, 4000);
+  const html = await fetchText(`https://www.youtube.com/channel/${encodeURIComponent(id)}/live`, 2500);
   if (!html) return '';
 
   // Heuristic: YouTube sets isLiveNow for live streams.
@@ -58,7 +82,7 @@ async function fetchYouTubeLatestVideoFast(channelId: string): Promise<{ videoId
   const id = String(channelId || '').trim();
   if (!id) return null;
 
-  const xml = await fetchText(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(id)}`, 4000);
+  const xml = await fetchText(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(id)}`, 2500);
   if (!xml) return null;
 
   const videoId = (xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)?.[1] || '').trim();
@@ -72,6 +96,59 @@ async function fetchYouTubeLatestVideoFast(channelId: string): Promise<{ videoId
     videoId,
     title: title || 'Latest YouTube',
     publishedAt: publishedAt || undefined,
+    thumbnailUrl: thumb || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+  };
+}
+
+async function fetchJsonWithTimeout(url: string, timeoutMs: number): Promise<any | null> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function fetchYouTubeLiveVideoIdWithApi(channelId: string): Promise<string> {
+  const key = process.env.YOUTUBE_API_KEY || '';
+  const id = String(channelId || '').trim();
+  if (!key || !id) return '';
+
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(id)}&eventType=live&type=video&maxResults=1&key=${encodeURIComponent(key)}`;
+  const json = await fetchJsonWithTimeout(url, 4500);
+  const item = Array.isArray(json?.items) ? json.items[0] : null;
+  const videoId = item?.id?.videoId ? String(item.id.videoId) : '';
+  return videoId;
+}
+
+async function fetchYouTubeLatestVideoWithApi(channelId: string): Promise<{ videoId: string; title: string; publishedAt?: string; thumbnailUrl?: string } | null> {
+  const key = process.env.YOUTUBE_API_KEY || '';
+  const id = String(channelId || '').trim();
+  if (!key || !id) return null;
+
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(id)}&order=date&type=video&maxResults=1&key=${encodeURIComponent(key)}`;
+  const json = await fetchJsonWithTimeout(url, 4500);
+  const item = Array.isArray(json?.items) ? json.items[0] : null;
+  const videoId = item?.id?.videoId ? String(item.id.videoId) : '';
+  if (!videoId) return null;
+
+  const title = item?.snippet?.title ? String(item.snippet.title) : 'Latest YouTube';
+  const publishedAt = item?.snippet?.publishedAt ? String(item.snippet.publishedAt) : undefined;
+  const thumb = item?.snippet?.thumbnails?.high?.url || item?.snippet?.thumbnails?.medium?.url || item?.snippet?.thumbnails?.default?.url;
+
+  return {
+    videoId,
+    title,
+    publishedAt,
     thumbnailUrl: thumb || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
   };
 }
@@ -141,6 +218,8 @@ type CreatorSnapshot = {
   lastFastCheckedAt?: string;
   sources: {
     tiktokStatusApi?: string;
+    twitch?: string;
+    youtube?: string;
   };
 };
 
@@ -277,10 +356,11 @@ async function fetchTikTokStatusApi(username: string): Promise<TikTokStatusApiRe
     }
   };
 
-  // Try once with a generous timeout; retry once if the first attempt fails.
-  const first = await attempt(15000);
+  // Keep this fast to avoid holding background refreshes for too long.
+  // Retry once with a slightly higher timeout.
+  const first = await attempt(4000);
   if (first) return first;
-  return await attempt(20000);
+  return await attempt(6000);
 }
 
 async function fetchTikTokStatusApiFast(username: string): Promise<TikTokStatusApiResponse | null> {
@@ -323,7 +403,20 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
     const clean = String(creator.twitchLogin).trim().replace(/^@/, '');
     links.twitch = `https://www.twitch.tv/${clean}`;
     links.twitchLive = links.twitch;
-    live.twitch = await fetchTwitchIsLive(clean);
+    let liveFromOAuth: boolean | null = null;
+    try {
+      const conn = await dbGet<any>(`${TWITCH_CONNECTION_PREFIX}${creator.slug}`, true);
+      const token = String(conn?.accessToken || '').trim();
+      if (token) {
+        sources.twitch = 'helix_oauth';
+        liveFromOAuth = await fetchTwitchIsLiveWithOAuth(clean, token);
+      }
+    } catch {
+      // ignore
+    }
+
+    live.twitch = liveFromOAuth !== null ? liveFromOAuth : await fetchTwitchIsLive(clean);
+    if (!sources.twitch) sources.twitch = 'public_fallback';
   }
 
   if (creator.tiktokUsername) {
@@ -364,7 +457,16 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
     if (clean) {
       links.youtube = `https://www.youtube.com/channel/${clean}`;
 
-      const liveId = await fetchYouTubeLiveVideoIdFast(clean);
+      const hasYouTubeApiKey = !!process.env.YOUTUBE_API_KEY;
+      let liveId = '';
+      if (hasYouTubeApiKey) {
+        sources.youtube = 'data_api_v3';
+        liveId = await fetchYouTubeLiveVideoIdWithApi(clean);
+      }
+      if (!liveId) {
+        if (!sources.youtube) sources.youtube = 'rss_html_fallback';
+        liveId = await fetchYouTubeLiveVideoIdFast(clean);
+      }
       if (liveId) {
         live.youtube = true;
         links.youtubeLive = `https://www.youtube.com/watch?v=${liveId}`;
@@ -377,7 +479,16 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
         });
       } else {
         live.youtube = false;
-        const latest = await fetchYouTubeLatestVideoFast(clean);
+
+        let latest: { videoId: string; title: string; publishedAt?: string; thumbnailUrl?: string } | null = null;
+        if (hasYouTubeApiKey) {
+          if (!sources.youtube) sources.youtube = 'data_api_v3';
+          latest = await fetchYouTubeLatestVideoWithApi(clean);
+        }
+        if (!latest?.videoId) {
+          if (!sources.youtube) sources.youtube = 'rss_html_fallback';
+          latest = await fetchYouTubeLatestVideoFast(clean);
+        }
         if (latest?.videoId) {
           const latestUrl = `https://www.youtube.com/watch?v=${latest.videoId}`;
           items.push({
@@ -471,7 +582,8 @@ async function refreshTikTokOnly(cached: CreatorSnapshot, creator: CreatorProfil
   // Ensure a stable boolean when configured.
   if (creator.tiktokUsername && next.live.tiktok === null) next.live.tiktok = false;
 
-  const status = await fetchTikTokStatusApi(creator.tiktokUsername);
+  // Fast call; if it fails we keep cached values.
+  const status = await fetchTikTokStatusApiFast(creator.tiktokUsername);
   // If the status API is unreachable, keep the previous cached state so the badge doesn't disappear.
   if (!status) {
     next.lastFastCheckedAt = new Date().toISOString();

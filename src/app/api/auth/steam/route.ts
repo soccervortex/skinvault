@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const protoFromUrl = url.protocol.replace(':', '');
   const protocol = forwardedProto || protoFromUrl || 'http';
 
-  const returnUrl = `${protocol}://${host}/inventory`;
+  const returnUrl = `${protocol}://${host}/api/auth/steam/callback`;
 
   const params = new URLSearchParams({
     'openid.ns': 'http://specs.openid.net/auth/2.0',

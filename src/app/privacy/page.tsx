@@ -102,9 +102,9 @@ export default function PrivacyPage() {
                 2.4 Automatically Collected Information
               </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-                <li>First login timestamp (for free trial eligibility, stored in Vercel KV and MongoDB)</li>
+                <li>First login timestamp (for new user bonus eligibility, stored in Vercel KV and MongoDB)</li>
                 <li>Pro subscription status and expiration dates (stored in Vercel KV and MongoDB)</li>
-                <li>Claimed free month status (stored in Vercel KV and MongoDB)</li>
+                <li>Claimed bonus status (stored in Vercel KV and MongoDB)</li>
                 <li>Price alert trigger history (stored in Vercel KV and MongoDB)</li>
                 <li>Purchase history (all Pro and consumable purchases, including session IDs, amounts, timestamps, fulfillment status - stored in Vercel KV and MongoDB)</li>
                 <li>Failed purchase records (for admin review and manual fulfillment - stored in Vercel KV and MongoDB)</li>
@@ -170,7 +170,7 @@ export default function PrivacyPage() {
                   <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
                     <li>Pro subscription data (key: <code>pro_users</code>)</li>
                     <li>First login timestamps (key: <code>first_logins</code>)</li>
-                    <li>Claimed free month flags (key: <code>claimed_free_month</code>)</li>
+                    <li>Claimed bonus flags (key: <code>claimed_free_month</code>)</li>
                     <li>Discord connections (key: <code>discord_connections</code>) - includes Discord ID, username, avatar, OAuth tokens</li>
                     <li>Price alerts/trackers (key: <code>price_alerts</code>) - includes target prices, conditions, trigger status</li>
                     <li>Discord DM queue (key: <code>discord_dm_queue</code>) - temporary queue for bot messages</li>

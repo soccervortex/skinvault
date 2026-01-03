@@ -139,8 +139,8 @@ export default function FAQPage() {
           answer: "Pro subscription pricing: €9.99/month, €24.99/3 months (save €5), or €44.99/6 months (save €15). All payments are processed securely through Stripe. We do not store credit card details on our servers."
         },
         {
-          question: "Is there a free trial?",
-          answer: "Yes! New users may be eligible for a 2-week free trial within 7 days of first login. This offer is one-time only and must be claimed manually. The offer expires after 7 days if not claimed. Check your account page to see if you're eligible."
+          question: "Is there a new user bonus?",
+          answer: "We occasionally offer a one-time new user bonus: 2 weeks of Pro access available during your first 7 days after signing in. If you're eligible, you can activate it from the Pro page."
         },
         {
           question: "Does Pro auto-renew?",

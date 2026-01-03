@@ -7,7 +7,7 @@ import {
   markFreeMonthClaimed 
 } from '@/app/utils/pro-storage';
 
-// First week free promotion: Users can claim 2 weeks free Pro within 7 days of first login
+// New user bonus: Users can activate 2 weeks of Pro access within 7 days of first login
 const FREE_MONTH_DAYS = 7;
 const FREE_WEEKS = 2; // 2 weeks = 0.5 months
 
@@ -28,11 +28,11 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Check if user has already claimed the free two weeks (one-time only)
+    // Check if user has already claimed the bonus (one-time only)
     const alreadyClaimed = await hasClaimedFreeMonth(steamId);
     if (alreadyClaimed) {
       return NextResponse.json({ 
-        error: 'You have already claimed your free two weeks trial. This offer is only available once.',
+        error: 'You have already activated the new user Pro bonus. This offer is available once per account.',
         alreadyClaimed: true 
       }, { status: 400 });
     }
@@ -52,13 +52,13 @@ export async function POST(request: Request) {
 
     if (daysSinceFirstLogin > FREE_MONTH_DAYS) {
       return NextResponse.json({ 
-        error: `This free trial is only available within the first ${FREE_MONTH_DAYS} days of your first login. Your account is ${Math.floor(daysSinceFirstLogin)} days old.`,
+        error: `This new user Pro bonus is only available within the first ${FREE_MONTH_DAYS} days after your first sign-in. Your account is ${Math.floor(daysSinceFirstLogin)} days old.`,
         expired: true,
         daysSinceFirstLogin: Math.floor(daysSinceFirstLogin)
       }, { status: 400 });
     }
 
-    // All checks passed - grant the free two weeks (0.5 months)
+    // All checks passed - grant 2 weeks of Pro access
     const newProUntil = await grantPro(steamId, 0.5);
     
     // Mark as claimed (one-time only)
@@ -67,11 +67,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       proUntil: newProUntil,
-      message: `Congratulations! You've claimed your free two weeks of Pro!`,
+      message: `Success! Your 2-week Pro bonus is now active.`,
     });
   } catch (error) {
-    console.error('Failed to claim free two weeks:', error);
-    return NextResponse.json({ error: 'Failed to claim free two weeks' }, { status: 500 });
+    console.error('Failed to activate Pro bonus:', error);
+    return NextResponse.json({ error: 'Failed to activate Pro bonus' }, { status: 500 });
   }
 }
 
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         eligible: false,
         alreadyClaimed: true,
-        message: 'You have already claimed your free two weeks trial. This offer is only available once.',
+        message: 'You have already activated the new user Pro bonus. This offer is available once per account.',
       });
     }
 
@@ -126,7 +126,7 @@ export async function GET(request: Request) {
         eligible: false,
         expired: true,
         daysSinceFirstLogin: Math.floor(daysSinceFirstLogin),
-        message: `This free trial is only available within the first ${FREE_MONTH_DAYS} days of your first login. Your account is ${Math.floor(daysSinceFirstLogin)} days old.`,
+        message: `This new user Pro bonus is only available within the first ${FREE_MONTH_DAYS} days after your first sign-in. Your account is ${Math.floor(daysSinceFirstLogin)} days old.`,
       });
     }
 
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
       eligible: true,
       hasPro: false,
       daysRemaining,
-      message: `You are eligible for two weeks free Pro! ${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining > 1 ? 's' : ''} remaining to claim.` : 'Claim it now!'}`,
+      message: `You are eligible for a 2-week Pro bonus. ${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining > 1 ? 's' : ''} remaining to activate.` : 'Activate it now!'}`,
     });
   } catch (error) {
     console.error('Failed to check free month eligibility:', error);

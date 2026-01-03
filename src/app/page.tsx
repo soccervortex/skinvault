@@ -15,6 +15,9 @@ const PriceTrackerModal = dynamic(() => import('@/app/components/PriceTrackerMod
 const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal'), {
   ssr: false,
 });
+const SurpriseMeModal = dynamic(() => import('@/app/components/SurpriseMeModal'), {
+  ssr: false,
+});
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
@@ -130,6 +133,7 @@ export default function GlobalSkinSearch() {
   const router = useRouter();
   const [activeCat, setActiveCat] = useState(CATEGORIES[0]);
   const [items, setItems] = useState<any[]>([]);
+  const [allMarketItems, setAllMarketItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortType>('rarity-desc');
@@ -145,6 +149,7 @@ export default function GlobalSkinSearch() {
   const [showTrackerModal, setShowTrackerModal] = useState(false);
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showSurpriseModal, setShowSurpriseModal] = useState(false);
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
 
   // VEILIGE SYNC VOOR LOCALSTORAGE
@@ -227,6 +232,73 @@ export default function GlobalSkinSearch() {
     } catch {
       /* ignore quota errors */
     }
+  };
+
+  const loadAllMarketItems = async (): Promise<any[]> => {
+    const { API_FILES, BASE_URL, isItemExcluded } = await import('@/data/api-endpoints');
+    let all: any[] = [];
+
+    const allCached = API_FILES.every((file) => {
+      const cached = datasetCacheRef.current[file];
+      const isFresh = cached && Date.now() - cached.timestamp < CACHE_TTL;
+      if (isFresh) {
+        const filtered = cached.data.filter((item: any) => !isItemExcluded(item.id));
+        all.push(...filtered);
+        return true;
+      }
+      return false;
+    });
+
+    if (!allCached) {
+      const fetchPromises = API_FILES.map(async (file) => {
+        const cached = datasetCacheRef.current[file];
+        const isFresh = cached && Date.now() - cached.timestamp < CACHE_TTL;
+        if (isFresh) return cached.data;
+
+        try {
+          const res = await fetch(`${BASE_URL}/${file}`, { cache: 'force-cache' });
+          const data = await res.json();
+          const items = Array.isArray(data) ? data : Object.values(data);
+          const filteredItems = items.filter((item: any) => !isItemExcluded(item.id));
+          datasetCacheRef.current[file] = { data: filteredItems, timestamp: Date.now() };
+          return filteredItems;
+        } catch {
+          return [];
+        }
+      });
+
+      const results = await Promise.all(fetchPromises);
+      all = results.flat();
+      persistCache();
+    }
+
+    // Load custom items and add them to the list
+    try {
+      const customRes = await fetch('/api/admin/custom-items');
+      if (customRes.ok) {
+        const customData = await customRes.json();
+        if (customData.items && Array.isArray(customData.items)) {
+          const formattedCustomItems = customData.items.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            market_hash_name: item.marketHashName || item.name,
+            image: item.image || null,
+            rarity: item.rarity ? { name: item.rarity } : null,
+            weapon: item.weapon ? { name: item.weapon } : null,
+            category: item.weapon ? { name: item.weapon } : null,
+            isCustom: true,
+          }));
+          const existingIds = new Set(all.map((i: any) => i.id));
+          formattedCustomItems.forEach((customItem: any) => {
+            if (!existingIds.has(customItem.id)) all.push(customItem);
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return all;
   };
 
   const filterItems = (list: any[], cat: (typeof CATEGORIES)[number]) => {
@@ -391,10 +463,13 @@ export default function GlobalSkinSearch() {
     return () => { cancelled = true; };
   }, [activeCat]);
 
-  const goToRandomSkin = () => {
-    if (items.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * items.length);
-    router.push(`/item/${encodeURIComponent(items[randomIndex].id)}`);
+  const openSurpriseModal = () => {
+    setShowSurpriseModal(true);
+    if (allMarketItems.length === 0) {
+      void loadAllMarketItems()
+        .then((all) => setAllMarketItems(all))
+        .catch(() => {});
+    }
   };
 
   const toggleCompare = (item: any) => {
@@ -503,7 +578,7 @@ export default function GlobalSkinSearch() {
           </div>
           
           <div className="flex items-center gap-2 md:gap-3 w-full xl:w-auto justify-between xl:justify-end">
-            <button onClick={goToRandomSkin} className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 lg:py-3 rounded-lg md:rounded-xl text-[7px] md:text-[8px] lg:text-[9px] font-black uppercase border border-amber-500/30 bg-amber-500/5 text-amber-500 hover:bg-amber-500 hover:text-black transition-all whitespace-nowrap shrink-0">
+            <button onClick={openSurpriseModal} className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 lg:py-3 rounded-lg md:rounded-xl text-[7px] md:text-[8px] lg:text-[9px] font-black uppercase border border-amber-500/30 bg-amber-500/5 text-amber-500 hover:bg-amber-500 hover:text-black transition-all whitespace-nowrap shrink-0">
               <Dices size={12} />
               <span className="hidden sm:inline">Surprise Me</span>
               <span className="sm:hidden">Random</span>
@@ -732,6 +807,13 @@ export default function GlobalSkinSearch() {
         limit={getWishlistLimitSync(false)}
         currentCount={wishlist.length}
       />
+
+      <SurpriseMeModal
+        isOpen={showSurpriseModal}
+        onClose={() => setShowSurpriseModal(false)}
+        allItems={allMarketItems.length ? allMarketItems : items}
+      />
+
       <InstallPrompt />
     </div>
   );
