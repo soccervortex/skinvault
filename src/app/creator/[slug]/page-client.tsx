@@ -94,6 +94,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     data?.links?.tiktok || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}` : undefined);
   const tiktokLiveUrl =
     data?.links?.tiktokLive || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}/live` : undefined);
+  const canConnectTikTok = !!(data?.creator?.partnerSteamId && (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId))));
   const latestTikTokItem = data?.items?.find((i) => i.platform === 'tiktok');
   const latestTiktokUrl = latestTikTokItem?.url;
 
@@ -294,6 +295,14 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                     className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10"
                   >
                     Inventory
+                  </a>
+                )}
+                {canConnectTikTok && (
+                  <a
+                    href={`/api/auth/tiktok?slug=${encodeURIComponent(slug)}`}
+                    className="px-3 py-2 rounded-xl bg-pink-600/20 border border-pink-500/40 text-pink-200 text-[10px] font-black uppercase tracking-widest hover:bg-pink-600/30"
+                  >
+                    Connect TikTok
                   </a>
                 )}
                 {canConnectTwitch && (

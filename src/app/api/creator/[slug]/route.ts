@@ -13,6 +13,7 @@ type FeedItem = {
 
 const CREATORS_KEY = 'creators_v1';
 const TWITCH_CONNECTION_PREFIX = 'creator_twitch_connection_';
+const TIKTOK_CONNECTION_PREFIX = 'creator_tiktok_connection_';
 
 type TikTokStatusApiResponse = {
   is_live?: string;
@@ -24,6 +25,32 @@ type TikTokStatusApiResponse = {
 type TikTokOEmbedResponse = {
   title?: string;
   thumbnail_url?: string;
+};
+
+type TikTokConnection = {
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  openId?: string;
+  scope?: string;
+  username?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  connectedAt?: string;
+};
+
+type TikTokVideoListResponse = {
+  data?: {
+    videos?: Array<{
+      id?: string;
+      title?: string;
+      cover_image_url?: string;
+      create_time?: number;
+    }>;
+    cursor?: number;
+    has_more?: boolean;
+  };
+  error?: { code?: string; message?: string; log_id?: string };
 };
 
 function extractMetaContent(html: string, property: string): string {
@@ -38,6 +65,45 @@ function extractMetaContent(html: string, property: string): string {
   const m = h.match(re);
   const v = (m && (m[1] || m[2])) ? String(m[1] || m[2]).trim() : '';
   return v;
+}
+
+async function fetchTikTokLatestVideoWithOAuth(conn: TikTokConnection): Promise<{ url: string; title: string; thumbnailUrl?: string } | null> {
+  const token = String(conn?.accessToken || '').trim();
+  const username = String(conn?.username || '').trim().replace(/^@/, '');
+  if (!token || !username) return null;
+
+  const url = 'https://open.tiktokapis.com/v2/video/list/?fields=cover_image_url,id,title';
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 2500);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+      },
+      body: JSON.stringify({ max_count: 1 }),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    const json = (await res.json().catch(() => ({} as any))) as TikTokVideoListResponse;
+    const videos = Array.isArray(json?.data?.videos) ? json.data.videos : [];
+    const v = videos[0] || null;
+    const videoId = v?.id ? String(v.id) : '';
+    if (!res.ok || !videoId) return null;
+
+    const videoUrl = `https://www.tiktok.com/@${encodeURIComponent(username)}/video/${encodeURIComponent(videoId)}`;
+    const title = v?.title ? String(v.title) : 'Latest TikTok';
+    const thumbnailUrl = v?.cover_image_url ? String(v.cover_image_url) : undefined;
+    return { url: videoUrl, title, thumbnailUrl };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 async function fetchTwitchIsLiveWithOAuth(login: string, accessToken: string): Promise<boolean | null> {
@@ -218,6 +284,7 @@ type CreatorSnapshot = {
   lastFastCheckedAt?: string;
   sources: {
     tiktokStatusApi?: string;
+    tiktok?: string;
     twitch?: string;
     youtube?: string;
   };
@@ -427,6 +494,24 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
     // Default to offline when configured so the UI always has a stable boolean.
     live.tiktok = false;
 
+    // Prefer official TikTok API when the creator connected via Login Kit.
+    try {
+      const conn = await dbGet<TikTokConnection>(`${TIKTOK_CONNECTION_PREFIX}${creator.slug}`, true);
+      const latest = await fetchTikTokLatestVideoWithOAuth(conn || {});
+      if (latest?.url) {
+        sources.tiktok = 'official_oauth';
+        items.push({
+          id: safeId(`tiktok_latest_${latest.url}`),
+          platform: 'tiktok',
+          title: latest.title || 'Latest TikTok',
+          url: latest.url,
+          thumbnailUrl: latest.thumbnailUrl,
+        });
+      }
+    } catch {
+      // ignore
+    }
+
     const status = await fetchTikTokStatusApi(creator.tiktokUsername);
     if (status?.is_live) {
       const v = String(status.is_live).trim().toUpperCase();
@@ -439,16 +524,21 @@ async function refreshSnapshot(creator: CreatorProfile, cached?: CreatorSnapshot
       if (u) links.tiktokLive = u;
     }
 
-    const latestUrl = getTikTokLatestVideoUrl(status, clean);
-    if (latestUrl) {
-      const oembed = await fetchTikTokPreviewFast(latestUrl);
-      items.push({
-        id: safeId(`tiktok_latest_${latestUrl}`),
-        platform: 'tiktok',
-        title: (oembed?.title && String(oembed.title).trim()) || 'Latest TikTok',
-        url: latestUrl,
-        thumbnailUrl: oembed?.thumbnail_url,
-      });
+    // If official OAuth didn't provide a latest video, fall back to the status API latest_video.
+    const hasTikTokItem = items.some((i) => i.platform === 'tiktok' && i.url);
+    if (!hasTikTokItem) {
+      const latestUrl = getTikTokLatestVideoUrl(status, clean);
+      if (latestUrl) {
+        if (!sources.tiktok) sources.tiktok = 'status_api_fallback';
+        const oembed = await fetchTikTokPreviewFast(latestUrl);
+        items.push({
+          id: safeId(`tiktok_latest_${latestUrl}`),
+          platform: 'tiktok',
+          title: (oembed?.title && String(oembed.title).trim()) || 'Latest TikTok',
+          url: latestUrl,
+          thumbnailUrl: oembed?.thumbnail_url,
+        });
+      }
     }
   }
 
