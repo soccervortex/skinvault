@@ -1,6 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getMongoClient } from '@/app/utils/mongodb-client';
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...(init || {}), signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+type InventoryCacheDoc = {
+  _id: string;
+  steamId: string;
+  currency: number;
+  startAssetId: string;
+  createdAt: Date;
+  expiresAt: Date;
+  data: any;
+};
+
+const INVENTORY_CACHE_TTL_MS = 60_000; // 1 minute
+
 // Helper function to parse price strings correctly (handles EUR/USD formats)
 function parsePriceString(priceStr: string): number {
   if (!priceStr || typeof priceStr !== 'string') return 0;
@@ -31,54 +53,97 @@ function parsePriceString(priceStr: string): number {
 }
 
 // Helper function to calculate total inventory value
-async function enrichInventoryWithTotalValue(data: any, currency: number): Promise<any> {
+async function enrichInventoryWithTotalValue(data: any, currency: number, origin: string): Promise<any> {
   try {
     // Get price index from MongoDB
+    const currencyStr = String(currency);
+
+    const marketHashNames = new Set<string>();
+    if (data.descriptions && Array.isArray(data.descriptions)) {
+      for (const item of data.descriptions) {
+        const name = String(item?.market_hash_name || '').trim();
+        if (name) marketHashNames.add(name);
+      }
+    }
+
+    if (data.rgInventory && typeof data.rgInventory === 'object') {
+      for (const item of Object.values(data.rgInventory) as any[]) {
+        const name = String((item as any)?.market_hash_name || '').trim();
+        if (name) marketHashNames.add(name);
+      }
+    }
+
+    const names = Array.from(marketHashNames);
+
     const mongoClient = await getMongoClient();
     const db = mongoClient.db('skinvault');
     const priceCollection = db.collection('market_prices');
-    
-    const priceIndex = await priceCollection.findOne({ currency });
-    let prices = priceIndex?.prices || {};
-    
-    // If price index is empty or missing, fetch prices on-the-fly for items in inventory
-    if (!prices || Object.keys(prices).length === 0) {
-      console.warn('Price index empty, fetching prices dynamically for inventory items');
-      prices = await fetchPricesForInventory(data, currency);
-    }
-    
-    let totalValue = 0;
-    let valuedItemCount = 0;
-    
-    // Process descriptions to calculate total value
-    if (data.descriptions && Array.isArray(data.descriptions)) {
-      for (const item of data.descriptions) {
-        if (item.marketable && item.market_hash_name) {
-          const price = prices[item.market_hash_name];
-          if (price && typeof price === 'string') {
-            const numericPrice = parsePriceString(price);
-            if (numericPrice > 0) {
-              totalValue += numericPrice;
-              valuedItemCount++;
-            }
-          }
-        }
+
+    const prices: Record<string, number> = {};
+    if (names.length) {
+      const docs = await priceCollection
+        .find({ currency: currencyStr, market_hash_name: { $in: names } }, { projection: { _id: 0, market_hash_name: 1, price: 1 } })
+        .toArray();
+
+      for (const d of docs as any[]) {
+        const k = String(d?.market_hash_name || '').trim();
+        const p = Number(d?.price);
+        if (k && Number.isFinite(p)) prices[k] = p;
       }
     }
-    
+
+    // If price index is empty or missing, fetch prices on-the-fly for items in inventory
+    if (!Object.keys(prices).length && names.length) {
+      console.warn('Price index empty, fetching prices dynamically for inventory items');
+      const dynamic = await fetchPricesForInventory(origin, names, currencyStr);
+      for (const [k, v] of Object.entries(dynamic)) prices[k] = v;
+    }
+
+    let totalValue = 0;
+    let valuedItemCount = 0;
+
+    const descByKey = new Map<string, any>();
+    if (data.descriptions && Array.isArray(data.descriptions)) {
+      for (const d of data.descriptions) {
+        const key = `${String(d?.classid)}_${String(d?.instanceid || 0)}`;
+        if (!descByKey.has(key)) descByKey.set(key, d);
+      }
+    }
+
+    if (data.assets && Array.isArray(data.assets) && descByKey.size) {
+      for (const a of data.assets) {
+        const key = `${String((a as any)?.classid)}_${String((a as any)?.instanceid || 0)}`;
+        const d = descByKey.get(key);
+        const name = String(d?.market_hash_name || '').trim();
+        if (!name) continue;
+        const p = prices[name];
+        if (!Number.isFinite(p) || p <= 0) continue;
+        const qty = Math.max(1, Number((a as any)?.amount || 1));
+        totalValue += p * qty;
+        valuedItemCount += qty;
+      }
+    } else if (data.descriptions && Array.isArray(data.descriptions)) {
+      // Process descriptions to calculate total value
+      for (const item of data.descriptions) {
+        const name = String(item?.market_hash_name || '').trim();
+        if (!name) continue;
+        const p = prices[name];
+        if (!Number.isFinite(p) || p <= 0) continue;
+        totalValue += p;
+        valuedItemCount++;
+      }
+    }
+
     // Process rgInventory format if present
     if (data.rgInventory && typeof data.rgInventory === 'object') {
       for (const item of Object.values(data.rgInventory) as any[]) {
-        if (item.market_hash_name) {
-          const price = prices[item.market_hash_name];
-          if (price && typeof price === 'string') {
-            const numericPrice = parsePriceString(price);
-            if (numericPrice > 0) {
-              totalValue += numericPrice;
-              valuedItemCount++;
-            }
-          }
-        }
+        const name = String((item as any)?.market_hash_name || '').trim();
+        if (!name) continue;
+        const p = prices[name];
+        if (!Number.isFinite(p) || p <= 0) continue;
+        const qty = Math.max(1, Number((item as any)?.amount || 1));
+        totalValue += p * qty;
+        valuedItemCount += qty;
       }
     }
     
@@ -100,44 +165,27 @@ async function enrichInventoryWithTotalValue(data: any, currency: number): Promi
 }
 
 // Helper function to fetch prices for specific items in inventory
-async function fetchPricesForInventory(data: any, currency: number): Promise<Record<string, string>> {
-  const prices: Record<string, string> = {};
-  const marketHashNames = new Set<string>();
-  
-  // Collect all unique market_hash_names from inventory
-  if (data.descriptions && Array.isArray(data.descriptions)) {
-    for (const item of data.descriptions) {
-      if (item.marketable && item.market_hash_name) {
-        marketHashNames.add(item.market_hash_name);
-      }
-    }
-  }
-  
-  if (data.rgInventory && typeof data.rgInventory === 'object') {
-    for (const item of Object.values(data.rgInventory) as any[]) {
-      if (item.market_hash_name) {
-        marketHashNames.add(item.market_hash_name);
-      }
-    }
-  }
+async function fetchPricesForInventory(origin: string, names: string[], currency: string): Promise<Record<string, number>> {
+  const prices: Record<string, number> = {};
   
   // Fetch prices for each unique item (limit to first 20 to avoid timeout)
-  const itemsToFetch = Array.from(marketHashNames).slice(0, 20);
+  const itemsToFetch = Array.from(new Set(names)).slice(0, 20);
   console.log(`Fetching prices for ${itemsToFetch.length} items`);
   
   for (const marketHashName of itemsToFetch) {
     try {
       // Use your existing Steam price API
-      const priceUrl = `https://www.skinvaults.online/api/steam/price?market_hash_name=${encodeURIComponent(marketHashName)}&currency=${currency}`;
-      const res = await fetch(priceUrl, { 
-        signal: AbortSignal.timeout(3000),
-        cache: 'no-store'
-      });
+      const priceUrl = `${String(origin).replace(/\/$/, '')}/api/steam/price?market_hash_name=${encodeURIComponent(marketHashName)}&currency=${encodeURIComponent(currency)}`;
+      const res = await fetchWithTimeout(priceUrl, {
+        cache: 'no-store',
+      }, 3000);
       
       if (res.ok) {
-        const priceData = await res.json();
-        if (priceData?.success && priceData?.lowest_price) {
-          prices[marketHashName] = priceData.lowest_price;
+        const priceData = await res.json().catch(() => ({} as any));
+        const raw = priceData?.lowest_price || priceData?.median_price;
+        const parsed = typeof raw === 'number' ? raw : parsePriceString(String(raw || ''));
+        if (Number.isFinite(parsed) && parsed > 0) {
+          prices[marketHashName] = parsed;
         }
       }
     } catch (error) {
@@ -434,11 +482,13 @@ async function fetchInventoryViaAPI(steamId: string, apiType: 'steamwebapi' | 'c
     };
 
     if (apiType === 'steamwebapi') {
-      const apiKey = process.env.STEAM_WEB_API_KEY || 'HA8REWE7GQER9I0N';
+      const apiKey = process.env.STEAM_WEB_API_KEY;
+      if (!apiKey) return null;
       apiUrl = `https://api.steamwebapi.com/steam/api/inventory?key=${apiKey}&steamid=${steamId}&appid=730&contextid=2`;
       headers['X-API-Key'] = apiKey;
     } else if (apiType === 'csinventoryapi') {
-      const apiKey = process.env.CS_INVENTORY_API_KEY || '3f85b8d7-7731-43ba-8124-e015015d9c84';
+      const apiKey = process.env.CS_INVENTORY_API_KEY;
+      if (!apiKey) return null;
       apiUrl = `https://csinventoryapi.com/api/v1/inventory?steamid=${steamId}&apikey=${apiKey}`;
       headers['Authorization'] = `Bearer ${apiKey}`;
     } else if (apiType === 'steamapis') {
@@ -515,6 +565,7 @@ export async function GET(request: Request) {
     const isPro = url.searchParams.get('isPro') === 'true';
     const currencyParam = String(url.searchParams.get('currency') || '').trim();
     const currency = currencyParam === '1' ? 1 : 3;
+    const refresh = url.searchParams.get('refresh') === '1';
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
@@ -532,14 +583,58 @@ export async function GET(request: Request) {
       }
     }
 
-    // METHOD 1: Try official Steam Web API FIRST (100% working method - highest priority)
+    const normalizedStart = String(startAssetId || '0');
+    const cacheKey = `inv_${steamId}_${currency}_${normalizedStart}`;
+    const mongoClient = await getMongoClient();
+    const db = mongoClient.db('skinvault');
+    const cacheCollection = db.collection<InventoryCacheDoc>('inventory_cache');
+
+    const respond = async (payload: any, cacheState: 'miss' | 'refresh' = 'miss') => {
+      try {
+        const now = new Date();
+        await cacheCollection.updateOne(
+          { _id: cacheKey },
+          {
+            $set: {
+              steamId,
+              currency,
+              startAssetId: normalizedStart,
+              data: payload,
+              createdAt: now,
+              expiresAt: new Date(Date.now() + INVENTORY_CACHE_TTL_MS),
+            },
+          },
+          { upsert: true }
+        );
+      } catch {
+        // Ignore cache write failures
+      }
+      const res = NextResponse.json(payload);
+      res.headers.set('x-sv-cache', cacheState);
+      return res;
+    };
+
+    if (!refresh) {
+      try {
+        const cached = await cacheCollection.findOne({ _id: cacheKey });
+        if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
+          const res = NextResponse.json(cached.data);
+          res.headers.set('x-sv-cache', 'hit');
+          return res;
+        }
+      } catch {
+        // Ignore cache read failures
+      }
+    }
+
+    // METHOD 1: Try official Steam Web API FIRST (highest priority)
     // This is the official Steam API endpoint for CS2 inventories (IEconItems_730/GetPlayerItems)
     try {
       const steamWebAPIData = await fetchInventoryViaSteamWebAPI(steamId);
       if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
         console.log('✅ Inventory fetched via Official Steam Web API');
-        const enrichedData = await enrichInventoryWithTotalValue(steamWebAPIData, currency);
-        return NextResponse.json(enrichedData);
+        const enrichedData = await enrichInventoryWithTotalValue(steamWebAPIData, currency, origin);
+        return respond(enrichedData, refresh ? 'refresh' : 'miss');
       }
     } catch (error) {
       console.warn('⚠️ Official Steam Web API failed, trying next method:', error);
@@ -553,8 +648,8 @@ export async function GET(request: Request) {
         const data = await fetchInventoryViaAPI(steamId, apiType);
         if (data && (data.assets || data.descriptions)) {
           console.log(`✅ Inventory fetched via third-party API: ${apiType}`);
-          const enrichedData = await enrichInventoryWithTotalValue(data, currency);
-          return NextResponse.json(enrichedData);
+          const enrichedData = await enrichInventoryWithTotalValue(data, currency, origin);
+          return respond(enrichedData, refresh ? 'refresh' : 'miss');
         }
       } catch (error) {
         console.warn(`âš ï¸ Third-party API ${apiType} failed, trying next...`);
@@ -617,30 +712,29 @@ export async function GET(request: Request) {
       if (direct && typeof direct === 'object') {
         if (direct.success === false) {
           return NextResponse.json({
-            success: false,
-            error: 'Inventory is private',
-            assets: [],
-            descriptions: [],
-          });
+            error: direct.error || 'Steam returned an error',
+            status: direct.success,
+          }, { status: 502 });
         }
 
-        if (Array.isArray(direct.assets) || Array.isArray(direct.descriptions)) {
+        if (direct.assets || direct.descriptions || direct.rgInventory || direct.rgDescriptions) {
           const enrichedData = await enrichInventoryWithTotalValue({
-            ...direct,
             assets: Array.isArray(direct.assets) ? direct.assets : [],
             descriptions: Array.isArray(direct.descriptions) ? direct.descriptions : [],
-          }, currency);
-          return NextResponse.json(enrichedData);
+            rgInventory: direct.rgInventory,
+            rgDescriptions: direct.rgDescriptions,
+          }, currency, origin);
+          return respond(enrichedData, refresh ? 'refresh' : 'miss');
         }
       }
     } catch {
-      // If direct fetch fails, we'll fall back to proxies below.
-    }    // Get scraping services first (with API keys), then fallback free proxies
+      // fall through
+    }
+    // Get scraping services first (with API keys), then fallback free proxies
     const scrapingProxies = getScrapingProxies();
     const allProxies = getAllProxies(); // This includes scraping + fallback
     
     // Pro users get more proxies, free users get limited
-    // Prioritize scraping services (with API keys) over free proxies
     const maxProxies = isPro ? allProxies.length : Math.min(
       scrapingProxies.length > 0 ? scrapingProxies.length + 2 : 3, // Prefer scraping services
       allProxies.length
@@ -673,8 +767,8 @@ export async function GET(request: Request) {
           // Check for valid inventory structure
           if (data.descriptions || data.assets || data.rgDescriptions || data.rgInventory) {
             // Success - calculate total value and return the data
-            const enrichedData = await enrichInventoryWithTotalValue(data, currency);
-            return NextResponse.json(enrichedData);
+            const enrichedData = await enrichInventoryWithTotalValue(data, currency, origin);
+            return respond(enrichedData, refresh ? 'refresh' : 'miss');
           }
           
           // Check if it's an empty inventory (valid response)
@@ -709,6 +803,18 @@ export async function GET(request: Request) {
           continue;
         }
       }
+    }
+
+    // All methods failed - try stale cache as last resort
+    try {
+      const stale = await cacheCollection.findOne({ _id: cacheKey });
+      if (stale?.data) {
+        const res = NextResponse.json(stale.data);
+        res.headers.set('x-sv-cache', 'stale');
+        return res;
+      }
+    } catch {
+      // Ignore
     }
 
     // All methods failed - log detailed error

@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...(init || {}), signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 /**
  * Resolve Steam username to Steam64 ID
  * Supports both custom URLs and Steam64 IDs
@@ -72,12 +82,11 @@ export async function GET(request: Request) {
     // Method 2: Try steamid.io (if available)
     try {
       const steamIdIoUrl = `https://steamid.io/lookup/${encodeURIComponent(cleanUsername)}`;
-      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(steamIdIoUrl)}`, {
-        signal: AbortSignal.timeout(10000),
+      const response = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(steamIdIoUrl)}`, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         }
-      });
+      }, 10000);
       
       if (response.ok) {
         const html = await response.text();

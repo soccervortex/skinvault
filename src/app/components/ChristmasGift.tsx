@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Gift, X, Sparkles } from 'lucide-react';
+import { useToast } from './Toast';
+import { copyToClipboard } from '@/app/utils/clipboard';
 import { getRandomReward, saveReward, type Reward } from '@/app/utils/christmas-rewards';
 
 interface ChristmasGiftProps {
@@ -219,7 +221,7 @@ export default function ChristmasGift({ steamId }: ChristmasGiftProps) {
                     </code>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(reward.value as string);
+                        void copyToClipboard(reward.value as string);
                       }}
                       className="text-white/80 hover:text-white transition-colors"
                       title="Kopieer code"

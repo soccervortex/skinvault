@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { isOwner } from '@/app/utils/owner-ids';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -40,11 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const MONGODB_URI = process.env.MONGODB_URI;
-  const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-  if (!MONGODB_URI) {
-    return NextResponse.json({ error: 'MongoDB URI not configured' }, { status: 400 });
+  if (!hasMongoConfig()) {
+    return NextResponse.json({ error: 'MongoDB not configured' }, { status: 400 });
   }
 
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -145,11 +142,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const MONGODB_URI = process.env.MONGODB_URI;
-  const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-  if (!MONGODB_URI) {
-    return NextResponse.json({ error: 'MongoDB URI not configured' }, { status: 400 });
+  if (!hasMongoConfig()) {
+    return NextResponse.json({ error: 'MongoDB not configured' }, { status: 400 });
   }
 
   try {

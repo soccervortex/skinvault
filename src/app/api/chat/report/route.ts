@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { notifyChatReport } from '@/app/utils/discord-webhook';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 interface Report {
   _id?: string;
@@ -29,7 +27,7 @@ interface Report {
 // POST: Create a report
 export async function POST(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -151,7 +149,7 @@ export async function POST(request: Request) {
 // GET: Get reports (admin only)
 export async function GET(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ reports: [] });
     }
 
@@ -205,7 +203,7 @@ export async function GET(request: Request) {
 // PATCH: Update report status (admin only)
 export async function PATCH(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 

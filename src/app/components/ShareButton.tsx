@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Share2, Check, Copy, ExternalLink } from 'lucide-react';
 import { useToast } from './Toast';
+import { copyToClipboard } from '@/app/utils/clipboard';
 
 interface ShareButtonProps {
   url: string;
@@ -45,10 +46,14 @@ export default function ShareButton({
 
     // Fallback: Copy to clipboard
     try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      toast.success('Link copied to clipboard!');
-      setTimeout(() => setCopied(false), 2000);
+      const ok = await copyToClipboard(url);
+      if (ok) {
+        setCopied(true);
+        toast.success('Link copied to clipboard!');
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        toast.error('Please copy the link manually.');
+      }
     } catch (error) {
       toast.error('Failed to copy link. Please copy it manually.');
     }

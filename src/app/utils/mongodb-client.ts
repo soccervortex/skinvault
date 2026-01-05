@@ -23,6 +23,10 @@ function getMongoUriCandidates(): string[] {
   return Array.from(new Set(candidates));
 }
 
+export function hasMongoConfig(): boolean {
+  return getMongoUriCandidates().length > 0;
+}
+
 // Global connection pool
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;

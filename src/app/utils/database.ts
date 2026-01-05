@@ -280,7 +280,7 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
 
   // For theme_settings, prioritize MongoDB over KV to ensure we get the latest data
   // (KV might have stale data if write to KV failed or was slow)
-  if (isThemeSettings && MONGODB_URI) {
+  if (isThemeSettings && hasMongoConfig()) {
     try {
       const mongoValue = await mongoGet<T>(key);
       if (mongoValue !== null) {
@@ -312,7 +312,7 @@ export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T
       }
       
       // If found in KV, ensure MongoDB also has it (sync in background)
-      if (value && MONGODB_URI) {
+      if (value && hasMongoConfig()) {
         mongoSet(key, value).catch(() => {}); // Sync to MongoDB
       }
       
@@ -476,7 +476,7 @@ export async function dbDelete(key: string): Promise<boolean> {
   }
 
   // Also delete from MongoDB
-  if (MONGODB_URI) {
+  if (hasMongoConfig()) {
     mongoSuccess = await mongoDelete(key);
   }
 
@@ -572,7 +572,7 @@ export async function checkDbHealth(): Promise<{
   status: 'kv' | 'mongodb' | 'fallback';
 }> {
   const kvAvailable = await isKVAvailable();
-  const mongoAvailable = MONGODB_URI ? (await initMongoDB()) !== null : false;
+  const mongoAvailable = hasMongoConfig() ? (await initMongoDB()) !== null : false;
 
   // If KV just became available and we were using MongoDB, trigger sync
   if (kvAvailable && dbStatus === 'mongodb' && mongoAvailable) {

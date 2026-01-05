@@ -42,7 +42,9 @@ export async function preloadChatData(steamId: string): Promise<void> {
     // Store in sessionStorage
     sessionStorage.setItem(CHAT_PRELOAD_KEY, JSON.stringify(preloadedData));
   } catch (error) {
-    console.warn('Failed to preload chat data:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Failed to preload chat data:', error);
+    }
   }
 }
 

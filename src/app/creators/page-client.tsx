@@ -30,6 +30,20 @@ export default function CreatorsIndexClient() {
     twitchLogin: '',
   });
 
+  const getSafeAvatarUrl = (raw?: string) => {
+    const v = String(raw || '').trim();
+    if (!v) return '';
+    try {
+      const u = new URL(v);
+      const host = u.hostname.toLowerCase();
+      const isTikTok = host.includes('tiktokcdn') || host.startsWith('p16-');
+      if (isTikTok) return `/api/image-proxy?url=${encodeURIComponent(v)}`;
+      return v;
+    } catch {
+      return v;
+    }
+  };
+
   const adminSteamId = useMemo(() => {
     try {
       const raw = window.localStorage.getItem('steam_user');
@@ -150,7 +164,7 @@ export default function CreatorsIndexClient() {
                 <div className="w-12 h-12 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
                   {c.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.avatarUrl} alt={c.displayName} className="w-full h-full object-cover" />
+                    <img src={getSafeAvatarUrl(c.avatarUrl)} alt={c.displayName} className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-xs font-black text-gray-300 uppercase">{c.displayName.slice(0, 2)}</div>
                   )}
@@ -194,7 +208,7 @@ export default function CreatorsIndexClient() {
                   <div className="w-14 h-14 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
                     {form.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.avatarUrl} alt={form.displayName || 'Avatar'} className="w-full h-full object-cover" />
+                      <img src={getSafeAvatarUrl(form.avatarUrl)} alt={form.displayName || 'Avatar'} className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-sm font-black text-gray-300 uppercase">{(form.displayName || '??').slice(0, 2)}</div>
                     )}

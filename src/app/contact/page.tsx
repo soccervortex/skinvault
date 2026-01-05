@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import { Mail, Copy, Check } from 'lucide-react';
+import { copyToClipboard } from '@/app/utils/clipboard';
 
 export default function ContactPage() {
   const [copied, setCopied] = useState(false);
@@ -21,16 +22,20 @@ Description:
 
 [If applicable, attach screenshots/images]`;
 
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(contactEmail);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyEmail = async () => {
+    const ok = await copyToClipboard(contactEmail);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const handleCopyTemplate = () => {
-    navigator.clipboard.writeText(exampleTemplate);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyTemplate = async () => {
+    const ok = await copyToClipboard(exampleTemplate);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

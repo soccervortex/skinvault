@@ -13,6 +13,16 @@ import { isOwner } from '@/app/utils/owner-ids';
 import ChatPreloader from './ChatPreloader';
 import { getUnreadCounts } from '@/app/utils/chat-notifications';
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...(init || {}), signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const pathname = usePathname();
   const router = useRouter();
@@ -88,7 +98,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
         // Check if there's an active theme from admin (works without login)
         // We check without user preference to see if admin has enabled a theme
-        const adminThemeResponse = await fetch('/api/themes/active');
+        const adminThemeResponse = await fetchWithTimeout('/api/themes/active', {
+          cache: 'no-store',
+        }, 8000);
         if (adminThemeResponse.ok) {
           const adminThemeData = await adminThemeResponse.json();
           const themeExists = !!adminThemeData.theme;
@@ -98,7 +110,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             // Check if user has disabled themes
             let userDisabled = false;
             if (steamId) {
-              const prefResponse = await fetch(`/api/themes/user-preference?steamId=${steamId}`);
+              const prefResponse = await fetchWithTimeout(`/api/themes/user-preference?steamId=${steamId}`, {
+                cache: 'no-store',
+              }, 8000);
               if (prefResponse.ok) {
                 const prefData = await prefResponse.json();
                 userDisabled = prefData.disabled || false;
@@ -125,7 +139,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           }
         }
       } catch (error) {
-        console.error('Failed to load theme state:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to load theme state:', error);
+        }
       }
     };
 
@@ -138,7 +154,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     window.addEventListener('themeChanged', handleThemeChange);
 
     // Poll periodically to catch admin changes
-    const interval = setInterval(loadThemeState, 3000);
+    const interval = setInterval(loadThemeState, 15000);
 
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);

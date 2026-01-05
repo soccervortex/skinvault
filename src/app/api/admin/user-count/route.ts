@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbGet } from '@/app/utils/database';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 
 const FIRST_LOGINS_KEY = 'first_logins';
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 export async function GET() {
   try {
@@ -16,7 +15,7 @@ export async function GET() {
       userCount = Object.keys(firstLogins).length;
     } else {
       // Fallback: Count from MongoDB directly
-      if (MONGODB_URI) {
+      if (hasMongoConfig()) {
         try {
           const db = await getDatabase();
           const collection = db.collection('first_logins');

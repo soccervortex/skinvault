@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { setupChatIndexes, CHAT_INDEXES } from '@/app/utils/mongodb-indexes';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 /**
  * API route to set up MongoDB indexes for optimal chat performance
@@ -12,7 +10,7 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
  */
 export async function POST(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -82,6 +80,60 @@ export async function POST(request: Request) {
               results.push(`⚠️  Index already exists on ${col.name}`);
             }
           }
+        }
+      }
+
+      try {
+        const invCache = db.collection('inventory_cache');
+        await invCache.createIndex({ expiresAt: 1 }, { name: 'expiresAt_ttl', expireAfterSeconds: 0 });
+        results.push('✅ Created TTL index on inventory_cache.expiresAt');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          results.push('⚠️  TTL index already exists on inventory_cache.expiresAt');
+        } else {
+          results.push(`⚠️  inventory_cache TTL: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const invCache = db.collection('inventory_cache');
+        await invCache.createIndex(
+          { steamId: 1, currency: 1, startAssetId: 1, expiresAt: 1 },
+          { name: 'inventory_cache_lookup' }
+        );
+        results.push('✅ Created lookup index on inventory_cache');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          results.push('⚠️  Lookup index already exists on inventory_cache');
+        } else {
+          results.push(`⚠️  inventory_cache lookup: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const surpriseCache = db.collection('surprise_cache');
+        await surpriseCache.createIndex({ expiresAt: 1 }, { name: 'expiresAt_ttl', expireAfterSeconds: 0 });
+        results.push('✅ Created TTL index on surprise_cache.expiresAt');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          results.push('⚠️  TTL index already exists on surprise_cache.expiresAt');
+        } else {
+          results.push(`⚠️  surprise_cache TTL: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const surpriseCache = db.collection('surprise_cache');
+        await surpriseCache.createIndex(
+          { expiresAt: 1, createdAt: 1 },
+          { name: 'surprise_cache_lookup' }
+        );
+        results.push('✅ Created lookup index on surprise_cache');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          results.push('⚠️  Lookup index already exists on surprise_cache');
+        } else {
+          results.push(`⚠️  surprise_cache lookup: ${error?.message || String(error)}`);
         }
       }
       

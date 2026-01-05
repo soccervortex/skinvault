@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { isOwner } from '@/app/utils/owner-ids';
 import Pusher from 'pusher';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 interface ChatMessage {
   _id?: string;
@@ -32,7 +30,7 @@ export async function PATCH(
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -124,7 +122,7 @@ export async function DELETE(
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 

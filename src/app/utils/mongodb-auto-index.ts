@@ -3,10 +3,7 @@
  * This will automatically create indexes when the app starts or connects to MongoDB
  */
 
-import { getDatabase } from './mongodb-client';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
+import { getDatabase, hasMongoConfig } from './mongodb-client';
 
 let indexesSetup = false;
 let setupPromise: Promise<void> | null = null;
@@ -29,8 +26,8 @@ export async function autoSetupIndexes(): Promise<void> {
   // Start setup
   setupPromise = (async () => {
     try {
-      if (!MONGODB_URI) {
-        console.log('⚠️  MongoDB URI not configured, skipping index setup');
+      if (!hasMongoConfig()) {
+        console.log('⚠️  MongoDB not configured, skipping index setup');
         return;
       }
 
@@ -112,6 +109,61 @@ export async function autoSetupIndexes(): Promise<void> {
         }
       }
 
+      // Inventory cache: TTL cleanup + lookup
+      try {
+        const invCache = db.collection('inventory_cache');
+        await invCache.createIndex({ expiresAt: 1 }, { name: 'expiresAt_ttl', expireAfterSeconds: 0 });
+        results.push('✅ Created TTL index on inventory_cache.expiresAt');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  inventory_cache TTL: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const invCache = db.collection('inventory_cache');
+        await invCache.createIndex(
+          { steamId: 1, currency: 1, startAssetId: 1, expiresAt: 1 },
+          { name: 'inventory_cache_lookup' }
+        );
+        results.push('✅ Created lookup index on inventory_cache');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  inventory_cache lookup: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const surpriseCache = db.collection('surprise_cache');
+        await surpriseCache.createIndex({ expiresAt: 1 }, { name: 'expiresAt_ttl', expireAfterSeconds: 0 });
+        results.push('✅ Created TTL index on surprise_cache.expiresAt');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  surprise_cache TTL: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const surpriseCache = db.collection('surprise_cache');
+        await surpriseCache.createIndex(
+          { expiresAt: 1, createdAt: 1 },
+          { name: 'surprise_cache_lookup' }
+        );
+        results.push('✅ Created lookup index on surprise_cache');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  surprise_cache lookup: ${error?.message || String(error)}`);
+        }
+      }
+
       // Don't close connection - it's from shared pool
 
       if (results.length > 0) {
@@ -135,7 +187,7 @@ export async function autoSetupIndexes(): Promise<void> {
  * Setup indexes for a specific collection (called when new collections are created)
  */
 export async function setupIndexesForCollection(collectionName: string): Promise<void> {
-  if (!MONGODB_URI) return;
+  if (!hasMongoConfig()) return;
 
   try {
     // Use shared connection pool instead of creating new client

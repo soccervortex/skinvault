@@ -35,11 +35,17 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     
     const successful = document.execCommand('copy');
     document.body.removeChild(textArea);
-    
-    return successful;
+    if (successful) return true;
   } catch (error) {
     console.warn('Fallback copy method failed:', error);
-    return false;
   }
+
+  // Last resort: prompt-based manual copy (works on iOS Safari when clipboard access is blocked)
+  try {
+    window.prompt('Copy this text:', text);
+  } catch {
+    // ignore
+  }
+  return false;
 }
 

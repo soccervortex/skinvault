@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { checkDbHealth, getDbStatus } from '@/app/utils/database';
 import { isOwner } from '@/app/utils/owner-ids';
+import { hasMongoConfig } from '@/app/utils/mongodb-client';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
         available: health.kv,
       },
       mongodb: {
-        configured: !!process.env.MONGODB_URI,
+        configured: hasMongoConfig(),
         available: health.mongodb,
       },
     });

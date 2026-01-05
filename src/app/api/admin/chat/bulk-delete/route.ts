@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { isOwner } from '@/app/utils/owner-ids';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 // POST: Bulk delete messages
 export async function POST(request: Request) {
   try {
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 

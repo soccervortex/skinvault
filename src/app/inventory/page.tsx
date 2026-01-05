@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy } from 'lucide-react';
-import { getPriceScanConcurrencySync } from '@/app/utils/pro-limits';
+import { getPriceScanConcurrencySync, getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import dynamic from 'next/dynamic';
 
@@ -24,10 +24,10 @@ const CompareModal = dynamic(() => import('@/app/components/CompareModal'), {
 });
 import { InventoryItemSkeleton, ProfileHeaderSkeleton, StatCardSkeleton } from '@/app/components/LoadingSkeleton';
 import ShareButton from '@/app/components/ShareButton';
-import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
-import { getWishlistLimitSync } from '@/app/utils/pro-limits';
+import { copyToClipboard } from '@/app/utils/clipboard';
 import { useToast } from '@/app/components/Toast';
 import { isBanned } from '@/app/utils/ban-check';
+import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -85,17 +85,9 @@ function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   const hasValue = (() => {
     if (val === null || val === undefined) return false;
     if (typeof val === 'number') return Number.isFinite(val);
-    if (typeof val === 'string') {
-      const s = val.trim();
-      if (!s) return false;
-      if (s === '---' || s === '--' || s === '—') return false;
-      if (/^[-—]+%?$/.test(s)) return false;
-      if (s.toLowerCase() === 'nan') return false;
-      return true;
-    }
+    if (typeof val === 'string') return val.trim().length > 0;
     return true;
   })();
-
   if (!hasValue) return null;
 
   return (
@@ -117,6 +109,7 @@ function InventoryContent() {
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
   const [viewedUser, setViewedUser] = useState<any>(null);
+  const [cs2Overview, setCs2Overview] = useState<any>(null);
   const [playerStats, setPlayerStats] = useState<any>(null);
   const [faceitStats, setFaceitStats] = useState<any>(null);
   const [statsPrivate, setStatsPrivate] = useState(false);
@@ -141,10 +134,24 @@ function InventoryContent() {
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
-  const isPro = useMemo(
+  const isPro = useMemo(() => {
+    if (!loggedInUser?.steamId) return false;
+    if (loggedInUserPro) return true;
+    const until = loggedInUser?.proUntil;
+    return !!(until && new Date(until) > new Date());
+  }, [loggedInUser?.steamId, loggedInUser?.proUntil, loggedInUserPro]);
+
+  const viewedIsPro = useMemo(
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
     [viewedUser?.proUntil]
   );
+
+  const formatHours = (minutes: number | null) => {
+    if (minutes === null || minutes === undefined) return null;
+    const hours = minutes / 60;
+    if (!Number.isFinite(hours)) return null;
+    return hours;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -480,7 +487,7 @@ function InventoryContent() {
     const results: Record<string, string> = {};
     const active = new Set<Promise<void>>();
     // Pro users get faster scanning with higher concurrency
-    const CONCURRENCY = getPriceScanConcurrencySync(isPro, viewedUser?.steamId);
+    const CONCURRENCY = getPriceScanConcurrencySync(isPro, loggedInUser?.steamId);
 
     for (const name of missing) {
       let taskPromise: Promise<void>;
@@ -513,20 +520,8 @@ function InventoryContent() {
 
   const fetchInventory = async (id: string, proStatus?: boolean) => {
     try {
-      // Check Pro status if not provided
-      let actualProStatus = proStatus;
-      if (actualProStatus === undefined) {
-        // Check Pro status from API
-        try {
-          const proRes = await fetch(`/api/user/pro?id=${id}`);
-          if (proRes.ok) {
-            const proData = await proRes.json();
-            actualProStatus = !!(proData?.proUntil && new Date(proData.proUntil) > new Date());
-          }
-        } catch {
-          actualProStatus = false;
-        }
-      }
+      // Pro status here is for the viewer (affects proxy/scan performance). Never infer from the viewed profile.
+      const actualProStatus = !!proStatus;
       
       let allItems: InventoryItem[] = [];
       let startAssetId: string | null = null;
@@ -767,7 +762,7 @@ function InventoryContent() {
         }
       }
       
-      // Fetch Pro status FIRST so we can use it for inventory fetch
+      // Fetch Pro status of the VIEWED profile (only used for displaying badges, not gating features)
       let proInfo: any = { proUntil: null };
       try {
         const proRes = await fetch(`/api/user/pro?id=${viewedSteamId}`);
@@ -778,9 +773,16 @@ function InventoryContent() {
       } catch (err) {
         console.error('Pro status fetch error:', err);
       }
-      
-      // Calculate Pro status for inventory fetch
-      const proStatusForInventory = !!(proInfo?.proUntil && new Date(proInfo.proUntil) > new Date());
+
+      // Viewer Pro status for inventory fetch (performance-only)
+      let proStatusForInventory = false;
+      if (storedLoggedInUser?.steamId) {
+        try {
+          proStatusForInventory = await checkProStatus(storedLoggedInUser.steamId);
+        } catch {
+          proStatusForInventory = false;
+        }
+      }
       
       // Start all requests in parallel - show content progressively
       const profilePromise = fetchViewedProfile(viewedSteamId);
@@ -950,8 +952,9 @@ function InventoryContent() {
 
   // Load Discord status for viewed user (only show if Pro)
   useEffect(() => {
-    if (!viewedUser?.steamId) {
+    if (!viewedUser?.steamId || !loggedInUser?.steamId || loggedInUser.steamId !== viewedUser.steamId) {
       setDiscordStatus(null);
+      setHasDiscordAccess(false);
       return;
     }
     
@@ -1001,6 +1004,35 @@ function InventoryContent() {
     
     checkDiscordAccess();
   }, [viewedUser?.steamId, isPro]);
+
+  // Public CS2 overview (playtime/last played). Cached server-side.
+  useEffect(() => {
+    if (!viewedUser?.steamId) {
+      setCs2Overview(null);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch(`/api/steam/cs2/overview?steamId=${encodeURIComponent(viewedUser.steamId)}`, {
+          cache: 'no-store',
+        });
+        const json = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok) {
+          setCs2Overview(null);
+          return;
+        }
+        setCs2Overview(json);
+      } catch {
+        if (!cancelled) setCs2Overview(null);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser?.steamId]);
 
   // Handle discord=connected URL parameter (refresh status after OAuth callback)
   useEffect(() => {
@@ -1148,22 +1180,15 @@ function InventoryContent() {
   const handleCopyShareLink = async () => {
     if (!shareUrl) return;
     try {
-      if (typeof navigator !== 'undefined' && (navigator as any).clipboard && typeof window !== 'undefined' && (window as any).isSecureContext) {
-        await (navigator as any).clipboard.writeText(shareUrl);
-      } else if (typeof document !== 'undefined') {
-        const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-9999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
+      const ok = await copyToClipboard(shareUrl);
+      if (ok) {
+        setCopied(true);
+        toast.success('Link copied to clipboard!');
+        setTimeout(() => setCopied(false), 1500);
+      } else {
+        setCopied(false);
+        toast.error('Please copy the link manually.');
       }
-      setCopied(true);
-      toast.success('Link copied to clipboard!');
-      setTimeout(() => setCopied(false), 1500);
     } catch {
       setCopied(false);
       toast.error('Could not copy link. Please copy it manually.');
@@ -1208,7 +1233,7 @@ function InventoryContent() {
                     <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
-                    {isPro && (
+                    {viewedIsPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
                       </span>
@@ -1344,6 +1369,91 @@ function InventoryContent() {
                 </div>
               </div>
             </header>
+
+            <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">CS2 Overview</div>
+                <div className="text-[9px] md:text-[10px] text-gray-500">Public playtime data (Steam)</div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <Trophy size={12} /> Hours Played
+                  </div>
+                  <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
+                    {(() => {
+                      const hours = formatHours(cs2Overview?.playtimeForeverMinutes ?? null);
+                      if (hours === null) return '—';
+                      return hours.toLocaleString('nl-NL', { maximumFractionDigits: 0 });
+                    })()}
+                  </div>
+                  <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">All time</div>
+                </div>
+
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <TrendingUp size={12} /> CS2 Owned
+                  </div>
+                  <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
+                    {cs2Overview ? (cs2Overview?.hasCs2 ? 'Yes' : 'No') : '—'}
+                  </div>
+                  <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">AppID 730</div>
+                </div>
+
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <MessageSquare size={12} /> Last Seen
+                  </div>
+                  <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
+                    {(() => {
+                      const ts = cs2Overview?.lastLogoff;
+                      if (!ts) return '—';
+                      const d = new Date(Number(ts) * 1000);
+                      if (isNaN(d.getTime())) return '—';
+                      return d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' });
+                    })()}
+                  </div>
+                  <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">Steam last logoff</div>
+                </div>
+
+                {isPro ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[8px]">PRO</span>
+                      2 Weeks
+                    </div>
+                    <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
+                      {(() => {
+                        const hours = formatHours(cs2Overview?.playtime2WeeksMinutes ?? null);
+                        if (hours === null) return '—';
+                        return hours.toLocaleString('nl-NL', { maximumFractionDigits: 1 });
+                      })()}
+                    </div>
+                    <div className="mt-1 text-[9px] md:text-[10px] text-emerald-200/70">Hours last 2 weeks</div>
+                  </div>
+                ) : (
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500 opacity-60">
+                      <Lock size={12} /> 2 Weeks
+                    </div>
+                    <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-gray-600 opacity-60">—</div>
+                    <div className="mt-1 text-[9px] md:text-[10px] text-gray-600 opacity-60">Hours last 2 weeks</div>
+                  </div>
+                )}
+              </div>
+
+              {cs2Overview && cs2Overview?.hasCs2 === false && (
+                <div className="mt-4 text-[10px] md:text-xs text-gray-500">
+                  This Steam account does not expose CS2 ownership/playtime publicly (or does not own CS2).
+                </div>
+              )}
+            </section>
 
             {statsPrivate && (
               <div className="flex items-center gap-4 bg-amber-500/10 border border-amber-500/20 p-5 rounded-[2rem] text-xs">

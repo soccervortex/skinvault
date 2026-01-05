@@ -2,10 +2,8 @@ import { NextResponse } from 'next/server';
 import { dbGet } from '@/app/utils/database';
 import { isOwner } from '@/app/utils/owner-ids';
 import { getProUntil } from '@/app/utils/pro-storage';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForRange, getChatCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 export async function GET(
   request: Request,
@@ -61,7 +59,7 @@ export async function GET(
 
     // Get chat messages using date-based collections
     let messages: any[] = [];
-    if (MONGODB_URI) {
+    if (hasMongoConfig()) {
       const db = await getDatabase();
 
       // Calculate time filter and collection names
@@ -118,7 +116,7 @@ export async function GET(
 
     // Count timeout history (from backups)
     let timeoutCount = 0;
-    if (MONGODB_URI) {
+    if (hasMongoConfig()) {
       try {
         const db = await getDatabase();
         const backupsCollection = db.collection('chat_backups');
@@ -140,7 +138,7 @@ export async function GET(
 
     // Get DM messages for this user
     let dmMessages: any[] = [];
-    if (MONGODB_URI) {
+    if (hasMongoConfig()) {
       try {
         const db = await getDatabase();
         

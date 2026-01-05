@@ -94,6 +94,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
   const [priceIndex, setPriceIndex] = useState<Record<string, number> | null>(null);
   const [priceIndexLoaded, setPriceIndexLoaded] = useState(false);
+  const [surpriseLoading, setSurpriseLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -164,6 +165,9 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   }, [isOpen, currency.code]);
 
   const matchesFilters = (item: any, minNum?: number, maxNum?: number) => {
+    const rawName = String(item?.market_hash_name ?? item?.marketHashName ?? item?.name ?? '').trim();
+    if (rawName.includes('---')) return false;
+
     const name = (item.name || '').toLowerCase();
     const weapon = (item.weapon?.name || '').toLowerCase();
     const q = query.trim().toLowerCase();
@@ -215,7 +219,9 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
     }
   }, [query, wear, priceMin, priceMax, customMin, customMax, allItems, priceIndex]);
 
-  const handleSurprise = () => {
+  const handleSurprise = async () => {
+    if (surpriseLoading) return;
+
     const min = customMin || priceMin;
     const max = customMax || priceMax;
     const { minNum, maxNum } = makeMinMax(min, max);
@@ -227,9 +233,32 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
       return;
     }
 
-    const random = matches[Math.floor(Math.random() * matches.length)];
-    router.push(`/item/${encodeURIComponent(random.id)}`);
-    onClose();
+    setSurpriseLoading(true);
+    try {
+      const sp = new URLSearchParams();
+      sp.set('currency', currency.code);
+      const q = query.trim();
+      if (q) sp.set('q', q);
+      if (wear) sp.set('wear', wear);
+      if (min !== '') sp.set('min', min);
+      if (max !== '') sp.set('max', max);
+
+      const res = await fetch(`/api/market/surprise?${sp.toString()}`, { cache: 'no-store' });
+      const json = await res.json().catch(() => ({} as any));
+
+      if (!res.ok || !json?.itemId) {
+        const msg = typeof json?.error === 'string' ? json.error : 'Failed to pick a prize. Try again.';
+        alert(msg);
+        return;
+      }
+
+      router.push(`/item/${encodeURIComponent(String(json.itemId))}`);
+      onClose();
+    } catch {
+      alert('Failed to pick a prize. Try again.');
+    } finally {
+      setSurpriseLoading(false);
+    }
   };
 
   const selectPricePreset = (preset: (typeof PRICE_PRESETS)[number]) => {
@@ -352,11 +381,11 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
           {/* Action */}
           <button
             onClick={handleSurprise}
-            disabled={filteredCount === 0}
+            disabled={filteredCount === 0 || surpriseLoading}
             className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Dices size={16} />
-            Surprise Me
+            {surpriseLoading ? 'Loading…' : 'Surprise Me'}
           </button>
         </div>
       </div>

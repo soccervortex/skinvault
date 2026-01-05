@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
-import { getDatabase } from '@/app/utils/mongodb-client';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 
 // GET: List all collections in the database (admin only)
 export async function GET(request: Request) {
@@ -15,7 +13,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 

@@ -43,7 +43,8 @@ export async function GET(request: Request) {
     .card { width: 100%; height: 100%; border-radius: 18px; background: rgba(8,9,13,0.88); border: 1px solid rgba(59,130,246,0.55); box-shadow: 0 20px 60px rgba(0,0,0,0.55); position: relative; padding: 14px 16px; box-sizing: border-box; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .brand { display: flex; align-items: center; gap: 10px; }
-    .logo { width: 28px; height: 28px; border-radius: 8px; background: rgba(59,130,246,0.20); border: 1px solid rgba(59,130,246,0.45); display:flex; align-items:center; justify-content:center; color: #93c5fd; font-weight: 900; font-size: 12px; letter-spacing: 0.08em; }
+    .logo { width: 28px; height: 28px; border-radius: 8px; background: rgba(59,130,246,0.20); border: 1px solid rgba(59,130,246,0.45); display:flex; align-items:center; justify-content:center; overflow: hidden; }
+    .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .title { color: rgba(148,163,184,0.95); font-size: 10px; font-weight: 900; letter-spacing: 0.24em; text-transform: uppercase; }
     .valueRow { margin-top: 10px; display: flex; align-items: baseline; gap: 10px; }
     .currency { color: #60a5fa; font-size: 26px; font-weight: 900; font-style: italic; }
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
       <div class="card">
       <div class="row">
         <div class="brand">
-          <div class="logo">SV</div>
+          <div class="logo"><img src="/icons/favicon-48x48.png" alt="SkinVaults" /></div>
           <div>
             <div class="title">TOTAL VAULT VALUE</div>
           </div>

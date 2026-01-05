@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
+import { copyToClipboard } from '@/app/utils/clipboard';
 
 type FeedItem = {
   id: string;
@@ -55,6 +56,20 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     twitchLogin: '',
     partnerSteamId: '',
   });
+
+  const getSafeAvatarUrl = (raw?: string) => {
+    const v = String(raw || '').trim();
+    if (!v) return '';
+    try {
+      const u = new URL(v);
+      const host = u.hostname.toLowerCase();
+      const isTikTok = host.includes('tiktokcdn') || host.startsWith('p16-');
+      if (isTikTok) return `/api/image-proxy?url=${encodeURIComponent(v)}`;
+      return v;
+    } catch {
+      return v;
+    }
+  };
 
   useEffect(() => {
     try {
@@ -165,22 +180,13 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
         throw new Error(msg);
       }
 
-      if (typeof navigator !== 'undefined' && (navigator as any).clipboard && typeof window !== 'undefined' && (window as any).isSecureContext) {
-        await (navigator as any).clipboard.writeText(link);
-      } else if (typeof document !== 'undefined') {
-        const textArea = document.createElement('textarea');
-        textArea.value = link;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-9999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
+      const ok = await copyToClipboard(link);
+      if (ok) {
+        setObsCopied(true);
+        setTimeout(() => setObsCopied(false), 1500);
+      } else {
+        setError('Copy manually from the popup.');
       }
-
-      setObsCopied(true);
-      setTimeout(() => setObsCopied(false), 1500);
     } catch (e: any) {
       setError(e?.message || 'Failed to generate overlay link');
       setObsCopied(false);
@@ -347,7 +353,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
             <div className="w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
               {data?.creator?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={data.creator.avatarUrl} alt={data.creator.displayName} className="w-full h-full object-cover" />
+                <img src={getSafeAvatarUrl(data.creator.avatarUrl)} alt={data.creator.displayName} className="w-full h-full object-cover" />
               ) : (
                 <div className="text-sm md:text-base font-black text-gray-300 uppercase">
                   {(data?.creator?.displayName || slug).slice(0, 2)}
@@ -639,7 +645,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                   <div className="w-14 h-14 rounded-full overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
                     {edit.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={edit.avatarUrl} alt={edit.displayName || 'Avatar'} className="w-full h-full object-cover" />
+                      <img src={getSafeAvatarUrl(edit.avatarUrl)} alt={edit.displayName || 'Avatar'} className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-sm font-black text-gray-300 uppercase">{(edit.displayName || '??').slice(0, 2)}</div>
                     )}

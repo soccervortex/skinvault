@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays } from '@/app/utils/chat-collections';
-
-const MONGODB_URI = process.env.MONGODB_URI || '';
 
 // Backup current chat messages before clearing
 export async function POST(request: Request) {
@@ -16,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -77,7 +75,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (!MONGODB_URI) {
+    if (!hasMongoConfig()) {
       return NextResponse.json({ backups: [] });
     }
 
