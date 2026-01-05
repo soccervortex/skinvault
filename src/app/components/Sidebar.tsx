@@ -315,6 +315,24 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             </div>
 
             <div className="space-y-2 mb-10 flex-1">
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href="/terms"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
+                  aria-label="Terms of Service"
+                >
+                  <FileText size={14} /> Terms
+                </Link>
+                <Link
+                  href="/privacy"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
+                  aria-label="Privacy Policy"
+                >
+                  <Shield size={14} /> Privacy
+                </Link>
+              </div>
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
                 <Tag size={16} /> Market
               </Link>
@@ -533,6 +551,22 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         </div>
 
         <div className="space-y-2 mb-10 flex-1">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href="/terms"
+              className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
+              aria-label="Terms of Service"
+            >
+              <FileText size={14} /> Terms
+            </Link>
+            <Link
+              href="/privacy"
+              className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
+              aria-label="Privacy Policy"
+            >
+              <Shield size={14} /> Privacy
+            </Link>
+          </div>
           <Link href="/" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
             <Tag size={16} /> Market
           </Link>

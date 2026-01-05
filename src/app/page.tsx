@@ -782,25 +782,6 @@ export default function GlobalSkinSearch() {
             </div>
           )}
         </main>
-
-        <div className="px-6 md:px-10 pb-10">
-          <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-white/5">
-            <div className="flex flex-wrap items-center gap-4 text-[9px] font-black uppercase tracking-widest text-gray-500">
-              <Link href="/terms" className="hover:text-gray-300 transition-colors">
-                Terms of Service
-              </Link>
-              <Link href="/privacy" className="hover:text-gray-300 transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="/contact" className="hover:text-gray-300 transition-colors">
-                Contact
-              </Link>
-            </div>
-            <div className="mt-3 text-[8px] font-black uppercase tracking-widest text-gray-600">
-              © {new Date().getFullYear()} SkinVaults
-            </div>
-          </div>
-        </div>
       </div>
       
       {showTrackerModal && trackerModalItem && user && (
