@@ -1230,7 +1230,7 @@ function InventoryContent() {
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                    <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
+                    <h1 className="w-full sm:w-auto min-w-0 text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
                     {viewedIsPro && (
@@ -1369,6 +1369,16 @@ function InventoryContent() {
                 </div>
               </div>
             </header>
+
+            <div className="bg-black/40 border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 text-[10px] md:text-xs text-gray-300">
+              <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 mb-2">2. De "Inventory Cache"</div>
+              <div className="space-y-2">
+                <div>Grote sites zoals Skinport of CS.Money zijn constant bezig met het "scrapen" (uitlezen) van duizenden profielen.</div>
+                <div>Zodra jij inlogt, kijken ze in hun eigen database.</div>
+                <div>Als ze je inventory een minuut geleden al hebben ingeladen, laten ze die direct zien.</div>
+                <div>Als je op "Refresh" klikt, gebruiken zij hun servers om de data bij Steam op te halen. Dit gaat razendsnel omdat zij supersnelle verbindingen hebben met de Steam-servers.</div>
+              </div>
+            </div>
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">

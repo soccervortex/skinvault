@@ -243,7 +243,13 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
       if (min !== '') sp.set('min', min);
       if (max !== '') sp.set('max', max);
 
-      const res = await fetch(`/api/market/surprise?${sp.toString()}`, { cache: 'no-store' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(`/api/market/surprise?${sp.toString()}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
       const json = await res.json().catch(() => ({} as any));
 
       if (!res.ok || !json?.itemId) {
@@ -254,7 +260,11 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
 
       router.push(`/item/${encodeURIComponent(String(json.itemId))}`);
       onClose();
-    } catch {
+    } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        alert('Surprise Me is taking too long. Please try again.');
+        return;
+      }
       alert('Failed to pick a prize. Try again.');
     } finally {
       setSurpriseLoading(false);

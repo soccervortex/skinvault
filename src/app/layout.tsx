@@ -156,6 +156,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://raw.githubusercontent.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://steamcommunity.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://community.akamai.steamstatic.com" crossOrigin="anonymous" />

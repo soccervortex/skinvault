@@ -36,6 +36,30 @@ type PoolCacheDoc = {
   items: PoolItem[];
 };
 
+async function fetchWithTimeout(input: string, ms: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(input, { cache: 'no-store', signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function getCachedMarketPrice(db: any, currency: string, marketHashName: string): Promise<number | null> {
+  try {
+    const col = db.collection('market_prices');
+    const doc = await col.findOne(
+      { currency, market_hash_name: marketHashName } as any,
+      { projection: { _id: 0, price: 1 } } as any
+    );
+    const p = Number((doc as any)?.price);
+    return Number.isFinite(p) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeMinMax(searchParams: URLSearchParams) {
   const minRaw = searchParams.get('min');
   const maxRaw = searchParams.get('max');
@@ -153,6 +177,7 @@ export async function GET(req: NextRequest) {
 
     const db = await getDatabase();
     const cacheCol = db.collection('surprise_cache');
+    const marketPricesCol = db.collection('market_prices');
 
     const cacheKey = `surprise_${currency}_${q}_${wear}_${min ?? ''}_${max ?? ''}`;
 
@@ -196,6 +221,7 @@ export async function GET(req: NextRequest) {
 
     const maxAttempts = 60;
     let badDashTries = 0;
+    let steamFallbackCalls = 0;
 
     for (let i = 0; i < maxAttempts; i++) {
       const candidate = filteredPool[Math.floor(Math.random() * filteredPool.length)];
@@ -211,15 +237,33 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      const priceRes = await fetch(
-        `${url.origin}/api/steam/price?market_hash_name=${encodeURIComponent(marketHash)}&currency=${encodeURIComponent(currency)}`,
-        { cache: 'no-store' }
-      );
+      let priceNum: number | null = null;
+      priceNum = await getCachedMarketPrice(db, currency, marketHash);
 
-      if (!priceRes.ok) continue;
-      const priceJson = await priceRes.json().catch(() => ({} as any));
-      const priceNum = parsePriceNumber(priceJson?.lowest_price ?? priceJson?.median_price);
-      if (priceNum === null) continue;
+      if (priceNum === null) {
+        if (steamFallbackCalls >= 1) continue;
+        steamFallbackCalls++;
+
+        const priceRes = await fetchWithTimeout(
+          `${url.origin}/api/steam/price?market_hash_name=${encodeURIComponent(marketHash)}&currency=${encodeURIComponent(currency)}`,
+          4000
+        ).catch(() => null);
+
+        if (!priceRes || !priceRes.ok) continue;
+        const priceJson = await priceRes.json().catch(() => ({} as any));
+        priceNum = parsePriceNumber(priceJson?.lowest_price ?? priceJson?.median_price);
+        if (priceNum === null) continue;
+
+        try {
+          await marketPricesCol.updateOne(
+            { currency, market_hash_name: marketHash } as any,
+            { $set: { currency, market_hash_name: marketHash, price: priceNum, updatedAt: new Date().toISOString() } },
+            { upsert: true }
+          );
+        } catch {
+          // ignore
+        }
+      }
 
       if (min !== undefined && priceNum < min) continue;
       if (max !== undefined && priceNum > max) continue;

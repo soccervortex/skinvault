@@ -2,6 +2,18 @@ import { NextRequest } from 'next/server';
 
 const MAX_BYTES = 2_000_000;
 
+const FALLBACK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#0f111a"/></svg>';
+
+function fallbackResponse() {
+  return new Response(FALLBACK_SVG, {
+    status: 200,
+    headers: {
+      'content-type': 'image/svg+xml; charset=utf-8',
+      'cache-control': 'public, max-age=60, s-maxage=600',
+    },
+  });
+}
+
 function isAllowedUrl(raw: string): URL | null {
   try {
     const u = new URL(raw);
@@ -39,35 +51,38 @@ export async function GET(req: NextRequest) {
 
   const allowed = isAllowedUrl(target);
   if (!allowed) {
+    console.error('Image proxy: URL not allowed:', target);
     return new Response('Forbidden', { status: 403 });
   }
 
-  try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 10_000);
+  // Use a shorter timeout to avoid Vercel function timeout (10s max)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 seconds
 
-    let upstream: Response;
-    try {
-      upstream = await fetch(allowed.toString(), {
-        cache: 'no-store',
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        },
-      });
-    } finally {
-      clearTimeout(id);
-    }
+  try {
+    const upstream = await fetch(allowed.toString(), {
+      cache: 'no-store',
+      redirect: 'follow', // Let fetch handle redirects for now
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.tiktok.com/',
+      },
+    });
+
+    clearTimeout(timeoutId);
 
     if (!upstream.ok) {
-      return new Response('Upstream error', { status: 502 });
+      console.error('Image proxy: Upstream failed', { status: upstream.status, url: allowed.toString() });
+      return fallbackResponse();
     }
 
     const contentType = upstream.headers.get('content-type') || '';
     if (!contentType.toLowerCase().startsWith('image/')) {
-      return new Response('Invalid content type', { status: 415 });
+      console.error('Image proxy: Invalid content type:', contentType);
+      return fallbackResponse();
     }
 
     const len = Number(upstream.headers.get('content-length') || '0');
@@ -88,7 +103,10 @@ export async function GET(req: NextRequest) {
         'cache-control': 'public, max-age=86400, s-maxage=86400',
       },
     });
-  } catch {
-    return new Response('Fetch failed', { status: 502 });
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    // Log the error for debugging but always return fallback
+    console.error('Image proxy error:', error?.message || error);
+    return fallbackResponse();
   }
 }

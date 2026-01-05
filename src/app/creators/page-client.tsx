@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -20,6 +20,7 @@ export default function CreatorsIndexClient() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
   const [form, setForm] = useState({
     slug: '',
     displayName: '',
@@ -44,14 +45,17 @@ export default function CreatorsIndexClient() {
     }
   };
 
-  const adminSteamId = useMemo(() => {
+  useEffect(() => {
     try {
       const raw = window.localStorage.getItem('steam_user');
-      if (!raw) return null;
+      if (!raw) {
+        setAdminSteamId(null);
+        return;
+      }
       const user = JSON.parse(raw);
-      return user?.steamId || null;
+      setAdminSteamId(user?.steamId || null);
     } catch {
-      return null;
+      setAdminSteamId(null);
     }
   }, []);
 

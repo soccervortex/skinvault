@@ -236,6 +236,10 @@ export default function FAQPage() {
           answer: "Prices are cached for performance optimization. Free users have a 30-minute cache, Pro users have a 2-hour cache, and users with Cache Boost have a 1-hour cache. If prices seem outdated, wait for the cache to expire or clear your browser's localStorage. Also, ensure your internet connection is working properly."
         },
         {
+          question: "Hoe werkt de Inventory Cache?",
+          answer: "Grote sites zoals Skinport of CS.Money zijn constant bezig met het 'scrapen' (uitlezen) van duizenden profielen. Zodra jij inlogt, kijken ze in hun eigen database. Als ze je inventory een minuut geleden al hebben ingeladen, laten ze die direct zien. Als je op 'Refresh' klikt, gebruiken zij hun servers om de data bij Steam op te halen. Dit gaat razendsnel omdat zij supersnelle verbindingen hebben met de Steam-servers."
+        },
+        {
           question: "Why can't I see my inventory?",
           answer: "Make sure your Steam inventory is set to public. SkinVaults can only access public inventory data. Also, ensure you're signed in with the correct Steam account. If issues persist, try refreshing the page or clearing your browser cache."
         },

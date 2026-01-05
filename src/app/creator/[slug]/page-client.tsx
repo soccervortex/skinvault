@@ -46,6 +46,8 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const [adminSteamId, setAdminSteamId] = useState<string | null>(null);
   const [sessionSteamId, setSessionSteamId] = useState<string | null>(null);
   const [twitchPreviewFailed, setTwitchPreviewFailed] = useState(false);
+  const [twitchPreviewUrl, setTwitchPreviewUrl] = useState<string | null>(null);
+  const [lastCheckedText, setLastCheckedText] = useState<string | null>(null);
   const [pauseRealtimeUntil, setPauseRealtimeUntil] = useState(0);
   const [edit, setEdit] = useState({
     displayName: '',
@@ -134,13 +136,6 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     data?.creator?.partnerSteamId &&
     (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
   );
-  const twitchPreviewUrl = useMemo(() => {
-    if (!twitchHandle) return null;
-    // Cache-bust once per minute so it updates when live.
-    const t = Math.floor(Date.now() / 60000);
-    return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${encodeURIComponent(twitchHandle)}-640x360.jpg?t=${t}`;
-  }, [twitchHandle]);
-
   const showTwitchPreviewImage = !!(twitchPreviewUrl && twitchLive === true && !twitchPreviewFailed);
 
   const ytConfigured = !!data?.creator?.youtubeChannelId;
@@ -151,6 +146,31 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const latestYouTubeItem = data?.items?.find((i) => i.platform === 'youtube');
   const latestYouTubeUrl = latestYouTubeItem?.url;
   const twitchConfigured = !!data?.creator?.twitchLogin;
+
+  useEffect(() => {
+    if (!twitchHandle) {
+      setTwitchPreviewUrl(null);
+      return;
+    }
+    setTwitchPreviewFailed(false);
+    // Cache-bust once per minute so it updates when live.
+    const t = Math.floor(Date.now() / 60000);
+    setTwitchPreviewUrl(
+      `https://static-cdn.jtvnw.net/previews-ttv/live_user_${encodeURIComponent(twitchHandle)}-640x360.jpg?t=${t}`
+    );
+  }, [twitchHandle]);
+
+  useEffect(() => {
+    if (!data?.lastCheckedAt) {
+      setLastCheckedText(null);
+      return;
+    }
+    try {
+      setLastCheckedText(new Date(data.lastCheckedAt).toLocaleString());
+    } catch {
+      setLastCheckedText(null);
+    }
+  }, [data?.lastCheckedAt]);
 
   const openEdit = () => {
     if (!data) return;
@@ -387,8 +407,8 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
                     </div>
                   )}
                 </div>
-                {data?.lastCheckedAt && (
-                  <div className="mt-3 text-xs text-gray-500">Last checked: {new Date(data.lastCheckedAt).toLocaleString()}</div>
+                {lastCheckedText && (
+                  <div className="mt-3 text-xs text-gray-500">Last checked: {lastCheckedText}</div>
                 )}
               </div>
 

@@ -54,6 +54,33 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const priceCacheRef = useRef<Record<string, any>>({});
   const [priceDone, setPriceDone] = useState(false);
 
+  const normalizeItem = (raw: any) => {
+    if (!raw) return raw;
+    const baseImg =
+      raw.image ||
+      raw.image_inventory ||
+      raw.image_large ||
+      raw.image_small ||
+      raw.image_url ||
+      null;
+
+    let img: string | null = baseImg ? String(baseImg) : null;
+    if (!img) {
+      const icon = raw.icon_url || raw.iconUrl || raw.icon || null;
+      if (icon) {
+        const iconStr = String(icon);
+        if (/^https?:\/\//i.test(iconStr)) img = iconStr;
+        else img = `https://community.cloudflare.steamstatic.com/economy/image/${iconStr}`;
+      }
+    }
+
+    return {
+      ...raw,
+      image: img,
+      market_hash_name: raw.market_hash_name || raw.marketHashName || raw.market_name || raw.marketName || raw.name,
+    };
+  };
+
   // Hydrate dataset + price caches + wishlist once on mount
   useEffect(() => {
     try {
@@ -118,7 +145,12 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
   // Fetch item meta once (by id) - only if not provided initially
   useEffect(() => {
-    if (initialItem) return; // Skip if we already have the item
+    const normalizedInitial = initialItem ? normalizeItem(initialItem) : null;
+    if (normalizedInitial?.image) {
+      setItem(normalizedInitial);
+      setLoading(false);
+      return;
+    }
     
     const fetchItem = async () => {
       setLoading(true);
@@ -179,7 +211,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         }
       }
 
-      setItem(foundItem);
+      setItem(normalizeItem(foundItem));
       setLoading(false);
     };
 
@@ -374,6 +406,9 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
               <img
                 src={item?.image}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/icon.png';
+                }}
                 className="w-[80%] h-auto object-contain z-10"
                 alt={item?.name || ''}
                 style={{

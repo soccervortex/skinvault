@@ -1,18 +1,3 @@
-Starting update cycle at 01/05/2026 04:18:10
+Starting update cycle at 01/05/2026 05:18:38
 Processing EUR...
-EUR: start= processed= ok= failed= nextStart=37998 finished=
-EUR: start= processed= ok= failed= nextStart=38078 finished=
-Request error (attempt 1/30). Backing off 2s...
-EUR: start= processed= ok= failed= nextStart=38238 finished=
-EUR: start= processed= ok= failed= nextStart=38318 finished=
-EUR: start= processed= ok= failed= nextStart=38398 finished=
-EUR: start= processed= ok= failed= nextStart=38478 finished=
-EUR: start= processed= ok= failed= nextStart=0 finished=
-EUR: start= processed= ok= failed= nextStart=80 finished=
-EUR: start= processed= ok= failed= nextStart=160 finished=
-EUR: start= processed= ok= failed= nextStart=240 finished=
-EUR: start= processed= ok= failed= nextStart=320 finished=
-EUR: start= processed= ok= failed= nextStart=400 finished=
-EUR: start= processed= ok= failed= nextStart=480 finished=
-EUR: start= processed= ok= failed= nextStart=560 finished=
-EUR: start= processed= ok= failed= nextStart=640 finished=
+EUR: start= processed= ok= failed= nextStart=4560 finished=
