@@ -560,6 +560,7 @@ async function fetchInventoryViaAPI(steamId: string, apiType: 'steamwebapi' | 'c
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    const origin = url.origin;
     let steamId = url.searchParams.get('steamId');
     const startAssetId = url.searchParams.get('start_assetid');
     const isPro = url.searchParams.get('isPro') === 'true';
