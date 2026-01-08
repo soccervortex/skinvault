@@ -518,10 +518,30 @@ function InventoryContent() {
     mergeAndStorePrices(results);
   };
 
-  const fetchInventory = async (id: string, proStatus?: boolean) => {
+  const fetchInventory = async (id: string, proStatus?: boolean, forceRefresh?: boolean) => {
     try {
       // Pro status here is for the viewer (affects proxy/scan performance). Never infer from the viewed profile.
       const actualProStatus = !!proStatus;
+
+      const inventoryCacheKey = `sv_inventory_cache_${String(id)}_${String(currency.code)}`;
+      if (!forceRefresh) {
+        try {
+          if (typeof window !== 'undefined') {
+            const cached = window.sessionStorage.getItem(inventoryCacheKey);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              const ts = Number(parsed?.timestamp || 0);
+              const items = Array.isArray(parsed?.items) ? (parsed.items as InventoryItem[]) : null;
+              if (items && Number.isFinite(ts) && ts > 0 && Date.now() - ts < 60_000) {
+                setInventory(items);
+                return;
+              }
+            }
+          }
+        } catch {
+          // Ignore cache errors
+        }
+      }
       
       let allItems: InventoryItem[] = [];
       let startAssetId: string | null = null;
@@ -534,7 +554,7 @@ function InventoryContent() {
         
         try {
           // Use server-side API route to avoid CORS issues
-          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&currency=${encodeURIComponent(currency.code)}&isPro=${actualProStatus}${forceRefresh ? '&refresh=1' : ''}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced to 15 seconds for faster loading
           
@@ -644,6 +664,13 @@ function InventoryContent() {
       }
 
       setInventory(allItems);
+      try {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(inventoryCacheKey, JSON.stringify({ timestamp: Date.now(), items: allItems }));
+        }
+      } catch {
+        // Ignore cache write errors
+      }
     } catch (e: any) { 
       // Don't log AbortErrors (intentional timeouts) or expected network errors
       if (e?.name !== 'AbortError' && 

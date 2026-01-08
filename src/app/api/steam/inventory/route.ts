@@ -590,6 +590,12 @@ export async function GET(request: Request) {
     const db = mongoClient.db('skinvault');
     const cacheCollection = db.collection<InventoryCacheDoc>('inventory_cache');
 
+    const setCacheHeaders = (res: NextResponse, state: 'hit' | 'miss' | 'refresh' | 'stale') => {
+      res.headers.set('x-sv-cache', state);
+      res.headers.set('Cache-Control', 'private, max-age=60');
+      return res;
+    };
+
     const respond = async (payload: any, cacheState: 'miss' | 'refresh' = 'miss') => {
       try {
         const now = new Date();
@@ -611,8 +617,7 @@ export async function GET(request: Request) {
         // Ignore cache write failures
       }
       const res = NextResponse.json(payload);
-      res.headers.set('x-sv-cache', cacheState);
-      return res;
+      return setCacheHeaders(res, cacheState);
     };
 
     if (!refresh) {
@@ -620,8 +625,7 @@ export async function GET(request: Request) {
         const cached = await cacheCollection.findOne({ _id: cacheKey });
         if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
           const res = NextResponse.json(cached.data);
-          res.headers.set('x-sv-cache', 'hit');
-          return res;
+          return setCacheHeaders(res, 'hit');
         }
       } catch {
         // Ignore cache read failures
@@ -811,8 +815,7 @@ export async function GET(request: Request) {
       const stale = await cacheCollection.findOne({ _id: cacheKey });
       if (stale?.data) {
         const res = NextResponse.json(stale.data);
-        res.headers.set('x-sv-cache', 'stale');
-        return res;
+        return setCacheHeaders(res, 'stale');
       }
     } catch {
       // Ignore
