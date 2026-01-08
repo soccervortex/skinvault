@@ -474,14 +474,6 @@ async function resolveSteamUsername(username) {
   }
 }
 
-// getSteamIdFromDiscord
-async function getSteamIdFromDiscord(discordId) {
-  const response = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${discordId}`);
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data.steamId || null;
-}
-
 // Get top weapons from inventory (returns immediately with what it has, max 3)
 async function getTopWeapons(steamId, limit = 3) {
   try {
@@ -1105,11 +1097,14 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       try {
-        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
-        if (!invResponse.ok) {
-          const errorText = await invResponse.text().catch(() => 'Unknown error');
-          let errorMessage = 'Could not fetch your inventory.';
+        const isPro = await checkProStatus(steamId);
+        const invResponse = await fetch(
+          `${API_BASE_URL}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&currency=3&isPro=${isPro ? 'true' : 'false'}&refresh=1`,
+          { cache: 'no-store' }
+        );
 
+        if (!invResponse.ok) {
+          let errorMessage = 'Could not fetch your inventory.';
           if (invResponse.status === 403 || invResponse.status === 401) {
             errorMessage = 'Your Steam inventory is private. Set your Steam profile to public to view your inventory.';
           } else if (invResponse.status === 404) {
@@ -1126,168 +1121,53 @@ client.on('interactionCreate', async (interaction) => {
 
         const invData = await invResponse.json();
 
-        // Check if inventory is empty or private
-        if (!invData.success || !invData.assets || invData.assets.length === 0) {
+        if (invData?.success === false && String(invData?.error || '').toLowerCase().includes('private')) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
           await interaction.editReply({
-            content: `📦 **No Items Found**\n\nYour inventory appears to be empty or private.\n\n**Possible reasons:**\n• Your Steam inventory is empty\n• Your Steam profile is set to private\n• Inventory hasn't loaded yet\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit [your vault](${vaultUrl}) to sync your inventory\n• Make sure you have CS2 items in your inventory`,
+            content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVault can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
           });
           return;
         }
 
-        const assets = invData.assets || [];
-        const descriptions = invData.descriptions || [];
-
-        if (!descriptions || descriptions.length === 0) {
-          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
-          await interaction.editReply({
-            content: `⚠️ **Inventory Data Incomplete**\n\nCould not load item details from your inventory.\n\n💡 **Try:**\n• Visit [your vault](${vaultUrl}) to refresh your inventory\n• Make sure your Steam profile is public\n• Try again in a few moments`,
-          });
-          return;
-        }
-
-        // Create a map of description by classid_instanceid
-        const descMap = new Map();
-        descriptions.forEach(desc => {
-          const key = `${desc.classid}_${desc.instanceid || 0}`;
-          descMap.set(key, desc);
-        });
-
-        // Process assets
-        const items = [];
-        let totalValue = 0;
-        let tradableCount = 0;
-        let nonTradableCount = 0;
-        let pricedCount = 0;
-
-        for (const asset of assets) {
-          const key = `${asset.classid}_${asset.instanceid || 0}`;
-          const desc = descMap.get(key);
-          if (!desc) continue;
-
-          const itemName = desc.market_hash_name || desc.market_name || desc.name || `Item ${desc.classid}`;
-          const isTradable = desc.tradable !== 0 && desc.tradable !== false;
-          const isMarketable = desc.marketable !== 0 && desc.marketable !== false;
-
-          if (isTradable) tradableCount++;
-          else nonTradableCount++;
-
-          // Get price for marketable items
-          let price = null;
-          let priceValue = 0;
-          if (isMarketable && (desc.market_hash_name || desc.market_name)) {
-            try {
-              price = await getItemPrice(desc.market_hash_name || desc.market_name, '3');
-              if (price) {
-                const priceStr = price.lowest_price || price.lowest || price.median_price;
-                if (priceStr) {
-                  const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
-                  priceValue = parseFloat(cleaned) || 0;
-                  totalValue += priceValue * (asset.amount || 1);
-                  pricedCount++;
-                }
-              }
-            } catch (priceError) {
-              // Ignore individual price errors
-            }
-          }
-
-          items.push({
-            name: itemName,
-            price: price ? (price.lowest_price || price.lowest || price.median_price) : null,
-            priceValue,
-            isTradable,
-            isMarketable,
-            amount: asset.amount || 1,
-            marketHashName: desc.market_hash_name || desc.market_name,
-          });
-        }
-
-        // Sort items by price
-        items.sort((a, b) => b.priceValue - a.priceValue);
-
-        // Fetch stats
-        let stats = null;
-        try {
-          const statsResponse = await fetch(`${API_BASE_URL}/api/steam/stats?id=${steamId}`);
-          if (statsResponse.ok) {
-            const statsData = await statsResponse.json();
-            const ps = statsData?.playerstats;
-            const s = ps?.stats;
-            if (s && Array.isArray(s)) {
-              const statsObj = {};
-              s.forEach((stat) => {
-                if (stat.name && stat.value !== undefined) {
-                  statsObj[stat.name] = stat.value;
-                }
-              });
-              stats = statsObj;
-            }
-          }
-        } catch (error) {
-          // Stats are optional
-        }
+        const assets = Array.isArray(invData?.assets) ? invData.assets : [];
+        const descriptions = Array.isArray(invData?.descriptions) ? invData.descriptions : [];
+        const totalItems = assets.reduce((sum, a) => sum + Number(a?.amount || 1), 0);
+        const uniqueItems = new Set(descriptions.map(d => String(d?.market_hash_name || d?.market_name || d?.name || '').trim()).filter(Boolean)).size;
 
         const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
-        const totalItems = assets.length;
-        const uniqueItems = new Set(descriptions.map(d => d.classid)).size;
+        const totalInventoryValue = typeof invData?.totalInventoryValue === 'string' ? invData.totalInventoryValue : '0.00';
+        const totalValueNum = Number.parseFloat(totalInventoryValue);
+        const totalValueStr = Number.isFinite(totalValueNum) && totalValueNum > 0
+          ? `€${totalValueNum.toFixed(2).replace('.', ',')}`
+          : '€0,00';
 
-        // Create embed
+        const topWeapons = await getTopWeapons(steamId, 3);
+
         const embed = new EmbedBuilder()
-          .setTitle('💎 Your Vault')
+          .setTitle(`💎 Your Vault${isPro ? ' ⚡ PRO' : ''}`)
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
           .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
 
-        // Add summary
-        const totalValueStr = totalValue > 0 ? `€${totalValue.toFixed(2).replace('.', ',')}` : '€0,00';
         embed.addFields(
-          { name: '📦 Total Items', value: String(totalItems), inline: true },
-          { name: '🔢 Unique Items', value: String(uniqueItems), inline: true },
-          { name: '💰 Total Value', value: totalValueStr, inline: true },
-          { name: '✅ Tradable Items', value: String(tradableCount), inline: true },
-          { name: '🔒 Non-Tradable Items', value: String(nonTradableCount), inline: true },
-          { name: '💵 Priced Items', value: String(pricedCount), inline: true }
+          { name: '📦 Total Items', value: String(totalItems || 0), inline: true },
+          { name: '🔢 Unique Items', value: String(uniqueItems || 0), inline: true },
+          { name: '💰 Total Value', value: totalValueStr, inline: true }
         );
 
-        // Add stats if available
-        if (stats) {
-          if (stats.total_kills) embed.addFields({ name: '💀 Total Kills', value: String(stats.total_kills), inline: true });
-          if (stats.total_deaths) embed.addFields({ name: '☠️ Total Deaths', value: String(stats.total_deaths), inline: true });
-          if (stats.total_kills && stats.total_deaths) {
-            const kd = (stats.total_kills / stats.total_deaths).toFixed(2);
-            embed.addFields({ name: '📈 K/D Ratio', value: kd, inline: true });
-          }
-          if (stats.total_wins) embed.addFields({ name: '🏆 Wins', value: String(stats.total_wins), inline: true });
+        if (Array.isArray(topWeapons) && topWeapons.length > 0) {
+          const lines = topWeapons.map((w, idx) => {
+            const priceText = w.price || 'No price data';
+            return `${idx + 1}. ${w.name} - ${priceText}`;
+          }).join('\n');
+          embed.addFields({ name: '🔝 Top Weapons', value: lines.length > 1024 ? lines.slice(0, 1020) + '...' : lines, inline: false });
         }
 
-        // Add top items
-        const itemsToShow = items.slice(0, 10);
-        if (itemsToShow.length > 0) {
-          embed.addFields({ name: '\u200b', value: '**Top Items:**', inline: false });
-          itemsToShow.forEach((item, index) => {
-            const itemUrl = item.marketHashName
-              ? `https://skinvaults.online/item/${encodeURIComponent(item.marketHashName)}`
-              : vaultUrl;
-            const priceText = item.price || (item.isMarketable ? 'No price data' : 'NOT MARKETABLE');
-            const tradableText = item.isTradable ? '✅' : '🔒';
-            const amountText = item.count > 1 ? ` (x${item.count})` : '';
-
-            embed.addFields({
-              name: `${index + 1}. ${tradableText} ${item.name}${amountText}`,
-              value: `💰 **Price:** ${priceText}\n🔗 [View Item](${itemUrl})`,
-              inline: false,
-            });
-          });
-
-          if (items.length > 10) {
-            embed.setDescription(`Showing top 10 of ${items.length} items\n\n[View Full Vault](${vaultUrl})`);
-          } else {
-            embed.setDescription(`[View Full Vault](${vaultUrl})`);
-          }
+        if (!assets.length && !descriptions.length) {
+          embed.setDescription(`📦 **No Items Found**\n\nYour inventory appears to be empty, private, or not synced yet.\n\n[Open your vault on the website](${vaultUrl})`);
         } else {
-          embed.setDescription(`📦 **No Items Found**\n\nYour vault appears to be empty or items couldn't be processed.\n\n[View Vault](${vaultUrl})`);
+          embed.setDescription(`[View Full Vault](${vaultUrl})`);
         }
 
         await interaction.editReply({ embeds: [embed] });
@@ -2147,9 +2027,13 @@ async function setupWelcomeMessage(guild) {
     const faqChannel = await getFAQChannel(guild);
     const supportChannel = await getSupportChannel(guild);
 
-    // Check if welcome message already exists (look for bot's recent messages)
-    const messages = await welcomeChannel.messages.fetch({ limit: 10 });
-    const existingMessage = messages.find(
+    const pinned = await welcomeChannel.messages.fetchPinned().catch(() => null);
+    const pinnedExistingMessage = pinned?.find(
+      msg => msg.author.id === client.user.id && msg.embeds.length > 0
+    );
+
+    const messages = await welcomeChannel.messages.fetch({ limit: 50 });
+    const existingMessage = pinnedExistingMessage || messages.find(
       msg => msg.author.id === client.user.id && msg.embeds.length > 0
     );
 
@@ -2207,6 +2091,11 @@ async function setupWelcomeMessage(guild) {
       .setTimestamp();
 
     const message = await welcomeChannel.send({ embeds: [welcomeEmbed] });
+    try {
+      await message.pin();
+    } catch (error) {
+      log(`⚠️ Could not pin welcome message: ${error.message}`);
+    }
     log('✅ Welcome message posted in #welcome');
     return message;
   } catch (error) {
@@ -2442,7 +2331,7 @@ async function sendWelcomeChannelMessage(member) {
     const welcomeMessage = new EmbedBuilder()
       .setTitle('🎉 New Member Joined!')
       .setDescription(
-        `Welcome to the server, ${member}! 👋\n\n` +
+        `Welcome to the server, <@${member.id}>! 👋\n\n` +
         '**Get Started:**\n' +
         `📋 Read the ${safeChannelMention(rulesChannel)}\n` +
         '🔗 Connect your Discord on [skinvaults.online](https://skinvaults.online/inventory)\n' +
