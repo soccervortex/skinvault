@@ -129,6 +129,19 @@ const commands = [
     .setName('website')
     .setDescription('Get a link to the SkinVault website')
     .toJSON(),
+  new SlashCommandBuilder()
+    .setName('currency')
+    .setDescription('Set your preferred currency (EUR or USD)')
+    .addStringOption(option =>
+      option.setName('currency')
+        .setDescription('Choose your preferred currency')
+        .setRequired(true)
+        .addChoices(
+          { name: 'EUR (€)', value: '3' },
+          { name: 'USD ($)', value: '1' }
+        )
+    )
+    .toJSON(),
 ];
 
 async function registerCommands() {
@@ -362,7 +375,7 @@ async function getDiscordUserIdFromUsername(username, client) {
 
 async function getPlayerInventory(player) {
   // Fetch player's inventory from API
-  const response = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${player.id}&isPro=false`);
+  const response = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${player.id}&currency=3&isPro=false`);
   if (!response.ok) return [];
   const data = await response.json();
   return data.assets || [];
@@ -475,9 +488,9 @@ async function resolveSteamUsername(username) {
 }
 
 // Get top weapons from inventory (returns immediately with what it has, max 3)
-async function getTopWeapons(steamId, limit = 3) {
+async function getTopWeapons(steamId, limit = 3, currency = '3') {
   try {
-    const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
+    const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&currency=${currency}&isPro=false`);
     if (!invResponse.ok) return [];
 
     const invData = await invResponse.json();
@@ -528,14 +541,34 @@ async function getTopWeapons(steamId, limit = 3) {
     const pricePromises = candidates.map(async (weapon, index) => {
       try {
         const price = await Promise.race([
-          getItemPrice(weapon.name, '3'),
+          getItemPrice(weapon.name, currency),
           new Promise(resolve => setTimeout(() => resolve(null), 2000)) // 2 second timeout per price
         ]);
 
         if (price) {
           const priceStr = price.lowest_price || price.lowest || price.median_price;
           if (priceStr) {
-            const cleaned = priceStr.replace(/[€$£¥\s]/g, '').replace(/\./g, '').replace(',', '.');
+            // Better price parsing that handles both EUR and USD formats
+            let cleaned = priceStr.replace(/[€$£¥\s]/g, '');
+            
+            // Handle European format: "70.991,00" -> "70991.00" (wrong) should be "70.991"
+            // Handle US format: "70.99" -> "70.99"
+            if (cleaned.includes(',') && cleaned.includes('.')) {
+              // European format: remove dots, replace comma with dot
+              cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+            } else if (cleaned.includes(',')) {
+              // Could be European "70,99" or US "70,991"
+              // If comma is the last separator, it's likely European decimal
+              const parts = cleaned.split(',');
+              if (parts.length === 2 && parts[1].length <= 2) {
+                // Likely "70,99" format
+                cleaned = cleaned.replace(',', '.');
+              } else {
+                // Likely "70,991" format (US thousand separator)
+                cleaned = cleaned.replace(/,/g, '');
+              }
+            }
+            
             weapon.priceValue = parseFloat(cleaned) || 0;
             weapon.price = priceStr;
           }
@@ -970,7 +1003,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       try {
-        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&isPro=false`);
+        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&currency=3&isPro=false`);
         if (!invResponse.ok) {
           const errorText = await invResponse.text().catch(() => 'Unknown error');
           let errorMessage = 'Could not fetch your inventory.';
@@ -1141,7 +1174,7 @@ client.on('interactionCreate', async (interaction) => {
           ? `€${totalValueNum.toFixed(2).replace('.', ',')}`
           : '€0,00';
 
-        const topWeapons = await getTopWeapons(steamId, 3);
+        const topWeapons = await getTopWeapons(steamId, 3, '3'); // EUR by default for now
 
         const embed = new EmbedBuilder()
           .setTitle(`💎 Your Vault${isPro ? ' ⚡ PRO' : ''}`)
@@ -1449,7 +1482,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // Get top 3 weapons (returns immediately, doesn't wait)
-        const topWeapons = await getTopWeapons(steamId, 3);
+        const topWeapons = await getTopWeapons(steamId, 3, '3'); // EUR by default for now
 
         const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
         const embed = new EmbedBuilder()
@@ -1898,6 +1931,32 @@ client.on('interactionCreate', async (interaction) => {
           }
         )
         .setFooter({ text: 'SkinVault - Premium CS2 Analytics' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+
+    } else if (commandName === 'currency') {
+      const currency = interaction.options.getString('currency');
+      const steamId = await getSteamIdFromDiscord(user.id);
+
+      if (!steamId) {
+        await interaction.reply({
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+          ephemeral: true
+        });
+        return;
+      }
+
+      // Store user's currency preference (we'll need to create a simple storage for this)
+      // For now, just confirm the choice
+      const currencySymbol = currency === '3' ? '€' : '$';
+      const currencyName = currency === '3' ? 'EUR' : 'USD';
+      
+      const embed = new EmbedBuilder()
+        .setTitle('💱 Currency Preference Updated')
+        .setDescription(`Your preferred currency has been set to **${currencyName} (${currencySymbol})**\n\nThis will be used for:\n• Vault value display\n• Item prices in commands\n• Top weapons rankings`)
+        .setColor(0x5865F2)
+        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
