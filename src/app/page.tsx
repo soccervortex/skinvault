@@ -482,9 +482,10 @@ export default function GlobalSkinSearch() {
 
   const processedItems = useMemo(() => {
     const searchWords = query.toLowerCase().trim().split(/\s+/);
-    let result = items.filter(item =>
-      searchWords.every(word => item.name.toLowerCase().includes(word))
-    );
+    let result = items.filter((item) => {
+      const name = String(item?.name || item?.market_hash_name || item?.market_name || '').toLowerCase();
+      return searchWords.every((word) => name.includes(word));
+    });
 
     return result.sort((a, b) => {
       if (sortBy === 'rarity-desc') {
