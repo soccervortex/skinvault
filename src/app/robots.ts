@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://skinvaults.online');
 
-  const commonDisallows = ['/admin', '/api/', '/payment/', '/chat', '/cgi-bin/'];
+  const commonDisallows = ['/admin', '/api/', '/payment/', '/chat', '/cgi-bin/', '/_next/static/', '/_next/image', '/_next/private/'];
 
   return {
     rules: [

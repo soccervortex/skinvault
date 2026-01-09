@@ -2849,11 +2849,12 @@ export const pageSEO = {
     ],
   },
   compare: {
-    title: 'Compare CS2 Skins - Side-by-Side Skin Comparison',
-    description: 'Compare CS2 skins side-by-side. Compare prices, rarity, wear conditions, and market trends to make better trading decisions.',
+    title: 'Compare CS2 Skins',
+    description: 'Compare CS2 skins side-by-side. Analyze prices, rarity, and other attributes to make informed trading decisions.',
     path: '/compare',
-    keywords: [
-      'CS2 skins',
+    noindex: false,
+  },
+    'CS2 skins',
       'CS2 skin tracker',
       'CS2 inventory',
       'CS2 Inventory Tracker',

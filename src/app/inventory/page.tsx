@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -107,7 +107,7 @@ function InventoryContent() {
   const [loading, setLoading] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
-  const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
+  const [currency, setCurrency] = useState({ code: '3', symbol: 'â‚¬' });
   const [inventoryCacheState, setInventoryCacheState] = useState<string | null>(null);
   const [inventoryFetchedAt, setInventoryFetchedAt] = useState<number | null>(null);
   const [refreshingInventory, setRefreshingInventory] = useState(false);
@@ -236,7 +236,7 @@ function InventoryContent() {
       if (stored === '1') {
         setCurrency({ code: '1', symbol: '$' });
       } else if (stored === '3') {
-        setCurrency({ code: '3', symbol: '€' });
+        setCurrency({ code: '3', symbol: 'â‚¬' });
       }
     } catch {
       // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
@@ -1286,6 +1286,15 @@ function InventoryContent() {
                   {/* Action Buttons (only for own profile) */}
                   {loggedInUser?.steamId === viewedUser?.steamId && (
                     <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
+                      {/* Refresh Button (visible to all) */}
+                      <button
+                        onClick={handleForceRefreshInventory}
+                        disabled={refreshingInventory}
+                        className={`flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                      >
+                        {refreshingInventory ? 'Refreshing...' : 'Refresh Inventory'}
+                      </button>
+
                       {/* Connect/Disconnect Discord Button (Show if Pro or has Discord access) */}
                       {(isPro || hasDiscordAccess) && (
                         !discordStatus?.connected ? (
@@ -1335,7 +1344,7 @@ function InventoryContent() {
                       {/* Manage Trackers Button */}
                       <button
                         onClick={() => setShowManageTrackers(true)}
-                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                       >
                         <Settings size={12} />
                         Manage Trackers
@@ -1343,48 +1352,48 @@ function InventoryContent() {
                     </div>
                   )}
                   <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
-                    <button
-                      onClick={() => {
-                        setCurrency({ code: '3', symbol: '€' });
-                        try {
-                          if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
-                        } catch {
-                          /* ignore */
-                        }
-                      }}
-                      className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                    >
-                      EUR
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCurrency({ code: '1', symbol: '$' });
-                        try {
-                          if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
-                        } catch {
-                          /* ignore */
-                        }
-                      }}
-                      className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                    >
-                      USD
-                    </button>
-                  </div>
-                  {shareUrl && (
-                    <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
-                      <ShareButton
-                        url={shareUrl}
-                        title={`${viewedUser?.name || 'User'}'s Vault - SkinVaults`}
-                        text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVaults`}
-                        variant="button"
-                        className="text-[8px] md:text-[9px]"
-                      />
-                      <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
-                        {shareUrl}
-                      </p>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => {
+                      setCurrency({ code: '3', symbol: '€' });
+                      try {
+                        if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                  >
+                    EUR
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrency({ code: '1', symbol: '$' });
+                      try {
+                        if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                  >
+                    USD
+                  </button>
                 </div>
+                {shareUrl && (
+                  <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
+                    <ShareButton
+                      url={shareUrl}
+                      title={`${viewedUser?.name || 'User'}'s Vault - SkinVaults`}
+                      text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVaults`}
+                      variant="button"
+                      className="text-[8px] md:text-[9px]"
+                    />
+                    <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
+                      {shareUrl}
+                    </p>
+                  </div>
+                )}
+              </div>
               </div>
               <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
                 <TrendingUp className="text-emerald-500 shrink-0" size={24} />
@@ -1394,34 +1403,6 @@ function InventoryContent() {
                 </div>
               </div>
             </header>
-
-            <div className="bg-black/40 border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 text-[10px] md:text-xs text-gray-300">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">2. De "Inventory Cache"</div>
-                <button
-                  onClick={handleForceRefreshInventory}
-                  disabled={refreshingInventory}
-                  className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${refreshingInventory ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-                >
-                  {refreshingInventory ? 'Refreshing...' : 'Refresh (force)'}
-                </button>
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
-                <div className="bg-black/30 border border-white/5 rounded-xl px-3 py-2">
-                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">Cache Status</div>
-                  <div className="mt-1 text-[10px] md:text-xs text-white">{inventoryCacheState || '—'}</div>
-                </div>
-                <div className="bg-black/30 border border-white/5 rounded-xl px-3 py-2">
-                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">Last Fetch</div>
-                  <div className="mt-1 text-[10px] md:text-xs text-white">{inventoryFetchedAt ? new Date(inventoryFetchedAt).toLocaleTimeString('nl-NL') : '—'}</div>
-                </div>
-                <div className="bg-black/30 border border-white/5 rounded-xl px-3 py-2">
-                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">Cache TTL</div>
-                  <div className="mt-1 text-[10px] md:text-xs text-white">1 min</div>
-                </div>
-              </div>
-            </div>
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
@@ -1437,7 +1418,7 @@ function InventoryContent() {
                   <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
                     {(() => {
                       const hours = formatHours(cs2Overview?.playtimeForeverMinutes ?? null);
-                      if (hours === null) return '—';
+                      if (hours === null) return 'â€”';
                       return hours.toLocaleString('nl-NL', { maximumFractionDigits: 0 });
                     })()}
                   </div>
@@ -1449,7 +1430,7 @@ function InventoryContent() {
                     <TrendingUp size={12} /> CS2 Owned
                   </div>
                   <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
-                    {cs2Overview ? (cs2Overview?.hasCs2 ? 'Yes' : 'No') : '—'}
+                    {cs2Overview ? (cs2Overview?.hasCs2 ? 'Yes' : 'No') : 'â€”'}
                   </div>
                   <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">AppID 730</div>
                 </div>
@@ -1461,9 +1442,9 @@ function InventoryContent() {
                   <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
                     {(() => {
                       const ts = cs2Overview?.lastLogoff;
-                      if (!ts) return '—';
+                      if (!ts) return 'â€”';
                       const d = new Date(Number(ts) * 1000);
-                      if (isNaN(d.getTime())) return '—';
+                      if (isNaN(d.getTime())) return 'â€”';
                       return d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' });
                     })()}
                   </div>
@@ -1479,7 +1460,7 @@ function InventoryContent() {
                     <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
                       {(() => {
                         const hours = formatHours(cs2Overview?.playtime2WeeksMinutes ?? null);
-                        if (hours === null) return '—';
+                        if (hours === null) return 'â€”';
                         return hours.toLocaleString('nl-NL', { maximumFractionDigits: 1 });
                       })()}
                     </div>
@@ -1495,7 +1476,7 @@ function InventoryContent() {
                     <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500 opacity-60">
                       <Lock size={12} /> 2 Weeks
                     </div>
-                    <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-gray-600 opacity-60">—</div>
+                    <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-gray-600 opacity-60">â€”</div>
                     <div className="mt-1 text-[9px] md:text-[10px] text-gray-600 opacity-60">Hours last 2 weeks</div>
                   </div>
                 )}
@@ -1576,7 +1557,7 @@ function InventoryContent() {
               <div className="mt-4 flex items-center gap-2 px-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
                 <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-1.5">
-                  <span className="text-[10px]">⚡</span>
+                  <span className="text-[10px]">âš¡</span>
                   Pro Performance Active
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
@@ -1760,9 +1741,9 @@ function InventoryContent() {
                     onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
                     className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"
                   >
-                    <option value="price-desc">Sort: Price High → Low</option>
-                    <option value="price-asc">Sort: Price Low → High</option>
-                    <option value="name-asc">Sort: Name A → Z</option>
+                    <option value="price-desc">Sort: Price High â†’ Low</option>
+                    <option value="price-asc">Sort: Price Low â†’ High</option>
+                    <option value="name-asc">Sort: Name A â†’ Z</option>
                   </select>
                 </div>
               </div>
@@ -1807,7 +1788,7 @@ function InventoryContent() {
                                     : priceScanDone 
                                       ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
                                       : <span className="text-gray-600 animate-pulse">
-                                          {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
+                                          {isPro ? 'âš¡ FAST SCAN...' : 'SCANNING...'}
                                         </span>}
                                 </div>
                               </div>

@@ -58,6 +58,35 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  // Redirects for SEO canonicalization
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.skinvaults.online',
+          },
+        ],
+        destination: 'https://skinvaults.online/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-forwarded-proto',
+            value: 'http',
+          },
+        ],
+        destination: 'https://skinvaults.online/:path*',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 // Wrap with Sentry if DSN is configured
