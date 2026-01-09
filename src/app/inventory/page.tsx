@@ -1123,7 +1123,12 @@ function InventoryContent() {
   }
 
   const filteredInv = useMemo(() => 
-    inventory.filter(i => getItemDisplayName(i).toLowerCase().includes(searchQuery.toLowerCase())), 
+    inventory.filter((i) => {
+      if (!i) return false;
+      const name = String(getItemDisplayName(i) || '');
+      const q = String(searchQuery || '');
+      return name.toLowerCase().includes(q.toLowerCase());
+    }), 
     [inventory, searchQuery]
   );
 

@@ -975,22 +975,33 @@ client.on('interactionCreate', async (interaction) => {
 
         const invData = await invResponse.json();
 
-        // Check if inventory is empty or private
-        if (!invData.success || !invData.assets || invData.assets.length === 0) {
+        const isPrivate =
+          invData?.success === false ||
+          String(invData?.error || '').toLowerCase().includes('private');
+
+        if (isPrivate) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
           await interaction.editReply({
-            content: `📦 **No Items Found**\n\nYour inventory appears to be empty or private.\n\n**Possible reasons:**\n• Your Steam inventory is empty\n• Your Steam profile is set to private\n• Inventory hasn't loaded yet\n\n💡 **Try:**\n• Set your Steam profile to public\n• Visit [your vault](${vaultUrl}) to sync your inventory\n• Make sure you have CS2 items in your inventory`,
+            content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVault can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
           });
           return;
         }
 
-        const assets = invData.assets || [];
-        const descriptions = invData.descriptions || [];
+        const assets = Array.isArray(invData?.assets) ? invData.assets : [];
+        const descriptions = Array.isArray(invData?.descriptions) ? invData.descriptions : [];
+        const rgInventory = invData?.rgInventory && typeof invData.rgInventory === 'object' ? invData.rgInventory : null;
+        const rgDescriptions = invData?.rgDescriptions && typeof invData.rgDescriptions === 'object' ? invData.rgDescriptions : null;
 
-        if (!descriptions || descriptions.length === 0) {
+        const rgInventoryAssets = rgInventory ? Object.values(rgInventory) : [];
+        const rgDescList = rgDescriptions ? Object.values(rgDescriptions) : [];
+
+        const hasAnyAssets = assets.length > 0 || rgInventoryAssets.length > 0;
+        const hasAnyDescriptions = descriptions.length > 0 || rgDescList.length > 0;
+
+        if (!hasAnyAssets || !hasAnyDescriptions) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
           await interaction.editReply({
-            content: `⚠️ **Inventory Data Incomplete**\n\nCould not load item details from your inventory.\n\n💡 **Try:**\n• Visit [your vault](${vaultUrl}) to refresh your inventory\n• Make sure your Steam profile is public\n• Try again in a few moments`,
+            content: `📦 **No Items Found**\n\nYour inventory appears to be empty or not synced yet.\n\n💡 **Try:**\n• Visit [your vault](${vaultUrl}) to sync your inventory\n• Make sure your Steam profile is public\n• Try again in a few moments`,
           });
           return;
         }
@@ -1001,17 +1012,24 @@ client.on('interactionCreate', async (interaction) => {
           const key = `${desc.classid}_${desc.instanceid || 0}`;
           descMap.set(key, desc);
         });
+        rgDescList.forEach((desc) => {
+          const d = desc;
+          if (!d || !d.classid) return;
+          const key = `${d.classid}_${d.instanceid || 0}`;
+          if (!descMap.has(key)) descMap.set(key, d);
+        });
 
         // Process assets
         const itemCounts = new Map();
 
-        for (const asset of assets) {
+        const allAssets = assets.length ? assets : rgInventoryAssets;
+        for (const asset of allAssets) {
           const key = `${asset.classid}_${asset.instanceid || 0}`;
           const desc = descMap.get(key);
           if (!desc) continue;
 
           const itemName = desc.market_hash_name || desc.market_name || desc.name || `Item ${desc.classid}`;
-          const amount = asset.amount || 1;
+          const amount = Number(asset.amount || 1) || 1;
 
           const currentCount = itemCounts.get(itemName) || 0;
           itemCounts.set(itemName, currentCount + amount);
@@ -1022,7 +1040,7 @@ client.on('interactionCreate', async (interaction) => {
           .map(([name, count]) => ({ name, count }))
           .sort((a, b) => a.name.localeCompare(b.name));
 
-        const totalItems = assets.length;
+        const totalItems = allAssets.reduce((sum, a) => sum + (Number(a?.amount || 1) || 1), 0);
         const uniqueItems = sortedItems.length;
         const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
 

@@ -832,11 +832,17 @@ export async function GET(
   const realtime = url.searchParams.get('realtime') === '1';
   const refresh = url.searchParams.get('refresh') === '1';
 
+  const respond = (payload: any) => {
+    const res = NextResponse.json(payload);
+    res.headers.set('Cache-Control', 'no-store');
+    return res;
+  };
+
   // Force refresh: bypass cache and return freshly fetched snapshot immediately.
   if (refresh) {
     const fresh = await refreshSnapshot(creator, cached);
     void dbSet(snapshotKey, fresh).catch(() => {});
-    return NextResponse.json(fresh);
+    return respond(fresh);
   }
 
   // Optional realtime mode: do a quick TikTok status check (2.5s max) and merge it into the response.
@@ -899,7 +905,7 @@ export async function GET(
 
     // Persist in background.
     void dbSet(snapshotKey, { ...updated, lastFastCheckedAt: new Date().toISOString() }).catch(() => {});
-    return NextResponse.json(updated);
+    return respond(updated);
   }
 
   // Always respond fast: if no cached snapshot, return a minimal snapshot immediately
@@ -910,7 +916,7 @@ export async function GET(
     void refreshSnapshot(creator, minimal)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return NextResponse.json(minimal);
+    return respond(minimal);
   }
 
   // If the TikTok status API config changed (or was newly enabled), refresh immediately
@@ -921,7 +927,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return NextResponse.json(cached);
+    return respond(cached);
   }
 
   // If creator has TikTok configured but cached snapshot has no latest video yet, refresh now.
@@ -935,7 +941,7 @@ export async function GET(
       void refreshSnapshot(creator, cached)
         .then((fresh) => dbSet(snapshotKey, fresh))
         .catch(() => {});
-      return NextResponse.json(cached);
+      return respond(cached);
     }
   }
 
@@ -944,7 +950,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return NextResponse.json(cached);
+    return respond(cached);
   }
 
   // If cached snapshot is missing lastCheckedAt, don't block the response.
@@ -953,7 +959,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return NextResponse.json(cached);
+    return respond(cached);
   }
 
   // Fast path: keep TikTok latest_video/live fresh, but do it in the background
@@ -975,7 +981,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return NextResponse.json(cached);
+    return respond(cached);
   }
 
   // Stale-while-revalidate: return cached immediately, but refresh in the background when stale.
@@ -985,5 +991,5 @@ export async function GET(
       .catch(() => {});
   }
 
-  return NextResponse.json(cached);
+  return respond(cached);
 }

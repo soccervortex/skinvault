@@ -568,6 +568,7 @@ export async function GET(request: Request) {
     const currencyParam = String(url.searchParams.get('currency') || '').trim();
     const currency = currencyParam === '1' ? 1 : 3;
     const refresh = url.searchParams.get('refresh') === '1';
+    const force = url.searchParams.get('force') === '1';
     const includeTopItems = url.searchParams.get('includeTopItems') === '1';
     const includePriceIndex = url.searchParams.get('includePriceIndex') === '1';
 
@@ -640,15 +641,18 @@ export async function GET(request: Request) {
 
     // Serve cache even for refresh=1 if it's still within TTL.
     // This makes repeated inventory checks within 1 minute instant (like Skinport/CS.Money).
-    try {
-      const cached = await cacheCollection.findOne({ _id: baseCacheKey });
-      if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
-        const res = NextResponse.json(cached.data);
-        res.headers.set('x-sv-cache', refresh ? 'hit-refresh' : 'hit');
-        return res;
+    // Use force=1 to bypass this cache.
+    if (!force) {
+      try {
+        const cached = await cacheCollection.findOne({ _id: baseCacheKey });
+        if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
+          const res = NextResponse.json(cached.data);
+          res.headers.set('x-sv-cache', refresh ? 'hit-refresh' : 'hit');
+          return res;
+        }
+      } catch {
+        // Ignore cache read failures
       }
-    } catch {
-      // Ignore cache read failures
     }
 
     // METHOD 1: Try official Steam Web API FIRST (highest priority)

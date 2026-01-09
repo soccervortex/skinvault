@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { dbSet } from '@/app/utils/database';
+import { dbDelete, dbSet } from '@/app/utils/database';
 
 const CONNECTION_PREFIX = 'creator_tiktok_connection_';
+const SNAPSHOT_PREFIX = 'creator_snapshot_';
 
 function signPayload(payload: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -135,6 +136,9 @@ export async function GET(req: NextRequest) {
     avatarUrl,
     connectedAt: new Date().toISOString(),
   });
+
+  // Invalidate cached creator snapshot so UI reflects the new connection immediately.
+  await dbDelete(`${SNAPSHOT_PREFIX}${parsed.slug}`).catch(() => {});
 
   const redirectTo = new URL(`/creator/${encodeURIComponent(parsed.slug)}`, url.origin);
   redirectTo.searchParams.set('tiktok', 'connected');
