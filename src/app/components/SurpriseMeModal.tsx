@@ -244,7 +244,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
       if (max !== '') sp.set('max', max);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const res = await fetch(`/api/market/surprise?${sp.toString()}`, {
         cache: 'no-store',

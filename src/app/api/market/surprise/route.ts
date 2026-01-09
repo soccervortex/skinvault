@@ -60,6 +60,29 @@ async function getCachedMarketPrice(db: any, currency: string, marketHashName: s
   }
 }
 
+async function getCachedMarketPrices(db: any, currency: string, marketHashNames: string[]): Promise<Record<string, number>> {
+  if (!marketHashNames.length) return {};
+  try {
+    const col = db.collection('market_prices');
+    const docs = await col
+      .find(
+        { currency, market_hash_name: { $in: marketHashNames } } as any,
+        { projection: { _id: 0, market_hash_name: 1, price: 1 } } as any
+      )
+      .toArray();
+
+    const out: Record<string, number> = {};
+    for (const d of docs as any[]) {
+      const k = String(d?.market_hash_name || '').trim();
+      const p = Number(d?.price);
+      if (k && Number.isFinite(p)) out[k] = p;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 function normalizeMinMax(searchParams: URLSearchParams) {
   const minRaw = searchParams.get('min');
   const maxRaw = searchParams.get('max');
@@ -170,6 +193,8 @@ export async function GET(req: NextRequest) {
     const wear = String(url.searchParams.get('wear') || '').trim();
     const { min, max } = normalizeMinMax(url.searchParams);
 
+    const hasPriceFilter = min !== undefined || max !== undefined;
+
     const now = Date.now();
     const msIntoMinute = now % 60_000;
     const isMinuteBoundary = msIntoMinute < 1000;
@@ -219,12 +244,73 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No items match filters' }, { status: 404 });
     }
 
+    // Fast path: if there is no price filter, do not block on market price lookups.
+    // This avoids timeouts on cold starts / when the market_prices cache is sparse.
+    if (!hasPriceFilter) {
+      const maxAttemptsNoPrice = 30;
+      for (let i = 0; i < maxAttemptsNoPrice; i++) {
+        const candidate = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+        const marketHash = buildMarketHashName(candidate);
+        if (!marketHash) continue;
+        if (marketHash.includes('---')) continue;
+
+        const payload = {
+          itemId: candidate.id,
+          marketHashName: marketHash,
+          price: null,
+          currency,
+          cached: false,
+        };
+
+        try {
+          await cacheCol.updateOne(
+            { _id: cacheKey } as any,
+            {
+              $set: {
+                _id: cacheKey,
+                createdAt: new Date().toISOString(),
+                expiresAt: new Date(Date.now() + ttlMs),
+                payload,
+              },
+            },
+            { upsert: true }
+          );
+        } catch {
+          // ignore
+        }
+
+        const res = NextResponse.json(payload, { status: 200 });
+        res.headers.set('x-sv-cache', 'miss');
+        return res;
+      }
+    }
+
+    // Price-filtered path: avoid doing many findOne() calls; batch query known cached prices.
     const maxAttempts = 60;
     let badDashTries = 0;
     let steamFallbackCalls = 0;
 
+    const batchSize = Math.min(40, filteredPool.length);
+    const picked: PoolItem[] = [];
+    const pickedIds = new Set<string>();
+    for (let i = 0; i < batchSize * 2 && picked.length < batchSize; i++) {
+      const it = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+      if (!it?.id || pickedIds.has(it.id)) continue;
+      pickedIds.add(it.id);
+      picked.push(it);
+    }
+
+    const marketHashes = picked
+      .map(buildMarketHashName)
+      .filter((m) => !!m && !m.includes('---')) as string[];
+
+    const priceMap = await getCachedMarketPrices(db, currency, marketHashes);
+
     for (let i = 0; i < maxAttempts; i++) {
-      const candidate = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+      const candidate = picked.length
+        ? picked[Math.floor(Math.random() * picked.length)]
+        : filteredPool[Math.floor(Math.random() * filteredPool.length)];
+
       const marketHash = buildMarketHashName(candidate);
 
       if (!marketHash) continue;
@@ -233,12 +319,10 @@ export async function GET(req: NextRequest) {
         badDashTries++;
         await logBadPrize(db, marketHash);
         if (badDashTries < 3) continue;
-        // after 3, keep skipping but allow other attempts
         continue;
       }
 
-      let priceNum: number | null = null;
-      priceNum = await getCachedMarketPrice(db, currency, marketHash);
+      let priceNum: number | null = Number.isFinite(priceMap[marketHash]) ? priceMap[marketHash] : null;
 
       if (priceNum === null) {
         if (steamFallbackCalls >= 1) continue;
