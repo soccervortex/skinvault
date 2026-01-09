@@ -2853,7 +2853,7 @@ export const pageSEO = {
     description: 'Compare CS2 skins side-by-side. Analyze prices, rarity, and other attributes to make informed trading decisions.',
     path: '/compare',
     noindex: false,
-  },
+    keywords: [
     'CS2 skins',
       'CS2 skin tracker',
       'CS2 inventory',
