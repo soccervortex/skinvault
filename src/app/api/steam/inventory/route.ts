@@ -151,7 +151,8 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
       ...data,
       totalInventoryValue: totalValue.toFixed(2),
       valuedItemCount,
-      currency: currency === 3 ? 'EUR' : 'USD'
+      currency: currency === 3 ? 'EUR' : 'USD',
+      priceIndex: prices,
     };
   } catch (error) {
     console.warn('Failed to calculate total inventory value:', error);
@@ -567,6 +568,8 @@ export async function GET(request: Request) {
     const currencyParam = String(url.searchParams.get('currency') || '').trim();
     const currency = currencyParam === '1' ? 1 : 3;
     const refresh = url.searchParams.get('refresh') === '1';
+    const includeTopItems = url.searchParams.get('includeTopItems') === '1';
+    const includePriceIndex = url.searchParams.get('includePriceIndex') === '1';
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
@@ -585,22 +588,36 @@ export async function GET(request: Request) {
     }
 
     const normalizedStart = String(startAssetId || '0');
-    const cacheKey = `inv_${steamId}_${currency}_${normalizedStart}`;
+    // Base cache is independent of pagination so repeated checks within 1 minute are instant.
+    // We still allow paginated fetches for very large inventories, but the primary cache is base.
+    const baseCacheKey = `inv_${steamId}_${currency}`;
+    const pageCacheKey = `inv_${steamId}_${currency}_${normalizedStart}`;
     const mongoClient = await getMongoClient();
     const db = mongoClient.db('skinvault');
     const cacheCollection = db.collection<InventoryCacheDoc>('inventory_cache');
 
-    const setCacheHeaders = (res: NextResponse, state: 'hit' | 'miss' | 'refresh' | 'stale') => {
-      res.headers.set('x-sv-cache', state);
-      res.headers.set('Cache-Control', 'private, max-age=60');
-      return res;
-    };
-
     const respond = async (payload: any, cacheState: 'miss' | 'refresh' = 'miss') => {
       try {
         const now = new Date();
+        const expiresAt = new Date(Date.now() + INVENTORY_CACHE_TTL_MS);
+        // Write base cache always
         await cacheCollection.updateOne(
-          { _id: cacheKey },
+          { _id: baseCacheKey },
+          {
+            $set: {
+              steamId,
+              currency,
+              startAssetId: '0',
+              data: payload,
+              createdAt: now,
+              expiresAt,
+            },
+          },
+          { upsert: true }
+        );
+        // Also write the page cache key (for compatibility)
+        await cacheCollection.updateOne(
+          { _id: pageCacheKey },
           {
             $set: {
               steamId,
@@ -608,7 +625,7 @@ export async function GET(request: Request) {
               startAssetId: normalizedStart,
               data: payload,
               createdAt: now,
-              expiresAt: new Date(Date.now() + INVENTORY_CACHE_TTL_MS),
+              expiresAt,
             },
           },
           { upsert: true }
@@ -617,19 +634,21 @@ export async function GET(request: Request) {
         // Ignore cache write failures
       }
       const res = NextResponse.json(payload);
-      return setCacheHeaders(res, cacheState);
+      res.headers.set('x-sv-cache', cacheState);
+      return res;
     };
 
-    if (!refresh) {
-      try {
-        const cached = await cacheCollection.findOne({ _id: cacheKey });
-        if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
-          const res = NextResponse.json(cached.data);
-          return setCacheHeaders(res, 'hit');
-        }
-      } catch {
-        // Ignore cache read failures
+    // Serve cache even for refresh=1 if it's still within TTL.
+    // This makes repeated inventory checks within 1 minute instant (like Skinport/CS.Money).
+    try {
+      const cached = await cacheCollection.findOne({ _id: baseCacheKey });
+      if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
+        const res = NextResponse.json(cached.data);
+        res.headers.set('x-sv-cache', refresh ? 'hit-refresh' : 'hit');
+        return res;
       }
+    } catch {
+      // Ignore cache read failures
     }
 
     // METHOD 1: Try official Steam Web API FIRST (highest priority)
@@ -639,7 +658,12 @@ export async function GET(request: Request) {
       if (steamWebAPIData && (steamWebAPIData.assets || steamWebAPIData.descriptions)) {
         console.log('✅ Inventory fetched via Official Steam Web API');
         const enrichedData = await enrichInventoryWithTotalValue(steamWebAPIData, currency, origin);
-        return respond(enrichedData, refresh ? 'refresh' : 'miss');
+        const payload: any = { ...enrichedData };
+        if (!includePriceIndex) delete payload.priceIndex;
+        if (includeTopItems) {
+          payload.topItems = buildTopItemsFromInventory(enrichedData, enrichedData.priceIndex || {}, 10);
+        }
+        return respond(payload, refresh ? 'refresh' : 'miss');
       }
     } catch (error) {
       console.warn('⚠️ Official Steam Web API failed, trying next method:', error);
@@ -654,7 +678,12 @@ export async function GET(request: Request) {
         if (data && (data.assets || data.descriptions)) {
           console.log(`✅ Inventory fetched via third-party API: ${apiType}`);
           const enrichedData = await enrichInventoryWithTotalValue(data, currency, origin);
-          return respond(enrichedData, refresh ? 'refresh' : 'miss');
+          const payload: any = { ...enrichedData };
+          if (!includePriceIndex) delete payload.priceIndex;
+          if (includeTopItems) {
+            payload.topItems = buildTopItemsFromInventory(enrichedData, enrichedData.priceIndex || {}, 10);
+          }
+          return respond(payload, refresh ? 'refresh' : 'miss');
         }
       } catch (error) {
         console.warn(`âš ï¸ Third-party API ${apiType} failed, trying next...`);
@@ -729,7 +758,12 @@ export async function GET(request: Request) {
             rgInventory: direct.rgInventory,
             rgDescriptions: direct.rgDescriptions,
           }, currency, origin);
-          return respond(enrichedData, refresh ? 'refresh' : 'miss');
+          const payload: any = { ...enrichedData };
+          if (!includePriceIndex) delete payload.priceIndex;
+          if (includeTopItems) {
+            payload.topItems = buildTopItemsFromInventory(enrichedData, enrichedData.priceIndex || {}, 10);
+          }
+          return respond(payload, refresh ? 'refresh' : 'miss');
         }
       }
     } catch {
@@ -773,7 +807,12 @@ export async function GET(request: Request) {
           if (data.descriptions || data.assets || data.rgDescriptions || data.rgInventory) {
             // Success - calculate total value and return the data
             const enrichedData = await enrichInventoryWithTotalValue(data, currency, origin);
-            return respond(enrichedData, refresh ? 'refresh' : 'miss');
+            const payload: any = { ...enrichedData };
+            if (!includePriceIndex) delete payload.priceIndex;
+            if (includeTopItems) {
+              payload.topItems = buildTopItemsFromInventory(enrichedData, enrichedData.priceIndex || {}, 10);
+            }
+            return respond(payload, refresh ? 'refresh' : 'miss');
           }
           
           // Check if it's an empty inventory (valid response)
@@ -812,10 +851,11 @@ export async function GET(request: Request) {
 
     // All methods failed - try stale cache as last resort
     try {
-      const stale = await cacheCollection.findOne({ _id: cacheKey });
+      const stale = await cacheCollection.findOne({ _id: baseCacheKey });
       if (stale?.data) {
         const res = NextResponse.json(stale.data);
-        return setCacheHeaders(res, 'stale');
+        res.headers.set('x-sv-cache', 'stale');
+        return res;
       }
     } catch {
       // Ignore
@@ -844,6 +884,37 @@ export async function GET(request: Request) {
       { error: error.message || 'Failed to fetch inventory' },
       { status: 500 }
     );
+  }
+}
+
+function buildTopItemsFromInventory(inv: any, prices: Record<string, number>, limit: number) {
+  try {
+    const assets = Array.isArray(inv?.assets) ? inv.assets : [];
+    const descriptions = Array.isArray(inv?.descriptions) ? inv.descriptions : [];
+    if (!assets.length || !descriptions.length) return [];
+
+    const descByKey = new Map<string, any>();
+    for (const d of descriptions) {
+      const key = `${String(d?.classid)}_${String(d?.instanceid || 0)}`;
+      if (!descByKey.has(key)) descByKey.set(key, d);
+    }
+
+    const items: Array<{ marketHashName: string; amount: number; price: number; value: number }> = [];
+    for (const a of assets) {
+      const key = `${String((a as any)?.classid)}_${String((a as any)?.instanceid || 0)}`;
+      const d = descByKey.get(key);
+      const name = String(d?.market_hash_name || '').trim();
+      if (!name) continue;
+      const p = Number(prices[name] || 0);
+      if (!Number.isFinite(p) || p <= 0) continue;
+      const amount = Math.max(1, Number((a as any)?.amount || 1));
+      items.push({ marketHashName: name, amount, price: p, value: p * amount });
+    }
+
+    items.sort((a, b) => b.value - a.value);
+    return items.slice(0, limit);
+  } catch {
+    return [];
   }
 }
 

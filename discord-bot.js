@@ -131,10 +131,10 @@ const commands = [
     .toJSON(),
   new SlashCommandBuilder()
     .setName('currency')
-    .setDescription('Set your preferred currency (EUR or USD)')
+    .setDescription('Set your preferred currency for SkinVault bot (EUR or USD)')
     .addStringOption(option =>
       option.setName('currency')
-        .setDescription('Choose your preferred currency')
+        .setDescription('Choose your currency')
         .setRequired(true)
         .addChoices(
           { name: 'EUR (€)', value: '3' },
@@ -329,6 +329,30 @@ async function checkProStatus(steamId) {
   }
 }
 
+async function getCurrencyPreference(discordId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/discord/preferences?discordId=${encodeURIComponent(discordId)}`);
+    if (!response.ok) return '3';
+    const data = await response.json();
+    return data?.currency === '1' ? '1' : '3';
+  } catch {
+    return '3';
+  }
+}
+
+async function setCurrencyPreference(discordId, currency) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/discord/preferences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discordId, currency }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Get Discord user ID from username (searches database first, then Discord servers)
 async function getDiscordUserIdFromUsername(username, client) {
   try {
@@ -375,7 +399,7 @@ async function getDiscordUserIdFromUsername(username, client) {
 
 async function getPlayerInventory(player) {
   // Fetch player's inventory from API
-  const response = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${player.id}&currency=3&isPro=false`);
+  const response = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${player.id}&isPro=false`);
   if (!response.ok) return [];
   const data = await response.json();
   return data.assets || [];
@@ -488,106 +512,25 @@ async function resolveSteamUsername(username) {
 }
 
 // Get top weapons from inventory (returns immediately with what it has, max 3)
-async function getTopWeapons(steamId, limit = 3, currency = '3') {
+async function getTopWeapons(steamId, limit = 3) {
   try {
-    const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&currency=${currency}&isPro=false`);
+    const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&currency=3&includeTopItems=1&refresh=1`);
     if (!invResponse.ok) return [];
 
     const invData = await invResponse.json();
-    const assets = invData.assets || [];
-    const descriptions = invData.descriptions || [];
+    const topItems = Array.isArray(invData?.topItems) ? invData.topItems : [];
+    if (topItems.length === 0) return [];
 
-    const descMap = new Map();
-    descriptions.forEach(desc => {
-      const key = `${desc.classid}_${desc.instanceid || 0}`;
-      descMap.set(key, desc);
+    const symbol = '€';
+    return topItems.slice(0, limit).map((it) => {
+      const v = Number(it?.value || 0);
+      const price = Number(it?.price || 0);
+      return {
+        name: it.marketHashName,
+        price: Number.isFinite(price) && price > 0 ? `${symbol}${price.toFixed(2).replace('.', ',')}` : null,
+        priceValue: Number.isFinite(v) ? v : 0,
+      };
     });
-
-    const weapons = [];
-    const weaponTypes = [
-      'Knife', 'AK-47', 'M4A4', 'AWP', 'Glock', 'USP', 'Desert Eagle', 'P250',
-      'Five-SeveN', 'Tec-9', 'CZ75', 'R8', 'P2000', 'Dual Berettas',
-      'P90', 'MP9', 'MAC-10', 'UMP-45', 'MP7', 'MP5',
-      'FAMAS', 'Galil', 'M4A1-S', 'AUG', 'SG 553', 'SCAR-20',
-      'G3SG1', 'SSG 08', 'Nova', 'XM1014', 'Sawed-Off', 'MAG-7',
-      'M249', 'Negev'
-    ];
-
-    // Collect all weapons first (without prices)
-    for (const asset of assets) {
-      const key = `${asset.classid}_${asset.instanceid || 0}`;
-      const desc = descMap.get(key);
-      if (!desc) continue;
-
-      const itemName = desc.market_hash_name || desc.market_name || desc.name;
-      if (!itemName) continue;
-
-      const isWeapon = desc.type === 'Weapon' ||
-        weaponTypes.some(weaponType => itemName.includes(weaponType));
-
-      if (isWeapon) {
-        weapons.push({
-          name: itemName,
-          price: null,
-          priceValue: 0,
-        });
-      }
-    }
-
-    // Limit to top candidates before fetching prices (to speed up)
-    const candidates = weapons.slice(0, limit * 2); // Get a few extra for safety
-
-    // Fetch prices in parallel with timeout - return what we have after 3 seconds max
-    const pricePromises = candidates.map(async (weapon, index) => {
-      try {
-        const price = await Promise.race([
-          getItemPrice(weapon.name, currency),
-          new Promise(resolve => setTimeout(() => resolve(null), 2000)) // 2 second timeout per price
-        ]);
-
-        if (price) {
-          const priceStr = price.lowest_price || price.lowest || price.median_price;
-          if (priceStr) {
-            // Better price parsing that handles both EUR and USD formats
-            let cleaned = priceStr.replace(/[€$£¥\s]/g, '');
-            
-            // Handle European format: "70.991,00" -> "70991.00" (wrong) should be "70.991"
-            // Handle US format: "70.99" -> "70.99"
-            if (cleaned.includes(',') && cleaned.includes('.')) {
-              // European format: remove dots, replace comma with dot
-              cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-            } else if (cleaned.includes(',')) {
-              // Could be European "70,99" or US "70,991"
-              // If comma is the last separator, it's likely European decimal
-              const parts = cleaned.split(',');
-              if (parts.length === 2 && parts[1].length <= 2) {
-                // Likely "70,99" format
-                cleaned = cleaned.replace(',', '.');
-              } else {
-                // Likely "70,991" format (US thousand separator)
-                cleaned = cleaned.replace(/,/g, '');
-              }
-            }
-            
-            weapon.priceValue = parseFloat(cleaned) || 0;
-            weapon.price = priceStr;
-          }
-        }
-      } catch (error) {
-        // Ignore price fetch errors
-      }
-      return weapon;
-    });
-
-    // Wait max 3 seconds total for prices
-    const results = await Promise.race([
-      Promise.all(pricePromises),
-      new Promise(resolve => setTimeout(() => resolve(candidates), 3000))
-    ]);
-
-    // Sort by price and return top weapons (even if some don't have prices yet)
-    const sorted = (results || candidates).sort((a, b) => b.priceValue - a.priceValue);
-    return sorted.slice(0, limit);
   } catch (error) {
     console.error('Error getting top weapons:', error);
     return [];
@@ -760,6 +703,8 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'wishlist') {
       await interaction.deferReply({ ephemeral: true });
 
+      const currency = await getCurrencyPreference(user.id);
+
       const steamId = await getSteamIdFromDiscord(user.id);
 
       if (!steamId) {
@@ -781,7 +726,7 @@ client.on('interactionCreate', async (interaction) => {
       // Get prices for all items (limit to first 10 for embed)
       const itemsToShow = wishlist.slice(0, 10);
       const pricePromises = itemsToShow.map(item =>
-        getItemPrice(item.market_hash_name || item.key, '3')
+        getItemPrice(item.market_hash_name || item.key, currency)
       );
       const prices = await Promise.all(pricePromises);
 
@@ -837,6 +782,8 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'alerts') {
       await interaction.deferReply({ ephemeral: true });
 
+      const currencyPref = await getCurrencyPreference(user.id);
+
       const steamId = await getSteamIdFromDiscord(user.id);
 
       if (!steamId) {
@@ -857,7 +804,7 @@ client.on('interactionCreate', async (interaction) => {
 
       // Get current prices for alerts
       const pricePromises = alerts.slice(0, 10).map(alert =>
-        getItemPrice(alert.marketHashName, alert.currency)
+        getItemPrice(alert.marketHashName, currencyPref)
       );
       const prices = await Promise.all(pricePromises);
 
@@ -911,6 +858,8 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'price') {
       await interaction.deferReply({ ephemeral: true });
 
+      const currency = await getCurrencyPreference(user.id);
+
       const itemQuery = interaction.options.getString('item');
       if (!itemQuery) {
         await interaction.editReply({
@@ -927,7 +876,7 @@ client.on('interactionCreate', async (interaction) => {
       const itemId = searchResult?.id || null;
 
       // Get price for the found item
-      const price = await getItemPrice(itemName, '3');
+      const price = await getItemPrice(itemName, currency);
 
       // If no price found, try to get item info from API
       if (!price) {
@@ -993,6 +942,8 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'inventory') {
       await interaction.deferReply({ ephemeral: true });
 
+      const currency = await getCurrencyPreference(user.id);
+
       const steamId = await getSteamIdFromDiscord(user.id);
 
       if (!steamId) {
@@ -1003,7 +954,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       try {
-        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${steamId}&currency=3&isPro=false`);
+        const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&currency=${currency}&isPro=false`);
         if (!invResponse.ok) {
           const errorText = await invResponse.text().catch(() => 'Unknown error');
           let errorMessage = 'Could not fetch your inventory.';
@@ -1120,6 +1071,8 @@ client.on('interactionCreate', async (interaction) => {
     } else if (commandName === 'vault') {
       await interaction.deferReply({ ephemeral: true });
 
+      const currency = await getCurrencyPreference(user.id);
+
       const steamId = await getSteamIdFromDiscord(user.id);
 
       if (!steamId) {
@@ -1132,7 +1085,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const isPro = await checkProStatus(steamId);
         const invResponse = await fetch(
-          `${API_BASE_URL}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&currency=3&isPro=${isPro ? 'true' : 'false'}&refresh=1`,
+          `${API_BASE_URL}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&currency=${currency}&isPro=${isPro ? 'true' : 'false'}&refresh=1&includeTopItems=1`,
           { cache: 'no-store' }
         );
 
@@ -1170,11 +1123,12 @@ client.on('interactionCreate', async (interaction) => {
         const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
         const totalInventoryValue = typeof invData?.totalInventoryValue === 'string' ? invData.totalInventoryValue : '0.00';
         const totalValueNum = Number.parseFloat(totalInventoryValue);
+        const symbol = currency === '1' ? '$' : '€';
         const totalValueStr = Number.isFinite(totalValueNum) && totalValueNum > 0
-          ? `€${totalValueNum.toFixed(2).replace('.', ',')}`
-          : '€0,00';
+          ? `${symbol}${totalValueNum.toFixed(2).replace('.', ',')}`
+          : `${symbol}0,00`;
 
-        const topWeapons = await getTopWeapons(steamId, 3, '3'); // EUR by default for now
+        const topItems = Array.isArray(invData?.topItems) ? invData.topItems : [];
 
         const embed = new EmbedBuilder()
           .setTitle(`💎 Your Vault${isPro ? ' ⚡ PRO' : ''}`)
@@ -1189,12 +1143,13 @@ client.on('interactionCreate', async (interaction) => {
           { name: '💰 Total Value', value: totalValueStr, inline: true }
         );
 
-        if (Array.isArray(topWeapons) && topWeapons.length > 0) {
-          const lines = topWeapons.map((w, idx) => {
-            const priceText = w.price || 'No price data';
-            return `${idx + 1}. ${w.name} - ${priceText}`;
+        if (topItems.length > 0) {
+          const lines = topItems.slice(0, 5).map((it, idx) => {
+            const val = Number(it?.value || 0);
+            const txt = Number.isFinite(val) && val > 0 ? `${symbol}${val.toFixed(2).replace('.', ',')}` : `${symbol}0,00`;
+            return `${idx + 1}. ${it.marketHashName} - ${txt}`;
           }).join('\n');
-          embed.addFields({ name: '🔝 Top Weapons', value: lines.length > 1024 ? lines.slice(0, 1020) + '...' : lines, inline: false });
+          embed.addFields({ name: '🔝 Top Items', value: lines.length > 1024 ? lines.slice(0, 1020) + '...' : lines, inline: false });
         }
 
         if (!assets.length && !descriptions.length) {
@@ -1482,7 +1437,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // Get top 3 weapons (returns immediately, doesn't wait)
-        const topWeapons = await getTopWeapons(steamId, 3, '3'); // EUR by default for now
+        const topWeapons = await getTopWeapons(steamId, 3);
 
         const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
         const embed = new EmbedBuilder()
@@ -1936,30 +1891,21 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({ embeds: [embed], ephemeral: true });
 
     } else if (commandName === 'currency') {
-      const currency = interaction.options.getString('currency');
-      const steamId = await getSteamIdFromDiscord(user.id);
+      await interaction.deferReply({ ephemeral: true });
 
-      if (!steamId) {
-        await interaction.reply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
-          ephemeral: true
+      const chosen = interaction.options.getString('currency');
+      const ok = await setCurrencyPreference(user.id, chosen);
+      if (!ok) {
+        await interaction.editReply({
+          content: '❌ **Error**\n\nFailed to save your currency preference. Please try again later.',
         });
         return;
       }
 
-      // Store user's currency preference (we'll need to create a simple storage for this)
-      // For now, just confirm the choice
-      const currencySymbol = currency === '3' ? '€' : '$';
-      const currencyName = currency === '3' ? 'EUR' : 'USD';
-      
-      const embed = new EmbedBuilder()
-        .setTitle('💱 Currency Preference Updated')
-        .setDescription(`Your preferred currency has been set to **${currencyName} (${currencySymbol})**\n\nThis will be used for:\n• Vault value display\n• Item prices in commands\n• Top weapons rankings`)
-        .setColor(0x5865F2)
-        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      const label = chosen === '1' ? 'USD ($)' : 'EUR (€)';
+      await interaction.editReply({
+        content: `✅ **Currency Updated**\n\nYour SkinVault bot currency is now set to **${label}**.`,
+      });
     }
   } catch (error) {
     console.error('Error handling command:', error);

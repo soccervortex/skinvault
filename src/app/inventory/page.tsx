@@ -518,30 +518,10 @@ function InventoryContent() {
     mergeAndStorePrices(results);
   };
 
-  const fetchInventory = async (id: string, proStatus?: boolean, forceRefresh?: boolean) => {
+  const fetchInventory = async (id: string, proStatus?: boolean) => {
     try {
       // Pro status here is for the viewer (affects proxy/scan performance). Never infer from the viewed profile.
       const actualProStatus = !!proStatus;
-
-      const inventoryCacheKey = `sv_inventory_cache_${String(id)}_${String(currency.code)}`;
-      if (!forceRefresh) {
-        try {
-          if (typeof window !== 'undefined') {
-            const cached = window.sessionStorage.getItem(inventoryCacheKey);
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              const ts = Number(parsed?.timestamp || 0);
-              const items = Array.isArray(parsed?.items) ? (parsed.items as InventoryItem[]) : null;
-              if (items && Number.isFinite(ts) && ts > 0 && Date.now() - ts < 60_000) {
-                setInventory(items);
-                return;
-              }
-            }
-          }
-        } catch {
-          // Ignore cache errors
-        }
-      }
       
       let allItems: InventoryItem[] = [];
       let startAssetId: string | null = null;
@@ -554,7 +534,7 @@ function InventoryContent() {
         
         try {
           // Use server-side API route to avoid CORS issues
-          const apiUrl: string = `/api/steam/inventory?steamId=${id}&currency=${encodeURIComponent(currency.code)}&isPro=${actualProStatus}${forceRefresh ? '&refresh=1' : ''}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced to 15 seconds for faster loading
           
@@ -664,13 +644,6 @@ function InventoryContent() {
       }
 
       setInventory(allItems);
-      try {
-        if (typeof window !== 'undefined') {
-          window.sessionStorage.setItem(inventoryCacheKey, JSON.stringify({ timestamp: Date.now(), items: allItems }));
-        }
-      } catch {
-        // Ignore cache write errors
-      }
     } catch (e: any) { 
       // Don't log AbortErrors (intentional timeouts) or expected network errors
       if (e?.name !== 'AbortError' && 
@@ -1396,6 +1369,16 @@ function InventoryContent() {
                 </div>
               </div>
             </header>
+
+            <div className="bg-black/40 border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 text-[10px] md:text-xs text-gray-300">
+              <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 mb-2">2. De "Inventory Cache"</div>
+              <div className="space-y-2">
+                <div>Grote sites zoals Skinport of CS.Money zijn constant bezig met het "scrapen" (uitlezen) van duizenden profielen.</div>
+                <div>Zodra jij inlogt, kijken ze in hun eigen database.</div>
+                <div>Als ze je inventory een minuut geleden al hebben ingeladen, laten ze die direct zien.</div>
+                <div>Als je op "Refresh" klikt, gebruiken zij hun servers om de data bij Steam op te halen. Dit gaat razendsnel omdat zij supersnelle verbindingen hebben met de Steam-servers.</div>
+              </div>
+            </div>
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
