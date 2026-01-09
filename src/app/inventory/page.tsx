@@ -108,6 +108,9 @@ function InventoryContent() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
+  const [inventoryCacheState, setInventoryCacheState] = useState<string | null>(null);
+  const [inventoryFetchedAt, setInventoryFetchedAt] = useState<number | null>(null);
+  const [refreshingInventory, setRefreshingInventory] = useState(false);
   const [viewedUser, setViewedUser] = useState<any>(null);
   const [cs2Overview, setCs2Overview] = useState<any>(null);
   const [playerStats, setPlayerStats] = useState<any>(null);
@@ -518,14 +521,16 @@ function InventoryContent() {
     mergeAndStorePrices(results);
   };
 
-  const fetchInventory = async (id: string, proStatus?: boolean) => {
+  const fetchInventory = async (id: string, proStatus?: boolean, options?: { force?: boolean }) => {
     try {
       // Pro status here is for the viewer (affects proxy/scan performance). Never infer from the viewed profile.
       const actualProStatus = !!proStatus;
+      const force = !!options?.force;
       
       let allItems: InventoryItem[] = [];
       let startAssetId: string | null = null;
       let hasMore = true;
+      
       let attempts = 0;
       const maxAttempts = 20; // Prevent infinite loops
 
@@ -534,7 +539,7 @@ function InventoryContent() {
         
         try {
           // Use server-side API route to avoid CORS issues
-          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}${startAssetId ? `&start_assetid=${startAssetId}` : ''}`;
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}&currency=${encodeURIComponent(currency.code)}${startAssetId ? `&start_assetid=${startAssetId}` : ''}${force ? '&refresh=1&force=1' : ''}`;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced to 15 seconds for faster loading
           
@@ -544,6 +549,11 @@ function InventoryContent() {
           });
           
           clearTimeout(timeoutId);
+
+          if (!startAssetId) {
+            setInventoryCacheState(res.headers.get('x-sv-cache'));
+            setInventoryFetchedAt(Date.now());
+          }
           
           if (!res.ok) {
             // Don't log 404s, 502s, or 503s (expected errors - inventory might not be available or API might be down)
@@ -655,6 +665,16 @@ function InventoryContent() {
         console.error("Inventory failed", e);
       }
       setInventory([]); // Set empty array so page can still render
+    }
+  };
+
+  const handleForceRefreshInventory = async () => {
+    if (!viewedUser?.steamId) return;
+    try {
+      setRefreshingInventory(true);
+      await fetchInventory(String(viewedUser.steamId), isPro, { force: true });
+    } finally {
+      setRefreshingInventory(false);
     }
   };
 
@@ -1376,12 +1396,30 @@ function InventoryContent() {
             </header>
 
             <div className="bg-black/40 border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 text-[10px] md:text-xs text-gray-300">
-              <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 mb-2">2. De "Inventory Cache"</div>
-              <div className="space-y-2">
-                <div>Grote sites zoals Skinport of CS.Money zijn constant bezig met het "scrapen" (uitlezen) van duizenden profielen.</div>
-                <div>Zodra jij inlogt, kijken ze in hun eigen database.</div>
-                <div>Als ze je inventory een minuut geleden al hebben ingeladen, laten ze die direct zien.</div>
-                <div>Als je op "Refresh" klikt, gebruiken zij hun servers om de data bij Steam op te halen. Dit gaat razendsnel omdat zij supersnelle verbindingen hebben met de Steam-servers.</div>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">2. De "Inventory Cache"</div>
+                <button
+                  onClick={handleForceRefreshInventory}
+                  disabled={refreshingInventory}
+                  className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${refreshingInventory ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                >
+                  {refreshingInventory ? 'Refreshing...' : 'Refresh (force)'}
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
+                <div className="bg-black/30 border border-white/5 rounded-xl px-3 py-2">
+                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">Cache Status</div>
+                  <div className="mt-1 text-[10px] md:text-xs text-white">{inventoryCacheState || '—'}</div>
+                </div>
+                <div className="bg-black/30 border border-white/5 rounded-xl px-3 py-2">
+                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">Last Fetch</div>
+                  <div className="mt-1 text-[10px] md:text-xs text-white">{inventoryFetchedAt ? new Date(inventoryFetchedAt).toLocaleTimeString('nl-NL') : '—'}</div>
+                </div>
+                <div className="bg-black/30 border border-white/5 rounded-xl px-3 py-2">
+                  <div className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500">Cache TTL</div>
+                  <div className="mt-1 text-[10px] md:text-xs text-white">1 min</div>
+                </div>
               </div>
             </div>
 

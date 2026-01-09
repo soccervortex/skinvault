@@ -589,10 +589,13 @@ export async function GET(request: Request) {
     }
 
     const normalizedStart = String(startAssetId || '0');
+    // Cache key must vary by response shape. Otherwise callers that request includeTopItems=1
+    // can receive a cached payload generated without topItems.
+    const variant = includeTopItems ? 'top1' : 'top0';
     // Base cache is independent of pagination so repeated checks within 1 minute are instant.
     // We still allow paginated fetches for very large inventories, but the primary cache is base.
-    const baseCacheKey = `inv_${steamId}_${currency}`;
-    const pageCacheKey = `inv_${steamId}_${currency}_${normalizedStart}`;
+    const baseCacheKey = `inv_${steamId}_${currency}_${variant}`;
+    const pageCacheKey = `inv_${steamId}_${currency}_${variant}_${normalizedStart}`;
     const mongoClient = await getMongoClient();
     const db = mongoClient.db('skinvault');
     const cacheCollection = db.collection<InventoryCacheDoc>('inventory_cache');
@@ -646,6 +649,10 @@ export async function GET(request: Request) {
       try {
         const cached = await cacheCollection.findOne({ _id: baseCacheKey });
         if (cached?.data && cached.expiresAt && cached.expiresAt.getTime() > Date.now()) {
+          if (includeTopItems && !Array.isArray((cached.data as any)?.topItems)) {
+            // Cache entry doesn't contain topItems - treat as miss.
+            throw new Error('Cached payload missing topItems');
+          }
           const res = NextResponse.json(cached.data);
           res.headers.set('x-sv-cache', refresh ? 'hit-refresh' : 'hit');
           return res;
