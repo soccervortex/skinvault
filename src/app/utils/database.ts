@@ -264,7 +264,11 @@ async function syncAllFromMongoDBToKV(): Promise<void> {
 export async function dbGet<T>(key: string, useCache: boolean = true): Promise<T | null> {
   // For theme_settings, always bypass cache and prioritize MongoDB to ensure fresh data
   const isThemeSettings = key === 'theme_settings';
-  if (isThemeSettings) {
+  const isCreatorVolatile =
+    key.startsWith('creator_snapshot_') ||
+    key.startsWith('creator_twitch_connection_') ||
+    key.startsWith('creator_tiktok_connection_');
+  if (isThemeSettings || isCreatorVolatile) {
     useCache = false;
     // Explicitly clear cache for theme settings
     readCache.delete(key);

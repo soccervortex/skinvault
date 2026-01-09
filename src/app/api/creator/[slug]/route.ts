@@ -828,6 +828,27 @@ export async function GET(
   const snapshotKey = `creator_snapshot_${creator.slug}`;
   const cached = await dbGet<CreatorSnapshot>(snapshotKey, true);
 
+  // Always compute connection flags from the authoritative connection keys.
+  // This prevents stale connected/disconnected UI when a cached snapshot is served.
+  const [twitchConn, tiktokConn] = await Promise.all([
+    dbGet<any>(`${TWITCH_CONNECTION_PREFIX}${creator.slug}`, false),
+    dbGet<any>(`${TIKTOK_CONNECTION_PREFIX}${creator.slug}`, false),
+  ]);
+  const liveConnections = {
+    twitchConnected: !!(twitchConn && String(twitchConn?.accessToken || '').trim()),
+    tiktokConnected: !!(tiktokConn && String(tiktokConn?.accessToken || '').trim()),
+  };
+
+  const withLiveConnections = (snap: CreatorSnapshot): CreatorSnapshot => {
+    return {
+      ...snap,
+      connections: {
+        twitchConnected: liveConnections.twitchConnected,
+        tiktokConnected: liveConnections.tiktokConnected,
+      },
+    };
+  };
+
   const url = new URL(request.url);
   const realtime = url.searchParams.get('realtime') === '1';
   const refresh = url.searchParams.get('refresh') === '1';
@@ -842,7 +863,7 @@ export async function GET(
   if (refresh) {
     const fresh = await refreshSnapshot(creator, cached);
     void dbSet(snapshotKey, fresh).catch(() => {});
-    return respond(fresh);
+    return respond(withLiveConnections(fresh));
   }
 
   // Optional realtime mode: do a quick TikTok status check (2.5s max) and merge it into the response.
@@ -905,7 +926,7 @@ export async function GET(
 
     // Persist in background.
     void dbSet(snapshotKey, { ...updated, lastFastCheckedAt: new Date().toISOString() }).catch(() => {});
-    return respond(updated);
+    return respond(withLiveConnections(updated));
   }
 
   // Always respond fast: if no cached snapshot, return a minimal snapshot immediately
@@ -916,7 +937,7 @@ export async function GET(
     void refreshSnapshot(creator, minimal)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return respond(minimal);
+    return respond(withLiveConnections(minimal));
   }
 
   // If the TikTok status API config changed (or was newly enabled), refresh immediately
@@ -927,7 +948,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return respond(cached);
+    return respond(withLiveConnections(cached));
   }
 
   // If creator has TikTok configured but cached snapshot has no latest video yet, refresh now.
@@ -941,7 +962,7 @@ export async function GET(
       void refreshSnapshot(creator, cached)
         .then((fresh) => dbSet(snapshotKey, fresh))
         .catch(() => {});
-      return respond(cached);
+      return respond(withLiveConnections(cached));
     }
   }
 
@@ -950,7 +971,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return respond(cached);
+    return respond(withLiveConnections(cached));
   }
 
   // If cached snapshot is missing lastCheckedAt, don't block the response.
@@ -959,7 +980,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return respond(cached);
+    return respond(withLiveConnections(cached));
   }
 
   // Fast path: keep TikTok latest_video/live fresh, but do it in the background
@@ -981,7 +1002,7 @@ export async function GET(
     void refreshSnapshot(creator, cached)
       .then((fresh) => dbSet(snapshotKey, fresh))
       .catch(() => {});
-    return respond(cached);
+    return respond(withLiveConnections(cached));
   }
 
   // Stale-while-revalidate: return cached immediately, but refresh in the background when stale.
@@ -991,5 +1012,5 @@ export async function GET(
       .catch(() => {});
   }
 
-  return respond(cached);
+  return respond(withLiveConnections(cached));
 }
