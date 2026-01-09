@@ -105,6 +105,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   }, []);
 
   const canManage = useMemo(() => isOwner(adminSteamId), [adminSteamId]);
+  const viewerSteamId = useMemo(() => sessionSteamId || adminSteamId, [sessionSteamId, adminSteamId]);
 
   const tiktokLive = data?.live?.tiktok ?? false;
   const tiktokHandle = data?.creator?.tiktokUsername
@@ -117,7 +118,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     data?.links?.tiktokLive || (tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}/live` : undefined);
   const canConnectTikTok = !!(
     data?.creator?.partnerSteamId &&
-    (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
+    (canManage || (viewerSteamId && String(data.creator.partnerSteamId) === String(viewerSteamId)))
   );
   const tiktokConnected = !!data?.connections?.tiktokConnected;
   const latestTikTokItem = data?.items?.find((i) => i.platform === 'tiktok');
@@ -129,12 +130,12 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   const twitchLiveUrl = data?.links?.twitchLive || twitchProfileUrl;
   const canConnectTwitch = !!(
     data?.creator?.partnerSteamId &&
-    (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
+    (canManage || (viewerSteamId && String(data.creator.partnerSteamId) === String(viewerSteamId)))
   );
   const twitchConnected = !!data?.connections?.twitchConnected;
   const canUseObsOverlay = !!(
     data?.creator?.partnerSteamId &&
-    (canManage || (sessionSteamId && String(data.creator.partnerSteamId) === String(sessionSteamId)))
+    (canManage || (viewerSteamId && String(data.creator.partnerSteamId) === String(viewerSteamId)))
   );
   const showTwitchPreviewImage = !!(twitchPreviewUrl && twitchLive === true && !twitchPreviewFailed);
 
