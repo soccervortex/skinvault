@@ -12,7 +12,7 @@ interface PriceAlert {
   condition: 'above' | 'below';
   currency: string;
   triggered: boolean;
-  createdAt: number;
+  createdAt: string;
 }
 
 interface ManagePriceTrackersProps {
@@ -32,6 +32,11 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
   useEffect(() => {
     if (isOpen && steamId) {
       loadAlerts();
+
+      const id = setInterval(() => {
+        loadAlerts().catch(() => {});
+      }, 5000);
+
       // Load rewards to update limit
       preloadRewards(steamId).then(() => {
         const limit = getPriceTrackerLimitSync(isPro, steamId);
@@ -55,6 +60,8 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
           setHasDiscordAccess(false);
         }
       });
+
+      return () => clearInterval(id);
     }
   }, [isOpen, steamId, isPro]);
 
@@ -83,7 +90,12 @@ export default function ManagePriceTrackers({ isOpen, onClose, steamId, isPro }:
       });
 
       if (res.ok) {
-        setAlerts(alerts.filter(a => a.id !== alertId));
+        const data = await res.json().catch(() => ({} as any));
+        if (Array.isArray(data?.alerts)) {
+          setAlerts(data.alerts);
+        } else {
+          setAlerts(alerts.filter(a => a.id !== alertId));
+        }
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to delete alert');

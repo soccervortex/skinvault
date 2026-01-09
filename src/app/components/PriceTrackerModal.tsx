@@ -34,6 +34,22 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
 
   const marketHashName = item.market_hash_name || item.name;
 
+  const refreshAlerts = async () => {
+    if (!user?.steamId) return;
+    try {
+      const res = await fetch(`/api/alerts/list?steamId=${encodeURIComponent(user.steamId)}&marketHashName=${encodeURIComponent(marketHashName)}`, {
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => ({} as any));
+      const itemAlerts = Array.isArray(data?.alerts) ? data.alerts : [];
+      setAlerts(itemAlerts);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingAlerts(false);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen || !user?.steamId) return;
 
@@ -70,15 +86,14 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
       })
       .catch(() => setLoadingDiscord(false));
 
-    // Load existing alerts for this item
-    fetch(`/api/alerts/list?steamId=${user.steamId}`)
-      .then(res => res.json())
-      .then(data => {
-        const itemAlerts = (data.alerts || []).filter((a: any) => a.marketHashName === marketHashName);
-        setAlerts(itemAlerts);
-        setLoadingAlerts(false);
-      })
-      .catch(() => setLoadingAlerts(false));
+    setLoadingAlerts(true);
+    refreshAlerts();
+
+    const id = setInterval(() => {
+      refreshAlerts();
+    }, 5000);
+
+    return () => clearInterval(id);
   }, [isOpen, user?.steamId, marketHashName]);
 
   // Focus management for modal
@@ -163,11 +178,12 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
       const data = await res.json();
       
       if (res.ok && data.success) {
-        // Refresh alerts
-        const listRes = await fetch(`/api/alerts/list?steamId=${user.steamId}`);
-        const listData = await listRes.json();
-        const itemAlerts = (listData.alerts || []).filter((a: any) => a.marketHashName === marketHashName);
-        setAlerts(itemAlerts);
+        if (Array.isArray((data as any)?.alerts)) {
+          setAlerts((data as any).alerts);
+          setLoadingAlerts(false);
+        } else {
+          await refreshAlerts();
+        }
         setTargetPrice('');
         setCondition('below');
       } else {
@@ -185,13 +201,17 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
     if (!user?.steamId) return;
 
     try {
-      await fetch('/api/alerts/delete', {
+      const res = await fetch('/api/alerts/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alertId, steamId: user.steamId }),
       });
-
-      setAlerts(alerts.filter(a => a.id !== alertId));
+      const data = await res.json().catch(() => ({} as any));
+      if (res.ok && Array.isArray(data?.alerts)) {
+        setAlerts(data.alerts);
+      } else {
+        setAlerts(alerts.filter(a => a.id !== alertId));
+      }
     } catch (error) {
       console.error('Failed to delete alert:', error);
     }

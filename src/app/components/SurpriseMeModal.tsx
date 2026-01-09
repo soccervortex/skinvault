@@ -10,6 +10,18 @@ interface SurpriseMeModalProps {
   allItems: any[];
 }
 
+function getItemIdForRoute(item: any): string {
+  const raw =
+    item?.id ??
+    item?.market_hash_name ??
+    item?.marketHashName ??
+    item?.market_name ??
+    item?.marketName ??
+    item?.name ??
+    '';
+  return String(raw || '').trim();
+}
+
 const WEAR_OPTIONS = [
   { label: 'Any', value: '' },
   { label: 'Factory New', value: 'Factory New' },
@@ -230,6 +242,17 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
 
     if (matches.length === 0) {
       alert('No items match your filters. Try adjusting them.');
+      return;
+    }
+
+    // Prefer client-side selection (instant) using the already loaded dataset.
+    // Fall back to the server endpoint only if we cannot find a usable item id.
+    for (let i = 0; i < 25; i++) {
+      const candidate = matches[Math.floor(Math.random() * matches.length)];
+      const id = getItemIdForRoute(candidate);
+      if (!id) continue;
+      router.push(`/item/${encodeURIComponent(id)}`);
+      onClose();
       return;
     }
 

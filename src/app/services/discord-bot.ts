@@ -1,7 +1,7 @@
 // Discord Bot Service - Runs with Next.js app
 // Handles price alerts and sends Discord DMs
 
-import { kv } from '@vercel/kv';
+import { dbGet, dbSet } from '@/app/utils/database';
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -114,7 +114,7 @@ export async function sendDiscordDMEmbed(discordId: string, embed: any): Promise
 export async function getAllPriceAlerts(): Promise<PriceAlert[]> {
   try {
     const alertsKey = 'price_alerts';
-    const alerts = await kv.get<Record<string, PriceAlert>>(alertsKey) || {};
+    const alerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
     return Object.values(alerts).filter(alert => !alert.triggered);
   } catch (error) {
     console.error('Failed to get price alerts:', error);
@@ -225,11 +225,11 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
 async function markAlertTriggered(alertId: string): Promise<void> {
   try {
     const alertsKey = 'price_alerts';
-    const alerts = await kv.get<Record<string, PriceAlert>>(alertsKey) || {};
+    const alerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
     
     if (alerts[alertId]) {
       alerts[alertId].triggered = true;
-      await kv.set(alertsKey, alerts);
+      await dbSet(alertsKey, alerts);
     }
   } catch (error) {
     console.error('Failed to mark alert as triggered:', error);

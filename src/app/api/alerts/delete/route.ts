@@ -23,7 +23,8 @@ export async function POST(request: Request) {
     }
 
     const alertsKey = 'price_alerts';
-    const alerts = await dbGet<Record<string, PriceAlert>>(alertsKey) || {};
+    const normalizedSteamId = String(steamId || '').trim();
+    const alerts = await dbGet<Record<string, PriceAlert>>(alertsKey, false) || {};
     
     // Verify the alert exists and belongs to the user
     const alert = alerts[alertId];
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Alert not found' }, { status: 404 });
     }
 
-    if (alert.steamId !== steamId) {
+    if (String(alert.steamId || '').trim() !== normalizedSteamId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -39,7 +40,16 @@ export async function POST(request: Request) {
     delete alerts[alertId];
     await dbSet(alertsKey, alerts);
 
-    return NextResponse.json({ success: true });
+    const updatedAlerts = Object.values(alerts).filter(a => String(a?.steamId || '').trim() === normalizedSteamId);
+    updatedAlerts.sort((a, b) => {
+      const ta = new Date(String(a?.createdAt || 0)).getTime();
+      const tb = new Date(String(b?.createdAt || 0)).getTime();
+      return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+    });
+
+    const res = NextResponse.json({ success: true, alerts: updatedAlerts }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
   } catch (error) {
     console.error('Delete alert error:', error);
     return NextResponse.json({ error: 'Failed to delete alert' }, { status: 500 });
