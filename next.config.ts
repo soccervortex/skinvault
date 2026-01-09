@@ -67,10 +67,10 @@ const nextConfig: NextConfig = {
         has: [
           {
             type: 'host',
-            value: 'www.skinvaults.online',
+            value: 'skinvaults.online',
           },
         ],
-        destination: 'https://skinvaults.online/:path*',
+        destination: 'https://www.skinvaults.online/:path*',
         permanent: true,
       },
       {
@@ -82,7 +82,7 @@ const nextConfig: NextConfig = {
             value: 'http',
           },
         ],
-        destination: 'https://skinvaults.online/:path*',
+        destination: 'https://www.skinvaults.online/:path*',
         permanent: true,
       },
     ];
