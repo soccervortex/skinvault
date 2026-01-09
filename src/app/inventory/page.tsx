@@ -107,7 +107,7 @@ function InventoryContent() {
   const [loading, setLoading] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
-  const [currency, setCurrency] = useState({ code: '3', symbol: 'â‚¬' });
+  const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
   const [inventoryCacheState, setInventoryCacheState] = useState<string | null>(null);
   const [inventoryFetchedAt, setInventoryFetchedAt] = useState<number | null>(null);
   const [refreshingInventory, setRefreshingInventory] = useState(false);
@@ -236,7 +236,7 @@ function InventoryContent() {
       if (stored === '1') {
         setCurrency({ code: '1', symbol: '$' });
       } else if (stored === '3') {
-        setCurrency({ code: '3', symbol: 'â‚¬' });
+        setCurrency({ code: '3', symbol: '€' });
       }
     } catch {
       // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
@@ -259,6 +259,17 @@ function InventoryContent() {
       setItemPrices({});
     }
   }, [cacheKey]);
+
+  const formatMoney = (amount: number) => {
+    const safe = Number.isFinite(amount) ? amount : 0;
+    const isUsd = currency.code === '1';
+    return new Intl.NumberFormat(isUsd ? 'en-US' : 'nl-NL', {
+      style: 'currency',
+      currency: isUsd ? 'USD' : 'EUR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safe);
+  };
 
   const fetchViewedProfile = async (id: string) => {
     try {
@@ -1084,10 +1095,6 @@ function InventoryContent() {
   }, [searchParams, viewedUser?.steamId]);
 
   const totalVaultValue = useMemo(() => {
-    // Always return a valid number, never Infinity
-    if (!inventory || inventory.length === 0) {
-      return '0,00';
-    }
     let total = 0;
     inventory.forEach(item => {
       const key = getMarketKey(item);
@@ -1103,8 +1110,8 @@ function InventoryContent() {
     if (!isFinite(total) || isNaN(total)) {
       total = 0;
     }
-    return total.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }, [inventory, itemPrices]);
+    return formatMoney(total);
+  }, [inventory, itemPrices, currency.code]);
 
   const totalItems = useMemo(() => inventory.reduce((sum, i) => sum + Number(i.amount ?? 1), 0), [inventory]);
 
@@ -1399,7 +1406,7 @@ function InventoryContent() {
                 <TrendingUp className="text-emerald-500 shrink-0" size={24} />
                 <div className="min-w-0">
                   <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
-                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter break-words">{currency.symbol}{"\u00A0"}{totalVaultValue}</p>
+                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter break-words">{totalVaultValue}</p>
                 </div>
               </div>
             </header>
@@ -1418,7 +1425,7 @@ function InventoryContent() {
                   <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
                     {(() => {
                       const hours = formatHours(cs2Overview?.playtimeForeverMinutes ?? null);
-                      if (hours === null) return 'â€”';
+                      if (hours === null) return '—';
                       return hours.toLocaleString('nl-NL', { maximumFractionDigits: 0 });
                     })()}
                   </div>
@@ -1430,7 +1437,7 @@ function InventoryContent() {
                     <TrendingUp size={12} /> CS2 Owned
                   </div>
                   <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
-                    {cs2Overview ? (cs2Overview?.hasCs2 ? 'Yes' : 'No') : 'â€”'}
+                    {cs2Overview ? (cs2Overview?.hasCs2 ? 'Yes' : 'No') : '—'}
                   </div>
                   <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">AppID 730</div>
                 </div>
@@ -1442,9 +1449,9 @@ function InventoryContent() {
                   <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
                     {(() => {
                       const ts = cs2Overview?.lastLogoff;
-                      if (!ts) return 'â€”';
+                      if (!ts) return '–';
                       const d = new Date(Number(ts) * 1000);
-                      if (isNaN(d.getTime())) return 'â€”';
+                      if (isNaN(d.getTime())) return '–';
                       return d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' });
                     })()}
                   </div>
@@ -1460,7 +1467,7 @@ function InventoryContent() {
                     <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-white">
                       {(() => {
                         const hours = formatHours(cs2Overview?.playtime2WeeksMinutes ?? null);
-                        if (hours === null) return 'â€”';
+                        if (hours === null) return '–';
                         return hours.toLocaleString('nl-NL', { maximumFractionDigits: 1 });
                       })()}
                     </div>
@@ -1476,7 +1483,7 @@ function InventoryContent() {
                     <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-500 opacity-60">
                       <Lock size={12} /> 2 Weeks
                     </div>
-                    <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-gray-600 opacity-60">â€”</div>
+                    <div className="mt-2 text-xl md:text-2xl font-black italic tracking-tighter text-gray-600 opacity-60">–</div>
                     <div className="mt-1 text-[9px] md:text-[10px] text-gray-600 opacity-60">Hours last 2 weeks</div>
                   </div>
                 )}
@@ -1530,11 +1537,7 @@ function InventoryContent() {
                         {getItemDisplayName(item)}
                       </p>
                       <p className="text-[10px] md:text-xs font-black text-emerald-400 italic">
-                        {currency.symbol}
-                        {price.toLocaleString('nl-NL', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
+                        {formatMoney(price)}
                       </p>
                     </div>
                   </Link>
@@ -1557,7 +1560,7 @@ function InventoryContent() {
               <div className="mt-4 flex items-center gap-2 px-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
                 <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-1.5">
-                  <span className="text-[10px]">âš¡</span>
+                  <span className="text-[10px]">⚡</span>
                   Pro Performance Active
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
@@ -1741,9 +1744,9 @@ function InventoryContent() {
                     onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
                     className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 focus:border-blue-500/50 outline-none shadow-xl"
                   >
-                    <option value="price-desc">Sort: Price High â†’ Low</option>
-                    <option value="price-asc">Sort: Price Low â†’ High</option>
-                    <option value="name-asc">Sort: Name A â†’ Z</option>
+                    <option value="price-desc">Sort: Price High → Low</option>
+                    <option value="price-asc">Sort: Price Low → High</option>
+                    <option value="name-asc">Sort: Name A → Z</option>
                   </select>
                 </div>
               </div>
@@ -1785,10 +1788,10 @@ function InventoryContent() {
                                 <div className="text-[10px] md:text-[11px] font-black italic">
                                   {getPriceForItem(item, itemPrices) 
                                     ? <span className="text-emerald-500">{getPriceForItem(item, itemPrices)}</span>
-                                    : priceScanDone 
-                                      ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
+                                      : priceScanDone 
+                                        ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
                                       : <span className="text-gray-600 animate-pulse">
-                                          {isPro ? 'âš¡ FAST SCAN...' : 'SCANNING...'}
+                                          {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
                                         </span>}
                                 </div>
                               </div>
