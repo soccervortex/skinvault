@@ -408,6 +408,10 @@ export async function GET(request: Request) {
     const slug = searchParams.get('slug');
     const range = parseRange(searchParams.get('rangeDays'));
 
+    const includeWindows = searchParams.get('includeWindows') !== '0';
+    const includeSeries = searchParams.get('includeSeries') !== '0';
+    const includeLeaderboard = searchParams.get('includeLeaderboard') !== '0';
+
     const normalizedSlug = slug ? String(slug).toLowerCase() : null;
 
     // Exclude creator's own SteamID from their stats when querying a single creator.
@@ -434,44 +438,50 @@ export async function GET(request: Request) {
 
     const uniqueRefSlugs = Array.from(new Set(refSlugs)).filter(Boolean);
 
-    const windows: WindowKey[] = ['daily', 'weekly', 'monthly', 'yearly', 'all_time'];
-    const out: any = { windows: {}, creators: uniqueRefSlugs };
+    const out: any = { creators: uniqueRefSlugs };
 
-    for (const w of windows) {
-      const start = getStartForWindow(w);
-      out.windows[w] = await computeWindow(db, uniqueRefSlugs, start, proMap, excludeSteamId);
+    if (includeWindows) {
+      const windows: WindowKey[] = ['daily', 'weekly', 'monthly', 'yearly', 'all_time'];
+      out.windows = {};
+      for (const w of windows) {
+        const start = getStartForWindow(w);
+        out.windows[w] = await computeWindow(db, uniqueRefSlugs, start, proMap, excludeSteamId);
+      }
     }
 
-    // Time series + leaderboard for selected range
-    if (range.mode === 'all') {
-      out.series = {
-        range: 'all',
-        bucketFormat: '%Y-%m',
-        slug: normalizedSlug,
-        startDay: null,
-        endDay: toDayString(startOfDay(new Date())),
-        data: await computeSeriesMonthly(db, normalizedSlug, excludeSteamId),
-      };
-    } else {
-      const seriesStart = startOfDay(addDays(new Date(), -(range.days - 1)));
-      out.series = {
-        range: range.days,
-        bucketFormat: '%Y-%m-%d',
-        slug: normalizedSlug,
-        startDay: toDayString(seriesStart),
-        endDay: toDayString(startOfDay(new Date())),
-        data: await computeSeries(db, seriesStart, range.days, normalizedSlug, excludeSteamId),
-      };
+    if (includeSeries) {
+      if (range.mode === 'all') {
+        out.series = {
+          range: 'all',
+          bucketFormat: '%Y-%m',
+          slug: normalizedSlug,
+          startDay: null,
+          endDay: toDayString(startOfDay(new Date())),
+          data: await computeSeriesMonthly(db, normalizedSlug, excludeSteamId),
+        };
+      } else {
+        const seriesStart = startOfDay(addDays(new Date(), -(range.days - 1)));
+        out.series = {
+          range: range.days,
+          bucketFormat: '%Y-%m-%d',
+          slug: normalizedSlug,
+          startDay: toDayString(seriesStart),
+          endDay: toDayString(startOfDay(new Date())),
+          data: await computeSeries(db, seriesStart, range.days, normalizedSlug, excludeSteamId),
+        };
+      }
     }
 
-    const leaderboardStart = range.mode === 'all'
-      ? null
-      : startOfDay(addDays(new Date(), -(range.days - 1)));
-    const leaderboardStartDate = leaderboardStart || new Date(0);
+    if (includeLeaderboard) {
+      const leaderboardStart = range.mode === 'all'
+        ? null
+        : startOfDay(addDays(new Date(), -(range.days - 1)));
+      const leaderboardStartDate = leaderboardStart || new Date(0);
 
-    out.leaderboard = await computeLeaderboard(db, leaderboardStartDate, null, proMap, null);
-    if (slug) {
-      out.leaderboard = out.leaderboard.filter((r: any) => String(r.slug) === String(slug).toLowerCase());
+      out.leaderboard = await computeLeaderboard(db, leaderboardStartDate, null, proMap, null);
+      if (slug) {
+        out.leaderboard = out.leaderboard.filter((r: any) => String(r.slug) === String(slug).toLowerCase());
+      }
     }
 
     out.excludedSteamId = excludeSteamId;

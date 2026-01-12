@@ -15,14 +15,14 @@ export async function GET(request: Request) {
     
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       
       const textRes = await fetch(steamUrl, {
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-        cache: 'no-store',
+        next: { revalidate: 86400 },
       });
       
       clearTimeout(timeoutId);

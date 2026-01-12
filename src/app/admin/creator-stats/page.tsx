@@ -215,6 +215,9 @@ function CreatorStatsAdminPageInner() {
     try {
       const params = new URLSearchParams();
       params.set('rangeDays', rangeDays === 'all' ? 'all' : String(rangeDays));
+      params.set('includeWindows', '0');
+      params.set('includeSeries', '0');
+      params.set('includeLeaderboard', '1');
 
       const res = await fetch(`/api/admin/creator-stats?${params.toString()}`, {
         headers: {
@@ -244,6 +247,9 @@ function CreatorStatsAdminPageInner() {
       const params = new URLSearchParams();
       params.set('rangeDays', rangeDays === 'all' ? 'all' : String(rangeDays));
       if (selectedCreator !== 'all') params.set('slug', selectedCreator);
+      params.set('includeWindows', '0');
+      params.set('includeSeries', '1');
+      params.set('includeLeaderboard', '0');
 
       const res = await fetch(`/api/admin/creator-stats?${params.toString()}`, {
         headers: {
@@ -429,12 +435,23 @@ function CreatorStatsAdminPageInner() {
 
   useEffect(() => {
     if (!userIsOwner) return;
+    if (selectedCreator === 'all') {
+      setSeriesData(null);
+      setLoadingSeries(false);
+      return;
+    }
     void loadSeries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIsOwner, rangeDays, selectedCreator]);
 
   useEffect(() => {
     if (!userIsOwner) return;
+    if (selectedCreator === 'all') {
+      setUsersData(null);
+      setUsersLoading(false);
+      setUsersError(null);
+      return;
+    }
     void loadCreatorUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIsOwner, rangeDays, selectedCreator, usersPage]);

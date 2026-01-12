@@ -142,13 +142,21 @@ function computeTopItemsAndTotal(
 
 async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrency: string) {
   try {
-    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includePriceIndex=1`;
+    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includeTopItems=1`;
     const profileUrl = `${baseUrl}/api/steam/profile?steamId=${steamId}`;
 
+    const invController = new AbortController();
+    const profController = new AbortController();
+    const invTimeout = setTimeout(() => invController.abort(), 8000);
+    const profTimeout = setTimeout(() => profController.abort(), 6000);
+
     const [inventoryRes, profileRes] = await Promise.all([
-      fetch(inventoryUrl, { next: { revalidate: 3600 } }).catch(() => null),
-      fetch(profileUrl, { next: { revalidate: 86400 } }).catch(() => null),
+      fetch(inventoryUrl, { next: { revalidate: 3600 }, signal: invController.signal }).catch(() => null),
+      fetch(profileUrl, { next: { revalidate: 86400 }, signal: profController.signal }).catch(() => null),
     ]);
+
+    clearTimeout(invTimeout);
+    clearTimeout(profTimeout);
 
     const profileData: Profile | null = profileRes && (profileRes as any).ok
       ? await (profileRes as Response).json().catch(() => null)
@@ -158,11 +166,9 @@ async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrenc
       ? await (inventoryRes as Response).json().catch(() => null)
       : null;
 
-    const priceIndex: Record<string, number> = (inventoryData?.priceIndex && typeof inventoryData.priceIndex === 'object')
-      ? inventoryData.priceIndex
-      : {};
-
-    const { topItems, totalValue, totalItems } = computeTopItemsAndTotal(inventoryData, priceIndex, 3);
+    const totalValue = Number(inventoryData?.totalInventoryValue || 0);
+    const totalItems = Number(inventoryData?.valuedItemCount || 0);
+    const topItems = Array.isArray(inventoryData?.topItems) ? inventoryData.topItems : [];
     const rank = getRankForValue(totalValue);
 
     const avatarFallback = `${baseUrl}/icons/web-app-manifest-192x192.png`;
@@ -177,7 +183,7 @@ async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrenc
       totalValue,
       totalItems,
       rank,
-      topItems,
+      topItems: Array.isArray(topItems) ? topItems.slice(0, 3) : [],
     };
   } catch (error) {
     console.error('Failed to fetch inventory data for OG image:', error);
