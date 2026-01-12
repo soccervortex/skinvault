@@ -28,6 +28,7 @@ import { copyToClipboard } from '@/app/utils/clipboard';
 import { useToast } from '@/app/components/Toast';
 import { isBanned } from '@/app/utils/ban-check';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
+import { getRankForValue } from '@/app/utils/rank-tiers';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -131,6 +132,27 @@ type InventoryItem = {
   marketable?: number | boolean;
   [key: string]: any;
 };
+
+function hexToRgba(hex: string, alpha: number) {
+  try {
+    const h = String(hex || '').trim().replace('#', '');
+    const a = Math.max(0, Math.min(1, Number(alpha)));
+    if (h.length === 3) {
+      const r = parseInt(h[0] + h[0], 16);
+      const g = parseInt(h[1] + h[1], 16);
+      const b = parseInt(h[2] + h[2], 16);
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+    if (h.length === 6) {
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+  } catch {
+  }
+  return `rgba(255, 255, 255, ${Math.max(0, Math.min(1, Number(alpha)))})`;
+}
 
 function formatProfileName(name: string): string {
   return String(name || '')
@@ -1205,7 +1227,7 @@ function InventoryContent() {
     }
   }, [searchParams, viewedUser?.steamId]);
 
-  const totalVaultValue = useMemo(() => {
+  const totalVaultValueNumber = useMemo(() => {
     let total = 0;
     inventory.forEach(item => {
       const key = getMarketKey(item);
@@ -1221,8 +1243,12 @@ function InventoryContent() {
     if (!isFinite(total) || isNaN(total)) {
       total = 0;
     }
-    return formatMoney(total);
+    return total;
   }, [inventory, itemPrices, currency.code]);
+
+  const totalVaultValue = useMemo(() => formatMoney(totalVaultValueNumber), [totalVaultValueNumber, currency.code]);
+
+  const vaultRank = useMemo(() => getRankForValue(totalVaultValueNumber), [totalVaultValueNumber]);
 
   const totalItems = useMemo(() => inventory.reduce((sum, i) => sum + Number(i.amount ?? 1), 0), [inventory]);
 
@@ -1477,6 +1503,18 @@ function InventoryContent() {
                     <h1 className="w-full sm:w-auto min-w-0 text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
+                    {vaultRank && (
+                      <span
+                        className="px-2 md:px-3 py-0.5 md:py-1 rounded-full border text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] shrink-0"
+                        style={{
+                          color: vaultRank.color,
+                          borderColor: hexToRgba(vaultRank.color, 0.5),
+                          backgroundColor: hexToRgba(vaultRank.color, 0.12),
+                        }}
+                      >
+                        {vaultRank.name}
+                      </span>
+                    )}
                     {viewedIsPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro

@@ -604,7 +604,7 @@ export async function GET(request: Request) {
     const normalizedStart = String(startAssetId || '0');
     // Cache key must vary by response shape. Otherwise callers that request includeTopItems=1
     // can receive a cached payload generated without topItems.
-    const variant = includeTopItems ? 'top1' : 'top0';
+    const variant = `${includeTopItems ? 'top1' : 'top0'}_${includePriceIndex ? 'px1' : 'px0'}`;
     // Base cache is independent of pagination so repeated checks within 1 minute are instant.
     // We still allow paginated fetches for very large inventories, but the primary cache is base.
     const baseCacheKey = `inv_${steamId}_${currency}_${variant}`;
@@ -665,6 +665,9 @@ export async function GET(request: Request) {
           if (includeTopItems && !Array.isArray((cached.data as any)?.topItems)) {
             // Cache entry doesn't contain topItems - treat as miss.
             throw new Error('Cached payload missing topItems');
+          }
+          if (includePriceIndex && (!((cached.data as any)?.priceIndex) || typeof (cached.data as any)?.priceIndex !== 'object')) {
+            throw new Error('Cached payload missing priceIndex');
           }
           const res = setInventoryResponseCachingHeaders(NextResponse.json(cached.data));
           res.headers.set('x-sv-cache', refresh ? 'hit-refresh' : 'hit');
