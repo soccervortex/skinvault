@@ -1,10 +1,10 @@
 ﻿"use client";
 
 import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy, HelpCircle, User } from 'lucide-react';
 import { getPriceScanConcurrencySync, getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import dynamic from 'next/dynamic';
@@ -28,7 +28,6 @@ import { copyToClipboard } from '@/app/utils/clipboard';
 import { useToast } from '@/app/components/Toast';
 import { isBanned } from '@/app/utils/ban-check';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
-import { getRankForValue, Rank } from '@/app/utils/rank-tiers';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -105,6 +104,7 @@ function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
 
 function InventoryContent() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
@@ -131,37 +131,19 @@ function InventoryContent() {
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedInUserPro, setLoggedInUserPro] = useState(false);
-  const [proStatusLoading, setProStatusLoading] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
   const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
-  const [rank, setRank] = useState<Rank | null>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
-  const serverPriceIndexLoadedRef = useRef(false);
-  const serverPriceIndexRef = useRef<Record<string, number>>({});
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState(0);
   const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
-
-  const handleSteamLogin = () => {
-    if (typeof window === 'undefined') return;
-    window.location.href = '/api/auth/steam';
-  };
-
-  const hasProUntil = useMemo(() => {
-    const until = loggedInUser?.proUntil;
-    return !!(until && new Date(until) > new Date());
-  }, [loggedInUser?.proUntil]);
-
   const isPro = useMemo(() => {
     if (!loggedInUser?.steamId) return false;
-    // Prefer authoritative API check when available; while loading, fall back to proUntil
     if (loggedInUserPro) return true;
-    if (proStatusLoading) return hasProUntil;
-    return hasProUntil;
-  }, [loggedInUser?.steamId, loggedInUserPro, proStatusLoading, hasProUntil]);
+    const until = loggedInUser?.proUntil;
+    return !!(until && new Date(until) > new Date());
+  }, [loggedInUser?.steamId, loggedInUser?.proUntil, loggedInUserPro]);
 
   const viewedIsPro = useMemo(
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
@@ -492,7 +474,6 @@ function InventoryContent() {
       // Don't log AbortErrors (intentional timeouts) or 404s (player not on Faceit)
       // Suppress all Faceit errors - they're not critical
       setFaceitStats(null);
-      setFaceitStats(null);
     }
   };
 
@@ -569,7 +550,7 @@ function InventoryContent() {
         
         try {
           // Use server-side API route to avoid CORS issues
-          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}&currency=${encodeURIComponent(currency.code)}&includeTopItems=1&includePriceIndex=1${startAssetId ? `&start_assetid=${startAssetId}` : ''}${force ? '&refresh=1&force=1' : ''}`;
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}&currency=${encodeURIComponent(currency.code)}${startAssetId ? `&start_assetid=${startAssetId}` : ''}${force ? '&refresh=1&force=1' : ''}`;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced to 15 seconds for faster loading
           
@@ -600,27 +581,6 @@ function InventoryContent() {
           if (data?.error) {
             console.error('Inventory API error:', data.error);
             throw new Error(data.error);
-          }
-          
-          if (!startAssetId && data?.priceIndex && typeof data.priceIndex === 'object') {
-            try {
-              const formatted: Record<string, string> = {};
-              const numeric: Record<string, number> = {};
-              for (const [name, price] of Object.entries(data.priceIndex as Record<string, number>)) {
-                const n = String(name || '').trim();
-                const p = Number(price);
-                if (!n || !Number.isFinite(p) || p <= 0) continue;
-                numeric[n] = p;
-                formatted[n] = formatMoney(p);
-              }
-              if (Object.keys(formatted).length) {
-                serverPriceIndexLoadedRef.current = true;
-                serverPriceIndexRef.current = numeric;
-                mergeAndStorePrices(formatted);
-              }
-            } catch {
-              // ignore
-            }
           }
           
           // Steam inventory API returns assets and descriptions separately
@@ -751,6 +711,15 @@ function InventoryContent() {
       return raw;
     };
 
+    const extractSteamIdFromPath = (path: string | null) => {
+      const p = String(path || '');
+      const parts = p.split('/').filter(Boolean);
+      const invIdx = parts.indexOf('inventory');
+      const after = invIdx >= 0 ? parts[invIdx + 1] : null;
+      if (!after) return null;
+      return extractSteamId(after);
+    };
+
     // Support multiple query keys for flexibility
     const possibleKeys = ['steamId', 'steamid', 'id', 'openid.claimed_id', 'openid_claimed_id'];
     let fromQuery: string | null = null;
@@ -762,6 +731,8 @@ function InventoryContent() {
         break;
       }
     }
+
+    const fromPath = extractSteamIdFromPath(pathname);
 
     // Get logged-in user (your own account) - this should NEVER change when viewing other profiles
     const storedLoggedInUser = typeof window !== 'undefined' 
@@ -775,22 +746,18 @@ function InventoryContent() {
       // Load wishlist for logged-in user
       setWishlist(loadWishlist(storedLoggedInUser.steamId));
       // Check Pro status from API
-      setProStatusLoading(true);
-      checkProStatus(storedLoggedInUser.steamId)
-        .then(setLoggedInUserPro)
-        .catch(() => setLoggedInUserPro(false))
-        .finally(() => setProStatusLoading(false));
+      checkProStatus(storedLoggedInUser.steamId).then(setLoggedInUserPro);
     } else {
       setLoggedInUser(null);
       setWishlist([]);
       setLoggedInUserPro(false);
-      setProStatusLoading(false);
     }
 
     // Determine which profile to view
     // Priority: query param > OpenID callback > logged-in user's own profile
     const viewedSteamId =
       extractSteamId(fromQuery) ||
+      extractSteamId(fromPath) ||
       extractSteamId(searchParams.get('openid.claimed_id')) ||
       extractSteamId(searchParams.get('openid_claimed_id')) ||
       loggedInSteamId;
@@ -893,7 +860,6 @@ function InventoryContent() {
         
         // Also update Pro status for logged-in user if viewing own profile
         if (isViewingOwnProfile && storedLoggedInUser?.steamId) {
-          setProStatusLoading(true);
           checkProStatus(storedLoggedInUser.steamId).then((proStatus) => {
             setLoggedInUserPro(proStatus);
             // Update localStorage with latest Pro status
@@ -911,10 +877,42 @@ function InventoryContent() {
                 }
               } catch {}
             }
-          }).catch(() => setLoggedInUserPro(false)).finally(() => setProStatusLoading(false));
+          });
         }
 
-        setLoading(false);
+        // Only update logged-in user in localStorage when:
+        // 1. It's a Steam login callback (OpenID redirect) - always update
+        // 2. User is viewing their own profile - update Pro status but keep your account
+        // This ensures your logged-in account stays consistent and Pro status stays up-to-date
+        try {
+          if (combinedUser && typeof window !== 'undefined') {
+            if (isLoginCallback) {
+              // This is your actual login - record first login date (don't block on this)
+              fetch('/api/user/first-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steamId: viewedSteamId }),
+              }).catch(() => {}); // Silently fail if this doesn't work
+              
+              // This is your actual login - update the logged-in user completely
+              window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
+              // Trigger 'userUpdated' event so sidebar updates
+              window.dispatchEvent(new CustomEvent('userUpdated'));
+            } else if (isViewingOwnProfile && loggedInUser) {
+              // Viewing your own profile - only update Pro status, keep your account info
+              const updatedUser = {
+                ...loggedInUser,
+                proUntil: combinedUser.proUntil, // Update Pro status
+              };
+              window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
+              // Trigger 'userUpdated' event so sidebar updates
+              window.dispatchEvent(new CustomEvent('userUpdated'));
+            }
+            // Otherwise, we're just viewing someone else's profile - don't touch logged-in user
+          }
+        } catch {
+          // ignore storage issues (e.g. private mode)
+        }
       } catch (error) {
         // If profile fetch times out, try to use cached or minimal data
         console.warn('Critical data fetch timeout, using fallback');
@@ -945,7 +943,7 @@ function InventoryContent() {
       setLoading(false);
     };
     loadAll();
-  }, [searchParams]);
+  }, [searchParams, pathname]);
 
   // Save inventory to localStorage for owned badge on market page (only for own profile)
   useEffect(() => {
@@ -976,9 +974,7 @@ function InventoryContent() {
     const run = async () => {
       setPriceScanDone(false);
       const uniqueNames = Array.from(new Set(inventory.map((i) => getMarketKey(i)).filter(Boolean) as string[]));
-      if (!serverPriceIndexLoadedRef.current) {
-        await fetchPrices(uniqueNames);
-      }
+      await fetchPrices(uniqueNames);
       setPriceScanDone(true);
     };
 
@@ -991,7 +987,7 @@ function InventoryContent() {
     try {
       if (typeof window === 'undefined') return;
       const origin = window.location.origin;
-      setShareUrl(`${origin}/inventory?steamId=${viewedUser.steamId}`);
+      setShareUrl(`${origin}/inventory/${viewedUser.steamId}`);
     } catch {
       setShareUrl(null);
     }
@@ -1036,7 +1032,6 @@ function InventoryContent() {
                 })
                 .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
             } else {
-              setHasDiscordAccess(false);
               setDiscordStatus({ connected: false, requiresPro: true });
             }
           } else {
@@ -1115,17 +1110,12 @@ function InventoryContent() {
     let total = 0;
     inventory.forEach(item => {
       const key = getMarketKey(item);
-      const raw = key ? serverPriceIndexRef.current[key] : undefined;
-      if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
-        total += raw * Number(item.amount ?? 1);
-        return;
-      }
-
       const priceStr = key ? itemPrices[key] : undefined;
-      if (!priceStr) return;
-      const num = parsePriceToNumber(priceStr);
-      if (!isNaN(num) && isFinite(num)) {
-        total += num * Number(item.amount ?? 1);
+      if (priceStr) {
+        const num = parsePriceToNumber(priceStr);
+        if (!isNaN(num) && isFinite(num)) {
+          total += num * Number(item.amount ?? 1);
+        }
       }
     });
     // Ensure total is always a finite number (not Infinity)
@@ -1133,31 +1123,7 @@ function InventoryContent() {
       total = 0;
     }
     return formatMoney(total);
-  }, [inventory, itemPrices, currency.code, formatMoney]);
-
-  const totalVaultValueNumeric = useMemo(() => {
-    let total = 0;
-    inventory.forEach(item => {
-      const key = getMarketKey(item);
-      const raw = key ? serverPriceIndexRef.current[key] : undefined;
-      if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
-        total += raw * Number(item.amount ?? 1);
-        return;
-      }
-
-      const priceStr = key ? itemPrices[key] : undefined;
-      if (!priceStr) return;
-      const num = parsePriceToNumber(priceStr);
-      if (!isNaN(num) && isFinite(num)) {
-        total += num * Number(item.amount ?? 1);
-      }
-    });
-    return !isFinite(total) || isNaN(total) ? 0 : total;
-  }, [inventory, itemPrices]);
-
-  useEffect(() => {
-    setRank(getRankForValue(totalVaultValueNumeric));
-  }, [totalVaultValueNumeric]);
+  }, [inventory, itemPrices, currency.code]);
 
   const totalItems = useMemo(() => inventory.reduce((sum, i) => sum + Number(i.amount ?? 1), 0), [inventory]);
 
@@ -1301,28 +1267,96 @@ function InventoryContent() {
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
-          <div className="max-w-3xl mx-auto space-y-6 pb-32">
-            <div className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5">
-              <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">My Vault</div>
-              <h1 className="mt-3 text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Sign in to load your inventory</h1>
-              <p className="mt-3 text-[11px] md:text-[12px] text-gray-400 leading-relaxed max-w-2xl">
-                See your total vault value, top items, wishlist, price trackers and compare tools.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
+          <div className="max-w-6xl mx-auto space-y-10 pb-32">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
+              <div className="flex items-start justify-between gap-6 flex-wrap">
+                <div>
+                  <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">
+                    Inventory Vault
+                  </h1>
+                  <p className="mt-3 text-[10px] md:text-xs text-gray-400 max-w-2xl">
+                    Search any Steam profile to view a read-only CS2 inventory breakdown.
+                    Sign in to unlock personal features like trackers, wishlist, and compare.
+                  </p>
+                </div>
                 <button
-                  onClick={handleSteamLogin}
-                  className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') window.location.href = '/api/auth/steam';
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
                 >
+                  <User size={14} />
                   Sign In with Steam
                 </button>
-                <Link
-                  href="/how-it-works"
-                  className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest text-gray-200"
-                >
-                  Features
-                </Link>
               </div>
-            </div>
+            </header>
+
+            <section className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
+              <div className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500 mb-4">
+                <HelpCircle size={14} />
+                What you can do here
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <TrendingUp size={12} />
+                    Vault value
+                  </div>
+                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                    Total inventory value with live market pricing.
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <PackageOpen size={12} />
+                    Top items
+                  </div>
+                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                    Quickly spot your most valuable skins.
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <Trophy size={12} />
+                    CS2 overview
+                  </div>
+                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                    Public playtime and last seen (Steam).
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <Scale size={12} />
+                    Compare
+                  </div>
+                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                    Compare items side-by-side (requires sign-in).
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <Bell size={12} />
+                    Price trackers
+                  </div>
+                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                    Track price changes and alerts (requires sign-in).
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                    <Heart size={12} />
+                    Wishlist
+                  </div>
+                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                    Save items and monitor prices (requires sign-in).
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 text-[10px] md:text-xs text-gray-500">
+                Use the sidebar Search to open any profile by SteamID64 or username.
+              </div>
+            </section>
           </div>
         </main>
       </div>
@@ -1331,129 +1365,6 @@ function InventoryContent() {
 
   return (
     <>
-      {showOnboarding && (
-        <div className="fixed inset-0 z-[9999]">
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={() => {
-              try {
-                const steamId = String(viewedUser?.steamId || loggedInUser?.steamId || '').trim();
-                if (steamId) window.localStorage.setItem(`sv_onboarding_seen_${steamId}`, '1');
-              } catch {}
-              setShowOnboarding(false);
-            }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div
-              className="w-full max-w-lg rounded-[2rem] md:rounded-[3rem] bg-[#0f111a] border border-white/10 shadow-2xl p-6 md:p-8"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-blue-400">
-                    Getting Started
-                  </div>
-                  <div className="mt-2 text-2xl md:text-3xl font-black italic uppercase tracking-tighter">
-                    {onboardingStep === 0 ? 'Your Vault' : onboardingStep === 1 ? 'Track & Alerts' : 'Share & Grow'}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    try {
-                      const steamId = String(viewedUser?.steamId || loggedInUser?.steamId || '').trim();
-                      if (steamId) window.localStorage.setItem(`sv_onboarding_seen_${steamId}`, '1');
-                    } catch {}
-                    setShowOnboarding(false);
-                  }}
-                  className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
-                >
-                  Skip
-                </button>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <div className={`h-1 flex-1 rounded-full ${onboardingStep >= 0 ? 'bg-blue-500' : 'bg-white/10'}`} />
-                <div className={`h-1 flex-1 rounded-full ${onboardingStep >= 1 ? 'bg-blue-500' : 'bg-white/10'}`} />
-                <div className={`h-1 flex-1 rounded-full ${onboardingStep >= 2 ? 'bg-blue-500' : 'bg-white/10'}`} />
-              </div>
-
-              <div className="mt-6 text-[11px] md:text-[12px] text-gray-300 leading-relaxed">
-                {onboardingStep === 0 && (
-                  <div className="space-y-4">
-                    <p>
-                      Your Steam inventory is loaded here. If it’s private, make your Steam inventory public to see items and analytics.
-                    </p>
-                    <a
-                      href="/how-it-works"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-200 hover:bg-white/10"
-                    >
-                      Learn how it works
-                    </a>
-                  </div>
-                )}
-                {onboardingStep === 1 && (
-                  <div className="space-y-4">
-                    <p>
-                      Add items to your wishlist and set price trackers. Pro users get faster scans and more tracker features.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href="/wishlist"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-500"
-                      >
-                        Open Wishlist
-                      </a>
-                      <a
-                        href="/pro"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600/30"
-                      >
-                        See Pro
-                      </a>
-                    </div>
-                  </div>
-                )}
-                {onboardingStep === 2 && (
-                  <div className="space-y-4">
-                    <p>
-                      Share your vault link with friends or on social. Public profiles help you grow and compare with others.
-                    </p>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                      Tip: Use the Share button on your profile header.
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 flex items-center justify-between gap-3">
-                <button
-                  onClick={() => setOnboardingStep((s) => Math.max(0, s - 1))}
-                  disabled={onboardingStep === 0}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${onboardingStep === 0 ? 'bg-white/5 border-white/10 text-gray-600 cursor-not-allowed' : 'bg-[#11141d] border-white/10 text-gray-200 hover:bg-white/10'}`}
-                >
-                  Back
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (onboardingStep < 2) {
-                      setOnboardingStep((s) => Math.min(2, s + 1));
-                      return;
-                    }
-                    try {
-                      const steamId = String(viewedUser?.steamId || loggedInUser?.steamId || '').trim();
-                      if (steamId) window.localStorage.setItem(`sv_onboarding_seen_${steamId}`, '1');
-                    } catch {}
-                    setShowOnboarding(false);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all"
-                >
-                  {onboardingStep < 2 ? 'Next' : 'Done'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
@@ -1467,14 +1378,6 @@ function InventoryContent() {
                     <h1 className="w-full sm:w-auto min-w-0 text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
-                    {rank && totalItems > 0 && (
-                      <span
-                        style={{ '--rank-color': rank.color } as React.CSSProperties}
-                        className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-[var(--rank-color)]/10 border border-[var(--rank-color)]/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-[var(--rank-color)] shrink-0"
-                      >
-                        {rank.name}
-                      </span>
-                    )}
                     {viewedIsPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
@@ -1600,8 +1503,8 @@ function InventoryContent() {
                   <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
                     <ShareButton
                       url={shareUrl}
-                      title={`${viewedUser.name}'s ${rank?.name} Inventory - SkinVaults`}
-                      text={`Check out my ${rank?.name} inventory on SkinVaults! Total value: ${totalVaultValue} with ${totalItems} items. ${shareUrl}`}
+                      title={`${viewedUser?.name || 'User'}'s Vault - SkinVaults`}
+                      text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVaults`}
                       variant="button"
                       className="text-[8px] md:text-[9px]"
                     />
@@ -1761,10 +1664,8 @@ function InventoryContent() {
               <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
               <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
               <StatCard label="HS %" icon={<Target size={12}/>} val={playerStats?.hs} unit="%" />
-              <StatCard label="Vault Value" icon={<TrendingUp size={12} />} val={totalVaultValue} color="text-emerald-400" />
-              <StatCard label="Total Items" icon={<PackageOpen size={12} />} val={totalItems.toLocaleString()} />
-              {rank && <StatCard label="Rank" icon={<Trophy size={12} />} val={rank.name} color="text-yellow-400" />}
-              <StatCard label="Priced Items" icon={<CheckCircle2 size={12} />} val={`${pricedItems.toLocaleString()} / ${totalItems.toLocaleString()}`} />
+              <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
+              <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
             </div>
             
             {/* Pro Performance Indicator */}

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users, CheckCircle2 } from 'lucide-react';
 import HelpTooltip from './HelpTooltip';
 import Link from 'next/link';
@@ -27,6 +27,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const didTrySessionHydrationRef = useRef(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchId, setSearchId] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -46,6 +47,39 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
         const savedUser = window.localStorage.getItem('steam_user');
         const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+
+        if (!parsedUser?.steamId && !didTrySessionHydrationRef.current) {
+          didTrySessionHydrationRef.current = true;
+          void (async () => {
+            try {
+              const sessionRes = await fetchWithTimeout('/api/auth/steam/session', { cache: 'no-store' }, 6000);
+              if (!sessionRes.ok) return;
+              const sessionJson = await sessionRes.json().catch(() => null);
+              const steamId = String(sessionJson?.steamId || '').trim();
+              if (!steamId || !/^\d{17}$/.test(steamId)) return;
+
+              const profileRes = await fetchWithTimeout(`/api/steam/profile?steamId=${encodeURIComponent(steamId)}`, { cache: 'no-store' }, 8000);
+              if (!profileRes.ok) return;
+              const profile = await profileRes.json().catch(() => null);
+              const hydratedUser = {
+                steamId,
+                name: profile?.name || 'User',
+                avatar: profile?.avatar || '',
+              };
+              try {
+                window.localStorage.setItem('steam_user', JSON.stringify(hydratedUser));
+              } catch {
+                /* ignore */
+              }
+              setUser(hydratedUser);
+              window.dispatchEvent(new CustomEvent('userUpdated'));
+            } catch {
+              /* ignore */
+            }
+          })();
+          setUser(null);
+          return;
+        }
         
         // If user exists but name/avatar is missing, fetch from API
         if (parsedUser?.steamId && (!parsedUser.name || !parsedUser.avatar)) {
@@ -235,6 +269,11 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
   // 3. Logout Handler (Zorgt voor directe UI update)
   const handleLogout = () => {
+    try {
+      fetch('/api/auth/steam/logout', { method: 'POST' }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem('steam_user');
     localStorage.removeItem('user_inventory');
     setUser(null);
@@ -248,7 +287,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
     // If it's a Steam64 ID (17 digits), navigate directly
     if (/^\d{17}$/.test(trimmedQuery)) {
-      router.push(`/inventory?steamId=${trimmedQuery}`);
+      router.push(`/inventory/${trimmedQuery}`);
       setIsSearchOpen(false);
       setSearchId("");
       return;
@@ -260,7 +299,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
       if (resolveRes.ok) {
         const data = await resolveRes.json();
         if (data.steamId) {
-          router.push(`/inventory?steamId=${data.steamId}`);
+          router.push(`/inventory/${data.steamId}`);
           setIsSearchOpen(false);
           setSearchId("");
         } else {
@@ -336,7 +375,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
                 <Tag size={16} /> Market
               </Link>
-              <Link href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
+              <Link href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
                 <Wallet size={16} /> My Vault
               </Link>
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
@@ -589,8 +628,8 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <Tag size={16} /> Market
           </Link>
           <Link
-            href={user?.steamId ? `/inventory?steamId=${user.steamId}` : '/inventory'}
-            className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/inventory' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`}
+            href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'}
+            className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`}
             aria-label="My Vault"
           >
             <Wallet size={16} /> My Vault
