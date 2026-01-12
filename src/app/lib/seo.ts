@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
 const SITE_NAME = 'SkinVaults';
 const DEFAULT_DESCRIPTION = 'Track CS2 skin prices, manage your Steam inventory, set price alerts, and compare skins. Real-time analytics for CS2 traders and collectors.';
 

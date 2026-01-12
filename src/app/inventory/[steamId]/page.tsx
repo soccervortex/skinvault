@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { generateSEOMetadata } from '@/app/lib/seo';
 import InventoryPage from '../page';
 
@@ -10,6 +11,17 @@ type SteamProfile = {
   avatar?: string;
 };
 
+async function getRequestOriginSafe() {
+  try {
+    const h = await headers();
+    const host = h.get('x-forwarded-host') || h.get('host') || '';
+    const proto = h.get('x-forwarded-proto') || 'https';
+    if (host) return `${proto}://${host}`;
+  } catch {
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
+}
+
 export async function generateMetadata(
   { params, searchParams }: { params: { steamId: string }; searchParams?: Record<string, string | string[] | undefined> }
 ): Promise<Metadata> {
@@ -20,16 +32,19 @@ export async function generateMetadata(
   const rawCurrency = Array.isArray(sp?.currency) ? sp.currency[0] : sp?.currency;
   const currency = rawCurrency ? String(rawCurrency) : null;
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
+  const baseUrl = await getRequestOriginSafe();
+  const isValidSteamId = /^\d{17}$/.test(safeSteamId);
   let profile: SteamProfile | null = null;
-  try {
-    const res = await fetch(
-      `${baseUrl}/api/steam/profile?steamId=${encodeURIComponent(safeSteamId)}`,
-      { next: { revalidate: 86400 } },
-    );
-    if (res.ok) profile = await res.json().catch(() => null);
-  } catch {
-    profile = null;
+  if (isValidSteamId) {
+    try {
+      const res = await fetch(
+        `${baseUrl}/api/steam/profile?steamId=${encodeURIComponent(safeSteamId)}`,
+        { next: { revalidate: 86400 } }
+      );
+      if (res.ok) profile = await res.json().catch(() => null);
+    } catch {
+      profile = null;
+    }
   }
 
   const displayName = String(profile?.name || 'Inventory Vault');

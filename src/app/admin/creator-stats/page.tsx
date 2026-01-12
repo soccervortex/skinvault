@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
@@ -124,7 +124,7 @@ function parseMetric(raw: string | null): keyof SeriesPoint {
   return (allowed.includes(s as any) ? (s as any) : 'pageViews') as keyof SeriesPoint;
 }
 
-export default function CreatorStatsAdminPage() {
+function CreatorStatsAdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
@@ -904,5 +904,22 @@ export default function CreatorStatsAdminPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreatorStatsAdminPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+          <Sidebar />
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="animate-spin text-emerald-400" size={32} />
+          </div>
+        </div>
+      }
+    >
+      <CreatorStatsAdminPageInner />
+    </Suspense>
   );
 }
