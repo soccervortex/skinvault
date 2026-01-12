@@ -1,5 +1,55 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
+async function fetchWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchSteamProfileViaWebApi(steamId: string): Promise<{ name: string; avatar: string } | null> {
+  try {
+    const apiKey = process.env.STEAM_API_KEY;
+    if (!apiKey) return null;
+    if (!/^\d{17}$/.test(String(steamId || '').trim())) return null;
+
+    const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${encodeURIComponent(apiKey)}&steamids=${encodeURIComponent(steamId)}`;
+    const res = await fetchWithTimeout(url, 8000);
+    if (!res.ok) return null;
+
+    const data: any = await res.json().catch(() => null);
+    const player = data?.response?.players?.[0];
+    const name = String(player?.personaname || '').trim();
+    const avatar = String(player?.avatarfull || '').trim();
+    if (!name) return null;
+    return { name, avatar };
+  } catch {
+    return null;
+  }
+}
+
+function parseSteamProfileXml(xml: string): { name: string; avatar: string } | null {
+  try {
+    const text = String(xml || '');
+    if (!text) return null;
+
+    const nameMatch = text.match(/<steamID>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/steamID>/);
+    const avatarMatch = text.match(/<avatarFull>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/avatarFull>/);
+
+    const name = String(nameMatch?.[1] || '').trim();
+    const avatar = String(avatarMatch?.[1] || '').trim();
+    if (!name) return null;
+    return { name, avatar };
+  } catch {
+    return null;
+  }
+}
+
 // Server-side Steam profile fetcher (no proxies needed - server can fetch directly)
 export async function GET(request: Request) {
   try {
@@ -10,8 +60,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing steamId parameter' }, { status: 400 });
     }
 
-    // Server-side fetch doesn't need proxies - we can fetch directly from Steam
-    const steamUrl = `https://steamcommunity.com/profiles/${steamId}/?xml=1`;
+    const safeSteamId = String(steamId).trim();
+
+    const avatarFallback = `${new URL(request.url).origin}/icons/web-app-manifest-192x192.png`;
+
+    // Prefer Steam Web API when available (more reliable than scraping XML)
+    const viaWebApi = await fetchSteamProfileViaWebApi(safeSteamId);
+    if (viaWebApi) {
+      return NextResponse.json({
+        steamId: safeSteamId,
+        name: viaWebApi.name,
+        avatar: viaWebApi.avatar || avatarFallback,
+      });
+    }
+
+    // Fallback: Steam Community XML
+    const steamUrl = `https://steamcommunity.com/profiles/${safeSteamId}/?xml=1`;
     
     try {
       const controller = new AbortController();
@@ -21,6 +85,8 @@ export async function GET(request: Request) {
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
         },
         next: { revalidate: 86400 },
       });
@@ -29,38 +95,47 @@ export async function GET(request: Request) {
       
       if (textRes.ok) {
         const text = await textRes.text();
-        const nameMatch = text.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/);
-        const avatarMatch = text.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/);
-        
-        const name = nameMatch?.[1] || 'Unknown User';
-        const avatar = avatarMatch?.[1] || '';
-        
-        return NextResponse.json({ 
-          steamId,
-          name, 
-          avatar,
-        });
-      } else {
-        return NextResponse.json(
-          { error: 'Steam profile not found', status: textRes.status },
-          { status: textRes.status }
-        );
+        const parsed = parseSteamProfileXml(text);
+        if (parsed) {
+          return NextResponse.json({
+            steamId: safeSteamId,
+            name: parsed.name,
+            avatar: parsed.avatar || avatarFallback,
+          });
+        }
       }
+
+      // Last resort: return 200 so metadata generation doesn't fall back to null.
+      return NextResponse.json({
+        steamId: safeSteamId,
+        name: 'Unknown User',
+        avatar: avatarFallback,
+      });
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        return NextResponse.json(
-          { error: 'Request timeout' },
-          { status: 408 }
-        );
+        return NextResponse.json({
+          steamId: safeSteamId,
+          name: 'Unknown User',
+          avatar: avatarFallback,
+        });
       }
       throw error;
     }
   } catch (error: any) {
     console.error('Steam profile fetch failed:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch Steam profile' },
-      { status: 500 }
-    );
+    // Return 200 fallback to keep SEO metadata stable.
+    const origin = (() => {
+      try {
+        return new URL(request.url).origin;
+      } catch {
+        return 'https://www.skinvaults.online';
+      }
+    })();
+    return NextResponse.json({
+      steamId: '',
+      name: 'Unknown User',
+      avatar: `${origin}/icons/web-app-manifest-192x192.png`,
+    });
   }
 }
 
