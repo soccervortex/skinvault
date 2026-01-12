@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { recordFirstLogin } from '@/app/utils/pro-storage';
 import { updateUserCount } from '@/app/lib/user-milestones';
 import { notifyNewUser, notifyUserLogin } from '@/app/utils/discord-webhook';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 /**
  * Get Steam username from Steam ID using Steam API
@@ -66,6 +67,85 @@ export async function POST(request: Request) {
 
     // Record first login (only records if not already recorded)
     const isNewUser = await recordFirstLogin(steamId);
+
+    // Analytics: steam_login + (optional) first_login attribution
+    try {
+      const req = request as NextRequest;
+      const db = await getDatabase();
+      const attributions = db.collection('creator_attribution');
+      const refCookieRaw = req.cookies?.get('sv_ref')?.value;
+
+      let refSlug: string | null = null;
+      let utm: any | null = null;
+      if (refCookieRaw) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(refCookieRaw));
+          if (parsed?.ref) refSlug = String(parsed.ref).toLowerCase();
+          utm = parsed || null;
+        } catch {
+          // ignore
+        }
+      }
+      if (!refSlug) {
+        const existing = await attributions.findOne({ steamId });
+        if (existing?.refSlug) refSlug = String(existing.refSlug);
+        if (!utm && existing?.utm) utm = existing.utm;
+      }
+
+      if (refSlug) {
+        await attributions.updateOne(
+          { steamId },
+          {
+            $set: {
+              steamId,
+              refSlug,
+              utm,
+              lastSeenAt: new Date(),
+            },
+            $setOnInsert: { firstSeenAt: new Date() },
+          },
+          { upsert: true },
+        );
+      }
+
+      const now = new Date();
+      const baseDoc = {
+        createdAt: now,
+        day: now.toISOString().slice(0, 10),
+        steamId,
+        refSlug,
+        utm: utm ? {
+          utm_source: utm?.utm_source,
+          utm_medium: utm?.utm_medium,
+          utm_campaign: utm?.utm_campaign,
+          utm_content: utm?.utm_content,
+          utm_term: utm?.utm_term,
+          landing: utm?.landing,
+          ts: utm?.ts,
+        } : undefined,
+      };
+
+      await db.collection('analytics_events').insertOne({
+        ...baseDoc,
+        event: 'steam_login',
+        metadata: {
+          steamName: finalSteamName || undefined,
+          isNewUser,
+        },
+      });
+
+      if (isNewUser) {
+        await db.collection('analytics_events').insertOne({
+          ...baseDoc,
+          event: 'first_login',
+          metadata: {
+            steamName: finalSteamName || undefined,
+          },
+        });
+      }
+    } catch {
+      // analytics should never block login
+    }
     
     // Update user count if this is a new user
     if (isNewUser) {

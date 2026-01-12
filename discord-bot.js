@@ -47,11 +47,11 @@ const commands = [
     .toJSON(),
   new SlashCommandBuilder()
     .setName('guild')
-    .setDescription('Get an invite link to add SkinVault bot to your server')
+    .setDescription('Get an invite link to add SkinVaults bot to your server')
     .toJSON(),
   new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Get help with SkinVault bot commands')
+    .setDescription('Get help with SkinVaults bot commands')
     .toJSON(),
   new SlashCommandBuilder()
     .setName('alerts')
@@ -127,11 +127,11 @@ const commands = [
     .toJSON(),
   new SlashCommandBuilder()
     .setName('website')
-    .setDescription('Get a link to the SkinVault website')
+    .setDescription('Get a link to the SkinVaults website')
     .toJSON(),
   new SlashCommandBuilder()
     .setName('currency')
-    .setDescription('Set your preferred currency for SkinVault bot (EUR or USD)')
+    .setDescription('Set your preferred currency for SkinVaults bot (EUR or USD)')
     .addStringOption(option =>
       option.setName('currency')
         .setDescription('Choose your currency')
@@ -709,7 +709,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -718,7 +718,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!wishlist || wishlist.length === 0) {
         await interaction.editReply({
-          content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVault to track their prices!\n\nVisit: https://skinvaults.online',
+          content: '📝 **Your Wishlist is Empty**\n\nAdd items to your wishlist on SkinVaults to track their prices!\n\nVisit: https://skinvaults.online',
         });
         return;
       }
@@ -737,7 +737,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription(`Showing ${itemsToShow.length} of ${wishlist.length} items`)
         .setColor(0x5865F2)
         .setTimestamp()
-        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+        .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
       // Add thumbnail if first item has image
       if (firstItem?.image) {
@@ -770,7 +770,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({
         ephemeral: true,
         content:
-          `🔗 **Invite SkinVault Bot to your server**\n\n` +
+          `🔗 **Invite SkinVaults Bot to your server**\n\n` +
           `${inviteUrl}\n\n` +
           `Scopes:\n` +
           `- bot\n` +
@@ -788,7 +788,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\nVisit: https://skinvaults.online/inventory',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\nVisit: https://skinvaults.online/inventory',
         });
         return;
       }
@@ -797,7 +797,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!alerts || alerts.length === 0) {
         await interaction.editReply({
-          content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVault to get notified when prices hit your target!\n\nVisit: https://skinvaults.online',
+          content: '🔔 **No Active Alerts**\n\nSet up price alerts on SkinVaults to get notified when prices hit your target!\n\nVisit: https://skinvaults.online',
         });
         return;
       }
@@ -912,7 +912,7 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0x5865F2)
         .setURL(itemUrl)
         .setTimestamp()
-        .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+        .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
       // Set image if available
       if (itemImage) {
@@ -948,7 +948,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -982,7 +982,7 @@ client.on('interactionCreate', async (interaction) => {
         if (isPrivate) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
           await interaction.editReply({
-            content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVault can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
+            content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVaults can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
           });
           return;
         }
@@ -1049,7 +1049,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         embed.addFields(
           { name: '📊 Summary', value: `**Total Items:** ${totalItems}\n**Unique Items:** ${uniqueItems}`, inline: false }
@@ -1095,7 +1095,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -1128,7 +1128,7 @@ client.on('interactionCreate', async (interaction) => {
         if (invData?.success === false && String(invData?.error || '').toLowerCase().includes('private')) {
           const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
           await interaction.editReply({
-            content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVault can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
+            content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVaults can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
           });
           return;
         }
@@ -1153,7 +1153,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         embed.addFields(
           { name: '📦 Total Items', value: String(totalItems || 0), inline: true },
@@ -1190,7 +1190,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\n**Steps to connect:**\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n4. Authorize the connection\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -1248,7 +1248,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(`https://skinvaults.online/inventory?steamId=${steamId}`)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Basic stats (always shown)
         if (kills > 0) {
@@ -1374,7 +1374,7 @@ client.on('interactionCreate', async (interaction) => {
 
           if (!steamId || !profile) {
             await interaction.editReply({
-              content: `❌ **Discord Username Not Found**\n\nCould not find Discord user: "${query}"\n\n💡 **Make sure:**\n• The user has connected their Discord account to SkinVault\n• You're using the correct Discord username\n• The user is in a server with the bot (if not in database)\n\nOr try using their Steam64 ID instead.`,
+              content: `❌ **Discord Username Not Found**\n\nCould not find Discord user: "${query}"\n\n💡 **Make sure:**\n• The user has connected their Discord account to SkinVaults\n• You're using the correct Discord username\n• The user is in a server with the bot (if not in database)\n\nOr try using their Steam64 ID instead.`,
             });
             return;
           }
@@ -1401,7 +1401,7 @@ client.on('interactionCreate', async (interaction) => {
               }
             } else {
               await interaction.editReply({
-                content: `❌ **Discord ID Not Found**\n\nCould not find Discord connection for ID: "${query}"\n\nThe user may not have connected their Discord account to SkinVault.`,
+                content: `❌ **Discord ID Not Found**\n\nCould not find Discord connection for ID: "${query}"\n\nThe user may not have connected their Discord account to SkinVaults.`,
               });
               return;
             }
@@ -1463,7 +1463,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(vaultUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Set profile avatar
         if (profile.avatar) {
@@ -1615,7 +1615,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setURL(compareUrl)
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Add items to embed
         items.forEach((item, index) => {
@@ -1648,7 +1648,7 @@ client.on('interactionCreate', async (interaction) => {
 
     } else if (commandName === 'help') {
       const embed = new EmbedBuilder()
-        .setTitle('🤖 SkinVault Bot Help')
+        .setTitle('🤖 SkinVaults Bot Help')
         .setDescription('Commands and features available:')
         .setColor(0x5865F2)
         .addFields(
@@ -1709,7 +1709,7 @@ client.on('interactionCreate', async (interaction) => {
           },
           {
             name: '🌐 `/website`',
-            value: 'Get a link to the SkinVault website',
+            value: 'Get a link to the SkinVaults website',
             inline: false,
           },
           {
@@ -1718,7 +1718,7 @@ client.on('interactionCreate', async (interaction) => {
             inline: false,
           }
         )
-        .setFooter({ text: 'SkinVault - Premium CS2 Analytics' })
+        .setFooter({ text: 'SkinVaults - Premium CS2 Analytics' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -1730,7 +1730,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can use this command!',
         });
         return;
       }
@@ -1753,7 +1753,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(isPro ? 0x5865F2 : 0x808080)
           .setURL('https://skinvaults.online/pro')
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         if (isPro && proUntil) {
           const daysRemaining = Math.ceil((proUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -1772,7 +1772,7 @@ client.on('interactionCreate', async (interaction) => {
         } else {
           embed.setDescription(`❌ **You don't have an active Pro subscription.**`);
           embed.addFields(
-            { name: '💡 Upgrade to Pro', value: 'Get unlimited features and support SkinVault!\n\nUse `/shop` to view available plans.', inline: false },
+            { name: '💡 Upgrade to Pro', value: 'Get unlimited features and support SkinVaults!\n\nUse `/shop` to view available plans.', inline: false },
             { name: '🎁 Benefits', value: '• Unlimited wishlist items\n• Unlimited price alerts\n• Advanced stats\n• Discord bot features', inline: false }
           );
         }
@@ -1792,7 +1792,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!steamId) {
         await interaction.editReply({
-          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVault first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can purchase items!',
+          content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first.\n\n1. Go to https://skinvaults.online/inventory\n2. Sign in with Steam\n3. Click "Connect Discord" in your profile\n\nOnce connected, you can purchase items!',
         });
         return;
       }
@@ -1817,12 +1817,12 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const embed = new EmbedBuilder()
-          .setTitle('🛒 SkinVault Shop')
+          .setTitle('🛒 SkinVaults Shop')
           .setDescription('Purchase Pro subscriptions and consumables')
           .setColor(0x5865F2)
           .setURL('https://skinvaults.online/pro')
           .setTimestamp()
-          .setFooter({ text: 'SkinVault', iconURL: 'https://skinvaults.online/icon.png' });
+          .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
         // Pro Subscription Plans
         embed.addFields({
@@ -1892,8 +1892,8 @@ client.on('interactionCreate', async (interaction) => {
 
     } else if (commandName === 'website') {
       const embed = new EmbedBuilder()
-        .setTitle('🌐 SkinVault Website')
-        .setDescription('Visit the SkinVault website to manage your inventory, wishlist, and more!')
+        .setTitle('🌐 SkinVaults Website')
+        .setDescription('Visit the SkinVaults website to manage your inventory, wishlist, and more!')
         .setColor(0x5865F2)
         .setURL('https://skinvaults.online')
         .addFields(
@@ -1903,7 +1903,7 @@ client.on('interactionCreate', async (interaction) => {
             inline: false,
           }
         )
-        .setFooter({ text: 'SkinVault - Premium CS2 Analytics' })
+        .setFooter({ text: 'SkinVaults - Premium CS2 Analytics' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -1922,7 +1922,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const label = chosen === '1' ? 'USD ($)' : 'EUR (€)';
       await interaction.editReply({
-        content: `✅ **Currency Updated**\n\nYour SkinVault bot currency is now set to **${label}**.`,
+        content: `✅ **Currency Updated**\n\nYour SkinVaults bot currency is now set to **${label}**.`,
       });
     }
   } catch (error) {

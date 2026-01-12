@@ -592,7 +592,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   </Link>
                 </div>
                 <div className="text-[8px] font-black uppercase tracking-widest text-gray-400 px-2">
-                  © {new Date().getFullYear()} SkinVault. All rights reserved.
+                  © {new Date().getFullYear()} SkinVaults. All rights reserved.
                 </div>
               </div>
             </div>
@@ -848,7 +848,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </Link>
             </div>
             <div className="text-[8px] font-black uppercase tracking-widest text-gray-400 px-2">
-              © {new Date().getFullYear()} SkinVault. All rights reserved.
+              © {new Date().getFullYear()} SkinVaults. All rights reserved.
             </div>
           </div>
         </div>

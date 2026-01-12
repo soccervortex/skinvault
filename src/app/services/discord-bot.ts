@@ -170,7 +170,7 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
             style: 'currency',
             currency: currency === '1' ? 'USD' : 'EUR',
           }).format(alert.targetPrice)}\n\n` +
-          `View on SkinVault: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/item/${encodeURIComponent(marketHashName)}`;
+          `View on SkinVaults: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/item/${encodeURIComponent(marketHashName)}`;
 
         // Queue message via bot gateway (preferred method - uses Discord bot)
         try {

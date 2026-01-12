@@ -929,7 +929,7 @@ export function generateSEOMetadata(config: SEOConfig): Metadata {
 
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - CS2 Skin Analytics & Inventory Management`;
   const url = `${BASE_URL}${path}`;
-  const imageUrl = image.startsWith('http') ? image : `${BASE_URL}${image}`;
+  const imageUrl = image.startsWith('http') ? image : `${BASE_URL}${encodeURI(image)}`;
 
   // Map 'product' type to 'website' for Next.js compatibility
   const ogType = type === 'product' ? 'website' : type;
@@ -969,7 +969,7 @@ export function generateSEOMetadata(config: SEOConfig): Metadata {
       title: fullTitle,
       description,
       images: [imageUrl],
-      creator: '@skinvault', // Update with your Twitter handle if you have one
+      creator: '@Skinvaults', // Update with your Twitter handle if you have one
     },
     alternates: {
       canonical: url,
@@ -2902,7 +2902,7 @@ export const pageSEO = {
       'CS2 Skin Valuation',
       'CS2 Skin Tracker',
       'CS2 Skin Portfolio',
-      'CS2 Skin Portfolio Tracker',
+      'CS2 Skin Port folio Tracker',
       'CS2 Skin Portfolio Valuation',
       'CS2 Skin Portfolio Tracker',
       'CS2 Skin Portfolio Tracker',

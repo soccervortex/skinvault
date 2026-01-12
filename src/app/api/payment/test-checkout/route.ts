@@ -75,8 +75,8 @@ export async function POST(request: Request) {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `[TEST] SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`,
-              description: `[TEST MODE] Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`,
+              name: `[TEST] SkinVaults Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`,
+              description: `[TEST MODE] Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`,
             },
             unit_amount: finalAmount,
           },

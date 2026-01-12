@@ -77,12 +77,12 @@ export async function POST(request: Request) {
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60); // 30 minutes in seconds
 
     const productName = testMode 
-      ? `[TEST] SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`
-      : `SkinVault Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`;
+      ? `[TEST] SkinVaults Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`
+      : `SkinVaults Pro - ${priceInfo.months} ${priceInfo.months === 1 ? 'Month' : 'Months'}`;
     
     const productDescription = testMode
-      ? `[TEST MODE] Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`
-      : `Premium access to SkinVault for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`;
+      ? `[TEST MODE] Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`
+      : `Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],

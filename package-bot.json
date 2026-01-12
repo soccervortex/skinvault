@@ -1,7 +1,7 @@
 {
-  "name": "skinvault-discord-bot",
+  "name": "SkinVaults-discord-bot",
   "version": "1.0.0",
-  "description": "Discord bot for SkinVault price alerts and wishlist",
+  "description": "Discord bot for SkinVaults price alerts and wishlist",
   "main": "discord-bot.js",
   "scripts": {
     "start": "node discord-bot.js",

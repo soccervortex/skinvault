@@ -37,7 +37,7 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
         />
         <div style={{ marginLeft: '30px', display: 'flex', flexDirection: 'column' }}>
           <h1 style={{ fontSize: 52, margin: 0, fontWeight: 800 }}>{profile.name}</h1>
-          <p style={{ fontSize: 32, margin: '5px 0 0', color: '#9ca3af' }}>SkinVault Inventory</p>
+          <p style={{ fontSize: 32, margin: '5px 0 0', color: '#9ca3af' }}>SkinVaults Inventory</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', borderRadius: '15px', backgroundColor: '#1a1b21' }}>

@@ -5,6 +5,7 @@ import { dbGet, dbSet } from '@/app/utils/database';
 import { captureError, captureMessage } from '@/app/lib/error-handler';
 import { sendInngestEvent } from '@/app/lib/inngest';
 import { notifyProPurchase, notifyConsumablePurchase } from '@/app/utils/discord-webhook';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -98,6 +99,33 @@ export async function POST(request: Request) {
 
         const proUntil = await grantPro(steamId, months);
         console.log(`✅ Granted ${months} months Pro to ${steamId}, expires ${proUntil}`);
+
+        // Analytics: pro_purchase (creator-attributed)
+        try {
+          const db = await getDatabase();
+          const attribution = await db.collection('creator_attribution').findOne({ steamId });
+          const refSlug = attribution?.refSlug ? String(attribution.refSlug).toLowerCase() : null;
+          const utm = attribution?.utm || null;
+
+          const now = new Date();
+          await db.collection('analytics_events').insertOne({
+            event: 'pro_purchase',
+            createdAt: now,
+            day: now.toISOString().slice(0, 10),
+            steamId,
+            refSlug,
+            utm,
+            value: session.amount_total ? session.amount_total / 100 : undefined,
+            metadata: {
+              months,
+              sessionId: session.id,
+              currency: session.currency || undefined,
+              proUntil,
+            },
+          });
+        } catch {
+          // ignore analytics errors
+        }
         
         // Record purchase history with fulfillment status
         try {

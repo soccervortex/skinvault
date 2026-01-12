@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         if (!discordId) {
           return NextResponse.json({ error: 'Missing discordId' }, { status: 400 });
         }
-        const welcomeMessage = `🎉 **Thanks for connecting with SkinVault Bot!**
+        const welcomeMessage = `🎉 **Thanks for connecting with SkinVaults Bot!**
 
 **⚠️ IMPORTANT:** Discord bot features require an active **Pro subscription**. If your Pro subscription expires, Discord features will be disabled.
 
@@ -110,7 +110,7 @@ Happy trading! 🚀`;
         }).format(alert.targetPrice)}
 **Current Price:** ${priceData.lowest || 'N/A'}
 
-View on SkinVault: https://skinvaults.online/item/${encodeURIComponent(alert.marketHashName)}`;
+View on SkinVaults: https://skinvaults.online/item/${encodeURIComponent(alert.marketHashName)}`;
 
         const notificationQueueKey = 'discord_dm_queue';
         const notificationQueue = await kv.get<Array<{ discordId: string; message: string; timestamp: number }>>(notificationQueueKey) || [];

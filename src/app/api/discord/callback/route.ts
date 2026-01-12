@@ -140,7 +140,7 @@ export async function GET(request: Request) {
       // Queue welcome message for bot to process - THIS MUST RUN
       console.log(`[Discord Callback] 🚀 Starting welcome message queue process...`);
       
-      const welcomeMessage = `🎉 **Thanks for connecting to SkinVault Bot!**
+      const welcomeMessage = `🎉 **Thanks for connecting to SkinVaults Bot!**
 
 **⚠️ IMPORTANT:** Discord bot features require an active **Pro subscription**. If your Pro subscription expires, Discord features will be disabled.
 

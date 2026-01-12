@@ -20,6 +20,7 @@ import GlobalChatService from "./components/GlobalChatService";
 import BanChecker from "./components/BanChecker";
 import VercelAnalytics from "./components/VercelAnalytics";
 import GlobalErrorHandler from "./components/GlobalErrorHandler";
+import CreatorAnalyticsTracker from "./components/CreatorAnalyticsTracker";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { SITE_CONFIG, ALL_KEYWORDS } from "@/lib/seo-config";
@@ -187,6 +188,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <ChatNotificationListener />
             <GlobalChatService />
             <BanChecker />
+            <CreatorAnalyticsTracker />
             <main id="main-content">{children}</main>
             <ProExpirationWarning />
             <NetworkStatus />

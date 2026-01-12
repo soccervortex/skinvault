@@ -1,7 +1,7 @@
 [dotenv@17.2.3] injecting env (22) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
 [2025-12-20T02:32:09.888Z] 🚀 Starting Discord bot...
 [2025-12-20T02:32:09.994Z] 🔐 Attempting to login to Discord...
-[2025-12-20T02:32:10.753Z] ✅ Discord bot logged in as Skinvault#4219!
+[2025-12-20T02:32:10.753Z] ✅ Discord bot logged in as SkinVaults#4219!
 [2025-12-20T02:32:10.770Z] Bot is in 1 guild(s)
 [2025-12-20T02:32:10.788Z] Started refreshing application (/) commands.
 [2025-12-20T02:32:10.804Z] Registering 9 commands: wishlist, help, alerts, inventory, price, vault, stats, player, compare
