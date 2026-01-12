@@ -4,6 +4,80 @@ import { InventoryImage } from './InventoryImage';
 
 export const runtime = 'edge';
 
+const STEAM_CURRENCY_TO_ISO: Record<string, string> = {
+  '1': 'USD',
+  '2': 'GBP',
+  '3': 'EUR',
+  '5': 'RUB',
+  '6': 'PLN',
+  '7': 'BRL',
+  '8': 'JPY',
+  '9': 'NOK',
+  '10': 'IDR',
+  '11': 'MYR',
+  '12': 'PHP',
+  '13': 'SGD',
+  '14': 'THB',
+  '15': 'VND',
+  '16': 'KRW',
+  '17': 'TRY',
+  '18': 'UAH',
+  '19': 'MXN',
+  '20': 'CAD',
+  '21': 'AUD',
+  '22': 'NZD',
+  '23': 'CNY',
+  '24': 'INR',
+  '29': 'HKD',
+  '30': 'TWD',
+  '33': 'SEK',
+  '35': 'ILS',
+  '28': 'ZAR',
+};
+
+const ISO_TO_STEAM_CURRENCY: Record<string, string> = {
+  USD: '1',
+  GBP: '2',
+  EUR: '3',
+  RUB: '5',
+  PLN: '6',
+  BRL: '7',
+  JPY: '8',
+  NOK: '9',
+  IDR: '10',
+  MYR: '11',
+  PHP: '12',
+  SGD: '13',
+  THB: '14',
+  VND: '15',
+  KRW: '16',
+  TRY: '17',
+  UAH: '18',
+  MXN: '19',
+  CAD: '20',
+  AUD: '21',
+  NZD: '22',
+  CNY: '23',
+  INR: '24',
+  HKD: '29',
+  TWD: '30',
+  SEK: '33',
+  ILS: '35',
+  ZAR: '28',
+};
+
+function normalizeCurrencyParam(raw: string | null): { steam: string; iso: string } {
+  const v = String(raw || '').trim();
+  if (!v) return { steam: '3', iso: 'EUR' };
+  if (/^\d+$/.test(v)) {
+    const iso = STEAM_CURRENCY_TO_ISO[v] || 'USD';
+    return { steam: v, iso };
+  }
+  const iso = v.toUpperCase();
+  const steam = ISO_TO_STEAM_CURRENCY[iso] || '1';
+  return { steam, iso: ISO_TO_STEAM_CURRENCY[iso] ? iso : 'USD' };
+}
+
 type Profile = {
   steamId?: string;
   name?: string;
@@ -66,9 +140,9 @@ function computeTopItemsAndTotal(
   }
 }
 
-async function fetchInventoryData(steamId: string, baseUrl: string) {
+async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrency: string) {
   try {
-    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=1&includePriceIndex=1`;
+    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includePriceIndex=1`;
     const profileUrl = `${baseUrl}/api/steam/profile?steamId=${steamId}`;
 
     const [inventoryRes, profileRes] = await Promise.all([
@@ -114,12 +188,13 @@ async function fetchInventoryData(steamId: string, baseUrl: string) {
 export async function GET(req: Request) {
   const { searchParams, origin } = new URL(req.url);
   const steamId = searchParams.get('steamId');
+  const { steam: steamCurrency, iso: isoCurrency } = normalizeCurrencyParam(searchParams.get('currency'));
 
   if (!steamId) {
     return new Response('Missing steamId', { status: 400 });
   }
 
-  const data = await fetchInventoryData(steamId, origin);
+  const data = await fetchInventoryData(steamId, origin, steamCurrency);
 
   const safe = data || {
     profile: {
@@ -142,6 +217,7 @@ export async function GET(req: Request) {
       totalValue={totalValue}
       totalItems={totalItems}
       topItems={Array.isArray(topItems) ? topItems : []}
+      currency={isoCurrency}
     />,
     {
       width: 1200,

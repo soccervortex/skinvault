@@ -31,6 +31,92 @@ import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
+const STEAM_CURRENCY_TO_ISO: Record<string, string> = {
+  '1': 'USD',
+  '2': 'GBP',
+  '3': 'EUR',
+  '5': 'RUB',
+  '6': 'PLN',
+  '7': 'BRL',
+  '8': 'JPY',
+  '9': 'NOK',
+  '10': 'IDR',
+  '11': 'MYR',
+  '12': 'PHP',
+  '13': 'SGD',
+  '14': 'THB',
+  '15': 'VND',
+  '16': 'KRW',
+  '17': 'TRY',
+  '18': 'UAH',
+  '19': 'MXN',
+  '20': 'CAD',
+  '21': 'AUD',
+  '22': 'NZD',
+  '23': 'CNY',
+  '24': 'INR',
+  '29': 'HKD',
+  '30': 'TWD',
+  '33': 'SEK',
+  '35': 'ILS',
+  '28': 'ZAR',
+};
+
+const ISO_TO_STEAM_CURRENCY: Record<string, string> = {
+  USD: '1',
+  GBP: '2',
+  EUR: '3',
+  RUB: '5',
+  PLN: '6',
+  BRL: '7',
+  JPY: '8',
+  NOK: '9',
+  IDR: '10',
+  MYR: '11',
+  PHP: '12',
+  SGD: '13',
+  THB: '14',
+  VND: '15',
+  KRW: '16',
+  TRY: '17',
+  UAH: '18',
+  MXN: '19',
+  CAD: '20',
+  AUD: '21',
+  NZD: '22',
+  CNY: '23',
+  INR: '24',
+  HKD: '29',
+  TWD: '30',
+  SEK: '33',
+  ILS: '35',
+  ZAR: '28',
+};
+
+function getCurrencyMetaFromSteamCode(code: string): { iso: string; locale: string; symbol: string } {
+  const iso = STEAM_CURRENCY_TO_ISO[String(code)] || 'USD';
+  const locale = (() => {
+    if (iso === 'EUR') return 'nl-NL';
+    if (iso === 'GBP') return 'en-GB';
+    if (iso === 'JPY') return 'ja-JP';
+    if (iso === 'KRW') return 'ko-KR';
+    if (iso === 'TRY') return 'tr-TR';
+    if (iso === 'PLN') return 'pl-PL';
+    return 'en-US';
+  })();
+  const symbol = (() => {
+    if (iso === 'EUR') return '€';
+    if (iso === 'GBP') return '£';
+    if (iso === 'JPY') return '¥';
+    if (iso === 'KRW') return '₩';
+    if (iso === 'TRY') return '₺';
+    if (iso === 'RUB') return '₽';
+    if (iso === 'PLN') return 'zł';
+    return '$';
+  })();
+  return { iso, locale, symbol };
+}
+
 type InventoryItem = {
   market_hash_name?: string;
   market_name?: string;
@@ -232,17 +318,30 @@ function InventoryContent() {
       const testKey = '__localStorage_test__';
       window.localStorage.setItem(testKey, 'test');
       window.localStorage.removeItem(testKey);
+
+      const currencyParamRaw = searchParams.get('currency');
+      if (currencyParamRaw) {
+        const raw = String(currencyParamRaw).trim();
+        const steamCode = /^\d+$/.test(raw) ? raw : (ISO_TO_STEAM_CURRENCY[raw.toUpperCase()] || raw);
+        const meta = getCurrencyMetaFromSteamCode(steamCode);
+        setCurrency({ code: steamCode, symbol: meta.symbol });
+        try {
+          window.localStorage.setItem('sv_currency', String(steamCode));
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       
       const stored = window.localStorage.getItem('sv_currency');
-      if (stored === '1') {
-        setCurrency({ code: '1', symbol: '$' });
-      } else if (stored === '3') {
-        setCurrency({ code: '3', symbol: '€' });
+      if (stored) {
+        const meta = getCurrencyMetaFromSteamCode(stored);
+        setCurrency({ code: stored, symbol: meta.symbol });
       }
     } catch {
       // Ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     const cached = localStorage.getItem(cacheKey);
@@ -263,10 +362,10 @@ function InventoryContent() {
 
   const formatMoney = (amount: number) => {
     const safe = Number.isFinite(amount) ? amount : 0;
-    const isUsd = currency.code === '1';
-    return new Intl.NumberFormat(isUsd ? 'en-US' : 'nl-NL', {
+    const meta = getCurrencyMetaFromSteamCode(currency.code);
+    return new Intl.NumberFormat(meta.locale, {
       style: 'currency',
-      currency: isUsd ? 'USD' : 'EUR',
+      currency: meta.iso,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(safe);
@@ -987,11 +1086,11 @@ function InventoryContent() {
     try {
       if (typeof window === 'undefined') return;
       const origin = window.location.origin;
-      setShareUrl(`${origin}/inventory/${viewedUser.steamId}`);
+      setShareUrl(`${origin}/inventory/${viewedUser.steamId}?currency=${encodeURIComponent(currency.code)}`);
     } catch {
       setShareUrl(null);
     }
-  }, [viewedUser]);
+  }, [viewedUser, currency.code]);
 
   // Load Discord status for viewed user (only show if Pro)
   useEffect(() => {

@@ -90,13 +90,13 @@ export const metadata: Metadata = {
     type: 'website',
     url: BASE_URL,
     siteName: 'SkinVaults',
-    images: [{ url: `${BASE_URL}/icons/Open Graph Image.jpg`, width: 1200, height: 630 }],
+    images: [{ url: `${BASE_URL}${encodeURI('/icons/Open Graph Image.jpg')}`, width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'SkinVaults - CS2 Inventory Analytics',
     description: SHORT_DESCRIPTION,
-    images: [`${BASE_URL}/icons/Open Graph Image.jpg`],
+    images: [`${BASE_URL}${encodeURI('/icons/Open Graph Image.jpg')}`],
   },
   verification: {
     google: 'googleb716dc02fc690049',
