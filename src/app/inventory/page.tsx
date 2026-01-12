@@ -135,6 +135,9 @@ function InventoryContent() {
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
+  const serverPriceIndexLoadedRef = useRef(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
   const isPro = useMemo(() => {
@@ -550,7 +553,7 @@ function InventoryContent() {
         
         try {
           // Use server-side API route to avoid CORS issues
-          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}&currency=${encodeURIComponent(currency.code)}${startAssetId ? `&start_assetid=${startAssetId}` : ''}${force ? '&refresh=1&force=1' : ''}`;
+          const apiUrl: string = `/api/steam/inventory?steamId=${id}&isPro=${actualProStatus}&currency=${encodeURIComponent(currency.code)}&includeTopItems=1&includePriceIndex=1${startAssetId ? `&start_assetid=${startAssetId}` : ''}${force ? '&refresh=1&force=1' : ''}`;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced to 15 seconds for faster loading
           
@@ -581,6 +584,24 @@ function InventoryContent() {
           if (data?.error) {
             console.error('Inventory API error:', data.error);
             throw new Error(data.error);
+          }
+          
+          if (!startAssetId && data?.priceIndex && typeof data.priceIndex === 'object') {
+            try {
+              const formatted: Record<string, string> = {};
+              for (const [name, price] of Object.entries(data.priceIndex as Record<string, number>)) {
+                const n = String(name || '').trim();
+                const p = Number(price);
+                if (!n || !Number.isFinite(p) || p <= 0) continue;
+                formatted[n] = formatMoney(p);
+              }
+              if (Object.keys(formatted).length) {
+                serverPriceIndexLoadedRef.current = true;
+                mergeAndStorePrices(formatted);
+              }
+            } catch {
+              // ignore
+            }
           }
           
           // Steam inventory API returns assets and descriptions separately
@@ -886,6 +907,17 @@ function InventoryContent() {
               window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
               // Trigger storage event so sidebar updates
               window.dispatchEvent(new Event('storage'));
+
+              try {
+                const key = `sv_onboarding_seen_${String(viewedSteamId)}`;
+                const already = window.localStorage.getItem(key) === '1';
+                if (!already) {
+                  setOnboardingStep(0);
+                  setShowOnboarding(true);
+                }
+              } catch {
+                // ignore
+              }
             } else if (isViewingOwnProfile && loggedInUser) {
               // Viewing your own profile - only update Pro status, keep your account info
               const updatedUser = {
@@ -962,7 +994,9 @@ function InventoryContent() {
     const run = async () => {
       setPriceScanDone(false);
       const uniqueNames = Array.from(new Set(inventory.map((i) => getMarketKey(i)).filter(Boolean) as string[]));
-      await fetchPrices(uniqueNames);
+      if (!serverPriceIndexLoadedRef.current) {
+        await fetchPrices(uniqueNames);
+      }
       setPriceScanDone(true);
     };
 
@@ -1246,12 +1280,135 @@ function InventoryContent() {
             </div>
           </div>
         </main>
-    </div>
-  );
+      </div>
+    );
   }
 
   return (
     <>
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[9999]">
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => {
+              try {
+                const steamId = String(viewedUser?.steamId || loggedInUser?.steamId || '').trim();
+                if (steamId) window.localStorage.setItem(`sv_onboarding_seen_${steamId}`, '1');
+              } catch {}
+              setShowOnboarding(false);
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className="w-full max-w-lg rounded-[2rem] md:rounded-[3rem] bg-[#0f111a] border border-white/10 shadow-2xl p-6 md:p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-blue-400">
+                    Getting Started
+                  </div>
+                  <div className="mt-2 text-2xl md:text-3xl font-black italic uppercase tracking-tighter">
+                    {onboardingStep === 0 ? 'Your Vault' : onboardingStep === 1 ? 'Track & Alerts' : 'Share & Grow'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    try {
+                      const steamId = String(viewedUser?.steamId || loggedInUser?.steamId || '').trim();
+                      if (steamId) window.localStorage.setItem(`sv_onboarding_seen_${steamId}`, '1');
+                    } catch {}
+                    setShowOnboarding(false);
+                  }}
+                  className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+                >
+                  Skip
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2">
+                <div className={`h-1 flex-1 rounded-full ${onboardingStep >= 0 ? 'bg-blue-500' : 'bg-white/10'}`} />
+                <div className={`h-1 flex-1 rounded-full ${onboardingStep >= 1 ? 'bg-blue-500' : 'bg-white/10'}`} />
+                <div className={`h-1 flex-1 rounded-full ${onboardingStep >= 2 ? 'bg-blue-500' : 'bg-white/10'}`} />
+              </div>
+
+              <div className="mt-6 text-[11px] md:text-[12px] text-gray-300 leading-relaxed">
+                {onboardingStep === 0 && (
+                  <div className="space-y-4">
+                    <p>
+                      Your Steam inventory is loaded here. If it’s private, make your Steam inventory public to see items and analytics.
+                    </p>
+                    <a
+                      href="/how-it-works"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-200 hover:bg-white/10"
+                    >
+                      Learn how it works
+                    </a>
+                  </div>
+                )}
+                {onboardingStep === 1 && (
+                  <div className="space-y-4">
+                    <p>
+                      Add items to your wishlist and set price trackers. Pro users get faster scans and more tracker features.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href="/wishlist"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-500"
+                      >
+                        Open Wishlist
+                      </a>
+                      <a
+                        href="/pro"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600/30"
+                      >
+                        See Pro
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {onboardingStep === 2 && (
+                  <div className="space-y-4">
+                    <p>
+                      Share your vault link with friends or on social. Public profiles help you grow and compare with others.
+                    </p>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      Tip: Use the Share button on your profile header.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setOnboardingStep((s) => Math.max(0, s - 1))}
+                  disabled={onboardingStep === 0}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${onboardingStep === 0 ? 'bg-white/5 border-white/10 text-gray-600 cursor-not-allowed' : 'bg-[#11141d] border-white/10 text-gray-200 hover:bg-white/10'}`}
+                >
+                  Back
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (onboardingStep < 2) {
+                      setOnboardingStep((s) => Math.min(2, s + 1));
+                      return;
+                    }
+                    try {
+                      const steamId = String(viewedUser?.steamId || loggedInUser?.steamId || '').trim();
+                      if (steamId) window.localStorage.setItem(`sv_onboarding_seen_${steamId}`, '1');
+                    } catch {}
+                    setShowOnboarding(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all"
+                >
+                  {onboardingStep < 2 ? 'Next' : 'Done'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">

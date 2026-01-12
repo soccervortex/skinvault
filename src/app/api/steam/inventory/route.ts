@@ -23,6 +23,19 @@ type InventoryCacheDoc = {
 
 const INVENTORY_CACHE_TTL_MS = 60_000; // 1 minute
 
+const RESPONSE_S_MAXAGE_SECONDS = 60;
+const RESPONSE_STALE_WHILE_REVALIDATE_SECONDS = 300;
+
+function setInventoryResponseCachingHeaders(res: NextResponse) {
+  // Allow CDN caching for a short period. Inventory data changes frequently,
+  // so keep TTL low and allow stale while background refresh happens.
+  res.headers.set(
+    'cache-control',
+    `public, s-maxage=${RESPONSE_S_MAXAGE_SECONDS}, stale-while-revalidate=${RESPONSE_STALE_WHILE_REVALIDATE_SECONDS}`
+  );
+  return res;
+}
+
 // Helper function to parse price strings correctly (handles EUR/USD formats)
 function parsePriceString(priceStr: string): number {
   if (!priceStr || typeof priceStr !== 'string') return 0;
@@ -637,7 +650,7 @@ export async function GET(request: Request) {
       } catch {
         // Ignore cache write failures
       }
-      const res = NextResponse.json(payload);
+      const res = setInventoryResponseCachingHeaders(NextResponse.json(payload));
       res.headers.set('x-sv-cache', cacheState);
       return res;
     };
@@ -653,7 +666,7 @@ export async function GET(request: Request) {
             // Cache entry doesn't contain topItems - treat as miss.
             throw new Error('Cached payload missing topItems');
           }
-          const res = NextResponse.json(cached.data);
+          const res = setInventoryResponseCachingHeaders(NextResponse.json(cached.data));
           res.headers.set('x-sv-cache', refresh ? 'hit-refresh' : 'hit');
           return res;
         }
@@ -864,7 +877,7 @@ export async function GET(request: Request) {
     try {
       const stale = await cacheCollection.findOne({ _id: baseCacheKey });
       if (stale?.data) {
-        const res = NextResponse.json(stale.data);
+        const res = setInventoryResponseCachingHeaders(NextResponse.json(stale.data));
         res.headers.set('x-sv-cache', 'stale');
         return res;
       }

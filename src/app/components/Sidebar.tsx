@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users, CheckCircle2 } from 'lucide-react';
 import HelpTooltip from './HelpTooltip';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
@@ -412,6 +412,10 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                         </span>
                       )}
                     </div>
+                    <div className="mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-gray-500">
+                      <CheckCircle2 size={10} className="text-emerald-400" />
+                      Verified via Steam OpenID
+                    </div>
                     <div className="flex items-center gap-3 mt-2">
                       <button
                         onClick={handleLogout}
@@ -505,6 +509,20 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               {/* Footer Links */}
               <div className="space-y-2 pt-4 border-t border-white/5">
                 <div className="flex flex-wrap items-center gap-3 px-2">
+                  <Link
+                    href="/how-it-works"
+                    className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <HelpCircle size={10} />
+                    How It Works
+                  </Link>
+                  <Link
+                    href="/disclaimer"
+                    className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <FileText size={10} />
+                    Disclaimer
+                  </Link>
                   <Link
                     href="/terms"
                     className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
