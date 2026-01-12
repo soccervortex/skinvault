@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { generateSEOMetadata } from '@/app/lib/seo';
 import InventoryPage from '../page';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 type SteamProfile = {
   steamId?: string;
@@ -20,7 +20,7 @@ export async function generateMetadata(
   const rawCurrency = Array.isArray(sp?.currency) ? sp.currency[0] : sp?.currency;
   const currency = rawCurrency ? String(rawCurrency) : null;
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
   let profile: SteamProfile | null = null;
   try {
     const res = await fetch(
@@ -72,9 +72,9 @@ export async function generateMetadata(
 }
 
 export default async function InventorySteamIdPage(
-  { params }: { params: Promise<{ steamId: string }> }
+  { params }: { params: { steamId: string } }
 ) {
-  const { steamId } = await params;
+  const { steamId } = params;
 
   // Reuse the existing client inventory page implementation.
   // This makes /inventory/[steamId] a shareable URL with correct OG tags.
