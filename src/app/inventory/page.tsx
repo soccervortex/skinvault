@@ -28,6 +28,7 @@ import { copyToClipboard } from '@/app/utils/clipboard';
 import { useToast } from '@/app/components/Toast';
 import { isBanned } from '@/app/utils/ban-check';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
+import { getRankForValue, Rank } from '@/app/utils/rank-tiers';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -135,8 +136,10 @@ function InventoryContent() {
   const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
+  const [rank, setRank] = useState<Rank | null>(null);
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const serverPriceIndexLoadedRef = useRef(false);
+  const serverPriceIndexRef = useRef<Record<string, number>>({});
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const toast = useToast();
@@ -602,14 +605,17 @@ function InventoryContent() {
           if (!startAssetId && data?.priceIndex && typeof data.priceIndex === 'object') {
             try {
               const formatted: Record<string, string> = {};
+              const numeric: Record<string, number> = {};
               for (const [name, price] of Object.entries(data.priceIndex as Record<string, number>)) {
                 const n = String(name || '').trim();
                 const p = Number(price);
                 if (!n || !Number.isFinite(p) || p <= 0) continue;
+                numeric[n] = p;
                 formatted[n] = formatMoney(p);
               }
               if (Object.keys(formatted).length) {
                 serverPriceIndexLoadedRef.current = true;
+                serverPriceIndexRef.current = numeric;
                 mergeAndStorePrices(formatted);
               }
             } catch {
@@ -908,50 +914,7 @@ function InventoryContent() {
           }).catch(() => setLoggedInUserPro(false)).finally(() => setProStatusLoading(false));
         }
 
-        // Only update logged-in user in localStorage when:
-        // 1. It's a Steam login callback (OpenID redirect) - always update
-        // 2. User is viewing their own profile - update Pro status but keep your account
-        // This ensures your logged-in account stays consistent and Pro status stays up-to-date
-        try {
-          if (combinedUser && typeof window !== 'undefined') {
-            if (isLoginCallback) {
-              // This is your actual login - record first login date (don't block on this)
-              fetch('/api/user/first-login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steamId: viewedSteamId }),
-              }).catch(() => {}); // Silently fail if this doesn't work
-              
-              // This is your actual login - update the logged-in user completely
-              window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
-              // Trigger storage event so sidebar updates
-              window.dispatchEvent(new Event('storage'));
-
-              try {
-                const key = `sv_onboarding_seen_${String(viewedSteamId)}`;
-                const already = window.localStorage.getItem(key) === '1';
-                if (!already) {
-                  setOnboardingStep(0);
-                  setShowOnboarding(true);
-                }
-              } catch {
-                // ignore
-              }
-            } else if (isViewingOwnProfile && loggedInUser) {
-              // Viewing your own profile - only update Pro status, keep your account info
-              const updatedUser = {
-                ...loggedInUser,
-                proUntil: combinedUser.proUntil, // Update Pro status
-              };
-              window.localStorage.setItem('steam_user', JSON.stringify(updatedUser));
-              // Trigger storage event so sidebar updates
-              window.dispatchEvent(new Event('storage'));
-            }
-            // Otherwise, we're just viewing someone else's profile - don't touch logged-in user
-          }
-        } catch {
-          // ignore storage issues (e.g. private mode)
-        }
+        setLoading(false);
       } catch (error) {
         // If profile fetch times out, try to use cached or minimal data
         console.warn('Critical data fetch timeout, using fallback');
@@ -1152,12 +1115,17 @@ function InventoryContent() {
     let total = 0;
     inventory.forEach(item => {
       const key = getMarketKey(item);
+      const raw = key ? serverPriceIndexRef.current[key] : undefined;
+      if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+        total += raw * Number(item.amount ?? 1);
+        return;
+      }
+
       const priceStr = key ? itemPrices[key] : undefined;
-      if (priceStr) {
-        const num = parsePriceToNumber(priceStr);
-        if (!isNaN(num) && isFinite(num)) {
-          total += num * Number(item.amount ?? 1);
-        }
+      if (!priceStr) return;
+      const num = parsePriceToNumber(priceStr);
+      if (!isNaN(num) && isFinite(num)) {
+        total += num * Number(item.amount ?? 1);
       }
     });
     // Ensure total is always a finite number (not Infinity)
@@ -1165,7 +1133,31 @@ function InventoryContent() {
       total = 0;
     }
     return formatMoney(total);
-  }, [inventory, itemPrices, currency.code]);
+  }, [inventory, itemPrices, currency.code, formatMoney]);
+
+  const totalVaultValueNumeric = useMemo(() => {
+    let total = 0;
+    inventory.forEach(item => {
+      const key = getMarketKey(item);
+      const raw = key ? serverPriceIndexRef.current[key] : undefined;
+      if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+        total += raw * Number(item.amount ?? 1);
+        return;
+      }
+
+      const priceStr = key ? itemPrices[key] : undefined;
+      if (!priceStr) return;
+      const num = parsePriceToNumber(priceStr);
+      if (!isNaN(num) && isFinite(num)) {
+        total += num * Number(item.amount ?? 1);
+      }
+    });
+    return !isFinite(total) || isNaN(total) ? 0 : total;
+  }, [inventory, itemPrices]);
+
+  useEffect(() => {
+    setRank(getRankForValue(totalVaultValueNumeric));
+  }, [totalVaultValueNumeric]);
 
   const totalItems = useMemo(() => inventory.reduce((sum, i) => sum + Number(i.amount ?? 1), 0), [inventory]);
 
@@ -1310,11 +1302,11 @@ function InventoryContent() {
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           <div className="max-w-3xl mx-auto space-y-6 pb-32">
-            <div className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
+            <div className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5">
               <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">My Vault</div>
               <h1 className="mt-3 text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Sign in to load your inventory</h1>
               <p className="mt-3 text-[11px] md:text-[12px] text-gray-400 leading-relaxed max-w-2xl">
-                We use Steam OpenID for login. It’s read-only and we never see your password.
+                See your total vault value, top items, wishlist, price trackers and compare tools.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <button
@@ -1327,7 +1319,7 @@ function InventoryContent() {
                   href="/how-it-works"
                   className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest text-gray-200"
                 >
-                  How It Works
+                  Features
                 </Link>
               </div>
             </div>
@@ -1475,6 +1467,14 @@ function InventoryContent() {
                     <h1 className="w-full sm:w-auto min-w-0 text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
+                    {rank && totalItems > 0 && (
+                      <span
+                        style={{ '--rank-color': rank.color } as React.CSSProperties}
+                        className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-[var(--rank-color)]/10 border border-[var(--rank-color)]/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-[var(--rank-color)] shrink-0"
+                      >
+                        {rank.name}
+                      </span>
+                    )}
                     {viewedIsPro && (
                       <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
                         Pro
@@ -1600,8 +1600,8 @@ function InventoryContent() {
                   <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
                     <ShareButton
                       url={shareUrl}
-                      title={`${viewedUser?.name || 'User'}'s Vault - SkinVaults`}
-                      text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVaults`}
+                      title={`${viewedUser.name}'s ${rank?.name} Inventory - SkinVaults`}
+                      text={`Check out my ${rank?.name} inventory on SkinVaults! Total value: ${totalVaultValue} with ${totalItems} items. ${shareUrl}`}
                       variant="button"
                       className="text-[8px] md:text-[9px]"
                     />
@@ -1761,8 +1761,10 @@ function InventoryContent() {
               <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
               <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
               <StatCard label="HS %" icon={<Target size={12}/>} val={playerStats?.hs} unit="%" />
-              <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
-              <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
+              <StatCard label="Vault Value" icon={<TrendingUp size={12} />} val={totalVaultValue} color="text-emerald-400" />
+              <StatCard label="Total Items" icon={<PackageOpen size={12} />} val={totalItems.toLocaleString()} />
+              {rank && <StatCard label="Rank" icon={<Trophy size={12} />} val={rank.name} color="text-yellow-400" />}
+              <StatCard label="Priced Items" icon={<CheckCircle2 size={12} />} val={`${pricedItems.toLocaleString()} / ${totalItems.toLocaleString()}`} />
             </div>
             
             {/* Pro Performance Indicator */}

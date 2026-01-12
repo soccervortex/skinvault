@@ -462,6 +462,37 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-green-400">Verified</span>
               </div>
               <div className="md:hidden flex-1 flex justify-end gap-2">
+                {/* Share Button (Mobile) */}
+                {typeof window !== 'undefined' && (
+                  <ShareButton
+                    url={window.location.href}
+                    title={`${item?.name} - SkinVaults`}
+                    text={`Check out ${item?.name} on SkinVaults`}
+                    variant="icon"
+                    className="inline-flex"
+                  />
+                )}
+
+                {/* Compare Button (Mobile) */}
+                <button
+                  onClick={() => setShowCompareModal(true)}
+                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                  aria-label="Compare items"
+                >
+                  <Scale size={16} className="text-blue-400" />
+                </button>
+
+                {/* Price Tracker Button (Mobile) */}
+                {user && (
+                  <button
+                    onClick={() => setShowTrackerModal(true)}
+                    className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                    aria-label="Set price tracker"
+                  >
+                    <Bell size={16} className="text-blue-400" />
+                  </button>
+                )}
+
                 {/* Report Button (Mobile) */}
                 <button
                   onClick={() => setShowReportModal(true)}

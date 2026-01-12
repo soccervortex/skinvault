@@ -102,11 +102,6 @@ body.christmas-theme {
   z-index: -1;
 }
 
-/* Keep it modern and visible - don't overwhelm */
-.christmas-theme {
-  /* Subtle enhancements that don't break visibility */
-}
-
 /* Christmas theme for specific UI elements */
 .christmas-theme button.bg-blue-600 {
   background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
