@@ -130,6 +130,7 @@ function InventoryContent() {
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedInUserPro, setLoggedInUserPro] = useState(false);
+  const [proStatusLoading, setProStatusLoading] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
   const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -140,12 +141,24 @@ function InventoryContent() {
   const [onboardingStep, setOnboardingStep] = useState(0);
   const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
-  const isPro = useMemo(() => {
-    if (!loggedInUser?.steamId) return false;
-    if (loggedInUserPro) return true;
+
+  const handleSteamLogin = () => {
+    if (typeof window === 'undefined') return;
+    window.location.href = '/api/auth/steam';
+  };
+
+  const hasProUntil = useMemo(() => {
     const until = loggedInUser?.proUntil;
     return !!(until && new Date(until) > new Date());
-  }, [loggedInUser?.steamId, loggedInUser?.proUntil, loggedInUserPro]);
+  }, [loggedInUser?.proUntil]);
+
+  const isPro = useMemo(() => {
+    if (!loggedInUser?.steamId) return false;
+    // Prefer authoritative API check when available; while loading, fall back to proUntil
+    if (loggedInUserPro) return true;
+    if (proStatusLoading) return hasProUntil;
+    return hasProUntil;
+  }, [loggedInUser?.steamId, loggedInUserPro, proStatusLoading, hasProUntil]);
 
   const viewedIsPro = useMemo(
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
@@ -756,11 +769,16 @@ function InventoryContent() {
       // Load wishlist for logged-in user
       setWishlist(loadWishlist(storedLoggedInUser.steamId));
       // Check Pro status from API
-      checkProStatus(storedLoggedInUser.steamId).then(setLoggedInUserPro);
+      setProStatusLoading(true);
+      checkProStatus(storedLoggedInUser.steamId)
+        .then(setLoggedInUserPro)
+        .catch(() => setLoggedInUserPro(false))
+        .finally(() => setProStatusLoading(false));
     } else {
       setLoggedInUser(null);
       setWishlist([]);
       setLoggedInUserPro(false);
+      setProStatusLoading(false);
     }
 
     // Determine which profile to view
@@ -869,6 +887,7 @@ function InventoryContent() {
         
         // Also update Pro status for logged-in user if viewing own profile
         if (isViewingOwnProfile && storedLoggedInUser?.steamId) {
+          setProStatusLoading(true);
           checkProStatus(storedLoggedInUser.steamId).then((proStatus) => {
             setLoggedInUserPro(proStatus);
             // Update localStorage with latest Pro status
@@ -886,7 +905,7 @@ function InventoryContent() {
                 }
               } catch {}
             }
-          });
+          }).catch(() => setLoggedInUserPro(false)).finally(() => setProStatusLoading(false));
         }
 
         // Only update logged-in user in localStorage when:
@@ -1054,6 +1073,7 @@ function InventoryContent() {
                 })
                 .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
             } else {
+              setHasDiscordAccess(false);
               setDiscordStatus({ connected: false, requiresPro: true });
             }
           } else {
@@ -1277,6 +1297,39 @@ function InventoryContent() {
               {Array.from({ length: 10 }).map((_, i) => (
                 <InventoryItemSkeleton key={i} />
               ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!viewedUser && !loading) {
+    return (
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+          <div className="max-w-3xl mx-auto space-y-6 pb-32">
+            <div className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
+              <div className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">My Vault</div>
+              <h1 className="mt-3 text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Sign in to load your inventory</h1>
+              <p className="mt-3 text-[11px] md:text-[12px] text-gray-400 leading-relaxed max-w-2xl">
+                We use Steam OpenID for login. It’s read-only and we never see your password.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  onClick={handleSteamLogin}
+                  className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest"
+                >
+                  Sign In with Steam
+                </button>
+                <Link
+                  href="/how-it-works"
+                  className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest text-gray-200"
+                >
+                  How It Works
+                </Link>
+              </div>
             </div>
           </div>
         </main>
