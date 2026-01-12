@@ -25,6 +25,19 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
     if (!u) return '';
     const b = String(baseUrl || '').trim();
     if (!b) return u;
+
+    if (u.startsWith('data:')) return u;
+    if (u.startsWith(`${b}/api/image-proxy?`)) return u;
+    if (u.startsWith('/')) return `${b}${u}`;
+
+    try {
+      const bu = new URL(b);
+      const uu = new URL(u);
+      if (bu.origin === uu.origin) return u;
+    } catch {
+      // If URL parsing fails, fall back to proxying.
+    }
+
     return `${b}/api/image-proxy?url=${encodeURIComponent(u)}`;
   };
 
@@ -111,11 +124,9 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
               {topFive.map((item: any, index: number) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: '14px', backgroundColor: '#0d0f16', border: '1px solid #20222b' }}>
-                  {getSteamIconSrc(item.icon_url) ? (
-                    <img src={getSteamIconSrc(item.icon_url)} width="54" height="54" alt={item.market_hash_name} style={{ borderRadius: '10px' }} />
-                  ) : (
-                    <div style={{ width: '54px', height: '54px', borderRadius: '10px', backgroundColor: '#1a1b21' }} />
-                  )}
+                  <div style={{ width: '54px', height: '54px', borderRadius: '10px', backgroundColor: '#1a1b21', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontWeight: 900, fontSize: 18 }}>
+                    #{index + 1}
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '14px', flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 22, margin: 0, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{index + 1}. {String(item.market_hash_name || '').trim() || 'Unknown Item'}</p>
                     {Number(item?.amount || 0) > 1 ? (

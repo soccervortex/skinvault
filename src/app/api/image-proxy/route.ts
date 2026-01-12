@@ -27,6 +27,8 @@ function isAllowedUrl(raw: string): URL | null {
       host === 'p16-common-sign.tiktokcdn-eu.com' ||
       host.startsWith('p16-') ||
       host === 'steamcommunity.com' ||
+      host === 'steamcdn-a.akamaihd.net' ||
+      host === 'steamuserimages-a.akamaihd.net' ||
       host.endsWith('.steamstatic.com') ||
       host.endsWith('.steamstaticusercontent.com') ||
       host.endsWith('.akamai.steamstatic.com') ||

@@ -240,3 +240,21 @@ export async function GET(req: Request) {
   res.headers.set('cache-control', 'public, max-age=3600, s-maxage=3600');
   return res;
 }
+
+export async function HEAD(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const steamId = searchParams.get('steamId');
+  if (!steamId) {
+    return new Response(null, { status: 400 });
+  }
+
+  // Some scrapers issue HEAD requests for images. Rendering on HEAD can time out,
+  // so we only return headers that indicate this is a valid image endpoint.
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'content-type': 'image/png',
+      'cache-control': 'public, max-age=3600, s-maxage=3600',
+    },
+  });
+}
