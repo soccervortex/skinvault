@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -188,7 +189,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <ChatNotificationListener />
             <GlobalChatService />
             <BanChecker />
-            <CreatorAnalyticsTracker />
+            <Suspense fallback={null}>
+              <CreatorAnalyticsTracker />
+            </Suspense>
             <main id="main-content">{children}</main>
             <ProExpirationWarning />
             <NetworkStatus />
