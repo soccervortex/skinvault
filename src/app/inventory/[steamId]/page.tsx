@@ -23,9 +23,16 @@ async function getRequestOriginSafe() {
 }
 
 export async function generateMetadata(
-  { params, searchParams }: { params: { steamId: string }; searchParams?: Record<string, string | string[] | undefined> }
+  {
+    params,
+    searchParams,
+  }: {
+    params: { steamId: string } | Promise<{ steamId: string }>;
+    searchParams?: Record<string, string | string[] | undefined>;
+  }
 ): Promise<Metadata> {
-  const { steamId } = params;
+  const resolvedParams = await Promise.resolve(params as any);
+  const { steamId } = resolvedParams as { steamId: string };
   const safeSteamId = String(steamId || '').trim();
 
   const sp = (searchParams || {}) as any;
