@@ -124,14 +124,30 @@ function parseMetric(raw: string | null): keyof SeriesPoint {
   return (allowed.includes(s as any) ? (s as any) : 'pageViews') as keyof SeriesPoint;
 }
 
-function CreatorStatsAdminPageInner() {
+type CreatorStatsAdminPageInnerProps = {
+  forcedSlug?: string | null;
+};
+
+export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPageInnerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const forcedCreator = useMemo(() => {
+    const s = String(forcedSlug || '').trim().toLowerCase();
+    if (!s || s === 'all') return '';
+    return s;
+  }, [forcedSlug]);
+
+  const basePath = useMemo(() => {
+    if (!forcedCreator) return '/admin/creator-stats';
+    return `/admin/creator-stats/${encodeURIComponent(forcedCreator)}`;
+  }, [forcedCreator]);
+
   const [user, setUser] = useState<any>(null);
   const [userLoaded, setUserLoaded] = useState(false);
 
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
-  const [selectedCreator, setSelectedCreator] = useState<string>('all');
+  const [selectedCreator, setSelectedCreator] = useState<string>(forcedCreator || 'all');
   const [metric, setMetric] = useState<keyof SeriesPoint>('pageViews');
 
   const [manualSteamId, setManualSteamId] = useState('');
@@ -178,7 +194,11 @@ function CreatorStatsAdminPageInner() {
     const urlRangeDays = searchParams.get('rangeDays');
     const urlMetric = searchParams.get('metric');
 
-    if (urlSlug) setSelectedCreator(String(urlSlug).toLowerCase());
+    if (forcedCreator) {
+      setSelectedCreator(forcedCreator);
+    } else if (urlSlug) {
+      setSelectedCreator(String(urlSlug).toLowerCase());
+    }
     if (urlRangeDays) setRangeDays(parseRangeDays(urlRangeDays));
     if (urlMetric) setMetric(parseMetric(urlMetric));
 
@@ -187,18 +207,24 @@ function CreatorStatsAdminPageInner() {
   }, [userLoaded, userIsOwner]);
 
   useEffect(() => {
+    if (!forcedCreator) return;
+    if (selectedCreator === forcedCreator) return;
+    setSelectedCreator(forcedCreator);
+  }, [forcedCreator, selectedCreator]);
+
+  useEffect(() => {
     if (!userLoaded) return;
     if (!userIsOwner) return;
     if (!didInitFromUrl.current) return;
 
     const qs = new URLSearchParams();
-    if (selectedCreator !== 'all') qs.set('slug', selectedCreator);
+    if (!forcedCreator && selectedCreator !== 'all') qs.set('slug', selectedCreator);
     qs.set('rangeDays', rangeDays === 'all' ? 'all' : String(rangeDays));
     qs.set('metric', String(metric));
     const next = qs.toString();
     if (next === lastSyncedQuery.current) return;
     lastSyncedQuery.current = next;
-    router.replace(`/admin/creator-stats?${next}`);
+    router.replace(`${basePath}?${next}`);
   }, [userLoaded, userIsOwner, selectedCreator, rangeDays, metric, router]);
 
   useEffect(() => {
@@ -603,18 +629,20 @@ function CreatorStatsAdminPageInner() {
                   ))}
                 </div>
 
-                <select
-                  value={selectedCreator}
-                  onChange={(e) => setSelectedCreator(e.target.value)}
-                  className="px-4 py-2 bg-[#11141d] border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest text-white"
-                >
-                  <option value="all">All Creators</option>
-                  {creators.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                {!forcedCreator && (
+                  <select
+                    value={selectedCreator}
+                    onChange={(e) => setSelectedCreator(e.target.value)}
+                    className="px-4 py-2 bg-[#11141d] border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest text-white"
+                  >
+                    <option value="all">All Creators</option>
+                    {creators.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 <Link
                   href="/creators"

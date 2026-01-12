@@ -1,18 +1,23 @@
-import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
+import Sidebar from '@/app/components/Sidebar';
+import { CreatorStatsAdminPageInner } from '../page';
 
-export default async function AdminCreatorStatsSlugPage(
-  { params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Record<string, string | string[] | undefined> }
-) {
+export default async function AdminCreatorStatsSlugPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const sp = (searchParams || {}) as any;
 
-  const rangeDaysRaw = Array.isArray(sp?.rangeDays) ? sp.rangeDays[0] : sp?.rangeDays;
-  const metricRaw = Array.isArray(sp?.metric) ? sp.metric[0] : sp?.metric;
-
-  const qs = new URLSearchParams();
-  qs.set('slug', String(slug || '').toLowerCase());
-  if (rangeDaysRaw) qs.set('rangeDays', String(rangeDaysRaw));
-  if (metricRaw) qs.set('metric', String(metricRaw));
-
-  redirect(`/admin/creator-stats?${qs.toString()}`);
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+          <Sidebar />
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="animate-spin text-emerald-400" size={32} />
+          </div>
+        </div>
+      }
+    >
+      <CreatorStatsAdminPageInner forcedSlug={String(slug || '').toLowerCase()} />
+    </Suspense>
+  );
 }

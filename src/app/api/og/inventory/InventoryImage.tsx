@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 
-export function InventoryImage({ profile, rank, totalValue, totalItems, topItems, currency }: any) {
+export function InventoryImage({ profile, rank, totalValue, totalItems, topItems, currency, baseUrl }: any) {
   const formatValue = (value: number) => {
     const iso = String(currency || 'USD').toUpperCase();
     const locale = (() => {
@@ -20,15 +20,24 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
     }).format(value);
   };
 
+  const proxy = (rawUrl: string) => {
+    const u = String(rawUrl || '').trim();
+    if (!u) return '';
+    const b = String(baseUrl || '').trim();
+    if (!b) return u;
+    return `${b}/api/image-proxy?url=${encodeURIComponent(u)}`;
+  };
+
   const getSteamIconSrc = (iconUrl: string) => {
     const raw = String(iconUrl || '').trim();
     if (!raw) return '';
     const alreadySized = /\/\d+fx\d+f$/.test(raw);
     const path = raw.replace(/^https?:\/\/[^/]+\/economy\/image\//i, '');
-    return `https://community.cloudflare.steamstatic.com/economy/image/${path}${alreadySized ? '' : '/256fx256f'}`;
+    const steamUrl = `https://community.cloudflare.steamstatic.com/economy/image/${path}${alreadySized ? '' : '/256fx256f'}`;
+    return proxy(steamUrl);
   };
 
-  const avatarSrc = String(profile?.avatar || '').trim();
+  const avatarSrc = proxy(String(profile?.avatar || '').trim());
 
   return (
     <div

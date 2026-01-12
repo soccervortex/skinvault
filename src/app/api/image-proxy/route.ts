@@ -25,14 +25,21 @@ function isAllowedUrl(raw: string): URL | null {
       host.endsWith('.tiktokcdn-eu.com') ||
       host === 'p16-pu-sign-no.tiktokcdn-eu.com' ||
       host === 'p16-common-sign.tiktokcdn-eu.com' ||
-      host.startsWith('p16-');
+      host.startsWith('p16-') ||
+      host === 'steamcommunity.com' ||
+      host.endsWith('.steamstatic.com') ||
+      host.endsWith('.steamstaticusercontent.com') ||
+      host.endsWith('.akamai.steamstatic.com') ||
+      host.endsWith('.cloudflare.steamstatic.com');
 
     if (!allowed) return null;
 
     // Only allow fetching images (avoid proxying random content)
     const path = u.pathname.toLowerCase();
-    if (!/\.(png|jpe?g|webp|gif|bmp|svg)$/.test(path) && !path.includes('tos-')) {
-      // TikTok avatar URLs often don't end with image extension; allow tos-* paths.
+    const isSteamEconomyImage =
+      (host.endsWith('.steamstatic.com') || host.endsWith('.akamai.steamstatic.com') || host.endsWith('.cloudflare.steamstatic.com')) &&
+      path.includes('/economy/image/');
+    if (!/\.(png|jpe?g|webp|gif|bmp|svg)$/.test(path) && !path.includes('tos-') && !isSteamEconomyImage) {
       return null;
     }
 

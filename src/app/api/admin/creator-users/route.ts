@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { dbGet } from '@/app/utils/database';
+import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 import { CREATORS, type CreatorProfile } from '@/data/creators';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -50,6 +51,19 @@ async function readCreators(): Promise<CreatorProfile[]> {
   return CREATORS;
 }
 
+function collectExcludedSteamIds(creators: CreatorProfile[]): string[] {
+  const out = new Set<string>();
+  for (const sid of OWNER_STEAM_IDS as any) {
+    const s = String(sid || '').trim();
+    if (/^\d{17}$/.test(s)) out.add(s);
+  }
+  for (const c of creators) {
+    const pid = String((c as any)?.partnerSteamId || '').trim();
+    if (/^\d{17}$/.test(pid)) out.add(pid);
+  }
+  return Array.from(out);
+}
+
 export async function GET(request: Request) {
   try {
     const adminKey = request.headers.get(ADMIN_HEADER);
@@ -75,6 +89,7 @@ export async function GET(request: Request) {
 
     const creators = await readCreators();
     const creator = findCreatorInList(creators, slug);
+    const excludeSteamIds = collectExcludedSteamIds(creators);
     const partnerSteamId = String(creator?.partnerSteamId || '').trim();
     const excludeSteamId = /^\d{17}$/.test(partnerSteamId) ? partnerSteamId : null;
 
@@ -82,7 +97,7 @@ export async function GET(request: Request) {
     const attributions = db.collection('creator_attribution');
 
     const filter: any = { refSlug: slug };
-    if (excludeSteamId) filter.steamId = { $ne: excludeSteamId };
+    if (excludeSteamIds.length > 0) filter.steamId = { $nin: excludeSteamIds };
     if (q) {
       // SteamID is numeric, so substring search is fine.
       filter.steamId = {
@@ -166,6 +181,7 @@ export async function GET(request: Request) {
       ok: true,
       slug,
       excludeSteamId,
+      excludeSteamIds,
       range,
       page,
       limit,

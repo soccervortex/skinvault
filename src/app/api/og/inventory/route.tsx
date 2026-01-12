@@ -224,6 +224,7 @@ export async function GET(req: Request) {
       totalItems={totalItems}
       topItems={Array.isArray(topItems) ? topItems : []}
       currency={isoCurrency}
+      baseUrl={origin}
     />,
     {
       width: 1200,

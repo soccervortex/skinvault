@@ -980,7 +980,7 @@ client.on('interactionCreate', async (interaction) => {
           String(invData?.error || '').toLowerCase().includes('private');
 
         if (isPrivate) {
-          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          const vaultUrl = `https://skinvaults.online/inventory/${steamId}`;
           await interaction.editReply({
             content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVaults can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
           });
@@ -999,7 +999,7 @@ client.on('interactionCreate', async (interaction) => {
         const hasAnyDescriptions = descriptions.length > 0 || rgDescList.length > 0;
 
         if (!hasAnyAssets || !hasAnyDescriptions) {
-          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          const vaultUrl = `https://skinvaults.online/inventory/${steamId}`;
           await interaction.editReply({
             content: `📦 **No Items Found**\n\nYour inventory appears to be empty or not synced yet.\n\n💡 **Try:**\n• Visit [your vault](${vaultUrl}) to sync your inventory\n• Make sure your Steam profile is public\n• Try again in a few moments`,
           });
@@ -1042,7 +1042,7 @@ client.on('interactionCreate', async (interaction) => {
 
         const totalItems = allAssets.reduce((sum, a) => sum + (Number(a?.amount || 1) || 1), 0);
         const uniqueItems = sortedItems.length;
-        const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+        const vaultUrl = `https://skinvaults.online/inventory/${steamId}`;
 
         const embed = new EmbedBuilder()
           .setTitle('📦 Your Inventory')
@@ -1126,7 +1126,7 @@ client.on('interactionCreate', async (interaction) => {
         const invData = await invResponse.json();
 
         if (invData?.success === false && String(invData?.error || '').toLowerCase().includes('private')) {
-          const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+          const vaultUrl = `https://skinvaults.online/inventory/${steamId}?currency=${encodeURIComponent(currency)}`;
           await interaction.editReply({
             content: `🔒 **Inventory Private**\n\nYour Steam inventory is private, so SkinVaults can't read your items.\n\n💡 **Fix:**\n• Set your Steam profile and inventory to public\n• Then open [your vault](${vaultUrl}) once to sync`,
           });
@@ -1138,7 +1138,7 @@ client.on('interactionCreate', async (interaction) => {
         const totalItems = assets.reduce((sum, a) => sum + Number(a?.amount || 1), 0);
         const uniqueItems = new Set(descriptions.map(d => String(d?.market_hash_name || d?.market_name || d?.name || '').trim()).filter(Boolean)).size;
 
-        const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+        const vaultUrl = `https://skinvaults.online/inventory/${steamId}?currency=${encodeURIComponent(currency)}`;
         const totalInventoryValue = typeof invData?.totalInventoryValue === 'string' ? invData.totalInventoryValue : '0.00';
         const totalValueNum = Number.parseFloat(totalInventoryValue);
         const symbol = currency === '1' ? '$' : '€';
@@ -1246,7 +1246,7 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle(`📊 Your CS2 Stats${isPro ? ' ⚡ PRO' : ''}`)
           .setColor(0x5865F2)
-          .setURL(`https://skinvaults.online/inventory?steamId=${steamId}`)
+          .setURL(`https://skinvaults.online/inventory/${steamId}`)
           .setTimestamp()
           .setFooter({ text: 'SkinVaults', iconURL: 'https://skinvaults.online/icon.png' });
 
@@ -1457,7 +1457,7 @@ client.on('interactionCreate', async (interaction) => {
         // Get top 3 weapons (returns immediately, doesn't wait)
         const topWeapons = await getTopWeapons(steamId, 3);
 
-        const vaultUrl = `https://skinvaults.online/inventory?steamId=${steamId}`;
+        const vaultUrl = `https://skinvaults.online/inventory/${steamId}`;
         const embed = new EmbedBuilder()
           .setTitle(`👤 ${profile.name}`)
           .setColor(0x5865F2)

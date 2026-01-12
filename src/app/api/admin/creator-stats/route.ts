@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { getAllProUsers } from '@/app/utils/pro-storage';
 import { dbGet } from '@/app/utils/database';
+import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 import { CREATORS, type CreatorProfile } from '@/data/creators';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -77,17 +78,30 @@ async function readCreators(): Promise<CreatorProfile[]> {
   return CREATORS;
 }
 
+function collectExcludedSteamIds(creators: CreatorProfile[]): string[] {
+  const out = new Set<string>();
+  for (const sid of OWNER_STEAM_IDS as any) {
+    const s = String(sid || '').trim();
+    if (/^\d{17}$/.test(s)) out.add(s);
+  }
+  for (const c of creators) {
+    const pid = String((c as any)?.partnerSteamId || '').trim();
+    if (/^\d{17}$/.test(pid)) out.add(pid);
+  }
+  return Array.from(out);
+}
+
 async function computeLeaderboard(
   db: any,
   start: Date,
   slug: string | null,
   proMap: Record<string, string>,
-  excludeSteamId: string | null,
+  excludeSteamIds: string[],
 ) {
   const events = db.collection('analytics_events');
   const match: any = { createdAt: { $gte: start }, refSlug: { $ne: null } };
   if (slug) match.refSlug = String(slug).toLowerCase();
-  if (excludeSteamId) match.steamId = { $ne: excludeSteamId };
+  if (excludeSteamIds.length > 0) match.steamId = { $nin: excludeSteamIds };
 
   const pipeline = [
     { $match: match },
@@ -176,7 +190,7 @@ async function computeSeries(
   start: Date,
   days: number,
   slug: string | null,
-  excludeSteamId: string | null,
+  excludeSteamIds: string[],
 ): Promise<SeriesPoint[]> {
   const events = db.collection('analytics_events');
   const end = addDays(start, days);
@@ -187,7 +201,7 @@ async function computeSeries(
   } else {
     match.refSlug = { $ne: null };
   }
-  if (excludeSteamId) match.steamId = { $ne: excludeSteamId };
+  if (excludeSteamIds.length > 0) match.steamId = { $nin: excludeSteamIds };
 
   const pipeline = [
     { $match: match },
@@ -268,7 +282,7 @@ async function computeSeries(
   return out;
 }
 
-async function computeSeriesMonthly(db: any, slug: string | null, excludeSteamId: string | null): Promise<SeriesPoint[]> {
+async function computeSeriesMonthly(db: any, slug: string | null, excludeSteamIds: string[]): Promise<SeriesPoint[]> {
   const events = db.collection('analytics_events');
 
   const match: any = {};
@@ -277,7 +291,7 @@ async function computeSeriesMonthly(db: any, slug: string | null, excludeSteamId
   } else {
     match.refSlug = { $ne: null };
   }
-  if (excludeSteamId) match.steamId = { $ne: excludeSteamId };
+  if (excludeSteamIds.length > 0) match.steamId = { $nin: excludeSteamIds };
 
   const pipeline = [
     { $match: match },
@@ -352,12 +366,12 @@ async function computeWindow(
   refSlugs: string[],
   start: Date | null,
   proMap: Record<string, string>,
-  excludeSteamId: string | null,
+  excludeSteamIds: string[],
 ) {
   const events = db.collection('analytics_events');
   const matchBase: any = {};
   if (start) matchBase.createdAt = { $gte: start };
-  if (excludeSteamId) matchBase.steamId = { $ne: excludeSteamId };
+  if (excludeSteamIds.length > 0) matchBase.steamId = { $nin: excludeSteamIds };
 
   const result: Record<string, any> = {};
 
@@ -414,27 +428,32 @@ export async function GET(request: Request) {
 
     const normalizedSlug = slug ? String(slug).toLowerCase() : null;
 
-    // Exclude creator's own SteamID from their stats when querying a single creator.
-    let excludeSteamId: string | null = null;
-    if (normalizedSlug) {
-      try {
-        const creators = await readCreators();
-        const c = findCreatorInList(creators, normalizedSlug);
-        const pid = String(c?.partnerSteamId || '').trim();
-        excludeSteamId = /^\d{17}$/.test(pid) ? pid : null;
-      } catch {
-        excludeSteamId = null;
-      }
+    // Exclude all owners + all creator partner SteamIDs from stats.
+    // This prevents owners/creators from inflating referral traffic.
+    let creatorsList: CreatorProfile[] = [];
+    try {
+      creatorsList = await readCreators();
+    } catch {
+      creatorsList = [];
     }
+    const excludeSteamIds = collectExcludedSteamIds(creatorsList);
 
     const db = await getDatabase();
     const events = db.collection('analytics_events');
 
     const proMap = await getAllProUsers().catch(() => ({} as Record<string, string>));
 
+    const storedSlugs = creatorsList
+      .map((c) => String((c as any)?.slug || '').toLowerCase())
+      .filter(Boolean);
+
+    const eventSlugs = slug
+      ? []
+      : (await events.distinct('refSlug', { refSlug: { $ne: null } })).map((s: any) => String(s).toLowerCase());
+
     const refSlugs = slug
       ? [String(slug).toLowerCase()]
-      : (await events.distinct('refSlug', { refSlug: { $ne: null } })).map((s: any) => String(s).toLowerCase());
+      : [...storedSlugs, ...eventSlugs];
 
     const uniqueRefSlugs = Array.from(new Set(refSlugs)).filter(Boolean);
 
@@ -445,7 +464,7 @@ export async function GET(request: Request) {
       out.windows = {};
       for (const w of windows) {
         const start = getStartForWindow(w);
-        out.windows[w] = await computeWindow(db, uniqueRefSlugs, start, proMap, excludeSteamId);
+        out.windows[w] = await computeWindow(db, uniqueRefSlugs, start, proMap, excludeSteamIds);
       }
     }
 
@@ -457,7 +476,7 @@ export async function GET(request: Request) {
           slug: normalizedSlug,
           startDay: null,
           endDay: toDayString(startOfDay(new Date())),
-          data: await computeSeriesMonthly(db, normalizedSlug, excludeSteamId),
+          data: await computeSeriesMonthly(db, normalizedSlug, excludeSteamIds),
         };
       } else {
         const seriesStart = startOfDay(addDays(new Date(), -(range.days - 1)));
@@ -467,7 +486,7 @@ export async function GET(request: Request) {
           slug: normalizedSlug,
           startDay: toDayString(seriesStart),
           endDay: toDayString(startOfDay(new Date())),
-          data: await computeSeries(db, seriesStart, range.days, normalizedSlug, excludeSteamId),
+          data: await computeSeries(db, seriesStart, range.days, normalizedSlug, excludeSteamIds),
         };
       }
     }
@@ -478,13 +497,13 @@ export async function GET(request: Request) {
         : startOfDay(addDays(new Date(), -(range.days - 1)));
       const leaderboardStartDate = leaderboardStart || new Date(0);
 
-      out.leaderboard = await computeLeaderboard(db, leaderboardStartDate, null, proMap, null);
+      out.leaderboard = await computeLeaderboard(db, leaderboardStartDate, null, proMap, excludeSteamIds);
       if (slug) {
         out.leaderboard = out.leaderboard.filter((r: any) => String(r.slug) === String(slug).toLowerCase());
       }
     }
 
-    out.excludedSteamId = excludeSteamId;
+    out.excludedSteamId = excludeSteamIds.length > 0 ? excludeSteamIds[0] : null;
 
     return NextResponse.json(out);
   } catch (error) {
