@@ -32,6 +32,9 @@ export async function generateMetadata(
   const rawCurrency = Array.isArray(sp?.currency) ? sp.currency[0] : sp?.currency;
   const currency = rawCurrency ? String(rawCurrency) : null;
 
+  const rawV = Array.isArray(sp?.v) ? sp.v[0] : sp?.v;
+  const userV = rawV ? String(rawV) : null;
+
   const baseUrl = await getRequestOriginSafe();
   const isValidSteamId = /^\d{17}$/.test(safeSteamId);
   let profile: SteamProfile | null = null;
@@ -52,7 +55,7 @@ export async function generateMetadata(
   const description = `View ${displayName}'s CS2 inventory vault with valuation, rank, and top items.`;
   const version = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim();
   const v = version ? version.slice(0, 12) : '';
-  const ogImage = `${baseUrl}/api/og/inventory?steamId=${encodeURIComponent(safeSteamId)}${currency ? `&currency=${encodeURIComponent(currency)}` : ''}${v ? `&v=${encodeURIComponent(v)}` : ''}`;
+  const ogImage = `${baseUrl}/api/og/inventory?steamId=${encodeURIComponent(safeSteamId)}${currency ? `&currency=${encodeURIComponent(currency)}` : ''}${v ? `&v=${encodeURIComponent(v)}` : ''}${userV ? `&uv=${encodeURIComponent(userV)}` : ''}`;
 
   const base = generateSEOMetadata({
     title,

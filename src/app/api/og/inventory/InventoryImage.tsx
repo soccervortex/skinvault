@@ -39,6 +39,8 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
 
   const avatarSrc = proxy(String(profile?.avatar || '').trim());
 
+  const topFive = Array.isArray(topItems) ? topItems.slice(0, 5) : [];
+
   return (
     <div
       style={{
@@ -98,18 +100,41 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '40px' }}>
-        {topItems.map((item: any, index: number) => (
-          <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 18px', backgroundColor: '#12141c', padding: '22px', borderRadius: '18px', border: '2px solid #2a2d36', width: '260px' }}>
-            {getSteamIconSrc(item.icon_url) ? (
-              <img src={getSteamIconSrc(item.icon_url)} width="120" height="120" alt={item.market_hash_name} style={{ marginBottom: '14px' }} />
-            ) : (
-              <div style={{ width: '120px', height: '120px', borderRadius: '18px', backgroundColor: '#1a1b21', marginBottom: '14px' }} />
-            )}
-            <p style={{ fontSize: 20, textAlign: 'center', margin: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 800 }}>{item.market_hash_name}</p>
-            <p style={{ fontSize: 26, color: '#22c55e', fontWeight: 900, margin: '8px 0 0', letterSpacing: -0.5 }}>{formatValue(item.price)}</p>
+      <div style={{ display: 'flex', width: '100%', marginTop: '34px', backgroundColor: '#12141c', border: '2px solid #2a2d36', borderRadius: '20px', padding: '22px 26px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', width: '100%', marginBottom: '14px' }}>
+            <p style={{ fontSize: 22, color: '#9ca3af', margin: 0, letterSpacing: 2, fontWeight: 900 }}>TOP 5 ITEMS</p>
+            <p style={{ fontSize: 20, color: '#6b7280', margin: 0, fontWeight: 800 }}>By value</p>
           </div>
-        ))}
+
+          {topFive.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+              {topFive.map((item: any, index: number) => (
+                <div key={index} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: '14px', backgroundColor: '#0d0f16', border: '1px solid #20222b' }}>
+                  {getSteamIconSrc(item.icon_url) ? (
+                    <img src={getSteamIconSrc(item.icon_url)} width="54" height="54" alt={item.market_hash_name} style={{ borderRadius: '10px' }} />
+                  ) : (
+                    <div style={{ width: '54px', height: '54px', borderRadius: '10px', backgroundColor: '#1a1b21' }} />
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '14px', flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 22, margin: 0, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{index + 1}. {String(item.market_hash_name || '').trim() || 'Unknown Item'}</p>
+                    {Number(item?.amount || 0) > 1 ? (
+                      <p style={{ fontSize: 16, margin: '4px 0 0', color: '#6b7280', fontWeight: 800 }}>x{Number(item.amount)}</p>
+                    ) : (
+                      <p style={{ fontSize: 16, margin: '4px 0 0', color: '#6b7280', fontWeight: 800 }}>&nbsp;</p>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginLeft: '14px' }}>
+                    <p style={{ fontSize: 22, margin: 0, color: '#22c55e', fontWeight: 900 }}>{formatValue(Number(item?.price || 0) * Number(item?.amount || 1))}</p>
+                    <p style={{ fontSize: 16, margin: '4px 0 0', color: '#6b7280', fontWeight: 800 }}>{Number(item?.amount || 1) > 1 ? `${formatValue(Number(item?.price || 0))} each` : ' '}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: 22, margin: 0, color: '#9ca3af', fontWeight: 800 }}>No top items available</p>
+          )}
+        </div>
       </div>
     </div>
   );

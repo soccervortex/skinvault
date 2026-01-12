@@ -142,7 +142,7 @@ function computeTopItemsAndTotal(
 
 async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrency: string) {
   try {
-    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includeTopItems=1`;
+    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includePriceIndex=1`;
     const profileUrl = `${baseUrl}/api/steam/profile?steamId=${steamId}`;
 
     const invController = new AbortController();
@@ -166,9 +166,14 @@ async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrenc
       ? await (inventoryRes as Response).json().catch(() => null)
       : null;
 
-    const totalValue = Number(inventoryData?.totalInventoryValue || 0);
-    const totalItems = Number(inventoryData?.valuedItemCount || 0);
-    const topItems = Array.isArray(inventoryData?.topItems) ? inventoryData.topItems : [];
+    const priceIndex = inventoryData?.priceIndex && typeof inventoryData.priceIndex === 'object'
+      ? (inventoryData.priceIndex as Record<string, number>)
+      : {};
+
+    const computed = computeTopItemsAndTotal(inventoryData, priceIndex, 5);
+    const totalValue = computed.totalValue;
+    const totalItems = computed.totalItems;
+    const topItems = computed.topItems;
     const rank = getRankForValue(totalValue);
 
     const avatarFallback = `${baseUrl}/icons/web-app-manifest-192x192.png`;
@@ -183,7 +188,7 @@ async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrenc
       totalValue,
       totalItems,
       rank,
-      topItems: Array.isArray(topItems) ? topItems.slice(0, 3) : [],
+      topItems,
     };
   } catch (error) {
     console.error('Failed to fetch inventory data for OG image:', error);
