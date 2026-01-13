@@ -8,16 +8,55 @@ import { SITE_CONFIG } from '@/lib/seo-config';
 async function getItemInfo(itemId: string) {
   try {
     // Use the optimized API endpoint which fetches in parallel
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-    const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(itemId)}&fuzzy=false`;
-    
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
+
+    const wearStripped = String(itemId || '')
+      .replace(/\s*\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)\s*$/i, '')
+      .trim();
+
+    const suffixStripped = (() => {
+      const s = String(itemId || '').trim();
+      const m = s.match(/^([a-z_]+-[a-z0-9]+)_\d{1,3}$/i);
+      return m ? String(m[1]) : s;
+    })();
+
+    const candidates = Array.from(
+      new Set(
+        [
+          String(itemId || '').trim(),
+          suffixStripped,
+          wearStripped,
+        ].filter(Boolean) as string[]
+      )
+    );
+
+    for (const c of candidates) {
+      const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(c)}&fuzzy=false`;
+      const response = await fetch(apiUrl, {
+        next: { revalidate: 3600 },
+      });
+
+      if (!response.ok) continue;
+      const item = await response.json();
+
+      if (item && (item.name || item.market_hash_name)) {
+        return {
+          name: item.name || item.market_hash_name || itemId,
+          image: item.image || null,
+          rarity: item.rarity?.name || item.rarity || null,
+          weapon: item.weapon?.name || item.weapon || null,
+          marketHashName: item.market_hash_name || item.name || itemId,
+        };
+      }
+    }
+
+    const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(String(itemId || '').trim())}&fuzzy=true`;
     const response = await fetch(apiUrl, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      next: { revalidate: 3600 },
     });
-    
+
     if (response.ok) {
       const item = await response.json();
-      
       if (item && (item.name || item.market_hash_name)) {
         return {
           name: item.name || item.market_hash_name || itemId,

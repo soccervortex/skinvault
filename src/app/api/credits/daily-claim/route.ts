@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isProMongoOnly } from '@/app/utils/pro-status-mongo';
 
@@ -28,11 +28,53 @@ function dayKeyUtc(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function nextMidnightUtc(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0));
+}
+
+export async function GET(req: NextRequest) {
+  const steamId = getSteamIdFromRequest(req);
+  if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
+    const db = await getDatabase();
+    const creditsCol = db.collection<UserCreditsDoc>('user_credits');
+
+    const now = new Date();
+    const today = dayKeyUtc(now);
+    const nextEligibleAt = nextMidnightUtc(now);
+
+    const doc = await creditsCol.findOne({ _id: steamId } as any);
+    const lastDay = String((doc as any)?.lastDailyClaimDay || '');
+    const canClaim = !lastDay || lastDay !== today;
+
+    return NextResponse.json(
+      {
+        steamId,
+        canClaim,
+        nextEligibleAt: nextEligibleAt.toISOString(),
+        serverNow: now.toISOString(),
+      },
+      { status: 200 }
+    );
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Failed to load claim status' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const steamId = getSteamIdFromRequest(req);
   if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const db = await getDatabase();
     const creditsCol = db.collection<UserCreditsDoc>('user_credits');
     const ledgerCol = db.collection<CreditsLedgerDoc>('credits_ledger');
@@ -72,7 +114,17 @@ export async function POST(req: NextRequest) {
       meta: { day: today, pro },
     });
 
-    return NextResponse.json({ steamId, balance: Number(doc.balance || 0), claimed: amount, pro }, { status: 200 });
+    return NextResponse.json(
+      {
+        steamId,
+        balance: Number(doc.balance || 0),
+        claimed: amount,
+        pro,
+        nextEligibleAt: nextMidnightUtc(now).toISOString(),
+        serverNow: now.toISOString(),
+      },
+      { status: 200 }
+    );
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to claim' }, { status: 500 });
   }

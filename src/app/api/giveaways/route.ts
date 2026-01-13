@@ -7,6 +7,7 @@ type GiveawayDoc = {
   title: string;
   description?: string;
   prize?: string;
+  prizeItem?: { id?: string; name?: string; market_hash_name?: string; marketHashName?: string; image?: string | null };
   startAt: Date;
   endAt: Date;
   creditsPerEntry: number;
@@ -52,6 +53,14 @@ export async function GET(req: NextRequest) {
         id: String(g._id),
         title: String(g.title || ''),
         prize: String(g.prize || ''),
+        prizeItem: g.prizeItem
+          ? {
+              id: String(g.prizeItem?.id || ''),
+              name: String(g.prizeItem?.name || ''),
+              market_hash_name: String(g.prizeItem?.market_hash_name || g.prizeItem?.marketHashName || ''),
+              image: g.prizeItem?.image ? String(g.prizeItem.image) : null,
+            }
+          : null,
         startAt: startAt ? startAt.toISOString() : null,
         endAt: endAt ? endAt.toISOString() : null,
         creditsPerEntry: Number(g.creditsPerEntry || 10),

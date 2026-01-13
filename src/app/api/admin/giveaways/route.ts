@@ -21,6 +21,14 @@ export async function GET(req: NextRequest) {
       id: String(g._id),
       title: String(g.title || ''),
       prize: String(g.prize || ''),
+      prizeItem: g.prizeItem
+        ? {
+            id: String(g.prizeItem?.id || ''),
+            name: String(g.prizeItem?.name || ''),
+            market_hash_name: String(g.prizeItem?.market_hash_name || g.prizeItem?.marketHashName || ''),
+            image: g.prizeItem?.image ? String(g.prizeItem.image) : null,
+          }
+        : null,
       startAt: g.startAt ? new Date(g.startAt).toISOString() : null,
       endAt: g.endAt ? new Date(g.endAt).toISOString() : null,
       creditsPerEntry: Number(g.creditsPerEntry || 10),
@@ -43,7 +51,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const title = String(body?.title || '').trim();
     const description = String(body?.description || '').trim();
-    const prize = String(body?.prize || '').trim();
+    const prizeItemRaw = body?.prizeItem || null;
+    const prizeItem = prizeItemRaw
+      ? {
+          id: String(prizeItemRaw?.id || '').trim(),
+          name: String(prizeItemRaw?.name || '').trim(),
+          market_hash_name: String(prizeItemRaw?.market_hash_name || prizeItemRaw?.marketHashName || '').trim(),
+          image: prizeItemRaw?.image ? String(prizeItemRaw.image).trim() : '',
+        }
+      : null;
+    const prize = String(body?.prize || prizeItem?.name || '').trim();
     const startAt = safeDate(body?.startAt);
     const endAt = safeDate(body?.endAt);
     const creditsPerEntry = Math.max(1, Math.floor(Number(body?.creditsPerEntry || 10)));
@@ -60,6 +77,14 @@ export async function POST(req: NextRequest) {
       title,
       description,
       prize,
+      prizeItem: prizeItem && (prizeItem.id || prizeItem.name || prizeItem.market_hash_name || prizeItem.image)
+        ? {
+            id: prizeItem.id,
+            name: prizeItem.name,
+            market_hash_name: prizeItem.market_hash_name,
+            image: prizeItem.image || null,
+          }
+        : undefined,
       startAt,
       endAt,
       creditsPerEntry,

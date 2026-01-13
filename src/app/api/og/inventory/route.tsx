@@ -107,7 +107,7 @@ function computeTopItemsAndTotal(
       if (!descByKey.has(key)) descByKey.set(key, d);
     }
 
-    const items: TopItem[] = [];
+    const agg = new Map<string, TopItem>();
     let totalValue = 0;
     let totalItems = 0;
 
@@ -121,14 +121,23 @@ function computeTopItemsAndTotal(
       totalItems += amount;
       if (!Number.isFinite(price) || price <= 0) continue;
       totalValue += price * amount;
-      items.push({
-        market_hash_name: marketHashName,
-        icon_url: String(d?.icon_url || ''),
-        amount,
-        price,
-      });
+      const iconUrl = String(d?.icon_url_large || d?.icon_url || '').trim();
+      const existing = agg.get(marketHashName);
+      if (existing) {
+        existing.amount += amount;
+        if (!existing.icon_url && iconUrl) existing.icon_url = iconUrl;
+        if (!Number.isFinite(existing.price) || existing.price <= 0) existing.price = price;
+      } else {
+        agg.set(marketHashName, {
+          market_hash_name: marketHashName,
+          icon_url: iconUrl,
+          amount,
+          price,
+        });
+      }
     }
 
+    const items = Array.from(agg.values());
     items.sort((a, b) => (b.price * b.amount) - (a.price * a.amount));
     return {
       topItems: items.slice(0, limit),

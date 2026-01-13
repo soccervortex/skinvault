@@ -1,22 +1,51 @@
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import ItemDetailClient from './ItemDetailClient';
 import { Metadata } from 'next';
 
 // --- HELPER: Fetch item data for SEO and initial render ---
 async function getItemData(itemId: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-    const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(itemId)}&fuzzy=false`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
 
+    const wearStripped = String(itemId || '')
+      .replace(/\s*\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)\s*$/i, '')
+      .trim();
+
+    const suffixStripped = (() => {
+      const s = String(itemId || '').trim();
+      const m = s.match(/^([a-z_]+-[a-z0-9]+)_\d{1,3}$/i);
+      return m ? String(m[1]) : s;
+    })();
+
+    const candidates = Array.from(
+      new Set(
+        [
+          String(itemId || '').trim(),
+          suffixStripped,
+          wearStripped,
+          wearStripped && wearStripped !== suffixStripped ? wearStripped : null,
+        ].filter(Boolean) as string[]
+      )
+    );
+
+    for (const c of candidates) {
+      const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(c)}&fuzzy=false`;
+      const response = await fetch(apiUrl, {
+        next: { revalidate: 3600 },
+      });
+      if (!response.ok) continue;
+      const item = await response.json();
+      if (item && (item.name || item.market_hash_name)) return item;
+    }
+
+    const apiUrl = `${baseUrl}/api/item/info?id=${encodeURIComponent(String(itemId || '').trim())}&fuzzy=true`;
     const response = await fetch(apiUrl, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) return null;
-
     const item = await response.json();
     if (!item || (!item.name && !item.market_hash_name)) return null;
-
     return item;
   } catch (error) {
     console.error('Failed to fetch item data:', error);
@@ -31,7 +60,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const item = await getItemData(decodedId);
 
   if (!item) {
-    return { title: 'Item Not Found | SkinVaults' };
+    const itemName = decodedId || 'Item';
+    return {
+      title: `${itemName} - CS2 Skin Prices | SkinVaults`,
+      description: `View CS2 item details and live prices for ${itemName} on SkinVaults.`,
+      openGraph: {
+        title: `${itemName} | SkinVaults`,
+        description: `View CS2 item details and live prices for ${itemName} on SkinVaults.`,
+        url: `https://www.skinvaults.online/item/${id}`,
+        siteName: 'SkinVaults',
+        images: [{ url: 'https://www.skinvaults.online/icons/web-app-manifest-192x192.png' }],
+        type: 'website',
+      },
+    };
   }
 
   const itemName = item.name || item.market_hash_name;
@@ -899,7 +940,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title: `${itemName} | SkinVaults`,
       description: description,
-      url: `https://skinvaults.online/item/${id}`,
+      url: `https://www.skinvaults.online/item/${id}`,
       siteName: 'SkinVaults',
       images: [{ url: itemImage }],
       type: 'website',
@@ -920,27 +961,35 @@ export default async function ItemDetail({ params }: { params: Promise<{ id: str
 
   const initialItem = await getItemData(decodedId);
 
-  if (!initialItem) {
-    notFound();
+  const safeInitialItem: any = initialItem || {
+    id: decodedId,
+    name: decodedId,
+    market_hash_name: decodedId,
+    image: null,
+  };
+
+  const canonicalId = String((safeInitialItem as any)?.id || '').trim();
+  if (canonicalId && canonicalId !== decodedId) {
+    redirect(`/item/${encodeURIComponent(canonicalId)}`);
   }
 
   // Generate Structured Data (JSON-LD) for Google Product Snippets
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: initialItem.name || initialItem.market_hash_name,
-    image: initialItem.image || initialItem.icon_url,
-    description: `Counter-Strike 2 skin: ${initialItem.name || initialItem.market_hash_name}`,
+    name: safeInitialItem.name || safeInitialItem.market_hash_name,
+    image: safeInitialItem.image || safeInitialItem.icon_url,
+    description: `Counter-Strike 2 skin: ${safeInitialItem.name || safeInitialItem.market_hash_name}`,
     brand: {
       '@type': 'Brand',
       name: 'Counter-Strike 2',
     },
     offers: {
       '@type': 'Offer',
-      url: `https://skinvaults.online/item/${id}`,
+      url: `https://www.skinvaults.online/item/${id}`,
       priceCurrency: 'USD',
-      price: initialItem.price || '0.00',
-      availability: initialItem.price ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      price: safeInitialItem.price || '0.00',
+      availability: safeInitialItem.price ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     },
   };
 
@@ -952,7 +1001,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ id: str
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <ItemDetailClient initialItem={initialItem} itemId={id} />
+      <ItemDetailClient initialItem={safeInitialItem} itemId={id} />
     </>
   );
 }

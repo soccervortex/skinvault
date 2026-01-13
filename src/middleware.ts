@@ -11,6 +11,12 @@ type RefCookie = {
   utm_term?: string;
 };
 
+ type AffCookie = {
+  aff: string;
+  ts: number;
+  landing: string;
+ };
+
 function safeStr(v: string | null): string {
   return String(v || '').trim();
 }
@@ -43,6 +49,20 @@ function buildRefCookie(req: NextRequest): RefCookie | null {
   return c;
 }
 
+ function buildAffCookie(req: NextRequest): AffCookie | null {
+  const url = req.nextUrl;
+  const aff = safeStr(url.searchParams.get('aff'));
+  if (!/^\d{17}$/.test(aff)) return null;
+
+  const landing = `${url.pathname}${url.search ? url.search : ''}`;
+
+  return {
+    aff,
+    ts: Date.now(),
+    landing,
+  };
+ }
+
 export function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
@@ -65,6 +85,19 @@ export function middleware(req: NextRequest) {
     res.cookies.set({
       name: 'sv_ref',
       value: encodeURIComponent(JSON.stringify(refCookie)),
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.nextUrl.protocol === 'https:',
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+    });
+  }
+
+  const affCookie = buildAffCookie(req);
+  if (affCookie) {
+    res.cookies.set({
+      name: 'sv_aff',
+      value: encodeURIComponent(JSON.stringify(affCookie)),
       httpOnly: true,
       sameSite: 'lax',
       secure: req.nextUrl.protocol === 'https:',

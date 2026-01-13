@@ -12,7 +12,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const db = await getDatabase();
     const col = db.collection('giveaways');
 
-    const doc = await col.findOne({ _id: new ObjectId(id) } as any);
+    let oid: ObjectId;
+    try {
+      oid = new ObjectId(id);
+    } catch {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    }
+
+    const doc = await col.findOne({ _id: oid } as any);
     if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const now = new Date();
@@ -27,6 +34,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
           title: String(doc.title || ''),
           description: String(doc.description || ''),
           prize: String(doc.prize || ''),
+          prizeItem: doc.prizeItem
+            ? {
+                id: String(doc.prizeItem?.id || ''),
+                name: String(doc.prizeItem?.name || ''),
+                market_hash_name: String(doc.prizeItem?.market_hash_name || doc.prizeItem?.marketHashName || ''),
+                image: doc.prizeItem?.image ? String(doc.prizeItem.image) : null,
+              }
+            : null,
           startAt: startAt ? startAt.toISOString() : null,
           endAt: endAt ? endAt.toISOString() : null,
           creditsPerEntry: Number(doc.creditsPerEntry || 10),

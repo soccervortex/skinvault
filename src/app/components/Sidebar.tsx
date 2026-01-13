@@ -381,6 +381,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
                 <Sparkles size={16} /> Giveaways
               </Link>
+              <Link href="/affiliate" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/affiliate') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Affiliate">
+                <Star size={16} /> Affiliate
+              </Link>
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16} /> Wishlist
               </Link>
@@ -645,6 +648,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
           <Link href="/giveaways" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
             <Sparkles size={16} /> Giveaways
+          </Link>
+          <Link href="/affiliate" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/affiliate') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Affiliate">
+            <Star size={16} /> Affiliate
           </Link>
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16} /> Wishlist

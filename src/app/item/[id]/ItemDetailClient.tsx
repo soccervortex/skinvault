@@ -211,7 +211,14 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         }
       }
 
-      setItem(normalizeItem(foundItem));
+      const fallback = initialItem || {
+        id: decodedId,
+        name: decodedId,
+        market_hash_name: decodedId,
+        image: null,
+      };
+
+      setItem(normalizeItem(foundItem || fallback));
       setLoading(false);
     };
 

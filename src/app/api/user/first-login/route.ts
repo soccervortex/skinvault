@@ -68,6 +68,34 @@ export async function POST(request: Request) {
     // Record first login (only records if not already recorded)
     const isNewUser = await recordFirstLogin(steamId);
 
+    try {
+      if (isNewUser) {
+        const req = request as NextRequest;
+        const affCookieRaw = req.cookies?.get('sv_aff')?.value;
+        if (affCookieRaw) {
+          const parsed = JSON.parse(decodeURIComponent(affCookieRaw));
+          const referrerSteamId = String(parsed?.aff || '').trim();
+          if (/^\d{17}$/.test(referrerSteamId) && referrerSteamId !== steamId) {
+            const db = await getDatabase();
+            await db.collection('affiliate_referrals').updateOne(
+              { _id: steamId } as any,
+              {
+                $setOnInsert: {
+                  _id: steamId,
+                  referredSteamId: steamId,
+                  referrerSteamId,
+                  createdAt: new Date(),
+                  landing: parsed?.landing ? String(parsed.landing).slice(0, 500) : undefined,
+                  ts: Number(parsed?.ts) || undefined,
+                },
+              } as any,
+              { upsert: true }
+            );
+          }
+        }
+      }
+    } catch {}
+
     // Analytics: steam_login + (optional) first_login attribution
     try {
       const req = request as NextRequest;

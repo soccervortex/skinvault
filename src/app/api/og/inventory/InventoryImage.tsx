@@ -124,9 +124,19 @@ export function InventoryImage({ profile, rank, totalValue, totalItems, topItems
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
               {topFive.map((item: any, index: number) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: '14px', backgroundColor: '#0d0f16', border: '1px solid #20222b' }}>
-                  <div style={{ width: '54px', height: '54px', borderRadius: '10px', backgroundColor: '#1a1b21', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontWeight: 900, fontSize: 18 }}>
-                    #{index + 1}
-                  </div>
+                  {(() => {
+                    const iconSrc = getSteamIconSrc(String(item?.icon_url || '').trim());
+                    return (
+                      <div style={{ width: '54px', height: '54px', borderRadius: '10px', backgroundColor: '#1a1b21', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', border: index === 0 ? '2px solid #f59e0b' : '1px solid #20222b' }}>
+                        {iconSrc ? (
+                          <img src={iconSrc} width={54} height={54} alt={String(item?.market_hash_name || 'Item')} style={{ objectFit: 'contain' }} />
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontWeight: 900, fontSize: 18 }}>#{index + 1}</span>
+                        )}
+                        <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 12, fontWeight: 900, color: 'white', textShadow: '0 2px 6px rgba(0,0,0,0.8)' }}>#{index + 1}</div>
+                      </div>
+                    );
+                  })()}
                   <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '14px', flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 22, margin: 0, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{index + 1}. {String(item.market_hash_name || '').trim() || 'Unknown Item'}</p>
                     {Number(item?.amount || 0) > 1 ? (

@@ -24,6 +24,20 @@ type GiveawayDetail = GiveawaySummary & {
   description: string;
 };
 
+type DailyClaimStatus = {
+  canClaim: boolean;
+  nextEligibleAt: string;
+  serverNow: string;
+};
+
+function formatHms(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
 function getGiveawayStatus(nowMs: number, g: GiveawaySummary): { label: string; className: string } {
   const drawnAtMs = g.drawnAt ? new Date(g.drawnAt).getTime() : NaN;
   if (Number.isFinite(drawnAtMs)) {
@@ -60,6 +74,10 @@ export default function GiveawaysPage() {
   const [creditsBalance, setCreditsBalance] = useState<number | null>(null);
   const [creditsLoading, setCreditsLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [claimStatusLoading, setClaimStatusLoading] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<DailyClaimStatus | null>(null);
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
+  const [nowTick, setNowTick] = useState(0);
 
   const [entriesToBuy, setEntriesToBuy] = useState<number>(1);
   const [entering, setEntering] = useState(false);
@@ -109,6 +127,33 @@ export default function GiveawaysPage() {
     }
   };
 
+  const loadDailyClaimStatus = async () => {
+    if (!user?.steamId) {
+      setClaimStatus(null);
+      setServerOffsetMs(0);
+      return;
+    }
+    setClaimStatusLoading(true);
+    try {
+      const res = await fetch('/api/credits/daily-claim', { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      const st: DailyClaimStatus = {
+        canClaim: !!json?.canClaim,
+        nextEligibleAt: String(json?.nextEligibleAt || ''),
+        serverNow: String(json?.serverNow || ''),
+      };
+      setClaimStatus(st);
+      const offset = Date.parse(st.serverNow) - Date.now();
+      setServerOffsetMs(Number.isFinite(offset) ? offset : 0);
+    } catch {
+      setClaimStatus(null);
+      setServerOffsetMs(0);
+    } finally {
+      setClaimStatusLoading(false);
+    }
+  };
+
   const loadCredits = async () => {
     if (!user?.steamId) {
       setCreditsBalance(null);
@@ -136,6 +181,18 @@ export default function GiveawaysPage() {
     loadCredits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.steamId]);
+
+  useEffect(() => {
+    loadDailyClaimStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.steamId]);
+
+  useEffect(() => {
+    if (!user?.steamId) return;
+    if (!claimStatus || claimStatus.canClaim) return;
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [user?.steamId, claimStatus?.canClaim, claimStatus?.nextEligibleAt]);
 
   const loadDetail = async (id: string) => {
     setSelectedId(id);
@@ -178,13 +235,37 @@ export default function GiveawaysPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setCreditsBalance(Number(json?.balance || 0));
+      if (json?.nextEligibleAt && json?.serverNow) {
+        const st: DailyClaimStatus = {
+          canClaim: false,
+          nextEligibleAt: String(json?.nextEligibleAt || ''),
+          serverNow: String(json?.serverNow || ''),
+        };
+        setClaimStatus(st);
+        const offset = Date.parse(st.serverNow) - Date.now();
+        setServerOffsetMs(Number.isFinite(offset) ? offset : 0);
+      } else {
+        loadDailyClaimStatus();
+      }
       toast.success(`Claimed ${json?.claimed || 0} credits!`);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to claim');
+      loadDailyClaimStatus();
     } finally {
       setClaiming(false);
     }
   };
+
+  const claimRemainingSeconds = useMemo(() => {
+    if (!claimStatus || claimStatus.canClaim) return 0;
+    const nextMs = Date.parse(claimStatus.nextEligibleAt);
+    if (!Number.isFinite(nextMs)) return 0;
+    const nowMsLocal = Date.now() + serverOffsetMs;
+    const remainingMs = nextMs - nowMsLocal;
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }, [claimStatus, serverOffsetMs, nowTick]);
+
+  const canClaim = !!user?.steamId && !!claimStatus?.canClaim;
 
   const enterGiveaway = async () => {
     if (!detail?.id) return;
@@ -245,10 +326,18 @@ export default function GiveawaysPage() {
                 </div>
                 <button
                   onClick={doDailyClaim}
-                  disabled={claiming || !user?.steamId}
-                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claiming || !user?.steamId ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                  disabled={claiming || claimStatusLoading || !user?.steamId || !canClaim}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claiming || claimStatusLoading || !user?.steamId || !canClaim ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                 >
-                  {claiming ? 'Claiming...' : 'Daily Claim'}
+                  {claiming
+                    ? 'Claiming...'
+                    : claimStatusLoading
+                      ? 'Loading...'
+                      : !user?.steamId
+                        ? 'Daily Claim'
+                        : canClaim
+                          ? 'Daily Claim'
+                          : `Next in ${formatHms(claimRemainingSeconds)}`}
                 </button>
               </div>
             </div>

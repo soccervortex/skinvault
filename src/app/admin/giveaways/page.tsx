@@ -10,6 +10,7 @@ type GiveawayAdminRow = {
   id: string;
   title: string;
   prize: string;
+  prizeItem?: { id: string; name: string; market_hash_name: string; image: string | null } | null;
   startAt: string | null;
   endAt: string | null;
   creditsPerEntry: number;
@@ -17,6 +18,20 @@ type GiveawayAdminRow = {
   totalEntries: number;
   totalParticipants: number;
   drawnAt: string | null;
+};
+
+type PrizeItem = {
+  id: string;
+  name: string;
+  market_hash_name: string;
+  image: string | null;
+};
+
+type EntrantRow = {
+  steamId: string;
+  entries: number;
+  creditsSpent: number;
+  tradeUrl: string;
 };
 
 function toLocalInputValue(d: Date): string {
@@ -52,6 +67,9 @@ export default function AdminGiveawaysPage() {
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [prize, setPrize] = useState('');
+  const [prizeSearch, setPrizeSearch] = useState('');
+  const [prizeItem, setPrizeItem] = useState<PrizeItem | null>(null);
+  const [prizeItemLoading, setPrizeItemLoading] = useState(false);
   const [description, setDescription] = useState('');
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
@@ -70,8 +88,11 @@ export default function AdminGiveawaysPage() {
   };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedPanel, setSelectedPanel] = useState<'winners' | 'entrants' | null>(null);
   const [winnersLoading, setWinnersLoading] = useState(false);
   const [winners, setWinners] = useState<Array<{ steamId: string; entries: number; tradeUrl: string }>>([]);
+  const [entrantsLoading, setEntrantsLoading] = useState(false);
+  const [entrants, setEntrants] = useState<EntrantRow[]>([]);
 
   useEffect(() => {
     try {
@@ -103,6 +124,47 @@ export default function AdminGiveawaysPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIsOwner]);
 
+  useEffect(() => {
+    if (!userIsOwner) return;
+    const q = String(prizeSearch || '').trim();
+    if (!q || q.length < 3) {
+      setPrizeItem(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const t = window.setTimeout(() => {
+      setPrizeItemLoading(true);
+      fetch(`/api/item/info?market_hash_name=${encodeURIComponent(q)}`, { cache: 'no-store', signal: controller.signal })
+        .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+        .then(({ ok, j }) => {
+          if (!ok) throw new Error(j?.error || 'Failed');
+          const item: PrizeItem = {
+            id: String(j?.id || ''),
+            name: String(j?.name || j?.market_hash_name || q),
+            market_hash_name: String(j?.market_hash_name || q),
+            image: j?.image ? String(j.image) : null,
+          };
+          setPrizeItem(item);
+          if (!prize.trim()) {
+            setPrize(item.name);
+          }
+        })
+        .catch(() => {
+          setPrizeItem(null);
+        })
+        .finally(() => {
+          setPrizeItemLoading(false);
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(t);
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prizeSearch, userIsOwner]);
+
   const create = async () => {
     if (!title.trim()) {
       toast.error('Missing title');
@@ -121,6 +183,7 @@ export default function AdminGiveawaysPage() {
         body: JSON.stringify({
           title,
           prize,
+          prizeItem,
           description,
           startAt: new Date(startAt).toISOString(),
           endAt: new Date(endAt).toISOString(),
@@ -133,6 +196,8 @@ export default function AdminGiveawaysPage() {
       toast.success('Created giveaway');
       setTitle('');
       setPrize('');
+      setPrizeSearch('');
+      setPrizeItem(null);
       setDescription('');
       setStartAt('');
       setEndAt('');
@@ -146,28 +211,47 @@ export default function AdminGiveawaysPage() {
     }
   };
 
-  const draw = async (id: string) => {
+  const loadWinners = async (id: string, shouldDraw: boolean) => {
     setWinnersLoading(true);
     setSelectedId(id);
+    setSelectedPanel('winners');
     setWinners([]);
+    setEntrants([]);
     try {
-      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/draw`, { method: 'POST' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Failed to draw');
-
-      await load();
+      if (shouldDraw) {
+        const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/draw`, { method: 'POST' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to draw');
+        toast.success('Winners selected');
+        await load();
+      }
 
       const res2 = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/winners`, { cache: 'no-store' });
       const json2 = await res2.json();
-      if (res2.ok) {
-        setWinners(Array.isArray(json2?.winners) ? json2.winners : []);
-      }
-
-      toast.success('Winners selected');
+      if (!res2.ok) throw new Error(json2?.error || 'Failed to load winners');
+      setWinners(Array.isArray(json2?.winners) ? json2.winners : []);
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to draw');
+      toast.error(e?.message || 'Failed to load winners');
     } finally {
       setWinnersLoading(false);
+    }
+  };
+
+  const loadEntrants = async (id: string) => {
+    setEntrantsLoading(true);
+    setSelectedId(id);
+    setSelectedPanel('entrants');
+    setEntrants([]);
+    setWinners([]);
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/entries`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to load entrants');
+      setEntrants(Array.isArray(json?.entrants) ? json.entrants : []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load entrants');
+    } finally {
+      setEntrantsLoading(false);
     }
   };
 
@@ -235,11 +319,33 @@ export default function AdminGiveawaysPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
-              <input value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="Prize" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
+              <input
+                value={prizeSearch}
+                onChange={(e) => setPrizeSearch(e.target.value)}
+                placeholder="Search prize skin (e.g. AK-47 | Redline)"
+                className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black"
+              />
+              <input value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="Prize title (optional override)" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <input value={startAt} onChange={(e) => setStartAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <input value={endAt} onChange={(e) => setEndAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <input value={String(creditsPerEntry)} onChange={(e) => setCreditsPerEntry(Math.max(1, Math.floor(Number(e.target.value || '10'))))} type="number" min={1} className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <input value={String(winnerCount)} onChange={(e) => setWinnerCount(Math.max(1, Math.floor(Number(e.target.value || '1'))))} type="number" min={1} className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
+              <div className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[9px] uppercase tracking-widest font-black text-gray-500">Prize preview</div>
+                    <div className="text-[11px] font-black mt-1 truncate">
+                      {prizeItemLoading ? 'Loading...' : (prizeItem?.name || '—')}
+                    </div>
+                    <div className="text-[9px] text-gray-500 truncate">{prizeItem?.market_hash_name || ''}</div>
+                  </div>
+                  {prizeItem?.image ? (
+                    <img src={prizeItem.image} alt={prizeItem.name} className="w-20 h-16 object-contain rounded-lg bg-white/5 border border-white/10" />
+                  ) : (
+                    <div className="w-20 h-16 rounded-lg bg-white/5 border border-white/10" />
+                  )}
+                </div>
+              </div>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px]" rows={4} />
             </div>
             <button
@@ -277,7 +383,11 @@ export default function AdminGiveawaysPage() {
                       );
                     })()}
                     <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex items-start gap-3">
+                        {g.prizeItem?.image ? (
+                          <img src={g.prizeItem.image} alt={g.prizeItem.name || g.prize} className="w-14 h-12 object-contain rounded-lg bg-white/5 border border-white/10" />
+                        ) : null}
+                        <div className="min-w-0">
                         <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
                         <div className="text-[10px] text-gray-500 mt-1">{g.prize || 'Prize TBA'}</div>
                         <div className="mt-2 flex items-center gap-4 text-[9px] text-gray-500">
@@ -285,45 +395,91 @@ export default function AdminGiveawaysPage() {
                           <div className="flex items-center gap-1"><Trophy size={12} /> {g.winnerCount}</div>
                           <div className="flex items-center gap-1"><Gift size={12} /> {g.creditsPerEntry} credits</div>
                         </div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => draw(g.id)}
+                          onClick={() => loadEntrants(g.id)}
+                          disabled={entrantsLoading && selectedId === g.id}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(entrantsLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                        >
+                          {(entrantsLoading && selectedId === g.id) ? 'Loading...' : 'Entrants'}
+                        </button>
+                        <button
+                          onClick={() => loadWinners(g.id, !g.drawnAt)}
                           disabled={winnersLoading && selectedId === g.id}
                           className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(winnersLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                         >
-                          {(winnersLoading && selectedId === g.id) ? 'Drawing...' : (g.drawnAt ? 'View Winners' : 'Draw Winners')}
+                          {(winnersLoading && selectedId === g.id) ? 'Loading...' : (g.drawnAt ? 'View Winners' : 'Draw Winners')}
                         </button>
                       </div>
                     </div>
 
-                    {selectedId === g.id && winnersLoading && (
-                      <div className="mt-4 text-gray-500 text-[11px]">Selecting winners...</div>
+                    {selectedId === g.id && selectedPanel === 'winners' && winnersLoading && (
+                      <div className="mt-4 text-gray-500 text-[11px]">Loading winners...</div>
                     )}
 
-                    {selectedId === g.id && !winnersLoading && winners.length > 0 && (
+                    {selectedId === g.id && selectedPanel === 'entrants' && entrantsLoading && (
+                      <div className="mt-4 text-gray-500 text-[11px]">Loading entrants...</div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'winners' && !winnersLoading && (
                       <div className="mt-4 bg-[#11141d] border border-white/5 rounded-[1.5rem] p-4">
                         <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Winners</div>
-                        <div className="space-y-2">
-                          {winners.map((w) => (
-                            <div key={w.steamId} className="flex items-center justify-between gap-3 bg-black/40 border border-white/5 rounded-xl p-3">
-                              <div className="min-w-0">
-                                <div className="text-[10px] font-black uppercase tracking-widest">{w.steamId}</div>
-                                <div className="text-[9px] text-gray-500">Entries: {w.entries}</div>
-                                {w.tradeUrl ? (
-                                  <div className="text-[9px] text-blue-400 break-all">{w.tradeUrl}</div>
-                                ) : (
-                                  <div className="text-[9px] text-gray-600">No trade URL set</div>
+                        {winners.length === 0 ? (
+                          <div className="text-gray-500 text-[11px]">No winners yet.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {winners.map((w) => (
+                              <div key={w.steamId} className="flex items-center justify-between gap-3 bg-black/40 border border-white/5 rounded-xl p-3">
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-black uppercase tracking-widest">{w.steamId}</div>
+                                  <div className="text-[9px] text-gray-500">Entries: {w.entries}</div>
+                                  {w.tradeUrl ? (
+                                    <div className="text-[9px] text-blue-400 break-all">{w.tradeUrl}</div>
+                                  ) : (
+                                    <div className="text-[9px] text-gray-600">No trade URL set</div>
+                                  )}
+                                </div>
+                                {w.tradeUrl && (
+                                  <button onClick={() => copy(w.tradeUrl)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy trade url">
+                                    <Copy size={14} className="text-gray-300" />
+                                  </button>
                                 )}
                               </div>
-                              {w.tradeUrl && (
-                                <button onClick={() => copy(w.tradeUrl)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy trade url">
-                                  <Copy size={14} className="text-gray-300" />
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'entrants' && !entrantsLoading && (
+                      <div className="mt-4 bg-[#11141d] border border-white/5 rounded-[1.5rem] p-4">
+                        <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Entrants</div>
+                        {entrants.length === 0 ? (
+                          <div className="text-gray-500 text-[11px]">No entrants yet.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {entrants.map((x) => (
+                              <div key={x.steamId} className="flex items-center justify-between gap-3 bg-black/40 border border-white/5 rounded-xl p-3">
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-black uppercase tracking-widest">{x.steamId}</div>
+                                  <div className="text-[9px] text-gray-500">Entries: {x.entries} • Spent: {x.creditsSpent}</div>
+                                  {x.tradeUrl ? (
+                                    <div className="text-[9px] text-blue-400 break-all">{x.tradeUrl}</div>
+                                  ) : (
+                                    <div className="text-[9px] text-gray-600">No trade URL set</div>
+                                  )}
+                                </div>
+                                {x.tradeUrl && (
+                                  <button onClick={() => copy(x.tradeUrl)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy trade url">
+                                    <Copy size={14} className="text-gray-300" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
