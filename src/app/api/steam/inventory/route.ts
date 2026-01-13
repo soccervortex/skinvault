@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMongoClient } from '@/app/utils/mongodb-client';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
   const controller = new AbortController();
@@ -65,31 +65,53 @@ function parsePriceString(priceStr: string): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+function normalizeInventoryPayload(input: any): { assets: any[]; descriptions: any[] } {
+  const assets = Array.isArray(input?.assets) ? input.assets : [];
+  const descriptions = Array.isArray(input?.descriptions) ? input.descriptions : [];
+  if (assets.length && descriptions.length) return { assets, descriptions };
+
+  const rgInv = input?.rgInventory;
+  const rgDesc = input?.rgDescriptions;
+
+  const normalizedDescriptions = descriptions.length
+    ? descriptions
+    : (rgDesc && typeof rgDesc === 'object')
+      ? Object.values(rgDesc as Record<string, any>)
+      : [];
+
+  const normalizedAssets = assets.length
+    ? assets
+    : (rgInv && typeof rgInv === 'object')
+      ? Object.entries(rgInv as Record<string, any>).map(([assetid, v]) => ({
+          assetid: String((v as any)?.id || assetid),
+          classid: String((v as any)?.classid || ''),
+          instanceid: String((v as any)?.instanceid || 0),
+          amount: (v as any)?.amount ?? 1,
+        }))
+      : [];
+
+  return { assets: normalizedAssets, descriptions: normalizedDescriptions };
+}
+
 // Helper function to calculate total inventory value
 async function enrichInventoryWithTotalValue(data: any, currency: number, origin: string): Promise<any> {
   try {
     // Get price index from MongoDB
     const currencyStr = String(currency);
 
-    const marketHashNames = new Set<string>();
-    if (data.descriptions && Array.isArray(data.descriptions)) {
-      for (const item of data.descriptions) {
-        const name = String(item?.market_hash_name || '').trim();
-        if (name) marketHashNames.add(name);
-      }
-    }
+    const normalized = normalizeInventoryPayload(data);
 
-    if (data.rgInventory && typeof data.rgInventory === 'object') {
-      for (const item of Object.values(data.rgInventory) as any[]) {
-        const name = String((item as any)?.market_hash_name || '').trim();
+    const marketHashNames = new Set<string>();
+    if (normalized.descriptions.length) {
+      for (const item of normalized.descriptions) {
+        const name = String(item?.market_hash_name || item?.market_name || item?.name || '').trim();
         if (name) marketHashNames.add(name);
       }
     }
 
     const names = Array.from(marketHashNames);
 
-    const mongoClient = await getMongoClient();
-    const db = mongoClient.db('skinvault');
+    const db = await getDatabase();
     const priceCollection = db.collection('market_prices');
 
     const prices: Record<string, number> = {};
@@ -116,18 +138,18 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
     let valuedItemCount = 0;
 
     const descByKey = new Map<string, any>();
-    if (data.descriptions && Array.isArray(data.descriptions)) {
-      for (const d of data.descriptions) {
+    if (normalized.descriptions.length) {
+      for (const d of normalized.descriptions) {
         const key = `${String(d?.classid)}_${String(d?.instanceid || 0)}`;
         if (!descByKey.has(key)) descByKey.set(key, d);
       }
     }
 
-    if (data.assets && Array.isArray(data.assets) && descByKey.size) {
-      for (const a of data.assets) {
+    if (normalized.assets.length && descByKey.size) {
+      for (const a of normalized.assets) {
         const key = `${String((a as any)?.classid)}_${String((a as any)?.instanceid || 0)}`;
         const d = descByKey.get(key);
-        const name = String(d?.market_hash_name || '').trim();
+        const name = String(d?.market_hash_name || d?.market_name || d?.name || '').trim();
         if (!name) continue;
         const p = prices[name];
         if (!Number.isFinite(p) || p <= 0) continue;
@@ -135,10 +157,10 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
         totalValue += p * qty;
         valuedItemCount += qty;
       }
-    } else if (data.descriptions && Array.isArray(data.descriptions)) {
+    } else if (normalized.descriptions.length) {
       // Process descriptions to calculate total value
-      for (const item of data.descriptions) {
-        const name = String(item?.market_hash_name || '').trim();
+      for (const item of normalized.descriptions) {
+        const name = String(item?.market_hash_name || item?.market_name || item?.name || '').trim();
         if (!name) continue;
         const p = prices[name];
         if (!Number.isFinite(p) || p <= 0) continue;
@@ -146,25 +168,14 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
         valuedItemCount++;
       }
     }
-
-    // Process rgInventory format if present
-    if (data.rgInventory && typeof data.rgInventory === 'object') {
-      for (const item of Object.values(data.rgInventory) as any[]) {
-        const name = String((item as any)?.market_hash_name || '').trim();
-        if (!name) continue;
-        const p = prices[name];
-        if (!Number.isFinite(p) || p <= 0) continue;
-        const qty = Math.max(1, Number((item as any)?.amount || 1));
-        totalValue += p * qty;
-        valuedItemCount += qty;
-      }
-    }
     
     return {
       ...data,
+      assets: normalized.assets,
+      descriptions: normalized.descriptions,
       totalInventoryValue: totalValue.toFixed(2),
       valuedItemCount,
-      currency: currency === 3 ? 'EUR' : 'USD',
+      currency: currency === 1 ? 'USD' : currency === 3 ? 'EUR' : String(currency),
       priceIndex: prices,
     };
   } catch (error) {
@@ -173,7 +184,7 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
       ...data,
       totalInventoryValue: '0.00',
       valuedItemCount: 0,
-      currency: currency === 3 ? 'EUR' : 'USD'
+      currency: currency === 1 ? 'USD' : currency === 3 ? 'EUR' : String(currency)
     };
   }
 }
@@ -579,7 +590,15 @@ export async function GET(request: Request) {
     const startAssetId = url.searchParams.get('start_assetid');
     const isPro = url.searchParams.get('isPro') === 'true';
     const currencyParam = String(url.searchParams.get('currency') || '').trim();
-    const currency = currencyParam === '1' ? 1 : 3;
+    const currency = (() => {
+      const n = parseInt(currencyParam, 10);
+      if (Number.isFinite(n) && n > 0) return n;
+      const iso = currencyParam.toUpperCase();
+      if (iso === 'USD') return 1;
+      if (iso === 'EUR') return 3;
+      if (iso === 'GBP') return 2;
+      return 3;
+    })();
     const refresh = url.searchParams.get('refresh') === '1';
     const force = url.searchParams.get('force') === '1';
     const includeTopItems = url.searchParams.get('includeTopItems') === '1';
@@ -609,8 +628,7 @@ export async function GET(request: Request) {
     // We still allow paginated fetches for very large inventories, but the primary cache is base.
     const baseCacheKey = `inv_${steamId}_${currency}_${variant}`;
     const pageCacheKey = `inv_${steamId}_${currency}_${variant}_${normalizedStart}`;
-    const mongoClient = await getMongoClient();
-    const db = mongoClient.db('skinvault');
+    const db = await getDatabase();
     const cacheCollection = db.collection<InventoryCacheDoc>('inventory_cache');
 
     const respond = async (payload: any, cacheState: 'miss' | 'refresh' = 'miss') => {
@@ -930,7 +948,7 @@ function buildTopItemsFromInventory(inv: any, prices: Record<string, number>, li
     for (const a of assets) {
       const key = `${String((a as any)?.classid)}_${String((a as any)?.instanceid || 0)}`;
       const d = descByKey.get(key);
-      const name = String(d?.market_hash_name || '').trim();
+      const name = String(d?.market_hash_name || d?.market_name || d?.name || '').trim();
       if (!name) continue;
       const p = Number(prices[name] || 0);
       if (!Number.isFinite(p) || p <= 0) continue;

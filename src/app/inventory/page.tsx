@@ -239,10 +239,15 @@ function InventoryContent() {
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedInUserPro, setLoggedInUserPro] = useState(false);
+  const [tradeUrl, setTradeUrl] = useState<string>('');
+  const [tradeUrlInput, setTradeUrlInput] = useState<string>('');
+  const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
+  const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
   const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
+
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
@@ -1090,6 +1095,68 @@ function InventoryContent() {
   }, [inventory, loggedInUser?.steamId, viewedUser?.steamId]);
 
   useEffect(() => {
+    const sid = String(viewedUser?.steamId || '').trim();
+    if (!/^\d{17}$/.test(sid)) {
+      setTradeUrl('');
+      setTradeUrlInput('');
+      return;
+    }
+
+    let cancelled = false;
+    setTradeUrlLoading(true);
+    fetch(`/api/user/trade-url?steamId=${encodeURIComponent(sid)}`, { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((j) => {
+        if (cancelled) return;
+        const t = String(j?.tradeUrl || '').trim();
+        setTradeUrl(t);
+        setTradeUrlInput(t);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTradeUrl('');
+        setTradeUrlInput('');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setTradeUrlLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser?.steamId]);
+
+  const handleSaveTradeUrl = async () => {
+    if (!loggedInUser?.steamId || loggedInUser.steamId !== viewedUser?.steamId) {
+      toast.error('Sign in to update your trade URL');
+      return;
+    }
+
+    setTradeUrlSaving(true);
+    try {
+      const res = await fetch('/api/user/trade-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tradeUrl: tradeUrlInput }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(String(json?.error || 'Failed to save trade URL'));
+        return;
+      }
+      const t = String(json?.tradeUrl || '').trim();
+      setTradeUrl(t);
+      setTradeUrlInput(t);
+      toast.success('Trade URL saved');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save trade URL');
+    } finally {
+      setTradeUrlSaving(false);
+    }
+  };
+
+  useEffect(() => {
     if (!inventory.length) return;
 
     const run = async () => {
@@ -1446,7 +1513,7 @@ function InventoryContent() {
                     CS2 overview
                   </div>
                   <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Public playtime and last seen (Steam).
+                    Public playtime data (Steam).
                   </div>
                 </div>
                 <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
@@ -1606,6 +1673,39 @@ function InventoryContent() {
                         <Settings size={12} />
                         Manage Trackers
                       </button>
+
+                      <div className="w-full mt-2 bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
+                        <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Trade URL</div>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <input
+                            value={tradeUrlInput}
+                            onChange={(e) => setTradeUrlInput(e.target.value)}
+                            placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
+                            className="flex-1 min-w-[240px] bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] md:text-[11px] font-black"
+                          />
+                          <button
+                            onClick={handleSaveTradeUrl}
+                            disabled={tradeUrlSaving}
+                            className={`px-4 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${tradeUrlSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                          >
+                            {tradeUrlSaving ? 'Saving...' : 'Save'}
+                          </button>
+                          {tradeUrl && (
+                            <button
+                              onClick={async () => {
+                                const ok = await copyToClipboard(tradeUrl);
+                                if (ok) toast.success('Trade URL copied');
+                              }}
+                              className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all"
+                            >
+                              Copy
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-2 text-[9px] text-gray-500">
+                          This is visible to visitors on your inventory.
+                        </div>
+                      </div>
                     </div>
                   )}
                   <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
@@ -1648,6 +1748,24 @@ function InventoryContent() {
                     <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
                       {shareUrl}
                     </p>
+                  </div>
+                )}
+
+                {!tradeUrlLoading && tradeUrl && loggedInUser?.steamId !== viewedUser?.steamId && (
+                  <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">Trade URL</p>
+                    <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
+                      {tradeUrl}
+                    </p>
+                    <button
+                      onClick={async () => {
+                        const ok = await copyToClipboard(tradeUrl);
+                        if (ok) toast.success('Trade URL copied');
+                      }}
+                      className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all"
+                    >
+                      Copy Trade URL
+                    </button>
                   </div>
                 )}
               </div>

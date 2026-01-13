@@ -114,7 +114,7 @@ function computeTopItemsAndTotal(
     for (const a of assets) {
       const key = `${String((a as any)?.classid)}_${String((a as any)?.instanceid || 0)}`;
       const d = descByKey.get(key);
-      const marketHashName = String(d?.market_hash_name || '').trim();
+      const marketHashName = String(d?.market_hash_name || d?.market_name || d?.name || '').trim();
       if (!marketHashName) continue;
       const price = Number(prices[marketHashName] || 0);
       const amount = Math.max(1, Number((a as any)?.amount || 1));
@@ -142,7 +142,7 @@ function computeTopItemsAndTotal(
 
 async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrency: string) {
   try {
-    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${steamId}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includePriceIndex=1`;
+    const inventoryUrl = `${baseUrl}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&isPro=true&currency=${encodeURIComponent(steamCurrency)}&includePriceIndex=1`;
     const profileUrl = `${baseUrl}/api/steam/profile?steamId=${steamId}`;
 
     const invController = new AbortController();
@@ -151,7 +151,7 @@ async function fetchInventoryData(steamId: string, baseUrl: string, steamCurrenc
     const profTimeout = setTimeout(() => profController.abort(), 6000);
 
     const [inventoryRes, profileRes] = await Promise.all([
-      fetch(inventoryUrl, { next: { revalidate: 3600 }, signal: invController.signal }).catch(() => null),
+      fetch(inventoryUrl, { cache: 'no-store', signal: invController.signal }).catch(() => null),
       fetch(profileUrl, { next: { revalidate: 86400 }, signal: profController.signal }).catch(() => null),
     ]);
 

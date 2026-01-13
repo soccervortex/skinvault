@@ -378,6 +378,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
                 <Wallet size={16} /> My Vault
               </Link>
+              <Link href="/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
+                <Sparkles size={16} /> Giveaways
+              </Link>
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16} /> Wishlist
               </Link>
@@ -414,6 +417,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               {isOwner(user?.steamId) && (
                 <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
                   <Shield size={16} /> Admin Panel
+                </Link>
+              )}
+
+              {isOwner(user?.steamId) && (
+                <Link href="/admin/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/giveaways') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
+                  <Sparkles size={16} /> Giveaways Admin
                 </Link>
               )}
 
@@ -634,6 +643,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           >
             <Wallet size={16} /> My Vault
           </Link>
+          <Link href="/giveaways" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
+            <Sparkles size={16} /> Giveaways
+          </Link>
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16} /> Wishlist
           </Link>
@@ -670,6 +682,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           {isOwner(user?.steamId) && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
               <Shield size={16} /> Admin Panel
+            </Link>
+          )}
+
+          {isOwner(user?.steamId) && (
+            <Link href="/admin/giveaways" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/giveaways') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
+              <Sparkles size={16} /> Giveaways Admin
             </Link>
           )}
 

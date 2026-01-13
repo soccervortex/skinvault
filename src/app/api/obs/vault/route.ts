@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getMongoClient } from '@/app/utils/mongodb-client';
+import { getDatabase } from '@/app/utils/mongodb-client';
 
 type ObsVaultCacheDoc = {
   _id: string;
@@ -49,8 +49,7 @@ export async function GET(req: NextRequest) {
   const steamId = parsed.steamId;
 
   try {
-    const mongoClient = await getMongoClient();
-    const db = mongoClient.db('skinvault');
+    const db = await getDatabase();
     const col = db.collection<ObsVaultCacheDoc>('obs_vault_cache');
 
     const cacheId = `${steamId}_${currency}`;
