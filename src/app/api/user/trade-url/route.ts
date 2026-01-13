@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
+
+export const runtime = 'nodejs';
 
 type UserSettingsDoc = {
   _id: string;
@@ -29,11 +31,16 @@ export async function GET(req: NextRequest) {
     const steamId = requested || getSteamIdFromRequest(req);
     if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const db = await getDatabase();
     const col = db.collection<UserSettingsDoc>('user_settings');
     const doc = await col.findOne({ _id: steamId });
     return NextResponse.json({ steamId, tradeUrl: String(doc?.tradeUrl || '') }, { status: 200 });
   } catch (e: any) {
+    console.error('GET /api/user/trade-url failed', { name: e?.name, code: e?.code, message: e?.message });
     return NextResponse.json({ error: e?.message || 'Failed to load trade url' }, { status: 500 });
   }
 }
@@ -45,6 +52,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     const tradeUrl = normalizeTradeUrl(body?.tradeUrl);
+
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
 
     const db = await getDatabase();
     const col = db.collection<UserSettingsDoc>('user_settings');
@@ -61,6 +72,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ steamId, tradeUrl: tradeUrl || '' }, { status: 200 });
   } catch (e: any) {
+    console.error('POST /api/user/trade-url failed', { name: e?.name, code: e?.code, message: e?.message });
     return NextResponse.json({ error: e?.message || 'Failed to save trade url' }, { status: 500 });
   }
 }

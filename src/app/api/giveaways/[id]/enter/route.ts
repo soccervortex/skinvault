@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+
+export const runtime = 'nodejs';
 
 type UserCreditsDoc = {
   _id: string;
@@ -28,6 +30,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const id = String((params as any)?.id || '').trim();
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const body = await req.json().catch(() => null);
     const entriesRequested = Math.floor(Number(body?.entries || 0));
     if (!Number.isFinite(entriesRequested) || entriesRequested <= 0 || entriesRequested > 100000) {
@@ -40,7 +46,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const creditsCol = db.collection<UserCreditsDoc>('user_credits');
     const ledgerCol = db.collection<CreditsLedgerDoc>('credits_ledger');
 
-    const giveawayId = new ObjectId(id);
+    let giveawayId: ObjectId;
+    try {
+      giveawayId = new ObjectId(id);
+    } catch {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    }
     const giveaway: any = await giveawaysCol.findOne({ _id: giveawayId } as any);
     if (!giveaway) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -79,13 +90,39 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     await giveawaysCol.updateOne(
       { _id: giveawayId } as any,
-      {
-        $inc: {
-          totalEntries: entriesRequested,
-          totalParticipants: isNewParticipant ? 1 : 0,
+      [
+        {
+          $set: {
+            totalEntries: {
+              $add: [
+                {
+                  $convert: {
+                    input: '$totalEntries',
+                    to: 'int',
+                    onError: 0,
+                    onNull: 0,
+                  },
+                },
+                entriesRequested,
+              ],
+            },
+            totalParticipants: {
+              $add: [
+                {
+                  $convert: {
+                    input: '$totalParticipants',
+                    to: 'int',
+                    onError: 0,
+                    onNull: 0,
+                  },
+                },
+                isNewParticipant ? 1 : 0,
+              ],
+            },
+            updatedAt: now,
+          },
         },
-        $set: { updatedAt: now },
-      } as any
+      ] as any
     );
 
     await ledgerCol.insertOne({
@@ -113,6 +150,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { status: 200 }
     );
   } catch (e: any) {
+    console.error('POST /api/giveaways/[id]/enter failed', { name: e?.name, code: e?.code, message: e?.message });
     return NextResponse.json({ error: e?.message || 'Failed to enter' }, { status: 500 });
   }
 }

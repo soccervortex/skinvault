@@ -94,8 +94,12 @@ export async function getMongoClient(): Promise<MongoClient> {
   }
 
   // Auto-setup indexes on first connection
-  const { autoSetupIndexes } = await import('@/app/utils/mongodb-auto-index');
-  autoSetupIndexes().catch(() => {});
+  try {
+    const { autoSetupIndexes } = await import('./mongodb-auto-index');
+    autoSetupIndexes().catch(() => {});
+  } catch (e: any) {
+    console.warn('MongoDB index auto-setup skipped', { name: e?.name, message: e?.message });
+  }
 
   return cachedClient;
 }
