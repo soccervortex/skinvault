@@ -59,7 +59,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { returnDocument: 'after' }
     );
 
-    const creditDoc = creditUpdate?.value as any;
+    const creditDoc = creditUpdate as any;
     if (!creditDoc) {
       return NextResponse.json({ error: 'Not enough credits' }, { status: 400 });
     }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { upsert: true, returnDocument: 'before' }
     );
 
-    const isNewParticipant = !prev?.value;
+    const isNewParticipant = !prev;
 
     await giveawaysCol.updateOne(
       { _id: giveawayId } as any,

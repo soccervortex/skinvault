@@ -42,20 +42,24 @@ export async function POST(req: NextRequest) {
     const pro = await isProMongoOnly(steamId);
     const amount = pro ? 20 : 10;
 
-    const updated = await creditsCol.findOneAndUpdate(
+    await creditsCol.updateOne(
+      { _id: steamId } as any,
+      { $setOnInsert: { _id: steamId, steamId, balance: 0, updatedAt: now } } as any,
+      { upsert: true }
+    );
+
+    const doc = await creditsCol.findOneAndUpdate(
       {
         _id: steamId,
         $or: [{ lastDailyClaimDay: { $ne: today } }, { lastDailyClaimDay: { $exists: false } }],
       } as any,
       {
-        $setOnInsert: { _id: steamId, steamId, balance: 0, updatedAt: now },
         $inc: { balance: amount },
         $set: { updatedAt: now, lastDailyClaimAt: now, lastDailyClaimDay: today },
       } as any,
-      { upsert: true, returnDocument: 'after' }
+      { returnDocument: 'after' }
     );
 
-    const doc = updated?.value as any;
     if (!doc) {
       return NextResponse.json({ error: 'Already claimed today' }, { status: 400 });
     }
