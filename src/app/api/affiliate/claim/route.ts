@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getDatabase, getMongoClient, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 type Milestone = {
   id: string;
@@ -158,6 +159,35 @@ export async function POST(req: NextRequest) {
 
         result = { ok: true, alreadyClaimed: false, reward: milestone.reward, granted: 0 };
       });
+
+      try {
+        if (result && result.ok && !result.alreadyClaimed) {
+          const reward = (result as any)?.reward || milestone.reward;
+          const rewardType = String(reward?.type || '').trim();
+          const message = (() => {
+            if (rewardType === 'credits') {
+              const amt = Number(reward?.amount || 0);
+              return `You claimed an affiliate milestone reward: ${amt} credits.`;
+            }
+            if (rewardType === 'discord_access') return 'You claimed an affiliate milestone reward: Discord access.';
+            if (rewardType === 'wishlist_slot') return 'You claimed an affiliate milestone reward: +1 wishlist slot.';
+            if (rewardType === 'price_tracker_slot') return 'You claimed an affiliate milestone reward: +1 price tracker slot.';
+            if (rewardType === 'price_scan_boost') return 'You claimed an affiliate milestone reward: price scan boost.';
+            if (rewardType === 'cache_boost') return 'You claimed an affiliate milestone reward: cache boost.';
+            return 'You claimed an affiliate milestone reward.';
+          })();
+
+          await createUserNotification(
+            db,
+            steamId,
+            'affiliate_milestone_claimed',
+            'Affiliate Reward Claimed',
+            message,
+            { milestoneId, referralsRequired: milestone.referralsRequired, referralCountAtClaim: referralCount, reward }
+          );
+        }
+      } catch {
+      }
 
       return NextResponse.json(result || { ok: true }, { status: 200 });
     } finally {

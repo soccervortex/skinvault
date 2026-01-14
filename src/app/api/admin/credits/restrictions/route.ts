@@ -5,6 +5,8 @@ import { isOwner } from '@/app/utils/owner-ids';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 const CREDITS_BANNED_KEY = 'credits_banned_steam_ids';
 const CREDITS_TIMEOUT_USERS_KEY = 'credits_timeout_users';
@@ -71,6 +73,60 @@ export async function POST(req: NextRequest) {
       await dbSet(CREDITS_TIMEOUT_USERS_KEY, map);
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        const meta = { bySteamId: adminSteamId };
+
+        if (action === 'ban') {
+          await createUserNotification(
+            db,
+            steamId,
+            'credits_banned',
+            'Credits Access Banned',
+            'Your credits access was banned by staff. You cannot earn or spend credits while banned.',
+            meta
+          );
+        }
+
+        if (action === 'unban') {
+          await createUserNotification(
+            db,
+            steamId,
+            'credits_unbanned',
+            'Credits Access Restored',
+            'Your credits access ban was lifted. You can earn and spend credits again.',
+            meta
+          );
+        }
+
+        if (action === 'timeout') {
+          const minutes = Math.floor(Number(body?.minutes || 0));
+          const until = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+          await createUserNotification(
+            db,
+            steamId,
+            'credits_timeout',
+            'Credits Access Timeout',
+            `Your credits access is temporarily restricted until ${until}.`,
+            { ...meta, timeoutUntil: until, minutes }
+          );
+        }
+
+        if (action === 'clear_timeout') {
+          await createUserNotification(
+            db,
+            steamId,
+            'credits_timeout_cleared',
+            'Credits Access Restored',
+            'Your credits access timeout was removed. You can earn and spend credits again.',
+            meta
+          );
+        }
+      }
+    } catch {
     }
 
     const status = await getCreditsRestrictionStatus(steamId);

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -35,6 +37,21 @@ export async function POST(request: Request) {
 
       existingRewards[steamId] = userRewards;
       await dbSet(rewardsKey, existingRewards);
+
+      try {
+        if (hasMongoConfig()) {
+          const db = await getDatabase();
+          await createUserNotification(
+            db,
+            String(steamId),
+            'discord_access_granted',
+            'Discord Access Granted',
+            'A staff member granted you Discord access. You can now join the Discord and access Pro channels (if applicable).',
+            {}
+          );
+        }
+      } catch {
+      }
 
       return NextResponse.json({ 
         success: true, 

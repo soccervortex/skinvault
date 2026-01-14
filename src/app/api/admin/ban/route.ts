@@ -3,10 +3,12 @@ import { sanitizeSteamId } from '@/app/utils/sanitize';
 import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { notifyUserBan, notifyUserUnban } from '@/app/utils/discord-webhook';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 const ADMIN_HEADER = 'x-admin-key';
 const BANNED_KEY = 'banned_steam_ids';
- const BAN_REASONS_KEY = 'ban_reasons';
+const BAN_REASONS_KEY = 'ban_reasons';
 
 export async function POST(request: Request) {
   try {
@@ -36,6 +38,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid SteamID format' }, { status: 400 });
     }
 
+    const reason = String(body?.reason || '').trim();
+    const bySteamIdRaw = String(body?.bannedBy || '').trim();
+    const bySteamId = /^\d{17}$/.test(bySteamIdRaw) ? bySteamIdRaw : null;
+
     // Store banned Steam IDs (uses database abstraction - KV + MongoDB)
     try {
       const banned = await dbGet<string[]>(BANNED_KEY) || [];
@@ -48,9 +54,23 @@ export async function POST(request: Request) {
         notifyUserBan(steamId, bannedBy).catch(error => {
           console.error('Failed to send ban notification:', error);
         });
+
+        try {
+          if (hasMongoConfig()) {
+            const db = await getDatabase();
+            await createUserNotification(
+              db,
+              steamId,
+              'user_banned',
+              'You have been banned',
+              reason ? `You have been banned from SkinVaults. Reason: ${reason}` : 'You have been banned from SkinVaults.',
+              { bySteamId, reason: reason || null }
+            );
+          }
+        } catch {
+        }
       }
 
-      const reason = String(body?.reason || '').trim();
       if (reason) {
         try {
           const reasons = (await dbGet<Record<string, any>>(BAN_REASONS_KEY, false)) || {};
@@ -145,6 +165,23 @@ export async function DELETE(request: Request) {
         notifyUserUnban(steamId, unbannedBy).catch(error => {
           console.error('Failed to send unban notification:', error);
         });
+
+        try {
+          if (hasMongoConfig()) {
+            const db = await getDatabase();
+            const byRaw = String(unbannedBy || '').trim();
+            const bySteamId = /^\d{17}$/.test(byRaw) ? byRaw : null;
+            await createUserNotification(
+              db,
+              steamId,
+              'user_unbanned',
+              'You have been unbanned',
+              'Your account ban has been lifted. You can now access SkinVaults again.',
+              { bySteamId }
+            );
+          }
+        } catch {
+        }
       }
       
       return NextResponse.json({ steamId, banned: false, message: 'User has been unbanned' });

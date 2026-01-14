@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { grantPro, getProUntil, getAllProUsers } from '@/app/utils/pro-storage';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
 import { notifyNewProUser } from '@/app/utils/discord-webhook';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -46,6 +48,23 @@ export async function POST(request: Request) {
     notifyNewProUser(steamId, months, proUntil, grantedBy).catch(error => {
       console.error('Failed to send Pro user notification:', error);
     });
+
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        const byRaw = String(grantedBy || '').trim();
+        const bySteamId = /^\d{17}$/.test(byRaw) ? byRaw : null;
+        await createUserNotification(
+          db,
+          steamId,
+          'pro_granted',
+          'Pro Activated',
+          `Your Pro status was updated. Added ${months} month${months === 1 ? '' : 's'}.`,
+          { bySteamId, months, proUntil }
+        );
+      }
+    } catch {
+    }
     
     return NextResponse.json({ steamId, proUntil });
   } catch (error) {
@@ -80,6 +99,23 @@ export async function DELETE(request: Request) {
       yesterday.setDate(yesterday.getDate() - 1);
       data[steamId] = yesterday.toISOString();
       await dbSet(PRO_USERS_KEY, data);
+
+      try {
+        if (hasMongoConfig()) {
+          const db = await getDatabase();
+          const byRaw = String(url.searchParams.get('removedBy') || url.searchParams.get('deletedBy') || '').trim();
+          const bySteamId = /^\d{17}$/.test(byRaw) ? byRaw : null;
+          await createUserNotification(
+            db,
+            steamId,
+            'pro_removed',
+            'Pro Removed',
+            'Your Pro status was removed by staff.',
+            { bySteamId }
+          );
+        }
+      } catch {
+      }
     } catch (error) {
       console.error('Failed to delete Pro:', error);
       return NextResponse.json({ error: 'Failed to delete Pro' }, { status: 500 });
@@ -129,6 +165,23 @@ export async function PATCH(request: Request) {
       const data = await dbGet<Record<string, string>>(PRO_USERS_KEY) || {};
       data[steamId] = expiryDate.toISOString();
       await dbSet(PRO_USERS_KEY, data);
+
+      try {
+        if (hasMongoConfig()) {
+          const db = await getDatabase();
+          const byRaw = String(body?.editedBy || '').trim();
+          const bySteamId = /^\d{17}$/.test(byRaw) ? byRaw : null;
+          await createUserNotification(
+            db,
+            steamId,
+            'pro_updated',
+            'Pro Status Updated',
+            `Your Pro status expiry was updated to ${expiryDate.toISOString()}.`,
+            { bySteamId, proUntil: expiryDate.toISOString() }
+          );
+        }
+      } catch {
+      }
     } catch (error) {
       console.error('Failed to edit Pro:', error);
       return NextResponse.json({ error: 'Failed to edit Pro' }, { status: 500 });

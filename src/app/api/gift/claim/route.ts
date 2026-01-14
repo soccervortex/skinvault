@@ -4,6 +4,8 @@ import { getRandomReward } from '@/app/utils/theme-rewards';
 import { getProUntil, grantPro } from '@/app/utils/pro-storage';
 import { ThemeType } from '@/app/utils/theme-storage';
 import { notifyNewProUser } from '@/app/utils/discord-webhook';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 export async function POST(request: Request) {
   try {
@@ -43,6 +45,22 @@ export async function POST(request: Request) {
 
     // Save claim
     await saveUserGiftClaim(steamId, reward, theme);
+
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        const rewardType = String((reward as any)?.type || '').trim() || 'reward';
+        await createUserNotification(
+          db,
+          steamId,
+          'gift_claimed',
+          'Gift Claimed',
+          `You claimed your gift reward: ${rewardType}.`,
+          { theme, reward }
+        );
+      }
+    } catch {
+    }
 
     return NextResponse.json({ success: true, reward });
   } catch (error) {

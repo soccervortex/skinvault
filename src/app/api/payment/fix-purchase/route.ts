@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -116,6 +118,21 @@ export async function POST(request: Request) {
       await dbSet(purchasesKey, existingPurchases.slice(-1000));
 
       const finalCount = existingRewards[steamId]?.filter((r: any) => r?.type === consumableType).length || 0;
+
+      try {
+        if (hasMongoConfig()) {
+          const db = await getDatabase();
+          await createUserNotification(
+            db,
+            steamId,
+            'purchase_fixed',
+            'Purchase Fulfilled',
+            `A missing purchase reward was fulfilled: ${quantity}x ${String(consumableType)}.`,
+            { consumableType, quantity, sessionId }
+          );
+        }
+      } catch {
+      }
 
       return NextResponse.json({ 
         success: true,

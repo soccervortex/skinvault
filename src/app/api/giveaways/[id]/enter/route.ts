@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 export const runtime = 'nodejs';
 
@@ -149,6 +150,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       createdAt: now,
       meta: { giveawayId: id, entries: entriesRequested, creditsPerEntry },
     });
+
+    try {
+      await createUserNotification(
+        db,
+        steamId,
+        'giveaway_entered',
+        'Giveaway Entered',
+        `You entered a giveaway with ${entriesRequested} entries and spent ${cost} credits.`,
+        { giveawayId: id, entries: entriesRequested, cost, creditsPerEntry, balance: nextBalance }
+      );
+    } catch {
+    }
 
     const newEntry = await entriesCol.findOne({ _id: entryId } as any);
 

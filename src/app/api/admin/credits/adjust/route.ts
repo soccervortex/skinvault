@@ -4,6 +4,7 @@ import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isOwner } from '@/app/utils/owner-ids';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 type UserCreditsDoc = {
   _id: string;
@@ -69,6 +70,20 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       meta: { adminSteamId, reason },
     });
+
+    try {
+      await createUserNotification(
+        db,
+        steamId,
+        'credits_adjusted',
+        'Credits Balance Updated',
+        reason
+          ? `Staff adjusted your credits by ${delta} (new balance: ${balance}). Reason: ${reason}`
+          : `Staff adjusted your credits by ${delta} (new balance: ${balance}).`,
+        { bySteamId: adminSteamId, delta, balance, reason: reason || null }
+      );
+    } catch {
+    }
 
     return NextResponse.json({ ok: true, steamId, balance, delta }, { status: 200 });
   } catch (e: any) {

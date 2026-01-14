@@ -5,6 +5,7 @@ import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isOwner } from '@/app/utils/owner-ids';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 type UserCreditsDoc = {
   _id: string;
@@ -101,6 +102,22 @@ export async function POST(req: NextRequest) {
         applyBalance,
       },
     });
+
+    try {
+      if (applyBalance && delta !== 0) {
+        await createUserNotification(
+          db,
+          steamId,
+          'credits_rolled_back',
+          'Credits Adjustment',
+          reason
+            ? `A credits ledger entry was rolled back by staff. Applied delta: ${delta}. Reason: ${reason}`
+            : `A credits ledger entry was rolled back by staff. Applied delta: ${delta}.`,
+          { bySteamId: adminSteamId, delta, entryId: entryIdRaw, originalDelta, originalType, applyBalance: true }
+        );
+      }
+    } catch {
+    }
 
     return NextResponse.json(
       {

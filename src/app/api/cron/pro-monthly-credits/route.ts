@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getAllProUsers } from '@/app/utils/pro-storage';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 export const runtime = 'nodejs';
 
@@ -128,6 +129,18 @@ export async function GET(req: NextRequest) {
           createdAt: now,
           meta: { month, stipendKey },
         } as any);
+
+        try {
+          await createUserNotification(
+            db,
+            sid,
+            'pro_monthly_credits',
+            'Pro Monthly Credits',
+            `Your Pro monthly stipend was granted: ${amount} credits.`,
+            { month, amount }
+          );
+        } catch {
+        }
 
         granted++;
       } catch (e) {

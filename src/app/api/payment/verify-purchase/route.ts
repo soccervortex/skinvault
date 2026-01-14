@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { notifyProPurchase, notifyConsumablePurchase } from '@/app/utils/discord-webhook';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -130,6 +131,18 @@ export async function POST(request: Request) {
         meta: { sessionId: session.id, pack, verifiedBy: 'manual_verification' },
       } as any);
 
+      try {
+        await createUserNotification(
+          db,
+          steamId,
+          'purchase_credits',
+          'Credits Purchased',
+          `Your purchase was verified and fulfilled. ${credits.toLocaleString('en-US')} credits were added to your balance.`,
+          { pack, credits, sessionId: session.id, verifiedBy: 'manual_verification' }
+        );
+      } catch {
+      }
+
       existingPurchases.push({
         steamId,
         type: 'credits',
@@ -181,6 +194,22 @@ export async function POST(request: Request) {
       notifyProPurchase(steamId, months, amount, currency, proUntil, session.id).catch(error => {
         console.error('Failed to send Pro purchase notification:', error);
       });
+
+      try {
+        const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
+        if (hasMongoConfig()) {
+          const db = await getDatabase();
+          await createUserNotification(
+            db,
+            steamId,
+            'purchase_pro',
+            'Pro Activated',
+            `Your Pro purchase was verified and fulfilled. Pro is active for ${months} month${months === 1 ? '' : 's'}.`,
+            { months, proUntil, sessionId: session.id, verifiedBy: 'manual_verification' }
+          );
+        }
+      } catch {
+      }
       
       return NextResponse.json({ 
         fulfilled: true,
@@ -247,6 +276,22 @@ export async function POST(request: Request) {
         notifyConsumablePurchase(steamId, consumableType, quantity, amount, currency, session.id).catch(error => {
           console.error('Failed to send consumable purchase notification:', error);
         });
+
+        try {
+          const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
+          if (hasMongoConfig()) {
+            const db = await getDatabase();
+            await createUserNotification(
+              db,
+              steamId,
+              'purchase_consumable',
+              'Purchase Successful',
+              `Your purchase was verified and fulfilled. ${quantity}x ${String(consumableType)} was added to your account.`,
+              { consumableType, quantity, sessionId: session.id, verifiedBy: 'manual_verification' }
+            );
+          }
+        } catch {
+        }
 
         return NextResponse.json({ 
           fulfilled: true,

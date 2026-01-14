@@ -6,6 +6,8 @@ import {
   hasClaimedFreeMonth, 
   markFreeMonthClaimed 
 } from '@/app/utils/pro-storage';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 // New user bonus: Users can activate 2 weeks of Pro access within 7 days of first login
 const FREE_MONTH_DAYS = 7;
@@ -63,6 +65,21 @@ export async function POST(request: Request) {
     
     // Mark as claimed (one-time only)
     await markFreeMonthClaimed(steamId);
+
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        await createUserNotification(
+          db,
+          steamId,
+          'pro_bonus_activated',
+          'Pro Bonus Activated',
+          'Your new user Pro bonus is now active (2 weeks).',
+          { proUntil: newProUntil }
+        );
+      }
+    } catch {
+    }
 
     return NextResponse.json({
       success: true,

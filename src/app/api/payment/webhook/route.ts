@@ -6,6 +6,7 @@ import { captureError, captureMessage } from '@/app/lib/error-handler';
 import { sendInngestEvent } from '@/app/lib/inngest';
 import { notifyProPurchase, notifyConsumablePurchase } from '@/app/utils/discord-webhook';
 import { getDatabase } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -148,6 +149,18 @@ export async function POST(request: Request) {
             console.error('Failed to record purchase history:', error);
           }
 
+          try {
+            await createUserNotification(
+              db,
+              steamId,
+              'purchase_credits',
+              'Credits Purchased',
+              `Your purchase was successful. ${credits.toLocaleString('en-US')} credits were added to your balance.`,
+              { pack, credits, sessionId: session.id }
+            );
+          } catch {
+          }
+
           console.log(`✅ Granted ${credits} credits to ${steamId}`);
         } catch (error) {
           console.error('❌ Failed to grant credits:', error);
@@ -244,6 +257,19 @@ export async function POST(request: Request) {
           notifyProPurchase(steamId, months, amount, currency, proUntil, session.id).catch(error => {
             console.error('Failed to send Pro purchase notification:', error);
           });
+
+          try {
+            const db = await getDatabase();
+            await createUserNotification(
+              db,
+              steamId,
+              'purchase_pro',
+              'Pro Activated',
+              `Your Pro purchase was successful. Pro is active for ${months} month${months > 1 ? 's' : ''}.`,
+              { months, proUntil, sessionId: session.id }
+            );
+          } catch {
+          }
           
           // Trigger Discord role sync if user has Discord connected
           try {
@@ -360,6 +386,19 @@ export async function POST(request: Request) {
             notifyConsumablePurchase(steamId, consumableType, quantity, amount, currency, session.id).catch(error => {
               console.error('Failed to send consumable purchase notification:', error);
             });
+
+            try {
+              const db = await getDatabase();
+              await createUserNotification(
+                db,
+                steamId,
+                'purchase_consumable',
+                'Purchase Successful',
+                `Your purchase was successful. ${quantity}x ${String(consumableType)} was added to your account.`,
+                { consumableType, quantity, sessionId: session.id }
+              );
+            } catch {
+            }
           } catch (error) {
             console.error('Failed to record purchase history:', error);
             // Still continue - rewards were granted

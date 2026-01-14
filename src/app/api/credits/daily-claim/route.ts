@@ -4,6 +4,7 @@ import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isProMongoOnly } from '@/app/utils/pro-status-mongo';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 type UserCreditsDoc = {
   _id: string;
@@ -143,6 +144,18 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       meta: { day: today, pro },
     });
+
+    try {
+      await createUserNotification(
+        db,
+        steamId,
+        'daily_claim',
+        'Daily Credits Claimed',
+        `You claimed ${amount} credits from your daily reward.`,
+        { amount, day: today, pro }
+      );
+    } catch {
+    }
 
     return NextResponse.json(
       {

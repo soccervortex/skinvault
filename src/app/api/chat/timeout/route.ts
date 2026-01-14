@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { isOwner } from '@/app/utils/owner-ids';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 const TIMEOUT_USERS_KEY = 'timeout_users';
 const TIMEOUT_REASONS_KEY = 'timeout_reasons';
@@ -63,6 +65,24 @@ export async function POST(request: Request) {
       }
     }
 
+    try {
+      if (hasMongoConfig() && /^\d{17}$/.test(String(steamId || '').trim())) {
+        const db = await getDatabase();
+        const untilIso = timeoutUntil.toISOString();
+        await createUserNotification(
+          db,
+          String(steamId),
+          'chat_timeout',
+          'Chat Timeout',
+          reason
+            ? `You have been timed out from chat until ${untilIso}. Reason: ${reason}`
+            : `You have been timed out from chat until ${untilIso}.`,
+          { bySteamId: adminSteamId, timeoutUntil: untilIso, duration }
+        );
+      }
+    } catch {
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: `User ${steamId} timed out for ${duration}`,
@@ -98,6 +118,21 @@ export async function DELETE(request: Request) {
       const next: Record<string, any> = typeof reasons === 'object' && reasons ? { ...reasons } : {};
       delete next[String(steamId)];
       await dbSet(TIMEOUT_REASONS_KEY, next);
+    } catch {
+    }
+
+    try {
+      if (hasMongoConfig() && /^\d{17}$/.test(String(steamId || '').trim())) {
+        const db = await getDatabase();
+        await createUserNotification(
+          db,
+          String(steamId),
+          'chat_timeout_removed',
+          'Chat Timeout Removed',
+          'Your chat timeout was removed. You can chat again.',
+          { bySteamId: adminSteamId }
+        );
+      }
     } catch {
     }
 
