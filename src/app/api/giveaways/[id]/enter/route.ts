@@ -92,18 +92,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     );
 
     const entryId = `${id}_${steamId}`;
-    const prevRes = await entriesCol.findOneAndUpdate(
+    const prev = await entriesCol.findOne({ _id: entryId } as any);
+    const isNewParticipant = !prev;
+
+    await entriesCol.updateOne(
       { _id: entryId } as any,
       {
-        $setOnInsert: { _id: entryId, giveawayId, steamId, createdAt: now, creditsSpent: 0, entries: 0 },
+        $setOnInsert: { _id: entryId, giveawayId, steamId, createdAt: now },
         $inc: { entries: entriesRequested, creditsSpent: cost },
         $set: { updatedAt: now },
       } as any,
-      { upsert: true, returnDocument: 'before' }
+      { upsert: true }
     );
-
-    const prev = (prevRes as any)?.value ?? null;
-    const isNewParticipant = !prev;
 
     await giveawaysCol.updateOne(
       { _id: giveawayId } as any,
