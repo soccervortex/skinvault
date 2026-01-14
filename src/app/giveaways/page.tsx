@@ -642,8 +642,8 @@ export default function GiveawaysPage() {
               <span className="ml-2 text-[11px] uppercase tracking-widest font-black">Loading</span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr,1.2fr] gap-6">
-              <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.35fr,1fr] gap-6">
+              <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl min-h-[520px]">
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Active</div>
                   <Sparkles className="text-yellow-400" size={18} />
@@ -657,7 +657,7 @@ export default function GiveawaysPage() {
                       <button
                         key={g.id}
                         onClick={() => loadDetail(g.id)}
-                        className={`w-full text-left p-4 rounded-[1.5rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/40 hover:border-white/10'}`}
+                        className={`w-full text-left p-5 rounded-[1.75rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/40 hover:border-white/10'}`}
                       >
                         {(() => {
                           const st = getGiveawayStatus(Date.now(), g);
@@ -675,7 +675,7 @@ export default function GiveawaysPage() {
 
                               <div className="flex items-start gap-4">
                                 <div
-                                  className="w-12 h-12 rounded-[1.25rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                                  className="w-14 h-14 rounded-[1.5rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
                                   style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
                                 >
                                   {img ? (
@@ -686,11 +686,11 @@ export default function GiveawaysPage() {
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                                  <div className="text-[10px] mt-1 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
+                                  <div className="text-[12px] font-black uppercase tracking-widest truncate">{g.title}</div>
+                                  <div className="text-[11px] mt-1 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
                                     {g.prize || info?.name || 'Prize TBA'}
                                   </div>
-                                  <div className="mt-3 grid grid-cols-3 gap-2 text-[9px] text-gray-500">
+                                  <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-gray-500">
                                     <div>
                                       <div className="uppercase tracking-widest">Entry</div>
                                       <div className="text-[10px] font-black text-white">{g.creditsPerEntry}</div>
@@ -724,7 +724,7 @@ export default function GiveawaysPage() {
                         <button
                           key={g.id}
                           onClick={() => loadDetail(g.id)}
-                          className={`w-full text-left p-3 rounded-[1.5rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/20 hover:border-white/10'}`}
+                          className={`w-full text-left p-4 rounded-[1.75rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/20 hover:border-white/10'}`}
                         >
                           {(() => {
                             const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
@@ -734,7 +734,7 @@ export default function GiveawaysPage() {
                             return (
                               <div className="flex items-center gap-3">
                                 <div
-                                  className="w-9 h-9 rounded-xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                                  className="w-12 h-12 rounded-[1.25rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
                                   style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
                                 >
                                   {img ? (
@@ -745,10 +745,10 @@ export default function GiveawaysPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between gap-3">
-                                    <div className="text-[10px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                                    <div className="text-[9px] text-gray-600">Starts {formatShortDate(g.startAt)}</div>
+                                    <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
+                                    <div className="text-[10px] text-gray-600">Starts {formatShortDate(g.startAt)}</div>
                                   </div>
-                                  <div className="mt-1 text-[9px] truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
+                                  <div className="mt-1 text-[10px] truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
                                     {g.prize || info?.name || 'Prize TBA'}
                                   </div>
                                 </div>
