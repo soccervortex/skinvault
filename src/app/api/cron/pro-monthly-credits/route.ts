@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
         await creditsCol.updateOne(
           { _id: sid } as any,
           {
-            $setOnInsert: { _id: sid, steamId: sid, balance: 0 },
+            $setOnInsert: { _id: sid, steamId: sid },
             $inc: { balance: amount },
             $set: { updatedAt: now },
           } as any,

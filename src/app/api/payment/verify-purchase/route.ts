@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       await creditsCol.updateOne(
         { _id: steamId } as any,
         {
-          $setOnInsert: { _id: steamId, steamId, balance: 0 },
+          $setOnInsert: { _id: steamId, steamId },
           $inc: { balance: credits },
           $set: { updatedAt: now },
         } as any,
