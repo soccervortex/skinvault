@@ -427,15 +427,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   </span>
                 )}
               </Link>
-
-              <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/notifications' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Notifications">
-                <Bell size={16} /> Notifications
-                {notificationsUnreadCount > 0 && (
-                  <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
-                    {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
-                  </span>
-                )}
-              </Link>
  
               <button
                 onClick={() => {
@@ -675,15 +666,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             {unreadCount > 0 && (
               <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
                 {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </Link>
-
-          <Link href="/notifications" className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/notifications' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Notifications">
-            <Bell size={16} /> Notifications
-            {notificationsUnreadCount > 0 && (
-              <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
-                {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
               </span>
             )}
           </Link>
