@@ -18,6 +18,7 @@ type GiveawayDoc = {
   updatedAt: Date;
   createdBy: string;
   drawnAt?: Date;
+  archivedAt?: Date;
 };
 
 export async function GET(req: NextRequest) {
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
     const col = db.collection<GiveawayDoc>('giveaways');
 
     const now = new Date();
-    const filter: any = {};
+    const filter: any = { archivedAt: { $exists: false } };
 
     if (status === 'active') {
       filter.startAt = { $lte: now };

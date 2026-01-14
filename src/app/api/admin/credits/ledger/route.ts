@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
       .toArray();
 
     const out = rows.map((r: any) => ({
+      id: r?._id ? String(r._id) : '',
       steamId: String(r?.steamId || ''),
       delta: Number(r?.delta || 0),
       type: String(r?.type || ''),

@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy, HelpCircle, User } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy, HelpCircle, User, Mail, X, Wallet } from 'lucide-react';
 import { getPriceScanConcurrencySync, getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import dynamic from 'next/dynamic';
@@ -29,6 +29,7 @@ import { useToast } from '@/app/components/Toast';
 import { isBanned } from '@/app/utils/ban-check';
 import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
 import { getRankForValue } from '@/app/utils/rank-tiers';
+import { isOwner } from '@/app/utils/owner-ids';
 
 // STEAM_API_KEYS removed - using environment variables instead
 
@@ -97,7 +98,7 @@ const ISO_TO_STEAM_CURRENCY: Record<string, string> = {
 function getCurrencyMetaFromSteamCode(code: string): { iso: string; locale: string; symbol: string } {
   const iso = STEAM_CURRENCY_TO_ISO[String(code)] || 'USD';
   const locale = (() => {
-    if (iso === 'EUR') return 'nl-NL';
+    if (iso === 'EUR') return 'en-US';
     if (iso === 'GBP') return 'en-GB';
     if (iso === 'JPY') return 'ja-JP';
     if (iso === 'KRW') return 'ko-KR';
@@ -210,6 +211,29 @@ function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   );
 }
 
+type PublicProfileStatus = {
+  ok?: boolean;
+  steamId?: string;
+  creditsBalance?: number;
+  banned?: boolean;
+  banReason?: string | null;
+  timeoutUntil?: string | null;
+  timeoutActive?: boolean;
+  timeoutMinutesRemaining?: number;
+  timeoutReason?: string | null;
+};
+
+type NotificationRow = {
+  id: string;
+  steamId: string;
+  type: string;
+  title: string;
+  message: string;
+  createdAt: string | null;
+  readAt: string | null;
+  meta: any;
+};
+
 function InventoryContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -248,6 +272,18 @@ function InventoryContent() {
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
 
+  const [publicStatusLoading, setPublicStatusLoading] = useState(false);
+  const [publicStatus, setPublicStatus] = useState<PublicProfileStatus | null>(null);
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsRows, setNotificationsRows] = useState<NotificationRow[]>([]);
+  const [notificationsUnreadCount, setNotificationsUnreadCount] = useState(0);
+  const [markingAllNotifications, setMarkingAllNotifications] = useState(false);
+  const [markingNotificationId, setMarkingNotificationId] = useState<string | null>(null);
+  const [actorProfilesBySteamId, setActorProfilesBySteamId] = useState<Record<string, { name?: string; avatar?: string }>>({});
+  const [notificationPreview, setNotificationPreview] = useState<{ title?: string; imageUrl: string } | null>(null);
+
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const toast = useToast();
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
@@ -257,6 +293,159 @@ function InventoryContent() {
     const until = loggedInUser?.proUntil;
     return !!(until && new Date(until) > new Date());
   }, [loggedInUser?.steamId, loggedInUser?.proUntil, loggedInUserPro]);
+
+  const loggedInIsOwner = useMemo(() => isOwner(loggedInUser?.steamId), [loggedInUser?.steamId]);
+
+  const notificationsTargetSteamId = useMemo(() => {
+    const loggedInSteamId = String(loggedInUser?.steamId || '').trim();
+    const viewedSteamId = String(viewedUser?.steamId || '').trim();
+    if (!loggedInSteamId || !/^\d{17}$/.test(loggedInSteamId)) return null;
+    if (loggedInIsOwner && viewedSteamId && /^\d{17}$/.test(viewedSteamId)) return viewedSteamId;
+    return loggedInSteamId;
+  }, [loggedInIsOwner, loggedInUser?.steamId, viewedUser?.steamId]);
+
+  const canOpenNotifications = useMemo(() => {
+    const loggedInSteamId = String(loggedInUser?.steamId || '').trim();
+    const viewedSteamId = String(viewedUser?.steamId || '').trim();
+    if (!loggedInSteamId || !/^\d{17}$/.test(loggedInSteamId)) return false;
+    if (loggedInIsOwner) return true;
+    return !!(viewedSteamId && loggedInSteamId === viewedSteamId);
+  }, [loggedInIsOwner, loggedInUser?.steamId, viewedUser?.steamId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      const steamId = String(viewedUser?.steamId || '').trim();
+      if (!steamId || !/^\d{17}$/.test(steamId)) {
+        if (!cancelled) setPublicStatus(null);
+        return;
+      }
+
+      setPublicStatusLoading(true);
+      try {
+        const res = await fetch(`/api/user/profile-public?steamId=${encodeURIComponent(steamId)}`, { cache: 'no-store' });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(json?.error || 'Failed to load profile status');
+        if (!cancelled) setPublicStatus(json as any);
+      } catch {
+        if (!cancelled) setPublicStatus(null);
+      } finally {
+        if (!cancelled) setPublicStatusLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser?.steamId]);
+
+  const loadNotifications = async () => {
+    if (!notificationsTargetSteamId) return;
+    setNotificationsLoading(true);
+    try {
+      const url = `/api/user/notifications?limit=100&steamId=${encodeURIComponent(String(notificationsTargetSteamId))}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed to load notifications');
+      const rows = Array.isArray(json?.notifications) ? (json.notifications as NotificationRow[]) : [];
+      setNotificationsRows(rows);
+      setNotificationsUnreadCount(Number(json?.unreadCount || 0));
+
+      const nextActorIds = Array.from(
+        new Set(
+          rows
+            .map((r) => String(r?.meta?.bySteamId || '').trim())
+            .filter((x) => /^\d{17}$/.test(x))
+        )
+      );
+
+      const missing = nextActorIds.filter((id) => !actorProfilesBySteamId[id]);
+      if (missing.length > 0) {
+        const fetched: Record<string, { name?: string; avatar?: string }> = {};
+        await Promise.all(
+          missing.slice(0, 25).map(async (id) => {
+            try {
+              const pr = await fetch(`/api/steam/profile?steamId=${encodeURIComponent(id)}`, { cache: 'no-store' });
+              if (!pr.ok) return;
+              const pj = await pr.json().catch(() => null);
+              fetched[id] = { name: String(pj?.name || ''), avatar: String(pj?.avatar || '') };
+            } catch {
+            }
+          })
+        );
+        setActorProfilesBySteamId((prev) => ({ ...prev, ...fetched }));
+      }
+    } catch (e: any) {
+      setNotificationsRows([]);
+      setNotificationsUnreadCount(0);
+      toast.error(e?.message || 'Failed to load notifications');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const markNotificationsRead = async (ids: string[], markAll?: boolean) => {
+    if (!notificationsTargetSteamId) return;
+    try {
+      const res = await fetch('/api/user/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: String(notificationsTargetSteamId), ids, markAll: !!markAll }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('user-notifications-updated'));
+      }
+      await loadNotifications();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update notifications');
+    }
+  };
+
+  useEffect(() => {
+    let alive = true;
+
+    const updateUnread = async () => {
+      if (!canOpenNotifications || !notificationsTargetSteamId) {
+        setNotificationsUnreadCount(0);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/user/notifications?limit=1&unreadOnly=true&steamId=${encodeURIComponent(String(notificationsTargetSteamId))}`, { cache: 'no-store' });
+        if (!res.ok) {
+          if (alive) setNotificationsUnreadCount(0);
+          return;
+        }
+        const json = await res.json().catch(() => null);
+        const c = Number(json?.unreadCount || 0);
+        if (alive) setNotificationsUnreadCount(Number.isFinite(c) ? c : 0);
+      } catch {
+        if (alive) setNotificationsUnreadCount(0);
+      }
+    };
+
+    void updateUnread();
+
+    const handleUpdated = () => {
+      void updateUnread();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('user-notifications-updated', handleUpdated);
+    }
+
+    const interval = setInterval(updateUnread, 15000);
+    return () => {
+      alive = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('user-notifications-updated', handleUpdated);
+      }
+      clearInterval(interval);
+    };
+  }, [canOpenNotifications, notificationsTargetSteamId]);
 
   const viewedIsPro = useMemo(
     () => !!(viewedUser?.proUntil && new Date(viewedUser.proUntil) > new Date()),
@@ -401,7 +590,7 @@ function InventoryContent() {
   const fetchViewedProfile = async (id: string) => {
     try {
       // Use server-side API route instead of proxies
-      const res = await fetch(`/api/steam/profile?steamId=${id}`, {
+      const res = await fetch(`/api/steam/profile?steamId=${encodeURIComponent(id)}`, {
         cache: 'force-cache', // Cache profile data for faster subsequent loads
       });
 
@@ -1566,7 +1755,7 @@ function InventoryContent() {
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="w-full sm:w-auto min-w-0 text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
@@ -1708,73 +1897,99 @@ function InventoryContent() {
                       </div>
                     </div>
                   )}
-                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mt-3 md:mt-4 w-fit">
-                  <button
-                    onClick={() => {
-                      setCurrency({ code: '3', symbol: '€' });
-                      try {
-                        if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                    className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                  >
-                    EUR
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCurrency({ code: '1', symbol: '$' });
-                      try {
-                        if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                    className={`px-3 md:px-4 py-1 md:py-1.5 rounded-lg text-[8px] md:text-[9px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                  >
-                    USD
-                  </button>
-                </div>
-                {shareUrl && (
-                  <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
-                    <ShareButton
-                      url={shareUrl}
-                      title={`${viewedUser?.name || 'User'}'s Vault - SkinVaults`}
-                      text={`Check out ${viewedUser?.name || 'this user'}'s CS2 inventory on SkinVaults`}
-                      variant="button"
-                      className="text-[8px] md:text-[9px]"
-                    />
-                    <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
-                      {shareUrl}
-                    </p>
+                  {!tradeUrlLoading && tradeUrl && loggedInUser?.steamId !== viewedUser?.steamId && (
+                    <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">Trade URL</p>
+                      <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
+                        {tradeUrl}
+                      </p>
+                      <button
+                        onClick={async () => {
+                          const ok = await copyToClipboard(tradeUrl);
+                          if (ok) {
+                            toast.success('Trade URL copied');
+                            if (loggedInUser?.steamId && viewedUser?.steamId && loggedInUser.steamId !== viewedUser.steamId) {
+                              fetch('/api/user/trade-url/copy', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ steamId: viewedUser.steamId }),
+                              }).catch(() => {});
+                            }
+                          }
+                        }}
+                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all"
+                      >
+                        Copy Trade URL
+                      </button>
+                    </div>
+                  )}
+              </div>
+              </div>
+              <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-3">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10">
+                    <Wallet size={16} className="text-blue-400" />
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits</div>
+                    <div className="text-[11px] font-black text-white">
+                      {publicStatusLoading ? '—' : (Number.isFinite(Number(publicStatus?.creditsBalance)) ? Number(publicStatus?.creditsBalance || 0).toLocaleString('en-US') : '—')}
+                    </div>
                   </div>
-                )}
 
-                {!tradeUrlLoading && tradeUrl && loggedInUser?.steamId !== viewedUser?.steamId && (
-                  <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">Trade URL</p>
-                    <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
-                      {tradeUrl}
-                    </p>
-                    <button
-                      onClick={async () => {
-                        const ok = await copyToClipboard(tradeUrl);
-                        if (ok) toast.success('Trade URL copied');
-                      }}
-                      className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all"
+                  {!!publicStatus?.banned && (
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30"
+                      title={publicStatus?.banReason ? `Banned: ${String(publicStatus.banReason)}` : 'Banned'}
                     >
-                      Copy Trade URL
+                      <Skull size={16} className="text-red-400" />
+                      <div className="text-[9px] font-black uppercase tracking-widest text-red-300">Banned</div>
+                    </div>
+                  )}
+
+                  {!!publicStatus?.timeoutActive && (
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30"
+                      title={(() => {
+                        const until = publicStatus?.timeoutUntil ? String(publicStatus.timeoutUntil) : '';
+                        const reason = publicStatus?.timeoutReason ? String(publicStatus.timeoutReason) : '';
+                        if (reason && until) return `Timeout: ${reason} (until ${until})`;
+                        if (reason) return `Timeout: ${reason}`;
+                        if (until) return `Timeout until ${until}`;
+                        return 'Timeout active';
+                      })()}
+                    >
+                      <Lock size={16} className="text-amber-300" />
+                      <div className="text-[9px] font-black uppercase tracking-widest text-amber-200">
+                        Timeout{Number.isFinite(Number(publicStatus?.timeoutMinutesRemaining)) ? ` (${Number(publicStatus?.timeoutMinutesRemaining || 0)}m)` : ''}
+                      </div>
+                    </div>
+                  )}
+
+                  {canOpenNotifications && (
+                    <button
+                      onClick={() => {
+                        setNotificationsOpen(true);
+                        void loadNotifications();
+                      }}
+                      className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 transition-all"
+                      aria-label="Notifications"
+                      title={loggedInIsOwner && String(loggedInUser?.steamId || '').trim() !== String(viewedUser?.steamId || '').trim() ? 'View user notifications' : 'Your notifications'}
+                    >
+                      <Mail size={16} className="text-gray-300" />
+                      {notificationsUnreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                          {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
+                        </span>
+                      )}
                     </button>
+                  )}
+                </div>
+
+                <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
+                  <TrendingUp className="text-emerald-500 shrink-0" size={24} />
+                  <div className="min-w-0">
+                    <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
+                    <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter break-words">{totalVaultValue}</p>
                   </div>
-                )}
-              </div>
-              </div>
-              <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
-                <TrendingUp className="text-emerald-500 shrink-0" size={24} />
-                <div className="min-w-0">
-                  <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
-                  <p className="text-2xl md:text-4xl font-black text-white italic tracking-tighter break-words">{totalVaultValue}</p>
                 </div>
               </div>
             </header>
@@ -1794,7 +2009,7 @@ function InventoryContent() {
                     {(() => {
                       const hours = formatHours(cs2Overview?.playtimeForeverMinutes ?? null);
                       if (hours === null) return '—';
-                      return hours.toLocaleString('nl-NL', { maximumFractionDigits: 0 });
+                      return hours.toLocaleString('en-US', { maximumFractionDigits: 0 });
                     })()}
                   </div>
                   <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">All time</div>
@@ -1820,7 +2035,7 @@ function InventoryContent() {
                       if (!ts) return '–';
                       const d = new Date(Number(ts) * 1000);
                       if (isNaN(d.getTime())) return '–';
-                      return d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' });
+                      return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
                     })()}
                   </div>
                   <div className="mt-1 text-[9px] md:text-[10px] text-gray-500">Steam last logoff</div>
@@ -1836,7 +2051,7 @@ function InventoryContent() {
                       {(() => {
                         const hours = formatHours(cs2Overview?.playtime2WeeksMinutes ?? null);
                         if (hours === null) return '–';
-                        return hours.toLocaleString('nl-NL', { maximumFractionDigits: 1 });
+                        return hours.toLocaleString('en-US', { maximumFractionDigits: 1 });
                       })()}
                     </div>
                     <div className="mt-1 text-[9px] md:text-[10px] text-emerald-200/70">Hours last 2 weeks</div>
@@ -1885,209 +2100,33 @@ function InventoryContent() {
                     Most valuable skins in this vault
                   </span>
                 </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                {topItems.map(({ item, price }, idx) => (
-                  <Link
-                    key={(item.assetid || getItemDisplayName(item)) + idx}
-                    href={`/item/${encodeURIComponent(getMarketKey(item) || getItemDisplayName(item))}`}
-                    prefetch={false}
-                    className="bg-[#11141d] p-3 md:p-4 rounded-[2rem] md:rounded-3xl border border-yellow-500/30 flex items-center gap-3 md:gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
-                  >
-                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden shrink-0">
-                      <img
-                        src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
-                        className="w-full h-full object-contain"
-                        alt={getItemDisplayName(item)}
-                      />
-                    </div>
-                    <div className="flex-1 space-y-1 min-w-0">
-                      <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
-                        {getItemDisplayName(item)}
-                      </p>
-                      <p className="text-[10px] md:text-xs font-black text-emerald-400 italic">
-                        {formatMoney(price)}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              </section>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-              <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={playerStats?.kd} />
-              <StatCard label="Total Kills" icon={<Swords size={12}/>} val={playerStats?.kills} color="text-blue-500" />
-              <StatCard label="Wins" icon={<Award size={12}/>} val={playerStats?.wins} color="text-emerald-500" />
-              <StatCard label="HS %" icon={<Target size={12}/>} val={playerStats?.hs} unit="%" />
-              <StatCard label="Total Items" icon={<PackageOpen size={12}/>} val={totalItems} />
-              <StatCard label="Priced Items" icon={<TrendingUp size={12}/>} val={pricedItems} />
-            </div>
-            
-            {/* Pro Performance Indicator */}
-            {isPro && (
-              <div className="mt-4 flex items-center gap-2 px-2">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-1.5">
-                  <span className="text-[10px]">⚡</span>
-                  Pro Performance Active
-                </span>
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-              </div>
-            )}
-            
-            {/* Pro-only Advanced Stats */}
-            {playerStats && (isPro ? (
-              <div className="mt-6">
-                <div className="flex items-center gap-3 mb-4 px-2">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px]">PRO</span>
-                    Advanced Stats
-                  </h3>
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
-                  <StatCard label="ADR" icon={<TrendingUp size={12}/>} val={playerStats?.adr} color="text-purple-400" />
-                  <StatCard label="MVPs" icon={<Award size={12}/>} val={playerStats?.mvps} color="text-amber-400" />
-                  <StatCard label="Accuracy" icon={<Target size={12}/>} val={playerStats?.accuracy} unit="%" color="text-cyan-400" />
-                  <StatCard label="Rounds Played" icon={<PackageOpen size={12}/>} val={playerStats?.roundsPlayed} color="text-indigo-400" />
-                  <StatCard label="Total Damage" icon={<Swords size={12}/>} val={playerStats?.totalDamage} color="text-red-400" />
-                </div>
-              </div>
-            ) : (
-              <div className="mt-6">
-                <div className="flex items-center gap-3 mb-4 px-2">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-600/30 to-transparent" />
-                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500 flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-gray-600/10 border border-gray-600/40 text-[8px]">LOCKED</span>
-                    Advanced Stats
-                  </h3>
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-600/30 to-transparent" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
-                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
-                        Upgrade to Pro
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
-                      <TrendingUp size={12}/> ADR
-                    </div>
-                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
-                      ---
-                    </div>
-                  </div>
-                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
-                        Upgrade to Pro
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
-                      <Award size={12}/> MVPs
-                    </div>
-                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
-                      ---
-                    </div>
-                  </div>
-                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
-                        Upgrade to Pro
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
-                      <Target size={12}/> Accuracy
-                    </div>
-                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
-                      ---
-                    </div>
-                  </div>
-                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
-                        Upgrade to Pro
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
-                      <PackageOpen size={12}/> Rounds
-                    </div>
-                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
-                      ---
-                    </div>
-                  </div>
-                  <div className="bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 opacity-50 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Link href="/pro" className="text-[8px] md:text-[9px] font-black uppercase text-blue-500 hover:text-blue-400 transition-colors">
-                        Upgrade to Pro
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3 text-[8px] md:text-[9px] font-black uppercase text-gray-500 tracking-widest">
-                      <Swords size={12}/> Damage
-                    </div>
-                    <div className="text-lg md:text-xl font-black italic tracking-tighter text-gray-600">
-                      ---
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Faceit Stats Section */}
-            {faceitStats && (
-              <div className="mt-6">
-                <div className="flex items-center gap-3 mb-4 px-2">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
-                  <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-orange-400 flex items-center gap-2">
-                    <Trophy size={14} className="text-orange-400" />
-                    <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/40 text-[8px]">FACEIT</span>
-                    {faceitStats.nickname && (
-                      <span className="text-[9px] text-gray-400">@{faceitStats.nickname}</span>
-                    )}
-                  </h3>
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-                  <StatCard label="ELO" icon={<Trophy size={12}/>} val={faceitStats.elo} color="text-orange-400" />
-                  <StatCard label="Level" icon={<Award size={12}/>} val={faceitStats.level} color="text-orange-300" />
-                  <StatCard label="K/D Ratio" icon={<Skull size={12}/>} val={faceitStats.kd} color="text-orange-200" />
-                  <StatCard label="Win Rate" icon={<TrendingUp size={12}/>} val={faceitStats.winRate} unit="%" color="text-emerald-400" />
-                  <StatCard label="HS %" icon={<Target size={12}/>} val={faceitStats.hsPercent} unit="%" color="text-cyan-400" />
-                  <StatCard label="KAST" icon={<Target size={12}/>} val={faceitStats.kast} unit="%" color="text-purple-400" />
-                </div>
-                {isPro && (
-                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-                    <StatCard label="Matches" icon={<PackageOpen size={12}/>} val={faceitStats.matches} color="text-blue-400" />
-                    <StatCard label="Wins" icon={<Award size={12}/>} val={faceitStats.wins} color="text-emerald-400" />
-                    <StatCard label="Losses" icon={<Skull size={12}/>} val={faceitStats.losses} color="text-red-400" />
-                    <StatCard label="Total Kills" icon={<Swords size={12}/>} val={faceitStats.kills} color="text-blue-500" />
-                    <StatCard label="Total Deaths" icon={<Skull size={12}/>} val={faceitStats.deaths} color="text-red-500" />
-                    <StatCard label="Total Assists" icon={<Award size={12}/>} val={faceitStats.assists} color="text-yellow-400" />
-                    <StatCard label="Headshots" icon={<Target size={12}/>} val={faceitStats.headshots} color="text-cyan-500" />
-                    <StatCard label="MVPs" icon={<Award size={12}/>} val={faceitStats.mvps} color="text-amber-400" />
-                    <StatCard label="Avg Kills" icon={<Swords size={12}/>} val={faceitStats.avgKills} color="text-blue-300" />
-                    <StatCard label="Avg Deaths" icon={<Skull size={12}/>} val={faceitStats.avgDeaths} color="text-red-300" />
-                    <StatCard label="Avg Assists" icon={<Award size={12}/>} val={faceitStats.avgAssists} color="text-yellow-300" />
-                    <StatCard label="Triple Kills" icon={<Swords size={12}/>} val={faceitStats.tripleKills} color="text-purple-300" />
-                    <StatCard label="Quad Kills" icon={<Swords size={12}/>} val={faceitStats.quadKills} color="text-indigo-300" />
-                    <StatCard label="Ace Kills" icon={<Swords size={12}/>} val={faceitStats.aceKills} color="text-pink-300" />
-                  </div>
-                )}
-                {faceitStats.playerId && (
-                  <div className="mt-4 px-2">
-                    <a
-                      href={`https://www.faceit.com/en/players/${faceitStats.nickname || faceitStats.playerId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-[8px] md:text-[9px] font-black uppercase text-orange-400 hover:text-orange-300 transition-colors"
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  {topItems.map(({ item, price }, idx) => (
+                    <Link
+                      key={(item.assetid || getItemDisplayName(item)) + idx}
+                      href={`/item/${encodeURIComponent(getMarketKey(item) || getItemDisplayName(item))}`}
+                      prefetch={false}
+                      className="bg-[#11141d] p-3 md:p-4 rounded-[2rem] md:rounded-3xl border border-yellow-500/30 flex items-center gap-3 md:gap-4 shadow-xl hover:border-yellow-400/60 hover:-translate-y-1 transition-all"
                     >
-                      <Trophy size={12} />
-                      View Full Faceit Profile
-                    </a>
-                  </div>
-                )}
-              </div>
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-black/40 flex items-center justify-center border border-yellow-500/30 overflow-hidden shrink-0">
+                        <img
+                          src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
+                          className="w-full h-full object-contain"
+                          alt={getItemDisplayName(item)}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1 min-w-0">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white line-clamp-2">
+                          {getItemDisplayName(item)}
+                        </p>
+                        <p className="text-[10px] md:text-xs font-black text-emerald-400 italic">
+                          {formatMoney(price)}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             )}
 
             <section className="space-y-6 md:space-y-10">
@@ -2142,12 +2181,12 @@ function InventoryContent() {
                           prefetch={false}
                           className="block"
                         >
-                          <div className="bg-[#11141d] p-4 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col h-48 md:h-64 group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
+                          <div className="bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2.5rem] border border-white/5 flex flex-col h-48 md:h-64 group-hover:border-blue-500/40 transition-all group-hover:-translate-y-1 md:group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
                             <div className="w-full h-24 md:h-32 mb-4 md:mb-6 z-10 flex items-center justify-center">
-                              <img 
-                                src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`} 
-                                className="max-w-full max-h-full object-contain drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" 
-                                alt="skin" 
+                              <img
+                                src={`https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`}
+                                className="w-full h-full object-contain"
+                                alt="skin"
                               />
                             </div>
                             <div className="mt-auto space-y-1.5 md:space-y-2">
@@ -2254,6 +2293,159 @@ function InventoryContent() {
         </main>
       </div>
       
+      {notificationsOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => {
+            setNotificationPreview(null);
+            setNotificationsOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-2xl bg-[#11141d] border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-white/5 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Notifications</div>
+                <div className="text-[11px] text-gray-400 mt-1">
+                  {loggedInIsOwner && String(loggedInUser?.steamId || '').trim() !== String(viewedUser?.steamId || '').trim()
+                    ? `Viewing ${formatProfileName(viewedUser?.name || 'User')}`
+                    : 'Your inbox'}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    setMarkingAllNotifications(true);
+                    await markNotificationsRead([], true);
+                    setMarkingAllNotifications(false);
+                  }}
+                  disabled={markingAllNotifications || notificationsLoading || notificationsRows.length === 0}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${markingAllNotifications || notificationsLoading || notificationsRows.length === 0 ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                >
+                  {markingAllNotifications ? 'Marking…' : 'Mark all read'}
+                </button>
+                <button
+                  onClick={() => {
+                    setNotificationPreview(null);
+                    setNotificationsOpen(false);
+                  }}
+                  className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 flex items-center justify-center"
+                  aria-label="Close"
+                >
+                  <X size={16} className="text-gray-300" />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {notificationsLoading ? (
+                <div className="p-6 flex items-center gap-2 text-gray-500">
+                  <Loader2 className="animate-spin" size={18} />
+                  <span className="text-[11px] uppercase tracking-widest font-black">Loading</span>
+                </div>
+              ) : notificationsRows.length === 0 ? (
+                <div className="p-6 text-gray-500 text-[11px]">No notifications.</div>
+              ) : (
+                <div className="p-4 space-y-2">
+                  {notificationsRows.map((r) => {
+                    const bySteamId = String(r?.meta?.bySteamId || '').trim();
+                    const actor = bySteamId && /^\d{17}$/.test(bySteamId) ? actorProfilesBySteamId[bySteamId] : null;
+                    const img = String(r?.meta?.imageUrl || r?.meta?.image || actor?.avatar || '').trim();
+                    const unread = !r.readAt;
+                    return (
+                      <div
+                        key={r.id}
+                        className={`p-4 rounded-[1.5rem] border ${unread ? 'bg-blue-500/5 border-blue-500/20' : 'bg-black/30 border-white/5'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!img) return;
+                              setNotificationPreview({ title: r.title || 'Notification', imageUrl: img });
+                            }}
+                            className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                            disabled={!img}
+                            aria-label={img ? 'Preview image' : 'No image'}
+                          >
+                            {img ? (
+                              <img src={img} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Mail size={16} className="text-gray-500" />
+                            )}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-[10px] font-black uppercase tracking-widest truncate">{r.title || 'Notification'}</div>
+                                <div className="mt-1 text-[11px] text-gray-400 whitespace-pre-wrap break-words">{r.message || ''}</div>
+                                {actor?.name && (
+                                  <div className="mt-2 text-[9px] text-gray-500">From: <span className="text-gray-300 font-black">{actor.name}</span></div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-[9px] text-gray-600">
+                                  {r.createdAt ? new Date(r.createdAt).toLocaleString('en-US', { month: 'short', day: '2-digit' }) : ''}
+                                </div>
+                                {unread && (
+                                  <button
+                                    onClick={async () => {
+                                      setMarkingNotificationId(r.id);
+                                      await markNotificationsRead([r.id], false);
+                                      setMarkingNotificationId(null);
+                                    }}
+                                    disabled={markingNotificationId === r.id}
+                                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${markingNotificationId === r.id ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/10 hover:bg-white/15 text-white'}`}
+                                  >
+                                    {markingNotificationId === r.id ? '…' : 'Read'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationPreview && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setNotificationPreview(null)}
+        >
+          <div
+            className="w-full max-w-3xl bg-[#11141d] border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-white/5 flex items-center justify-between gap-3">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 truncate">{notificationPreview.title || 'Notification'}</div>
+              <button
+                onClick={() => setNotificationPreview(null)}
+                className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 flex items-center justify-center"
+                aria-label="Close preview"
+              >
+                <X size={16} className="text-gray-300" />
+              </button>
+            </div>
+            <div className="p-4 bg-black/20">
+              <div className="w-full aspect-[16/9] bg-black/40 border border-white/10 rounded-[1.5rem] overflow-hidden flex items-center justify-center">
+                <img src={notificationPreview.imageUrl} alt="" className="w-full h-full object-contain" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showManageTrackers && loggedInUser?.steamId && (
         <ManagePriceTrackers
           isOpen={showManageTrackers}

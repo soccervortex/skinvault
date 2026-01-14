@@ -35,6 +35,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       steamId: String(x?.steamId || ''),
       entries: Number(x?.entries || 0),
       tradeUrl: tradeUrlBySteamId.get(String(x?.steamId || '')) || '',
+      claimStatus: String(x?.claimStatus || ''),
+      claimDeadlineAt: x?.claimDeadlineAt ? new Date(x.claimDeadlineAt).toISOString() : null,
+      claimedAt: x?.claimedAt ? new Date(x.claimedAt).toISOString() : null,
+      forfeitedAt: x?.forfeitedAt ? new Date(x.forfeitedAt).toISOString() : null,
     }));
 
     return NextResponse.json({ ok: true, winners: out }, { status: 200 });

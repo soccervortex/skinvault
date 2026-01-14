@@ -6,10 +6,18 @@ import Link from 'next/link';
 import { Loader2, Sparkles, Ticket, Wallet } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
+type PrizeItem = {
+  id?: string;
+  name?: string;
+  market_hash_name?: string;
+  image?: string | null;
+} | null;
+
 type GiveawaySummary = {
   id: string;
   title: string;
   prize: string;
+  prizeItem?: PrizeItem;
   startAt: string | null;
   endAt: string | null;
   creditsPerEntry: number;
@@ -22,6 +30,22 @@ type GiveawaySummary = {
 
 type GiveawayDetail = GiveawaySummary & {
   description: string;
+};
+
+type ItemInfo = {
+  name: string;
+  image: string | null;
+  market_hash_name: string;
+  rarityName: string | null;
+  rarityColor: string | null;
+};
+
+type MyWinnerStatus = {
+  isWinner: boolean;
+  claimStatus: string | null;
+  claimDeadlineAt: string | null;
+  claimedAt: string | null;
+  forfeitedAt: string | null;
 };
 
 type DailyClaimStatus = {
@@ -62,6 +86,43 @@ function getGiveawayStatus(nowMs: number, g: GiveawaySummary): { label: string; 
   return { label: 'ENDED', className: 'bg-white/5 border-white/10 text-gray-300' };
 }
 
+function rarityColorFallback(name: string | null | undefined): string {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return '#4b5563';
+  if (n.includes('covert')) return '#eb4b4b';
+  if (n.includes('extraordinary')) return '#eb4b4b';
+  if (n.includes('classified')) return '#d32ce6';
+  if (n.includes('restricted')) return '#8847ff';
+  if (n.includes('mil-spec') || n.includes('milspec')) return '#4b69ff';
+  if (n.includes('industrial')) return '#5e98d9';
+  if (n.includes('consumer') || n.includes('base')) return '#b0c3d9';
+  if (n.includes('high grade')) return '#4b69ff';
+  return '#4b5563';
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = String(hex || '').trim().replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(75,85,99,${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatShortTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function GiveawaysPage() {
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
@@ -83,6 +144,11 @@ export default function GiveawaysPage() {
   const [entering, setEntering] = useState(false);
   const [myEntries, setMyEntries] = useState<number>(0);
   const [myEntryLoading, setMyEntryLoading] = useState(false);
+
+  const [itemInfoByKey, setItemInfoByKey] = useState<Record<string, ItemInfo | null>>({});
+  const [myWinner, setMyWinner] = useState<MyWinnerStatus | null>(null);
+  const [myWinnerLoading, setMyWinnerLoading] = useState(false);
+  const [claimingPrize, setClaimingPrize] = useState(false);
 
   useEffect(() => {
     try {
@@ -124,6 +190,56 @@ export default function GiveawaysPage() {
       setGiveaways([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ensureItemInfo = async (key: string) => {
+    const k = String(key || '').trim();
+    if (!k) return;
+    if (Object.prototype.hasOwnProperty.call(itemInfoByKey, k)) return;
+
+    setItemInfoByKey((prev) => ({ ...prev, [k]: null }));
+
+    try {
+      const res = await fetch(`/api/item/info?market_hash_name=${encodeURIComponent(k)}`, { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      const info: ItemInfo = {
+        name: String(json?.name || json?.market_hash_name || k),
+        image: json?.image ? String(json.image) : null,
+        market_hash_name: String(json?.market_hash_name || k),
+        rarityName: json?.rarity?.name ? String(json.rarity.name) : (typeof json?.rarity === 'string' ? String(json.rarity) : null),
+        rarityColor: (json?.rarity?.color ? String(json.rarity.color) : null) || null,
+      };
+
+      setItemInfoByKey((prev) => ({ ...prev, [k]: info }));
+    } catch {
+      setItemInfoByKey((prev) => ({ ...prev, [k]: null }));
+    }
+  };
+
+  const loadMyWinner = async (id: string) => {
+    if (!user?.steamId) {
+      setMyWinner(null);
+      return;
+    }
+    setMyWinnerLoading(true);
+    try {
+      const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}/my-winner`, { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      const st: MyWinnerStatus = {
+        isWinner: !!json?.isWinner,
+        claimStatus: json?.claimStatus ? String(json.claimStatus) : null,
+        claimDeadlineAt: json?.claimDeadlineAt ? String(json.claimDeadlineAt) : null,
+        claimedAt: json?.claimedAt ? String(json.claimedAt) : null,
+        forfeitedAt: json?.forfeitedAt ? String(json.forfeitedAt) : null,
+      };
+      setMyWinner(st);
+    } catch {
+      setMyWinner(null);
+    } finally {
+      setMyWinnerLoading(false);
     }
   };
 
@@ -178,6 +294,17 @@ export default function GiveawaysPage() {
   }, []);
 
   useEffect(() => {
+    const keys = giveaways
+      .slice(0, 30)
+      .map((g) => String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim())
+      .filter(Boolean);
+    keys.forEach((k) => {
+      void ensureItemInfo(k);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giveaways]);
+
+  useEffect(() => {
     loadCredits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.steamId]);
@@ -198,12 +325,16 @@ export default function GiveawaysPage() {
     setSelectedId(id);
     setDetail(null);
     setMyEntries(0);
+    setMyWinner(null);
     setDetailLoading(true);
     try {
       const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setDetail(json?.giveaway || null);
+
+      const key = String(json?.giveaway?.prizeItem?.market_hash_name || json?.giveaway?.prizeItem?.id || '').trim();
+      if (key) void ensureItemInfo(key);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load giveaway');
     } finally {
@@ -221,6 +352,33 @@ export default function GiveawaysPage() {
       } finally {
         setMyEntryLoading(false);
       }
+
+      void loadMyWinner(id);
+    }
+  };
+
+  const claimPrize = async () => {
+    if (!detail?.id) return;
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return;
+    }
+    setClaimingPrize(true);
+    try {
+      const res = await fetch(`/api/giveaways/${encodeURIComponent(detail.id)}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Prize claimed');
+      await loadMyWinner(detail.id);
+      await loadGiveaways();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to claim');
+      await loadMyWinner(detail.id);
+    } finally {
+      setClaimingPrize(false);
     }
   };
 
@@ -301,6 +459,19 @@ export default function GiveawaysPage() {
     return entries * Math.max(1, Math.floor(Number(detail.creditsPerEntry || 10)));
   }, [detail, entriesToBuy]);
 
+  const detailItemKey = String(detail?.prizeItem?.market_hash_name || detail?.prizeItem?.id || '').trim();
+  const detailItemInfo = detailItemKey ? itemInfoByKey[detailItemKey] : null;
+  const detailRarityColor = detailItemInfo?.rarityColor || rarityColorFallback(detailItemInfo?.rarityName);
+  const detailPrizeImage = (detail?.prizeItem?.image ? String(detail.prizeItem.image) : null) || detailItemInfo?.image || null;
+
+  const winnerCanClaim = useMemo(() => {
+    if (!myWinner?.isWinner) return false;
+    if (String(myWinner.claimStatus || '') !== 'pending') return false;
+    const deadlineMs = myWinner.claimDeadlineAt ? new Date(myWinner.claimDeadlineAt).getTime() : NaN;
+    if (Number.isFinite(deadlineMs) && Date.now() > deadlineMs) return false;
+    return true;
+  }, [myWinner]);
+
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -375,26 +546,54 @@ export default function GiveawaysPage() {
                       >
                         {(() => {
                           const st = getGiveawayStatus(Date.now(), g);
+
+                          const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
+                          const info = key ? itemInfoByKey[key] : null;
+                          const rarityColor = (info?.rarityColor || rarityColorFallback(info?.rarityName)) as string;
+                          const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
+
                           return (
-                            <div className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest mb-2 ${st.className}`}>
-                              {st.label}
-                            </div>
+                            <>
+                              <div className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest mb-3 ${st.className}`}>
+                                {st.label}
+                              </div>
+
+                              <div className="flex items-start gap-4">
+                                <div
+                                  className="w-12 h-12 rounded-[1.25rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                                  style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
+                                >
+                                  {img ? (
+                                    <img src={img} alt={g.prize || 'Prize'} className="w-full h-full object-contain" />
+                                  ) : (
+                                    <div className="text-[8px] text-gray-500 font-black uppercase tracking-widest">—</div>
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
+                                  <div className="text-[10px] mt-1 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
+                                    {g.prize || info?.name || 'Prize TBA'}
+                                  </div>
+                                  <div className="mt-3 grid grid-cols-3 gap-2 text-[9px] text-gray-500">
+                                    <div>
+                                      <div className="uppercase tracking-widest">Entry</div>
+                                      <div className="text-[10px] font-black text-white">{g.creditsPerEntry}</div>
+                                    </div>
+                                    <div>
+                                      <div className="uppercase tracking-widest">Players</div>
+                                      <div className="text-[10px] font-black text-white">{g.totalParticipants}</div>
+                                    </div>
+                                    <div>
+                                      <div className="uppercase tracking-widest">Winners</div>
+                                      <div className="text-[10px] font-black text-white">{g.winnerCount}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
                           );
                         })()}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                            <div className="text-[10px] text-gray-500 mt-1">{g.prize || 'Prize TBA'}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[9px] text-gray-500 uppercase tracking-widest">Entry</div>
-                            <div className="text-[11px] font-black">{g.creditsPerEntry} credits</div>
-                          </div>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-[9px] text-gray-500">
-                          <div>{g.totalParticipants} players</div>
-                          <div>{g.winnerCount} winner(s)</div>
-                        </div>
                       </button>
                     ))}
                   </div>
@@ -412,10 +611,35 @@ export default function GiveawaysPage() {
                           onClick={() => loadDetail(g.id)}
                           className={`w-full text-left p-3 rounded-[1.5rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/20 hover:border-white/10'}`}
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                            <div className="text-[9px] text-gray-600">Starts soon</div>
-                          </div>
+                          {(() => {
+                            const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
+                            const info = key ? itemInfoByKey[key] : null;
+                            const rarityColor = (info?.rarityColor || rarityColorFallback(info?.rarityName)) as string;
+                            const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
+                            return (
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-9 h-9 rounded-xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                                  style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
+                                >
+                                  {img ? (
+                                    <img src={img} alt={g.prize || 'Prize'} className="w-full h-full object-contain" />
+                                  ) : (
+                                    <div className="text-[8px] text-gray-600 font-black uppercase">—</div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-[10px] font-black uppercase tracking-widest truncate">{g.title}</div>
+                                    <div className="text-[9px] text-gray-600">Starts {formatShortDate(g.startAt)}</div>
+                                  </div>
+                                  <div className="mt-1 text-[9px] truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
+                                    {g.prize || info?.name || 'Prize TBA'}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </button>
                       ))}
                     </div>
@@ -432,10 +656,35 @@ export default function GiveawaysPage() {
                           onClick={() => loadDetail(g.id)}
                           className={`w-full text-left p-3 rounded-[1.5rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/20 hover:border-white/10'}`}
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                            <div className="text-[9px] text-gray-600">{g.drawnAt ? 'Drawn' : 'Ended'}</div>
-                          </div>
+                          {(() => {
+                            const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
+                            const info = key ? itemInfoByKey[key] : null;
+                            const rarityColor = (info?.rarityColor || rarityColorFallback(info?.rarityName)) as string;
+                            const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
+                            return (
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-9 h-9 rounded-xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                                  style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
+                                >
+                                  {img ? (
+                                    <img src={img} alt={g.prize || 'Prize'} className="w-full h-full object-contain" />
+                                  ) : (
+                                    <div className="text-[8px] text-gray-600 font-black uppercase">—</div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-[10px] font-black uppercase tracking-widest truncate">{g.title}</div>
+                                    <div className="text-[9px] text-gray-600">{g.drawnAt ? 'Drawn' : 'Ended'}</div>
+                                  </div>
+                                  <div className="mt-1 text-[9px] truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
+                                    {g.prize || info?.name || 'Prize TBA'}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </button>
                       ))}
                     </div>
@@ -470,24 +719,89 @@ export default function GiveawaysPage() {
                       <Ticket className="text-yellow-400" size={22} />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-[10px]">
-                      <div className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
-                        <div className="text-gray-500 uppercase tracking-widest font-black">Entry Cost</div>
-                        <div className="text-lg font-black mt-1">{detail.creditsPerEntry} credits</div>
-                      </div>
-                      <div className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
-                        <div className="text-gray-500 uppercase tracking-widest font-black">Winners</div>
-                        <div className="text-lg font-black mt-1">{detail.winnerCount}</div>
-                      </div>
-                      <div className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
-                        <div className="text-gray-500 uppercase tracking-widest font-black">Participants</div>
-                        <div className="text-lg font-black mt-1">{detail.totalParticipants}</div>
-                      </div>
-                      <div className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
-                        <div className="text-gray-500 uppercase tracking-widest font-black">Total Entries</div>
-                        <div className="text-lg font-black mt-1">{detail.totalEntries}</div>
+                    <div
+                      className="rounded-[2rem] border overflow-hidden"
+                      style={{ borderColor: hexToRgba(detailRarityColor, 0.35), backgroundColor: 'rgba(0,0,0,0.2)' }}
+                    >
+                      <div
+                        className="p-5 md:p-6"
+                        style={{ background: `linear-gradient(135deg, ${hexToRgba(detailRarityColor, 0.20)} 0%, rgba(0,0,0,0.25) 65%)` }}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 rounded-[1.5rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                            {detailPrizeImage ? (
+                              <img src={detailPrizeImage} alt={detail.prize || 'Prize'} className="w-full h-full object-contain" />
+                            ) : (
+                              <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">No image</div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Prize</div>
+                            <div className="text-lg md:text-xl font-black italic tracking-tighter break-words" style={{ color: detailRarityColor }}>
+                              {detail.prize || detailItemInfo?.name || 'Prize TBA'}
+                            </div>
+                            {detailItemInfo?.rarityName && (
+                              <div className="mt-1 text-[9px] font-black uppercase tracking-widest" style={{ color: hexToRgba(detailRarityColor, 0.95) }}>
+                                {detailItemInfo.rarityName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-[10px]">
+                          <div className="bg-black/30 border border-white/5 rounded-[1.5rem] p-3">
+                            <div className="text-gray-500 uppercase tracking-widest font-black">Entry</div>
+                            <div className="text-[12px] font-black mt-1">{detail.creditsPerEntry} credits</div>
+                          </div>
+                          <div className="bg-black/30 border border-white/5 rounded-[1.5rem] p-3">
+                            <div className="text-gray-500 uppercase tracking-widest font-black">Winners</div>
+                            <div className="text-[12px] font-black mt-1">{detail.winnerCount}</div>
+                          </div>
+                          <div className="bg-black/30 border border-white/5 rounded-[1.5rem] p-3">
+                            <div className="text-gray-500 uppercase tracking-widest font-black">Ends</div>
+                            <div className="text-[12px] font-black mt-1">{formatShortDate(detail.endAt)}</div>
+                            <div className="text-[9px] text-gray-500">{formatShortTime(detail.endAt)}</div>
+                          </div>
+                          <div className="bg-black/30 border border-white/5 rounded-[1.5rem] p-3">
+                            <div className="text-gray-500 uppercase tracking-widest font-black">Players</div>
+                            <div className="text-[12px] font-black mt-1">{detail.totalParticipants}</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
+
+                    {user?.steamId && detail.drawnAt && (
+                      <div className="bg-black/40 border border-white/5 rounded-[2rem] p-5">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Winner Status</div>
+                            {myWinnerLoading ? (
+                              <div className="mt-2 flex items-center gap-2 text-gray-500 text-[11px]">
+                                <Loader2 className="animate-spin" size={16} /> Loading
+                              </div>
+                            ) : myWinner?.isWinner ? (
+                              <div className="mt-2 text-[11px] text-gray-300">
+                                Status: <span className="text-white font-black">{String(myWinner.claimStatus || 'pending').toUpperCase()}</span>
+                                {myWinner.claimDeadlineAt ? (
+                                  <span className="text-gray-500"> • Deadline: {formatShortDate(myWinner.claimDeadlineAt)} {formatShortTime(myWinner.claimDeadlineAt)}</span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-[11px] text-gray-500">You did not win this giveaway.</div>
+                            )}
+                          </div>
+
+                          {winnerCanClaim ? (
+                            <button
+                              onClick={claimPrize}
+                              disabled={claimingPrize}
+                              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                            >
+                              {claimingPrize ? 'Claiming...' : 'Claim Prize'}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="bg-black/40 border border-white/5 rounded-[2rem] p-5">
                       <div className="flex items-center justify-between">

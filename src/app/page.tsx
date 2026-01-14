@@ -143,6 +143,7 @@ export default function GlobalSkinSearch() {
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const [visibleCount, setVisibleCount] = useState(80);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollRootRef = useRef<HTMLElement | null>(null);
   const [user, setUser] = useState<any>(null);
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [isPro, setIsPro] = useState(false);
@@ -534,13 +535,15 @@ export default function GlobalSkinSearch() {
     const el = sentinelRef.current;
     if (!el) return;
 
+    const rootEl = scrollRootRef.current;
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
           setVisibleCount((prev) => Math.min(prev + 60, processedItems.length));
         }
       },
-      { rootMargin: '600px' }
+      { root: rootEl, rootMargin: '600px' }
     );
 
     observer.observe(el);
@@ -605,7 +608,7 @@ export default function GlobalSkinSearch() {
           </div>
         </header>
 
-        <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
+        <main ref={scrollRootRef} id="main-content" className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar scroll-smooth">
           {/* SEO-optimized heading structure for AI crawlers */}
           <h1 className="sr-only">CS2 Inventory Tracker - The Ultimate Skin Valuation Tool</h1>
           <div className="mb-6 md:mb-8 text-center">

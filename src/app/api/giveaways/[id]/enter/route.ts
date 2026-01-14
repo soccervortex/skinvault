@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
 
 export const runtime = 'nodejs';
 
@@ -26,6 +27,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const restriction = await getCreditsRestrictionStatus(steamId);
+    if (restriction.banned) {
+      return NextResponse.json({ error: 'Credits access is banned for this user' }, { status: 403 });
+    }
+    if (restriction.timeoutActive) {
+      return NextResponse.json(
+        { error: 'Credits access is temporarily restricted for this user', timeoutUntil: restriction.timeoutUntil },
+        { status: 403 }
+      );
+    }
+
     const params = await Promise.resolve(ctx.params as any);
     const id = String((params as any)?.id || '').trim();
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -70,13 +82,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { returnDocument: 'after' }
     );
 
-    const creditDoc = creditUpdate as any;
+    const creditDoc = (creditUpdate as any)?.value ?? null;
     if (!creditDoc) {
       return NextResponse.json({ error: 'Not enough credits' }, { status: 400 });
     }
 
     const entryId = `${id}_${steamId}`;
-    const prev = await entriesCol.findOneAndUpdate(
+    const prevRes = await entriesCol.findOneAndUpdate(
       { _id: entryId } as any,
       {
         $setOnInsert: { _id: entryId, giveawayId, steamId, createdAt: now, creditsSpent: 0, entries: 0 },
@@ -86,6 +98,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { upsert: true, returnDocument: 'before' }
     );
 
+    const prev = (prevRes as any)?.value ?? null;
     const isNewParticipant = !prev;
 
     await giveawaysCol.updateOne(
@@ -141,7 +154,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         steamId,
         giveawayId: id,
         cost,
-        balance: Number(creditDoc.balance || 0),
+        balance: Number(creditDoc?.balance || 0),
         entry: {
           entries: Number((newEntry as any)?.entries || 0),
           creditsSpent: Number((newEntry as any)?.creditsSpent || 0),

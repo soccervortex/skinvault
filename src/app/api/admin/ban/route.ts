@@ -6,6 +6,7 @@ import { notifyUserBan, notifyUserUnban } from '@/app/utils/discord-webhook';
 
 const ADMIN_HEADER = 'x-admin-key';
 const BANNED_KEY = 'banned_steam_ids';
+ const BAN_REASONS_KEY = 'ban_reasons';
 
 export async function POST(request: Request) {
   try {
@@ -47,6 +48,21 @@ export async function POST(request: Request) {
         notifyUserBan(steamId, bannedBy).catch(error => {
           console.error('Failed to send ban notification:', error);
         });
+      }
+
+      const reason = String(body?.reason || '').trim();
+      if (reason) {
+        try {
+          const reasons = (await dbGet<Record<string, any>>(BAN_REASONS_KEY, false)) || {};
+          const next: Record<string, any> = typeof reasons === 'object' && reasons ? { ...reasons } : {};
+          next[steamId] = {
+            reason,
+            at: new Date().toISOString(),
+            by: body?.bannedBy ? String(body.bannedBy) : null,
+          };
+          await dbSet(BAN_REASONS_KEY, next);
+        } catch {
+        }
       }
       return NextResponse.json({ steamId, banned: true });
     } catch (error) {
@@ -113,6 +129,14 @@ export async function DELETE(request: Request) {
       const wasBanned = banned.includes(steamId);
       const updatedBanned = banned.filter(id => id !== steamId);
       await dbSet(BANNED_KEY, updatedBanned);
+
+      try {
+        const reasons = (await dbGet<Record<string, any>>(BAN_REASONS_KEY, false)) || {};
+        const next: Record<string, any> = typeof reasons === 'object' && reasons ? { ...reasons } : {};
+        delete next[steamId];
+        await dbSet(BAN_REASONS_KEY, next);
+      } catch {
+      }
       
       // Send Discord notification for user unban
       if (wasBanned) {

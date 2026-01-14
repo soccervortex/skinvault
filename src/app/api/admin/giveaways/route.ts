@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     const out = rows.map((g: any) => ({
       id: String(g._id),
       title: String(g.title || ''),
+      description: String(g.description || ''),
       prize: String(g.prize || ''),
       prizeItem: g.prizeItem
         ? {
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
       totalEntries: Number(g.totalEntries || 0),
       totalParticipants: Number(g.totalParticipants || 0),
       drawnAt: g.drawnAt ? new Date(g.drawnAt).toISOString() : null,
+      archivedAt: g.archivedAt ? new Date(g.archivedAt).toISOString() : null,
     }));
     return NextResponse.json({ giveaways: out }, { status: 200 });
   } catch (e: any) {

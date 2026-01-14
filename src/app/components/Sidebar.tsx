@@ -29,11 +29,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const [user, setUser] = useState<any>(null);
   const didTrySessionHydrationRef = useRef(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [searchId, setSearchId] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [themesDisabled, setThemesDisabled] = useState(false);
   const [hasActiveTheme, setHasActiveTheme] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+ 
 
   // 1. Sync User state met LocalStorage & andere tabbladen
   useEffect(() => {
@@ -221,6 +223,8 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     };
   }, [user?.steamId]);
 
+ 
+
   const handleToggleTheme = async () => {
     const newValue = !themesDisabled;
     const steamId = user?.steamId;
@@ -354,35 +358,26 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             </div>
 
             <div className="space-y-2 mb-10 flex-1">
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href="/terms"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
-                  aria-label="Terms of Service"
-                >
-                  <FileText size={14} /> Terms
-                </Link>
-                <Link
-                  href="/privacy"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
-                  aria-label="Privacy Policy"
-                >
-                  <Shield size={14} /> Privacy
-                </Link>
-              </div>
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
                 <Tag size={16} /> Market
               </Link>
+              {pathname === '/' && categories && (
+                <button
+                  onClick={() => {
+                    setIsCategoriesOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+                  aria-label="Weapon Categories"
+                >
+                  <Tag size={16} /> Weapon Categories
+                </button>
+              )}
               <Link href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
                 <Wallet size={16} /> My Vault
               </Link>
               <Link href="/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
                 <Sparkles size={16} /> Giveaways
-              </Link>
-              <Link href="/affiliate" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/affiliate') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Affiliate">
-                <Star size={16} /> Affiliate
               </Link>
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16} /> Wishlist
@@ -395,6 +390,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   </span>
                 )}
               </Link>
+ 
               <button
                 onClick={() => {
                   setIsSearchOpen(true);
@@ -414,8 +410,14 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/creators" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
                 <Users size={16} /> Creators
               </Link>
+              <Link href="/affiliate" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/affiliate') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Affiliate">
+                <Star size={16} /> Affiliate
+              </Link>
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact
+              </Link>
+              <Link href="/report-item" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
+                <AlertTriangle size={16} /> Report Item
               </Link>
               {isOwner(user?.steamId) && (
                 <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
@@ -429,23 +431,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 </Link>
               )}
 
-              {pathname === '/' && categories && (
-                <div className="mt-8 pt-8 border-t border-white/5">
-                  <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-4">Weapon Categories</h2>
-                  <nav className="space-y-1">
-                    {categories.map((cat: any) => (
-                      <button
-                        key={cat.name}
-                        onClick={() => { setActiveCat(cat); setIsMobileMenuOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-5 py-3 min-h-[44px] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}
-                        aria-label={`Filter by ${cat.name}`}
-                      >
-                        {cat.icon} {cat.name}
-                      </button>
-                    ))}
-                  </nav>
-                </div>
-              )}
             </div>
 
             <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
@@ -620,25 +605,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         </div>
 
         <div className="space-y-2 mb-10 flex-1">
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              href="/terms"
-              className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
-              aria-label="Terms of Service"
-            >
-              <FileText size={14} /> Terms
-            </Link>
-            <Link
-              href="/privacy"
-              className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest bg-[#11141d] border border-white/5 text-gray-300 hover:border-blue-500/30 hover:text-white transition-all"
-              aria-label="Privacy Policy"
-            >
-              <Shield size={14} /> Privacy
-            </Link>
-          </div>
           <Link href="/" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Market">
             <Tag size={16} /> Market
           </Link>
+          {pathname === '/' && categories && (
+            <button
+              onClick={() => setIsCategoriesOpen(true)}
+              className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
+              aria-label="Weapon Categories"
+            >
+              <Tag size={16} /> Weapon Categories
+            </button>
+          )}
           <Link
             href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'}
             className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`}
@@ -648,9 +626,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
           <Link href="/giveaways" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
             <Sparkles size={16} /> Giveaways
-          </Link>
-          <Link href="/affiliate" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/affiliate') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Affiliate">
-            <Star size={16} /> Affiliate
           </Link>
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16} /> Wishlist
@@ -663,6 +638,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </span>
             )}
           </Link>
+ 
           <button
             onClick={() => setIsSearchOpen(true)}
             className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
@@ -679,12 +655,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/creators" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
             <Users size={16} /> Creators
           </Link>
-              <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
-                <Mail size={16} /> Contact
-              </Link>
-              <Link href="/report-item" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
-                <AlertTriangle size={16} /> Report Item
-              </Link>
+          <Link href="/affiliate" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/affiliate') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Affiliate">
+            <Star size={16} /> Affiliate
+          </Link>
+          <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
+            <Mail size={16} /> Contact
+          </Link>
+          <Link href="/report-item" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
+            <AlertTriangle size={16} /> Report Item
+          </Link>
           {isOwner(user?.steamId) && (
             <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
               <Shield size={16} /> Admin Panel
@@ -697,23 +676,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             </Link>
           )}
 
-          {pathname === '/' && categories && (
-            <div className="mt-8 pt-8 border-t border-white/5">
-              <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-4">Weapon Categories</h2>
-              <nav className="space-y-1">
-                {categories.map((cat: any) => (
-                  <button
-                    key={cat.name}
-                    onClick={() => setActiveCat(cat)}
-                    className={`w-full flex items-center gap-4 px-5 py-3 min-h-[44px] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeCat?.name === cat.name ? 'text-blue-500 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300'}`}
-                    aria-label={`Filter by ${cat.name}`}
-                  >
-                    {cat.icon} {cat.name}
-                  </button>
-                ))}
-              </nav>
-            </div>
-          )}
         </div>
 
         <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
@@ -883,7 +845,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative">
             <button onClick={() => setIsSearchOpen(false)} className="absolute top-4 md:top-8 right-4 md:right-8 text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3 mb-2 pr-12">
               <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Stalk Profile</h2>
               <HelpTooltip
                 title="How to Search"
@@ -895,7 +857,8 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     <p className="text-blue-400">💡 Tip: You can find your Steam ID in your Steam profile URL</p>
                   </>
                 }
-                position="left"
+                position="bottom"
+                className="shrink-0"
               />
             </div>
             <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mb-6 md:mb-8 tracking-[0.2em]">Enter a SteamID64 or username to see stats and vault</p>
@@ -911,6 +874,54 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               />
               <button type="submit" className="w-full bg-blue-600 py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20">Analyze Combat Record</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- CATEGORIES MODAL --- */}
+      {isCategoriesOpen && pathname === '/' && categories && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsCategoriesOpen(false);
+          }}
+        >
+          <div
+            className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsCategoriesOpen(false)}
+              className="absolute top-4 md:top-8 right-4 md:right-8 text-gray-500 hover:text-white transition-colors"
+              aria-label="Close weapon categories"
+            >
+              <X size={20} />
+            </button>
+            <div className="pr-12">
+              <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Weapon Categories</h2>
+              <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mt-2 tracking-[0.2em]">
+                Choose a category to filter the market.
+              </p>
+            </div>
+            <div className="mt-6 grid grid-cols-1 gap-2">
+              {categories.map((cat: any) => (
+                <button
+                  key={cat.name}
+                  onClick={() => {
+                    setActiveCat(cat);
+                    setIsCategoriesOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                    activeCat?.name === cat.name
+                      ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
+                      : 'bg-[#0f111a] border border-white/5 text-gray-400 hover:text-white hover:border-blue-500/30'
+                  }`}
+                  aria-label={`Filter by ${cat.name}`}
+                >
+                  {cat.icon} {cat.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

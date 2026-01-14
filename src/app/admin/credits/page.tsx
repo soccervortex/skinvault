@@ -7,11 +7,18 @@ import { useToast } from '@/app/components/Toast';
 import { Copy, Loader2, Shield, Wallet } from 'lucide-react';
 
 type LedgerEntry = {
+  id?: string;
   steamId: string;
   delta: number;
   type: string;
   createdAt: string | null;
   meta: any;
+};
+
+type CreditsRestriction = {
+  banned: boolean;
+  timeoutUntil: string | null;
+  timeoutActive: boolean;
 };
 
 export default function AdminCreditsPage() {
@@ -31,6 +38,22 @@ export default function AdminCreditsPage() {
   const [granting, setGranting] = useState(false);
   const [grantAmount, setGrantAmount] = useState('100');
   const [grantReason, setGrantReason] = useState('');
+
+  const [adjusting, setAdjusting] = useState(false);
+  const [adjustAmount, setAdjustAmount] = useState('100');
+  const [adjustMode, setAdjustMode] = useState<'add' | 'remove'>('add');
+  const [adjustReason, setAdjustReason] = useState('');
+
+  const [settingBalance, setSettingBalance] = useState(false);
+  const [setBalanceValue, setSetBalanceValue] = useState('0');
+  const [setBalanceReason, setSetBalanceReason] = useState('');
+
+  const [restrictionsLoading, setRestrictionsLoading] = useState(false);
+  const [restrictions, setRestrictions] = useState<CreditsRestriction | null>(null);
+  const [timeoutMinutes, setTimeoutMinutes] = useState('60');
+  const [updatingRestrictions, setUpdatingRestrictions] = useState(false);
+
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -64,6 +87,166 @@ export default function AdminCreditsPage() {
     }
   };
 
+  const loadRestrictions = async (targetSteamId: string) => {
+    const id = String(targetSteamId || '').trim();
+    if (!/^\d{17}$/.test(id)) {
+      setRestrictions(null);
+      return;
+    }
+
+    setRestrictionsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/credits/restrictions?steamId=${encodeURIComponent(id)}`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setRestrictions({
+        banned: !!json?.banned,
+        timeoutUntil: json?.timeoutUntil ? String(json.timeoutUntil) : null,
+        timeoutActive: !!json?.timeoutActive,
+      });
+    } catch (e: any) {
+      setRestrictions(null);
+      toast.error(e?.message || 'Failed to load restrictions');
+    } finally {
+      setRestrictionsLoading(false);
+    }
+  };
+
+  const updateRestrictions = async (action: 'ban' | 'unban' | 'timeout' | 'clear_timeout') => {
+    const id = String(steamId || '').trim();
+    if (!/^\d{17}$/.test(id)) {
+      toast.error('Enter a valid 17-digit SteamID64');
+      return;
+    }
+
+    setUpdatingRestrictions(true);
+    try {
+      const payload: any = { steamId: id, action };
+      if (action === 'timeout') {
+        payload.minutes = Math.floor(Number(timeoutMinutes || 0));
+      }
+      const res = await fetch('/api/admin/credits/restrictions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setRestrictions({
+        banned: !!json?.banned,
+        timeoutUntil: json?.timeoutUntil ? String(json.timeoutUntil) : null,
+        timeoutActive: !!json?.timeoutActive,
+      });
+      toast.success('Updated credits restrictions');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update restrictions');
+    } finally {
+      setUpdatingRestrictions(false);
+    }
+  };
+
+  const adjust = async () => {
+    const id = String(steamId || '').trim();
+    if (!/^\d{17}$/.test(id)) {
+      toast.error('Enter a valid 17-digit SteamID64');
+      return;
+    }
+
+    const amount = Math.floor(Number(adjustAmount || 0));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+
+    const delta = adjustMode === 'remove' ? -amount : amount;
+
+    setAdjusting(true);
+    try {
+      const res = await fetch('/api/admin/credits/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: id, delta, reason: adjustReason }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setBalance(Number(json?.balance || 0));
+      toast.success(delta > 0 ? `Added ${Math.abs(delta)} credits` : `Removed ${Math.abs(delta)} credits`);
+      await loadLedger(id);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to adjust');
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  const setBalanceAction = async () => {
+    const id = String(steamId || '').trim();
+    if (!/^\d{17}$/.test(id)) {
+      toast.error('Enter a valid 17-digit SteamID64');
+      return;
+    }
+
+    const newBalance = Math.floor(Number(setBalanceValue || 0));
+    if (!Number.isFinite(newBalance) || newBalance < 0) {
+      toast.error('Enter a valid balance');
+      return;
+    }
+
+    setSettingBalance(true);
+    try {
+      const res = await fetch('/api/admin/credits/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: id, balance: newBalance, reason: setBalanceReason }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setBalance(Number(json?.balance || 0));
+      toast.success('Balance updated');
+      await loadLedger(id);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to set balance');
+    } finally {
+      setSettingBalance(false);
+    }
+  };
+
+  const rollbackEntry = async (entry: LedgerEntry, applyBalance: boolean) => {
+    const id = String(steamId || '').trim();
+    if (!/^\d{17}$/.test(id)) {
+      toast.error('Enter a valid 17-digit SteamID64');
+      return;
+    }
+
+    const entryId = String(entry?.id || '').trim();
+    if (!entryId) {
+      toast.error('This ledger entry has no id');
+      return;
+    }
+
+    const reason = window.prompt('Rollback reason (optional)') || '';
+    const ok = window.confirm(applyBalance ? 'Rollback and apply balance change?' : 'Mark rollback without changing balance?');
+    if (!ok) return;
+
+    setRollingBackId(entryId);
+    try {
+      const res = await fetch('/api/admin/credits/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: id, entryId, applyBalance, reason }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setBalance(Number(json?.balance || 0));
+      toast.success('Rollback applied');
+      await loadLedger(id);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to rollback');
+    } finally {
+      setRollingBackId(null);
+    }
+  };
+
   const loadLedger = async (targetSteamId: string) => {
     const id = String(targetSteamId || '').trim();
     if (!/^\d{17}$/.test(id)) {
@@ -89,6 +272,7 @@ export default function AdminCreditsPage() {
     const id = String(steamId || '').trim();
     await loadUser(id);
     await loadLedger(id);
+    await loadRestrictions(id);
   };
 
   const grant = async () => {
@@ -180,10 +364,10 @@ export default function AdminCreditsPage() {
               />
               <button
                 onClick={loadAll}
-                disabled={loadingUser || loadingLedger}
-                className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${loadingUser || loadingLedger ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                disabled={loadingUser || loadingLedger || restrictionsLoading}
+                className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${loadingUser || loadingLedger || restrictionsLoading ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
               >
-                {loadingUser || loadingLedger ? 'Loading...' : 'Load'}
+                {loadingUser || loadingLedger || restrictionsLoading ? 'Loading...' : 'Load'}
               </button>
             </div>
 
@@ -223,13 +407,132 @@ export default function AdminCreditsPage() {
                 </button>
               </div>
             </div>
+
+            <div className="mt-6 pt-6 border-t border-white/5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Adjust Credits</div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <select
+                  value={adjustMode}
+                  onChange={(e) => setAdjustMode(e.target.value as any)}
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black"
+                >
+                  <option value="add">Add</option>
+                  <option value="remove">Remove</option>
+                </select>
+                <input
+                  value={adjustAmount}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
+                  type="number"
+                  min={1}
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black"
+                />
+                <input
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="Reason (optional)"
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px]"
+                />
+                <button
+                  onClick={adjust}
+                  disabled={adjusting}
+                  className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adjusting ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                >
+                  {adjusting ? 'Updating...' : 'Apply'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-white/5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Set Balance</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  value={setBalanceValue}
+                  onChange={(e) => setSetBalanceValue(e.target.value)}
+                  type="number"
+                  min={0}
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black"
+                />
+                <input
+                  value={setBalanceReason}
+                  onChange={(e) => setSetBalanceReason(e.target.value)}
+                  placeholder="Reason (optional)"
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px]"
+                />
+                <button
+                  onClick={setBalanceAction}
+                  disabled={settingBalance}
+                  className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settingBalance ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'}`}
+                >
+                  {settingBalance ? 'Updating...' : 'Set'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-white/5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Credits Restrictions</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px]">
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
+                  <div className="text-gray-500 uppercase tracking-widest font-black">Credits Ban</div>
+                  <div className="text-[11px] font-black mt-2">{restrictionsLoading ? '—' : (restrictions?.banned ? 'BANNED' : 'OK')}</div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => updateRestrictions('ban')}
+                      disabled={updatingRestrictions}
+                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${updatingRestrictions ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'}`}
+                    >
+                      Ban
+                    </button>
+                    <button
+                      onClick={() => updateRestrictions('unban')}
+                      disabled={updatingRestrictions}
+                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${updatingRestrictions ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/10 hover:bg-white/15 text-white'}`}
+                    >
+                      Unban
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4 md:col-span-2">
+                  <div className="text-gray-500 uppercase tracking-widest font-black">Credits Timeout</div>
+                  <div className="text-[11px] font-black mt-2 break-all">
+                    {restrictionsLoading ? '—' : (restrictions?.timeoutActive ? (restrictions?.timeoutUntil || '—') : 'OK')}
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr,auto,auto] gap-2">
+                    <input
+                      value={timeoutMinutes}
+                      onChange={(e) => setTimeoutMinutes(e.target.value)}
+                      type="number"
+                      min={1}
+                      className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-[11px] font-black"
+                      placeholder="Minutes"
+                    />
+                    <button
+                      onClick={() => updateRestrictions('timeout')}
+                      disabled={updatingRestrictions}
+                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${updatingRestrictions ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 text-white'}`}
+                    >
+                      Timeout
+                    </button>
+                    <button
+                      onClick={() => updateRestrictions('clear_timeout')}
+                      disabled={updatingRestrictions}
+                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${updatingRestrictions ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/10 hover:bg-white/15 text-white'}`}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Ledger</div>
               <button
-                onClick={() => loadLedger(steamId)}
+                onClick={() => {
+                  void loadLedger(steamId);
+                  void loadRestrictions(steamId);
+                }}
                 disabled={loadingLedger}
                 className={`text-[10px] font-black uppercase tracking-widest transition-all ${loadingLedger ? 'text-gray-600 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300'}`}
               >
@@ -247,13 +550,37 @@ export default function AdminCreditsPage() {
             ) : (
               <div className="space-y-2">
                 {ledger.map((e, idx) => (
-                  <div key={`${e.createdAt || 'x'}_${idx}`} className="bg-black/40 border border-white/5 rounded-xl p-3">
+                  <div key={`${e.id || e.createdAt || 'x'}_${idx}`} className="bg-black/40 border border-white/5 rounded-xl p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-[10px] font-black uppercase tracking-widest">{e.type || 'entry'}</div>
                         <div className="text-[9px] text-gray-500 mt-1">{e.createdAt || '—'}</div>
                       </div>
                       <div className={`text-[12px] font-black ${e.delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{e.delta >= 0 ? `+${e.delta}` : `${e.delta}`}</div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => rollbackEntry(e, true)}
+                        disabled={rollingBackId === String(e.id || '')}
+                        className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${rollingBackId === String(e.id || '') ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'}`}
+                      >
+                        {rollingBackId === String(e.id || '') ? 'Rolling...' : 'Rollback'}
+                      </button>
+                      <button
+                        onClick={() => rollbackEntry(e, false)}
+                        disabled={rollingBackId === String(e.id || '')}
+                        className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${rollingBackId === String(e.id || '') ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/10 hover:bg-white/15 text-white'}`}
+                      >
+                        No Balance
+                      </button>
+                      {e.id ? (
+                        <button
+                          onClick={() => copy(String(e.id))}
+                          className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10"
+                        >
+                          Copy ID
+                        </button>
+                      ) : null}
                     </div>
                     {e.meta ? (
                       <div className="mt-2 flex items-center justify-between gap-3">

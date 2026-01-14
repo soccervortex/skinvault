@@ -9,6 +9,7 @@ import { useToast } from '@/app/components/Toast';
 type GiveawayAdminRow = {
   id: string;
   title: string;
+  description?: string;
   prize: string;
   prizeItem?: { id: string; name: string; market_hash_name: string; image: string | null } | null;
   startAt: string | null;
@@ -18,6 +19,7 @@ type GiveawayAdminRow = {
   totalEntries: number;
   totalParticipants: number;
   drawnAt: string | null;
+  archivedAt?: string | null;
 };
 
 type PrizeItem = {
@@ -65,6 +67,7 @@ export default function AdminGiveawaysPage() {
   const [rows, setRows] = useState<GiveawayAdminRow[]>([]);
 
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [prize, setPrize] = useState('');
   const [prizeSearch, setPrizeSearch] = useState('');
@@ -90,7 +93,17 @@ export default function AdminGiveawaysPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedPanel, setSelectedPanel] = useState<'winners' | 'entrants' | null>(null);
   const [winnersLoading, setWinnersLoading] = useState(false);
-  const [winners, setWinners] = useState<Array<{ steamId: string; entries: number; tradeUrl: string }>>([]);
+  const [winners, setWinners] = useState<
+    Array<{
+      steamId: string;
+      entries: number;
+      tradeUrl: string;
+      claimStatus?: string;
+      claimDeadlineAt?: string | null;
+      claimedAt?: string | null;
+      forfeitedAt?: string | null;
+    }>
+  >([]);
   const [entrantsLoading, setEntrantsLoading] = useState(false);
   const [entrants, setEntrants] = useState<EntrantRow[]>([]);
 
@@ -165,7 +178,7 @@ export default function AdminGiveawaysPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prizeSearch, userIsOwner]);
 
-  const create = async () => {
+  const save = async () => {
     if (!title.trim()) {
       toast.error('Missing title');
       return;
@@ -177,23 +190,38 @@ export default function AdminGiveawaysPage() {
 
     setCreating(true);
     try {
-      const res = await fetch('/api/admin/giveaways', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          prize,
-          prizeItem,
-          description,
-          startAt: new Date(startAt).toISOString(),
-          endAt: new Date(endAt).toISOString(),
-          creditsPerEntry,
-          winnerCount,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Failed to create');
-      toast.success('Created giveaway');
+      const payload = {
+        title,
+        prize,
+        prizeItem,
+        description,
+        startAt: new Date(startAt).toISOString(),
+        endAt: new Date(endAt).toISOString(),
+        creditsPerEntry,
+        winnerCount,
+      };
+
+      if (editingId) {
+        const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(editingId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to update');
+        toast.success('Updated giveaway');
+      } else {
+        const res = await fetch('/api/admin/giveaways', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to create');
+        toast.success('Created giveaway');
+      }
+
+      setEditingId(null);
       setTitle('');
       setPrize('');
       setPrizeSearch('');
@@ -205,9 +233,109 @@ export default function AdminGiveawaysPage() {
       setWinnerCount(1);
       await load();
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to create');
+      toast.error(e?.message || (editingId ? 'Failed to update' : 'Failed to create'));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const beginEdit = (g: GiveawayAdminRow) => {
+    if (g.drawnAt) {
+      toast.error('Cannot edit a drawn giveaway');
+      return;
+    }
+    setEditingId(g.id);
+    setTitle(String(g.title || ''));
+    setPrize(String(g.prize || ''));
+    setPrizeSearch('');
+    setPrizeItem(
+      g.prizeItem
+        ? {
+            id: String(g.prizeItem.id || ''),
+            name: String(g.prizeItem.name || ''),
+            market_hash_name: String(g.prizeItem.market_hash_name || ''),
+            image: g.prizeItem.image || null,
+          }
+        : null
+    );
+    setDescription(String(g.description || ''));
+    setStartAt(g.startAt ? toLocalInputValue(new Date(g.startAt)) : '');
+    setEndAt(g.endAt ? toLocalInputValue(new Date(g.endAt)) : '');
+    setCreditsPerEntry(Number(g.creditsPerEntry || 10));
+    setWinnerCount(Number(g.winnerCount || 1));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setTitle('');
+    setPrize('');
+    setPrizeSearch('');
+    setPrizeItem(null);
+    setDescription('');
+    setStartAt('');
+    setEndAt('');
+    setCreditsPerEntry(10);
+    setWinnerCount(1);
+  };
+
+  const deleteGiveaway = async (id: string) => {
+    if (!id) return;
+    const ok = window.confirm('Delete this giveaway? This will also remove entries and winners.');
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Deleted giveaway');
+      if (editingId === id) cancelEdit();
+      if (selectedId === id) {
+        setSelectedId(null);
+        setSelectedPanel(null);
+        setWinners([]);
+        setEntrants([]);
+      }
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to delete');
+    }
+  };
+
+  const rerollAll = async (id: string) => {
+    if (!id) return;
+    const ok = window.confirm('Reroll all winners?');
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/reroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'all' }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Rerolled winners');
+      await loadWinners(id, false);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to reroll');
+    }
+  };
+
+  const rerollWinner = async (giveawayId: string, winnerSteamId: string) => {
+    if (!giveawayId || !winnerSteamId) return;
+    const ok = window.confirm(`Reroll winner ${winnerSteamId}?`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(giveawayId)}/reroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'replace', replaceSteamId: winnerSteamId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Rerolled winner');
+      await loadWinners(giveawayId, false);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to reroll');
     }
   };
 
@@ -348,13 +476,24 @@ export default function AdminGiveawaysPage() {
               </div>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px]" rows={4} />
             </div>
-            <button
-              onClick={create}
-              disabled={creating}
-              className={`mt-4 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
-            >
-              {creating ? 'Creating...' : 'Create'}
-            </button>
+            <div className="mt-4 flex items-center gap-2 flex-wrap">
+              <button
+                onClick={save}
+                disabled={creating}
+                className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+              >
+                {creating ? (editingId ? 'Saving...' : 'Creating...') : (editingId ? 'Save' : 'Create')}
+              </button>
+              {editingId ? (
+                <button
+                  onClick={cancelEdit}
+                  disabled={creating}
+                  className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
           </section>
 
           <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
@@ -390,14 +529,28 @@ export default function AdminGiveawaysPage() {
                         <div className="min-w-0">
                         <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
                         <div className="text-[10px] text-gray-500 mt-1">{g.prize || 'Prize TBA'}</div>
-                        <div className="mt-2 flex items-center gap-4 text-[9px] text-gray-500">
-                          <div className="flex items-center gap-1"><Users size={12} /> {g.totalParticipants}</div>
-                          <div className="flex items-center gap-1"><Trophy size={12} /> {g.winnerCount}</div>
-                          <div className="flex items-center gap-1"><Gift size={12} /> {g.creditsPerEntry} credits</div>
+                        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-[9px] text-gray-500">
+                          <div className="flex items-center gap-1"><Users size={12} /> Participants: {g.totalParticipants}</div>
+                          <div className="flex items-center gap-1"><Gift size={12} /> Entries: {g.totalEntries}</div>
+                          <div className="flex items-center gap-1"><Trophy size={12} /> Winners: {g.winnerCount}</div>
+                          <div className="flex items-center gap-1"><Gift size={12} /> Credits/Entry: {g.creditsPerEntry}</div>
                         </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => beginEdit(g)}
+                          disabled={!!g.drawnAt}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${g.drawnAt ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteGiveaway(g.id)}
+                          className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white"
+                        >
+                          Delete
+                        </button>
                         <button
                           onClick={() => loadEntrants(g.id)}
                           disabled={entrantsLoading && selectedId === g.id}
@@ -412,6 +565,14 @@ export default function AdminGiveawaysPage() {
                         >
                           {(winnersLoading && selectedId === g.id) ? 'Loading...' : (g.drawnAt ? 'View Winners' : 'Draw Winners')}
                         </button>
+                        {g.drawnAt ? (
+                          <button
+                            onClick={() => rerollAll(g.id)}
+                            className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-amber-600 hover:bg-amber-500 text-white"
+                          >
+                            Reroll
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -435,17 +596,31 @@ export default function AdminGiveawaysPage() {
                                 <div className="min-w-0">
                                   <div className="text-[10px] font-black uppercase tracking-widest">{w.steamId}</div>
                                   <div className="text-[9px] text-gray-500">Entries: {w.entries}</div>
+                                  <div className="text-[9px] text-gray-500">
+                                    Status: {w.claimStatus || '—'}
+                                    {w.claimDeadlineAt ? ` • Deadline: ${w.claimDeadlineAt}` : ''}
+                                    {w.claimedAt ? ` • Claimed: ${w.claimedAt}` : ''}
+                                    {w.forfeitedAt ? ` • Forfeited: ${w.forfeitedAt}` : ''}
+                                  </div>
                                   {w.tradeUrl ? (
                                     <div className="text-[9px] text-blue-400 break-all">{w.tradeUrl}</div>
                                   ) : (
                                     <div className="text-[9px] text-gray-600">No trade URL set</div>
                                   )}
                                 </div>
-                                {w.tradeUrl && (
-                                  <button onClick={() => copy(w.tradeUrl)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy trade url">
-                                    <Copy size={14} className="text-gray-300" />
+                                <div className="flex items-center gap-2">
+                                  {w.tradeUrl ? (
+                                    <button onClick={() => copy(w.tradeUrl)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy trade url">
+                                      <Copy size={14} className="text-gray-300" />
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    onClick={() => rerollWinner(g.id, w.steamId)}
+                                    className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all bg-amber-600 hover:bg-amber-500 text-white"
+                                  >
+                                    Reroll
                                   </button>
-                                )}
+                                </div>
                               </div>
                             ))}
                           </div>

@@ -21,6 +21,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
     const doc = await col.findOne({ _id: oid } as any);
     if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if ((doc as any)?.archivedAt) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const now = new Date();
     const startAt = doc.startAt ? new Date(doc.startAt) : null;

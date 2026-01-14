@@ -142,9 +142,9 @@ export default function CreatorsIndexClient() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 p-4 md:p-8">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-4">
           <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Creators</h1>
           {error && <div className="text-sm text-red-300">{error}</div>}

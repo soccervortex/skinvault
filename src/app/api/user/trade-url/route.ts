@@ -17,9 +17,20 @@ function normalizeTradeUrl(raw: string): string {
   const s = String(raw || '').trim();
   if (!s) return '';
   if (s.length > 500) return '';
-  if (!/^https?:\/\//i.test(s)) return '';
-  if (!/steamcommunity\.com\/tradeoffer\/new\//i.test(s)) return '';
-  return s;
+
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+    if (u.hostname !== 'steamcommunity.com') return '';
+    if (u.pathname !== '/tradeoffer/new/') return '';
+    const partner = u.searchParams.get('partner');
+    const token = u.searchParams.get('token');
+    if (!partner || !/^\d+$/.test(partner)) return '';
+    if (!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) return '';
+    return u.toString();
+  } catch {
+    return '';
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -51,7 +62,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => null);
-    const tradeUrl = normalizeTradeUrl(body?.tradeUrl);
+    const raw = String(body?.tradeUrl || '').trim();
+    const tradeUrl = normalizeTradeUrl(raw);
+
+    if (raw && !tradeUrl) {
+      return NextResponse.json(
+        {
+          error:
+            'Invalid trade URL. Use: https://steamcommunity.com/tradeoffer/new/?partner=...&token=... (partner + token required)',
+        },
+        { status: 400 }
+      );
+    }
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
@@ -64,7 +86,7 @@ export async function POST(req: NextRequest) {
     await col.updateOne(
       { _id: steamId },
       {
-        $setOnInsert: { _id: steamId, steamId, updatedAt: now },
+        $setOnInsert: { _id: steamId, steamId },
         $set: { tradeUrl: tradeUrl || '', updatedAt: now },
       },
       { upsert: true }

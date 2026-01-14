@@ -3,6 +3,7 @@ import { dbGet, dbSet } from '@/app/utils/database';
 import { isOwner } from '@/app/utils/owner-ids';
 
 const TIMEOUT_USERS_KEY = 'timeout_users';
+const TIMEOUT_REASONS_KEY = 'timeout_reasons';
 
 // Timeout durations in milliseconds
 const TIMEOUT_DURATIONS: Record<string, number> = {
@@ -47,6 +48,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Timeout verification failed' }, { status: 500 });
     }
 
+    const reason = String(body?.timeoutReason || body?.reason || '').trim();
+    if (reason) {
+      try {
+        const reasons = (await dbGet<Record<string, any>>(TIMEOUT_REASONS_KEY, false)) || {};
+        const next: Record<string, any> = typeof reasons === 'object' && reasons ? { ...reasons } : {};
+        next[String(steamId)] = {
+          reason,
+          at: new Date().toISOString(),
+          by: adminSteamId ? String(adminSteamId) : null,
+        };
+        await dbSet(TIMEOUT_REASONS_KEY, next);
+      } catch {
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: `User ${steamId} timed out for ${duration}`,
@@ -76,6 +92,14 @@ export async function DELETE(request: Request) {
     const timeoutUsers = await dbGet<Record<string, string>>(TIMEOUT_USERS_KEY) || {};
     delete timeoutUsers[steamId];
     await dbSet(TIMEOUT_USERS_KEY, timeoutUsers);
+
+    try {
+      const reasons = (await dbGet<Record<string, any>>(TIMEOUT_REASONS_KEY, false)) || {};
+      const next: Record<string, any> = typeof reasons === 'object' && reasons ? { ...reasons } : {};
+      delete next[String(steamId)];
+      await dbSet(TIMEOUT_REASONS_KEY, next);
+    } catch {
+    }
 
     return NextResponse.json({ success: true, message: `Timeout removed for ${steamId}` });
   } catch (error) {

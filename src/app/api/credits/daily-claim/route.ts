@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isProMongoOnly } from '@/app/utils/pro-status-mongo';
+import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
 
 type UserCreditsDoc = {
   _id: string;
@@ -71,6 +72,17 @@ export async function POST(req: NextRequest) {
   if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const restriction = await getCreditsRestrictionStatus(steamId);
+    if (restriction.banned) {
+      return NextResponse.json({ error: 'Credits access is banned for this user' }, { status: 403 });
+    }
+    if (restriction.timeoutActive) {
+      return NextResponse.json(
+        { error: 'Credits access is temporarily restricted for this user', timeoutUntil: restriction.timeoutUntil },
+        { status: 403 }
+      );
+    }
+
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
     }
@@ -102,7 +114,8 @@ export async function POST(req: NextRequest) {
       { returnDocument: 'after' }
     );
 
-    if (!doc) {
+    const updated = (doc as any)?.value ?? null;
+    if (!updated) {
       return NextResponse.json({ error: 'Already claimed today' }, { status: 400 });
     }
 
@@ -117,7 +130,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         steamId,
-        balance: Number(doc.balance || 0),
+        balance: Number(updated?.balance || 0),
         claimed: amount,
         pro,
         nextEligibleAt: nextMidnightUtc(now).toISOString(),
