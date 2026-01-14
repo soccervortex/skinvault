@@ -77,6 +77,7 @@ export default function AdminGiveawaysPage() {
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
   const [creditsPerEntry, setCreditsPerEntry] = useState(10);
+  const [suggestedCreditsPerEntry, setSuggestedCreditsPerEntry] = useState<number | null>(null);
   const [winnerCount, setWinnerCount] = useState(1);
 
   const applyPreset = (preset: 'day' | 'week' | 'month' | 'year') => {
@@ -142,6 +143,7 @@ export default function AdminGiveawaysPage() {
     const q = String(prizeSearch || '').trim();
     if (!q || q.length < 3) {
       setPrizeItem(null);
+      setSuggestedCreditsPerEntry(null);
       return;
     }
 
@@ -150,7 +152,7 @@ export default function AdminGiveawaysPage() {
       setPrizeItemLoading(true);
       fetch(`/api/item/info?market_hash_name=${encodeURIComponent(q)}`, { cache: 'no-store', signal: controller.signal })
         .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
-        .then(({ ok, j }) => {
+        .then(async ({ ok, j }) => {
           if (!ok) throw new Error(j?.error || 'Failed');
           const item: PrizeItem = {
             id: String(j?.id || ''),
@@ -162,9 +164,27 @@ export default function AdminGiveawaysPage() {
           if (!prize.trim()) {
             setPrize(item.name);
           }
+
+          try {
+            const pr = await fetch(`/api/item/price?market_hash_name=${encodeURIComponent(item.market_hash_name)}`, { cache: 'no-store' });
+            const pj = await pr.json().catch(() => null);
+            const eur = Number(pj?.priceEur);
+            if (pr.ok && Number.isFinite(eur) && eur > 0) {
+              const recommended = Math.min(100000, Math.max(100, Math.round(eur * 200)));
+              setSuggestedCreditsPerEntry(recommended);
+              if (!editingId) {
+                setCreditsPerEntry(recommended);
+              }
+            } else {
+              setSuggestedCreditsPerEntry(null);
+            }
+          } catch {
+            setSuggestedCreditsPerEntry(null);
+          }
         })
         .catch(() => {
           setPrizeItem(null);
+          setSuggestedCreditsPerEntry(null);
         })
         .finally(() => {
           setPrizeItemLoading(false);
@@ -262,6 +282,7 @@ export default function AdminGiveawaysPage() {
     setStartAt(g.startAt ? toLocalInputValue(new Date(g.startAt)) : '');
     setEndAt(g.endAt ? toLocalInputValue(new Date(g.endAt)) : '');
     setCreditsPerEntry(Number(g.creditsPerEntry || 10));
+    setSuggestedCreditsPerEntry(null);
     setWinnerCount(Number(g.winnerCount || 1));
   };
 
@@ -275,6 +296,7 @@ export default function AdminGiveawaysPage() {
     setStartAt('');
     setEndAt('');
     setCreditsPerEntry(10);
+    setSuggestedCreditsPerEntry(null);
     setWinnerCount(1);
   };
 
@@ -456,7 +478,21 @@ export default function AdminGiveawaysPage() {
               <input value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="Prize title (optional override)" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <input value={startAt} onChange={(e) => setStartAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <input value={endAt} onChange={(e) => setEndAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
-              <input value={String(creditsPerEntry)} onChange={(e) => setCreditsPerEntry(Math.max(1, Math.floor(Number(e.target.value || '10'))))} type="number" min={1} className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
+              <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <input value={String(creditsPerEntry)} onChange={(e) => setCreditsPerEntry(Math.max(1, Math.floor(Number(e.target.value || '10'))))} type="number" min={1} className="bg-transparent outline-none w-full text-[11px] font-black" />
+                  {typeof suggestedCreditsPerEntry === 'number' ? (
+                    <button
+                      type="button"
+                      onClick={() => setCreditsPerEntry(suggestedCreditsPerEntry)}
+                      className="shrink-0 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 text-gray-300"
+                    >
+                      Use {suggestedCreditsPerEntry}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-1 text-[9px] text-gray-500 font-black uppercase tracking-widest">Credits / Entry</div>
+              </div>
               <input value={String(winnerCount)} onChange={(e) => setWinnerCount(Math.max(1, Math.floor(Number(e.target.value || '1'))))} type="number" min={1} className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
               <div className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3">
                 <div className="flex items-center justify-between gap-3">

@@ -376,9 +376,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
                 <Wallet size={16} /> My Vault
               </Link>
-              <Link href="/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
-                <Sparkles size={16} /> Giveaways
-              </Link>
               <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
                 <Heart size={16} /> Wishlist
               </Link>
@@ -406,6 +403,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </Link>
               <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
                 <ShoppingCart size={16} /> Shop
+              </Link>
+              <Link href="/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
+                <Sparkles size={16} /> Giveaways
               </Link>
               <Link href="/creators" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
                 <Users size={16} /> Creators
@@ -624,9 +624,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           >
             <Wallet size={16} /> My Vault
           </Link>
-          <Link href="/giveaways" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
-            <Sparkles size={16} /> Giveaways
-          </Link>
           <Link href="/wishlist" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/wishlist' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Wishlist">
             <Heart size={16} /> Wishlist
           </Link>
@@ -651,6 +648,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
           <Link href="/shop" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
             <ShoppingCart size={16} /> Shop
+          </Link>
+          <Link href="/giveaways" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
+            <Sparkles size={16} /> Giveaways
           </Link>
           <Link href="/creators" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${(pathname === '/creators' || pathname.startsWith('/creator/')) ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Creators">
             <Users size={16} /> Creators

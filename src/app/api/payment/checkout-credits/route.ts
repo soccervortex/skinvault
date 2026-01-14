@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -33,9 +34,11 @@ type CreditPack = {
 };
 
 const CREDIT_PACKS: Record<string, CreditPack> = {
-  starter: { credits: 250, amount: 199, label: 'Starter Pack' },
-  value: { credits: 750, amount: 499, label: 'Value Pack' },
-  mega: { credits: 2000, amount: 999, label: 'Mega Pack' },
+  starter: { credits: 500, amount: 199, label: 'Starter Pack' },
+  value: { credits: 1500, amount: 499, label: 'Value Pack' },
+  mega: { credits: 4000, amount: 999, label: 'Mega Pack' },
+  giant: { credits: 10000, amount: 1999, label: 'Giant Pack' },
+  whale: { credits: 30000, amount: 4999, label: 'Whale Pack' },
 };
 
 export async function POST(request: Request) {
@@ -52,6 +55,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'You must be signed in with Steam to purchase credits. Please sign in and try again.' },
         { status: 401 }
+      );
+    }
+
+    const restriction = await getCreditsRestrictionStatus(steamId);
+    if (restriction.banned) {
+      return NextResponse.json({ error: 'Credits access is banned for this user' }, { status: 403 });
+    }
+    if (restriction.timeoutActive) {
+      return NextResponse.json(
+        { error: 'Credits access is temporarily restricted for this user', timeoutUntil: restriction.timeoutUntil },
+        { status: 403 }
       );
     }
 

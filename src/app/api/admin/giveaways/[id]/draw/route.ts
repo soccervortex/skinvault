@@ -125,6 +125,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { $set: { drawnAt: now, updatedAt: now } } as any
     );
 
+    for (const w of winners) {
+      const sid = String((w as any)?.steamId || '').trim();
+      if (!/^\d{17}$/.test(sid)) continue;
+      await createUserNotification(
+        db,
+        sid,
+        'giveaway_won',
+        'You Won a Giveaway!',
+        'You were selected as a giveaway winner. Claim your prize within 24 hours in the Giveaways page.',
+        { giveawayId: id, claimDeadlineAt: (w as any)?.claimDeadlineAt ? new Date((w as any).claimDeadlineAt).toISOString() : null }
+      );
+    }
+
     return NextResponse.json({ ok: true, winners }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to draw' }, { status: 500 });

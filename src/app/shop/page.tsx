@@ -16,7 +16,7 @@ export default function ShopPage() {
   const [loadingRewards, setLoadingRewards] = useState(true);
   const toast = useToast();
 
-  const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega') => {
+  const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale') => {
     if (!user?.steamId) {
       toast.error('You must be signed in with Steam to purchase. Please sign in first.');
       setTimeout(() => window.location.href = '/inventory', 2000);
@@ -172,11 +172,11 @@ export default function ShopPage() {
               Credits can be used for giveaways and other credit-based features.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4">
               <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
                 <div>
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
-                  <p className="text-lg font-black">250 Credits</p>
+                  <p className="text-lg font-black">500 Credits</p>
                   <p className="text-[10px] text-gray-400">€1.99</p>
                 </div>
                 <button
@@ -199,7 +199,7 @@ export default function ShopPage() {
               <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
                 <div>
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Value</p>
-                  <p className="text-lg font-black">750 Credits</p>
+                  <p className="text-lg font-black">1500 Credits</p>
                   <p className="text-[10px] text-gray-400">€4.99</p>
                 </div>
                 <button
@@ -222,7 +222,7 @@ export default function ShopPage() {
               <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
                 <div>
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Mega</p>
-                  <p className="text-lg font-black">2000 Credits</p>
+                  <p className="text-lg font-black">4000 Credits</p>
                   <p className="text-[10px] text-gray-400">€9.99</p>
                 </div>
                 <button
@@ -231,6 +231,52 @@ export default function ShopPage() {
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_mega' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Giant</p>
+                  <p className="text-lg font-black">10000 Credits</p>
+                  <p className="text-[10px] text-gray-400">€19.99</p>
+                </div>
+                <button
+                  onClick={() => handleCreditsCheckout('giant')}
+                  disabled={loading === 'credits_giant' || !user?.steamId}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_giant' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Whale</p>
+                  <p className="text-lg font-black">30000 Credits</p>
+                  <p className="text-[10px] text-gray-400">€49.99</p>
+                </div>
+                <button
+                  onClick={() => handleCreditsCheckout('whale')}
+                  disabled={loading === 'credits_whale' || !user?.steamId}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_whale' ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" /> Processing...
                     </>

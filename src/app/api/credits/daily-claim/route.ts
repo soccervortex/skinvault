@@ -44,14 +44,15 @@ export async function GET(req: NextRequest) {
 
     const db = await getDatabase();
     const creditsCol = db.collection<UserCreditsDoc>('user_credits');
+    const claimsCol = db.collection('credits_daily_claims');
 
     const now = new Date();
     const today = dayKeyUtc(now);
     const nextEligibleAt = nextMidnightUtc(now);
 
-    const doc = await creditsCol.findOne({ _id: steamId } as any);
-    const lastDay = String((doc as any)?.lastDailyClaimDay || '');
-    const canClaim = !lastDay || lastDay !== today;
+    const claimKey = `${steamId}_${today}`;
+    const alreadyClaimed = await claimsCol.findOne({ _id: claimKey } as any, { projection: { _id: 1 } });
+    const canClaim = !alreadyClaimed;
 
     return NextResponse.json(
       {
@@ -90,33 +91,49 @@ export async function POST(req: NextRequest) {
     const db = await getDatabase();
     const creditsCol = db.collection<UserCreditsDoc>('user_credits');
     const ledgerCol = db.collection<CreditsLedgerDoc>('credits_ledger');
+    const claimsCol = db.collection('credits_daily_claims');
 
     const now = new Date();
     const today = dayKeyUtc(now);
     const pro = await isProMongoOnly(steamId);
     const amount = pro ? 20 : 10;
 
-    await creditsCol.updateOne(
-      { _id: steamId } as any,
-      { $setOnInsert: { _id: steamId, steamId, balance: 0, updatedAt: now } } as any,
-      { upsert: true }
-    );
+    const claimKey = `${steamId}_${today}`;
+    try {
+      await claimsCol.insertOne({
+        _id: claimKey,
+        steamId,
+        day: today,
+        createdAt: now,
+        amount,
+        pro,
+      } as any);
+    } catch (e: any) {
+      if (e?.code === 11000) {
+        return NextResponse.json({ error: 'Already claimed today' }, { status: 400 });
+      }
+      throw e;
+    }
 
-    const doc = await creditsCol.findOneAndUpdate(
-      {
-        _id: steamId,
-        $or: [{ lastDailyClaimDay: { $ne: today } }, { lastDailyClaimDay: { $exists: false } }],
-      } as any,
-      {
-        $inc: { balance: amount },
-        $set: { updatedAt: now, lastDailyClaimAt: now, lastDailyClaimDay: today },
-      } as any,
-      { returnDocument: 'after' }
-    );
-
-    const updated = (doc as any)?.value ?? null;
-    if (!updated) {
-      return NextResponse.json({ error: 'Already claimed today' }, { status: 400 });
+    let updatedDoc: any = null;
+    try {
+      const upd = await creditsCol.findOneAndUpdate(
+        { _id: steamId } as any,
+        {
+          $setOnInsert: { _id: steamId, steamId, balance: 0 } as any,
+          $inc: { balance: amount },
+          $set: { updatedAt: now, lastDailyClaimAt: now, lastDailyClaimDay: today },
+        } as any,
+        { upsert: true, returnDocument: 'after' }
+      );
+      updatedDoc = (upd as any)?.value ?? null;
+    } catch (e) {
+      try {
+        await claimsCol.deleteOne({ _id: claimKey } as any);
+      } catch {
+        // ignore
+      }
+      throw e;
     }
 
     await ledgerCol.insertOne({
@@ -130,7 +147,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         steamId,
-        balance: Number(updated?.balance || 0),
+        balance: Number(updatedDoc?.balance || 0),
         claimed: amount,
         pro,
         nextEligibleAt: nextMidnightUtc(now).toISOString(),

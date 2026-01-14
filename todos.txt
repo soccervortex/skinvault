@@ -1,0 +1,12 @@
+Weapon Categorize modal not responsive
+
+A Edit button to see your profile how others sees it and a edit preview to see the trade url edit thing as example: no i want it shows how a other user copmes to your profile but if its your own porfile you have a edit button
+
+Where are all the stats it seems like you removed it in the inventory for the user
+
+create more and better milestones not only credits be various with some things
+
+no top right timeout or ban button for shwoing publicly if the user acoount got banned for acces or just for credits or something else 
+
+Banned users cant buy credits obviously
+
