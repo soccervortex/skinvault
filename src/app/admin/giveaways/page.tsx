@@ -170,7 +170,15 @@ export default function AdminGiveawaysPage() {
             const pj = await pr.json().catch(() => null);
             const eur = Number(pj?.priceEur);
             if (pr.ok && Number.isFinite(eur) && eur > 0) {
-              const recommended = Math.min(100000, Math.max(100, Math.round(eur * 200)));
+              const whalePackCredits = 30000;
+              const whalePackAmountCents = 4999;
+              const eurPerCredit = (whalePackAmountCents / 100) / whalePackCredits;
+              const profitAndFeesMultiplier = 1.25;
+              const totalPrizeEur = eur * Math.max(1, Math.floor(Number(winnerCount || 1)));
+              const recommended = Math.min(
+                100000,
+                Math.max(100, Math.ceil((totalPrizeEur / eurPerCredit) * profitAndFeesMultiplier))
+              );
               setSuggestedCreditsPerEntry(recommended);
               if (!editingId) {
                 setCreditsPerEntry(recommended);
