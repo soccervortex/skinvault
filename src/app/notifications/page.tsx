@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import { useToast } from '@/app/components/Toast';
 import { isOwner } from '@/app/utils/owner-ids';
-import { Bell, Check, CheckCheck, Loader2, RefreshCw } from 'lucide-react';
+import { Bell, Check, CheckCheck, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 
 type NotificationRow = {
   id: string;
@@ -51,6 +51,7 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [markingAll, setMarkingAll] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -128,6 +129,28 @@ export default function NotificationsPage() {
       toast.error(e?.message || 'Failed to mark all as read');
     } finally {
       setMarkingAll(false);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    if (!id || !targetSteamId) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch('/api/user/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: String(targetSteamId), ids: [id] }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('user-notifications-updated'));
+      }
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to delete');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -244,6 +267,16 @@ export default function NotificationsPage() {
                               </span>
                             </button>
                           ) : null}
+
+                          <button
+                            onClick={() => void deleteNotification(n.id)}
+                            disabled={deletingId === n.id}
+                            className={`p-2 rounded-xl border transition-all ${deletingId === n.id ? 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed' : 'bg-black/40 border-white/10 hover:border-white/20 text-gray-300'}`}
+                            aria-label="Delete notification"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
                     </div>

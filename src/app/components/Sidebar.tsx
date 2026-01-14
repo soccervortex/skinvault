@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users, CheckCircle2, Coins } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users, CheckCircle2, Coins, Bell } from 'lucide-react';
 import HelpTooltip from './HelpTooltip';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
@@ -35,6 +35,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const [themesDisabled, setThemesDisabled] = useState(false);
   const [hasActiveTheme, setHasActiveTheme] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsUnreadCount, setNotificationsUnreadCount] = useState(0);
  
 
   // 1. Sync User state met LocalStorage & andere tabbladen
@@ -194,6 +195,45 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
 
     return () => {
       window.removeEventListener('themeChanged', handleThemeChange);
+      clearInterval(interval);
+    };
+  }, [user?.steamId]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const updateNotificationsUnread = async () => {
+      const steamId = String(user?.steamId || '').trim();
+      if (!/^\d{17}$/.test(steamId)) {
+        if (alive) setNotificationsUnreadCount(0);
+        return;
+      }
+      try {
+        const url = `/api/user/notifications?limit=1&unreadOnly=true&steamId=${encodeURIComponent(steamId)}`;
+        const res = await fetchWithTimeout(url, { cache: 'no-store' }, 6000);
+        if (!res.ok) {
+          if (alive) setNotificationsUnreadCount(0);
+          return;
+        }
+        const json = await res.json().catch(() => null);
+        const c = Number(json?.unreadCount || 0);
+        if (alive) setNotificationsUnreadCount(Number.isFinite(c) ? c : 0);
+      } catch {
+        if (alive) setNotificationsUnreadCount(0);
+      }
+    };
+
+    void updateNotificationsUnread();
+
+    const handleUpdated = () => {
+      void updateNotificationsUnread();
+    };
+
+    window.addEventListener('user-notifications-updated', handleUpdated);
+    const interval = setInterval(updateNotificationsUnread, 15000);
+    return () => {
+      alive = false;
+      window.removeEventListener('user-notifications-updated', handleUpdated);
       clearInterval(interval);
     };
   }, [user?.steamId]);
@@ -384,6 +424,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 {unreadCount > 0 && (
                   <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
                     {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+
+              <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/notifications' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Notifications">
+                <Bell size={16} /> Notifications
+                {notificationsUnreadCount > 0 && (
+                  <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                    {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
                   </span>
                 )}
               </Link>
@@ -626,6 +675,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             {unreadCount > 0 && (
               <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
                 {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </Link>
+
+          <Link href="/notifications" className={`relative flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/notifications' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Notifications">
+            <Bell size={16} /> Notifications
+            {notificationsUnreadCount > 0 && (
+              <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
               </span>
             )}
           </Link>

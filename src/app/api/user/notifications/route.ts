@@ -134,3 +134,54 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message || 'Failed to update notifications' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const requesterSteamId = getSteamIdFromRequest(req);
+  if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
+    const body = await req.json().catch(() => null);
+    const requested = sanitizeSteamId(body?.steamId);
+    const steamId = requested || requesterSteamId;
+
+    const requesterIsOwner = isOwner(requesterSteamId);
+    if (!requesterIsOwner && steamId !== requesterSteamId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const idsRaw: any[] = Array.isArray(body?.ids) ? body.ids : (body?.id ? [body.id] : []);
+    const ids = idsRaw
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .slice(0, 200);
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: 'Missing ids' }, { status: 400 });
+    }
+
+    const objectIds: ObjectId[] = [];
+    for (const id of ids) {
+      try {
+        objectIds.push(new ObjectId(id));
+      } catch {
+        // ignore invalid
+      }
+    }
+
+    if (objectIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid ids' }, { status: 400 });
+    }
+
+    const db = await getDatabase();
+    const col = db.collection<UserNotificationDoc>('user_notifications');
+
+    const res = await col.deleteMany({ steamId, _id: { $in: objectIds } } as any);
+    return NextResponse.json({ ok: true, deleted: res?.deletedCount || 0 }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Failed to delete notifications' }, { status: 500 });
+  }
+}

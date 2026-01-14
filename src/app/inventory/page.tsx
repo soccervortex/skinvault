@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy, HelpCircle, User, Mail, X, Wallet } from 'lucide-react';
+import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, MessageSquare, CheckCircle2, Settings, Bell, Heart, Scale, Trophy, HelpCircle, User, Mail, X, Wallet, Trash2 } from 'lucide-react';
 import { getPriceScanConcurrencySync, getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import dynamic from 'next/dynamic';
@@ -286,6 +286,7 @@ function InventoryContent() {
   const [notificationsUnreadCount, setNotificationsUnreadCount] = useState(0);
   const [markingAllNotifications, setMarkingAllNotifications] = useState(false);
   const [markingNotificationId, setMarkingNotificationId] = useState<string | null>(null);
+  const [deletingNotificationId, setDeletingNotificationId] = useState<string | null>(null);
   const [actorProfilesBySteamId, setActorProfilesBySteamId] = useState<Record<string, { name?: string; avatar?: string }>>({});
   const [notificationPreview, setNotificationPreview] = useState<{ title?: string; imageUrl: string } | null>(null);
 
@@ -412,6 +413,30 @@ function InventoryContent() {
       await loadNotifications();
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update notifications');
+    }
+  };
+
+  const deleteNotifications = async (ids: string[]) => {
+    if (!notificationsTargetSteamId) return;
+    const list = (Array.isArray(ids) ? ids : [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .slice(0, 200);
+    if (list.length === 0) return;
+    try {
+      const res = await fetch('/api/user/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamId: String(notificationsTargetSteamId), ids: list }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('user-notifications-updated'));
+      }
+      await loadNotifications();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to delete notification');
     }
   };
 
@@ -2448,6 +2473,8 @@ function InventoryContent() {
                   {loggedInIsOwner && String(loggedInUser?.steamId || '').trim() !== String(viewedUser?.steamId || '').trim()
                     ? `Viewing ${formatProfileName(viewedUser?.name || 'User')}`
                     : 'Your inbox'}
+                  <span className="text-gray-600"> • Unread: </span>
+                  <span className="text-white font-black">{Number(notificationsUnreadCount || 0)}</span>
                 </div>
               </div>
 
@@ -2540,6 +2567,19 @@ function InventoryContent() {
                                     {markingNotificationId === r.id ? '…' : 'Read'}
                                   </button>
                                 )}
+                                <button
+                                  onClick={async () => {
+                                    setDeletingNotificationId(r.id);
+                                    await deleteNotifications([r.id]);
+                                    setDeletingNotificationId(null);
+                                  }}
+                                  disabled={deletingNotificationId === r.id}
+                                  className={`w-10 h-10 rounded-xl border transition-all flex items-center justify-center ${deletingNotificationId === r.id ? 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed' : 'bg-black/40 border-white/10 hover:border-white/20 text-gray-300'}`}
+                                  aria-label="Delete notification"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             </div>
                           </div>
