@@ -419,11 +419,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/report-item" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
                 <AlertTriangle size={16} /> Report Item
               </Link>
-              {isOwner(user?.steamId) && (
-                <Link href="/admin/credits" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/credits') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}> 
-                  <Coins size={16} /> Credits Admin
-                </Link>
-              )}
 
               <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
                 <Shield size={16} /> Admin Panel
@@ -661,11 +656,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/report-item" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
             <AlertTriangle size={16} /> Report Item
           </Link>
-          {isOwner(user?.steamId) && (
-            <Link href="/admin/credits" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/credits') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}> 
-              <Coins size={16} /> Credits Admin
-            </Link>
-          )}
 
           <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
             <Shield size={16} /> Admin Panel
