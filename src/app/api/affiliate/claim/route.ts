@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
           const updated = await creditsCol.findOneAndUpdate(
             { _id: steamId } as any,
             {
-              $setOnInsert: { _id: steamId, steamId, updatedAt: now },
+              $setOnInsert: { _id: steamId, steamId },
               $inc: { balance: milestone.reward.amount },
               $set: { updatedAt: now },
             } as any,
