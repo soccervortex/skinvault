@@ -14,6 +14,7 @@ export default function ShopPage() {
   const [isPro, setIsPro] = useState(false);
   const [userRewards, setUserRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(true);
+  const [creditsRestriction, setCreditsRestriction] = useState<{ banned: boolean; timeoutActive: boolean; timeoutUntil: string | null } | null>(null);
   const toast = useToast();
 
   const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale') => {
@@ -66,6 +67,18 @@ export default function ShopPage() {
       // Check Pro status
       if (parsedUser?.steamId) {
         checkProStatus(parsedUser.steamId).then(setIsPro);
+
+        fetch('/api/credits/restriction', { cache: 'no-store' })
+          .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+          .then(({ ok, j }) => {
+            if (!ok) return;
+            setCreditsRestriction({
+              banned: !!j?.banned,
+              timeoutActive: !!j?.timeoutActive,
+              timeoutUntil: j?.timeoutUntil ? String(j.timeoutUntil) : null,
+            });
+          })
+          .catch(() => setCreditsRestriction(null));
         
         // Load user rewards to check what they already have
         setLoadingRewards(true);
@@ -172,16 +185,28 @@ export default function ShopPage() {
               Credits can be used for giveaways and other credit-based features.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4">
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
-                <div>
+            {(creditsRestriction?.banned || creditsRestriction?.timeoutActive) && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-[10px] text-red-200">
+                <div className="font-black uppercase tracking-widest text-[9px] text-red-300">Credits purchases restricted</div>
+                <div className="mt-1">
+                  {creditsRestriction?.banned
+                    ? 'Your account is banned from using credits.'
+                    : `Your account is temporarily restricted from using credits${creditsRestriction?.timeoutUntil ? ` until ${creditsRestriction.timeoutUntil}` : ''}.`}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4 items-stretch">
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
                   <p className="text-lg font-black">500 Credits</p>
                   <p className="text-[10px] text-gray-400">€1.99</p>
                 </div>
                 <button
+                  style={{ marginTop: 'auto' }}
                   onClick={() => handleCreditsCheckout('starter')}
-                  disabled={loading === 'credits_starter' || !user?.steamId}
+                  disabled={loading === 'credits_starter' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_starter' ? (
@@ -196,15 +221,16 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
-                <div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Value</p>
                   <p className="text-lg font-black">1500 Credits</p>
                   <p className="text-[10px] text-gray-400">€4.99</p>
                 </div>
                 <button
+                  style={{ marginTop: 'auto' }}
                   onClick={() => handleCreditsCheckout('value')}
-                  disabled={loading === 'credits_value' || !user?.steamId}
+                  disabled={loading === 'credits_value' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_value' ? (
@@ -219,15 +245,16 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
-                <div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Mega</p>
                   <p className="text-lg font-black">4000 Credits</p>
                   <p className="text-[10px] text-gray-400">€9.99</p>
                 </div>
                 <button
+                  style={{ marginTop: 'auto' }}
                   onClick={() => handleCreditsCheckout('mega')}
-                  disabled={loading === 'credits_mega' || !user?.steamId}
+                  disabled={loading === 'credits_mega' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_mega' ? (
@@ -242,15 +269,16 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
-                <div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Giant</p>
                   <p className="text-lg font-black">10000 Credits</p>
                   <p className="text-[10px] text-gray-400">€19.99</p>
                 </div>
                 <button
+                  style={{ marginTop: 'auto' }}
                   onClick={() => handleCreditsCheckout('giant')}
-                  disabled={loading === 'credits_giant' || !user?.steamId}
+                  disabled={loading === 'credits_giant' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_giant' ? (
@@ -265,15 +293,16 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
-                <div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Whale</p>
                   <p className="text-lg font-black">30000 Credits</p>
                   <p className="text-[10px] text-gray-400">€49.99</p>
                 </div>
                 <button
+                  style={{ marginTop: 'auto' }}
                   onClick={() => handleCreditsCheckout('whale')}
-                  disabled={loading === 'credits_whale' || !user?.steamId}
+                  disabled={loading === 'credits_whale' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_whale' ? (

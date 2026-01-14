@@ -231,6 +231,7 @@ export default function ProInfoPage() {
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5 space-y-2">
             <p className="font-black uppercase tracking-[0.3em] text-gray-500">What you unlock</p>
             <ul className="space-y-1 text-gray-300 text-[10px]">
+              <li>– Monthly Pro credits stipend</li>
               <li>– Unlimited wishlist size</li>
               <li>– ⚡ Faster price scanning (10x speed)</li>
               <li>– ⚡ Priority API requests</li>

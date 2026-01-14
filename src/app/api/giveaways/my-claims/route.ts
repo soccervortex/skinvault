@@ -1,0 +1,124 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { ObjectId } from 'mongodb';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+
+export const runtime = 'nodejs';
+
+type GiveawayDoc = {
+  _id: ObjectId;
+  title?: string;
+  prize?: string;
+  prizeItem?: { id?: string; name?: string; market_hash_name?: string; marketHashName?: string; image?: string | null };
+  archivedAt?: Date;
+};
+
+export async function GET(req: NextRequest) {
+  const steamId = getSteamIdFromRequest(req);
+  if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    if (!hasMongoConfig()) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
+    const db = await getDatabase();
+    const winnersCol = db.collection('giveaway_winners');
+    const giveawaysCol = db.collection<GiveawayDoc>('giveaways');
+
+    const now = new Date();
+
+    const docs: any[] = await winnersCol
+      .find(
+        {
+          winners: {
+            $elemMatch: {
+              steamId,
+              claimStatus: 'pending',
+              claimDeadlineAt: { $gt: now },
+            },
+          },
+        } as any,
+        { projection: { _id: 1, giveawayId: 1, winners: 1 } }
+      )
+      .sort({ pickedAt: -1 })
+      .limit(100)
+      .toArray();
+
+    const giveawayIds: ObjectId[] = [];
+
+    for (const d of docs) {
+      const oid = d?.giveawayId;
+      if (oid && typeof oid === 'object') {
+        giveawayIds.push(oid as ObjectId);
+        continue;
+      }
+
+      const id = String(d?._id || '').trim();
+      if (!id) continue;
+      try {
+        giveawayIds.push(new ObjectId(id));
+      } catch {
+        continue;
+      }
+    }
+
+    const giveaways = giveawayIds.length
+      ? await giveawaysCol
+          .find({ _id: { $in: giveawayIds }, archivedAt: { $exists: false } } as any, {
+            projection: { _id: 1, title: 1, prize: 1, prizeItem: 1, archivedAt: 1 },
+          })
+          .toArray()
+      : [];
+
+    const byId = new Map<string, GiveawayDoc>();
+    for (const g of giveaways as any[]) {
+      byId.set(String(g?._id || ''), g as GiveawayDoc);
+    }
+
+    const out = docs
+      .map((d) => {
+        const id = String(d?._id || '').trim();
+        const g: any = byId.get(id);
+        if (!g) return null;
+
+        const winners: any[] = Array.isArray(d?.winners) ? d.winners : [];
+        const mine = winners.find((w) => String(w?.steamId || '') === steamId) || null;
+        if (!mine) return null;
+
+        const claimDeadlineAt = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).toISOString() : null;
+        const deadlineMs = claimDeadlineAt ? Date.parse(claimDeadlineAt) : NaN;
+        if (Number.isFinite(deadlineMs) && deadlineMs <= Date.now()) return null;
+
+        return {
+          giveawayId: id,
+          title: String(g?.title || ''),
+          prize: String(g?.prize || ''),
+          prizeItem: g?.prizeItem
+            ? {
+                id: String(g.prizeItem?.id || ''),
+                name: String(g.prizeItem?.name || ''),
+                market_hash_name: String(g.prizeItem?.market_hash_name || g.prizeItem?.marketHashName || ''),
+                image: g.prizeItem?.image ? String(g.prizeItem.image) : null,
+              }
+            : null,
+          entries: Number(mine?.entries || 0),
+          claimStatus: String(mine?.claimStatus || ''),
+          claimDeadlineAt,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => {
+        const am = a?.claimDeadlineAt ? Date.parse(String(a.claimDeadlineAt)) : 0;
+        const bm = b?.claimDeadlineAt ? Date.parse(String(b.claimDeadlineAt)) : 0;
+        return am - bm;
+      });
+
+    const res = NextResponse.json({ ok: true, steamId, claims: out }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Failed to load claims' }, { status: 500 });
+  }
+}

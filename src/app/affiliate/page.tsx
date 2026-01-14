@@ -8,10 +8,26 @@ import { Copy, Gift, Loader2, Users } from 'lucide-react';
 type Milestone = {
   id: string;
   referralsRequired: number;
-  rewardCredits: number;
+  reward:
+    | { type: 'credits'; amount: number }
+    | { type: 'discord_access' }
+    | { type: 'wishlist_slot' }
+    | { type: 'price_tracker_slot' }
+    | { type: 'price_scan_boost' }
+    | { type: 'cache_boost' };
   claimed: boolean;
   claimable: boolean;
 };
+
+function getRewardLabel(reward: Milestone['reward']): string {
+  if (reward.type === 'credits') return `+${reward.amount} credits`;
+  if (reward.type === 'discord_access') return 'Discord access';
+  if (reward.type === 'wishlist_slot') return '+1 wishlist slot';
+  if (reward.type === 'price_tracker_slot') return '+1 price tracker slot';
+  if (reward.type === 'price_scan_boost') return 'Faster price scanning';
+  if (reward.type === 'cache_boost') return 'Better cache / faster loads';
+  return 'Reward';
+}
 
 export default function AffiliatePage() {
   const toast = useToast();
@@ -85,7 +101,22 @@ export default function AffiliatePage() {
       if (json?.alreadyClaimed) {
         toast.success('Already claimed');
       } else {
-        toast.success(`Claimed ${Number(json?.granted || 0)} credits`);
+        const rt = String(json?.reward?.type || '');
+        if (rt === 'credits') {
+          toast.success(`Claimed ${Number(json?.granted || 0)} credits`);
+        } else if (rt === 'discord_access') {
+          toast.success('Claimed Discord access');
+        } else if (rt === 'wishlist_slot') {
+          toast.success('Claimed +1 wishlist slot');
+        } else if (rt === 'price_tracker_slot') {
+          toast.success('Claimed +1 price tracker slot');
+        } else if (rt === 'price_scan_boost') {
+          toast.success('Claimed price scan boost');
+        } else if (rt === 'cache_boost') {
+          toast.success('Claimed cache boost');
+        } else {
+          toast.success('Claimed');
+        }
       }
       await load();
     } catch (e: any) {
@@ -169,7 +200,7 @@ export default function AffiliatePage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] uppercase tracking-widest font-black text-gray-500">{m.referralsRequired} referrals</div>
-                        <div className="text-xl font-black italic tracking-tighter mt-1">+{m.rewardCredits} credits</div>
+                        <div className="text-xl font-black italic tracking-tighter mt-1">{getRewardLabel(m.reward)}</div>
                       </div>
                       <Gift className="text-yellow-400" size={18} />
                     </div>

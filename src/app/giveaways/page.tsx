@@ -54,6 +54,16 @@ type DailyClaimStatus = {
   serverNow: string;
 };
 
+type MyClaimRow = {
+  giveawayId: string;
+  title: string;
+  prize: string;
+  prizeItem?: PrizeItem;
+  entries: number;
+  claimStatus: string;
+  claimDeadlineAt: string | null;
+};
+
 function formatHms(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
   const hh = String(Math.floor(s / 3600)).padStart(2, '0');
@@ -150,6 +160,9 @@ export default function GiveawaysPage() {
   const [myWinnerLoading, setMyWinnerLoading] = useState(false);
   const [claimingPrize, setClaimingPrize] = useState(false);
 
+  const [myClaims, setMyClaims] = useState<MyClaimRow[]>([]);
+  const [myClaimsLoading, setMyClaimsLoading] = useState(false);
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -190,6 +203,24 @@ export default function GiveawaysPage() {
       setGiveaways([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMyClaims = async () => {
+    if (!user?.steamId) {
+      setMyClaims([]);
+      return;
+    }
+    setMyClaimsLoading(true);
+    try {
+      const res = await fetch('/api/giveaways/my-claims', { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setMyClaims(Array.isArray(json?.claims) ? (json.claims as MyClaimRow[]) : []);
+    } catch {
+      setMyClaims([]);
+    } finally {
+      setMyClaimsLoading(false);
     }
   };
 
@@ -310,6 +341,11 @@ export default function GiveawaysPage() {
   }, [user?.steamId]);
 
   useEffect(() => {
+    void loadMyClaims();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.steamId]);
+
+  useEffect(() => {
     loadDailyClaimStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.steamId]);
@@ -377,6 +413,38 @@ export default function GiveawaysPage() {
     } catch (e: any) {
       toast.error(e?.message || 'Failed to claim');
       await loadMyWinner(detail.id);
+    } finally {
+      setClaimingPrize(false);
+    }
+  };
+
+  const claimPrizeById = async (giveawayId: string) => {
+    const id = String(giveawayId || '').trim();
+    if (!id) return;
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return;
+    }
+    setClaimingPrize(true);
+    try {
+      const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Prize claimed');
+      await loadMyClaims();
+      if (detail?.id && String(detail.id) === id) {
+        await loadMyWinner(id);
+      }
+      await loadGiveaways();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to claim');
+      await loadMyClaims();
+      if (detail?.id && String(detail.id) === id) {
+        await loadMyWinner(id);
+      }
     } finally {
       setClaimingPrize(false);
     }
@@ -520,6 +588,53 @@ export default function GiveawaysPage() {
               </div>
             )}
           </header>
+
+          {!!user?.steamId && (
+            <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Claimable prizes</div>
+                <Ticket className="text-emerald-400" size={18} />
+              </div>
+
+              {myClaimsLoading ? (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Loader2 className="animate-spin" size={18} />
+                  <span className="text-[11px] uppercase tracking-widest font-black">Loading</span>
+                </div>
+              ) : myClaims.length === 0 ? (
+                <div className="text-gray-500 text-[11px]">No claimable prizes right now.</div>
+              ) : (
+                <div className="space-y-2">
+                  {myClaims.slice(0, 10).map((c) => (
+                    <div key={c.giveawayId} className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4 flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-black uppercase tracking-widest truncate">{c.title}</div>
+                        <div className="text-[10px] text-gray-500 mt-1 truncate">{c.prize || 'Prize'}</div>
+                        <div className="mt-2 text-[9px] text-emerald-300 font-black uppercase tracking-widest">
+                          Deadline: {c.claimDeadlineAt ? new Date(c.claimDeadlineAt).toLocaleString() : '—'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => loadDetail(c.giveawayId)}
+                          className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
+                        >
+                          Open
+                        </button>
+                        <button
+                          onClick={() => claimPrizeById(c.giveawayId)}
+                          disabled={claimingPrize}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                        >
+                          Claim
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center py-24 text-gray-500">

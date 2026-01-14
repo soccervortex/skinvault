@@ -10,3 +10,11 @@ no top right timeout or ban button for shwoing publicly if the user acoount got 
 
 Banned users cant buy credits obviously
 
+credits in the shop not nice aligned look at 500 credits one and the rest of it
+
+pro what you unlock field doesnt say credits
+
+in the sidebar there is standing giveaway admin but i dont want this in the sidebar cause i already have it in the admin panel
+
+claim in affialte doesnt work Updating the path 'balance' would create a conflict at 'balance' api/affiliate/claim:1   Failed to load resource: the server responded with a status of 500 ()
+api/affiliate/claim:1   Failed to load resource: the server responded with a status of 500 ()

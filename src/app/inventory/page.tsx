@@ -221,6 +221,10 @@ type PublicProfileStatus = {
   timeoutActive?: boolean;
   timeoutMinutesRemaining?: number;
   timeoutReason?: string | null;
+  creditsBanned?: boolean;
+  creditsTimeoutUntil?: string | null;
+  creditsTimeoutActive?: boolean;
+  creditsTimeoutMinutesRemaining?: number;
 };
 
 type NotificationRow = {
@@ -267,6 +271,7 @@ function InventoryContent() {
   const [tradeUrlInput, setTradeUrlInput] = useState<string>('');
   const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
   const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
+  const [viewAsOthers, setViewAsOthers] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
   const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -295,6 +300,11 @@ function InventoryContent() {
   }, [loggedInUser?.steamId, loggedInUser?.proUntil, loggedInUserPro]);
 
   const loggedInIsOwner = useMemo(() => isOwner(loggedInUser?.steamId), [loggedInUser?.steamId]);
+  const viewingOwnProfile = useMemo(
+    () => !!(loggedInUser?.steamId && viewedUser?.steamId && String(loggedInUser.steamId) === String(viewedUser.steamId)),
+    [loggedInUser?.steamId, viewedUser?.steamId]
+  );
+  const effectiveIsOwner = useMemo(() => viewingOwnProfile && !viewAsOthers, [viewingOwnProfile, viewAsOthers]);
 
   const notificationsTargetSteamId = useMemo(() => {
     const loggedInSteamId = String(loggedInUser?.steamId || '').trim();
@@ -1797,8 +1807,16 @@ function InventoryContent() {
                     )}
                   </div>
                   {/* Action Buttons (only for own profile) */}
-                  {loggedInUser?.steamId === viewedUser?.steamId && (
+                  {effectiveIsOwner && (
                     <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
+                      <button
+                        onClick={() => setViewAsOthers(true)}
+                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        title="Preview your profile as other users see it"
+                      >
+                        View as others
+                      </button>
+
                       {/* Refresh Button (visible to all) */}
                       <button
                         onClick={handleForceRefreshInventory}
@@ -1897,7 +1915,18 @@ function InventoryContent() {
                       </div>
                     </div>
                   )}
-                  {!tradeUrlLoading && tradeUrl && loggedInUser?.steamId !== viewedUser?.steamId && (
+                  {viewingOwnProfile && viewAsOthers && (
+                    <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
+                      <button
+                        onClick={() => setViewAsOthers(false)}
+                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        title="Return to editing your own profile"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+                  {!tradeUrlLoading && tradeUrl && !effectiveIsOwner && (
                     <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
                       <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">Trade URL</p>
                       <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
@@ -1964,6 +1993,31 @@ function InventoryContent() {
                     </div>
                   )}
 
+                  {!!publicStatus?.creditsBanned && (
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30"
+                      title="Credits restricted: banned"
+                    >
+                      <Skull size={16} className="text-fuchsia-300" />
+                      <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Credits Banned</div>
+                    </div>
+                  )}
+
+                  {!!publicStatus?.creditsTimeoutActive && (
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30"
+                      title={(() => {
+                        const until = publicStatus?.creditsTimeoutUntil ? String(publicStatus.creditsTimeoutUntil) : '';
+                        if (until) return `Credits timeout until ${until}`;
+                        return 'Credits timeout active';
+                      })()}
+                    >
+                      <Lock size={16} className="text-fuchsia-200" />
+                      <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">
+                        Credits Timeout{Number.isFinite(Number(publicStatus?.creditsTimeoutMinutesRemaining)) ? ` (${Number(publicStatus?.creditsTimeoutMinutesRemaining || 0)}m)` : ''}
+                      </div>
+                    </div>
+                  )}
                   {canOpenNotifications && (
                     <button
                       onClick={() => {
@@ -1993,6 +2047,87 @@ function InventoryContent() {
                 </div>
               </div>
             </header>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+              <StatCard
+                label="Total Items"
+                icon={<PackageOpen size={12} />}
+                val={Number.isFinite(Number(totalItems)) ? Number(totalItems).toLocaleString('en-US') : null}
+              />
+
+              <StatCard
+                label="Priced"
+                icon={<TrendingUp size={12} />}
+                val={Number.isFinite(Number(pricedItems)) ? Number(pricedItems).toLocaleString('en-US') : null}
+              />
+
+              <StatCard
+                label="Unpriced"
+                icon={<Target size={12} />}
+                val={Number.isFinite(Number(totalItems - pricedItems)) ? Number(totalItems - pricedItems).toLocaleString('en-US') : null}
+              />
+
+              <StatCard
+                label="K/D"
+                icon={<Swords size={12} />}
+                val={playerStats?.kd ?? null}
+              />
+
+              <StatCard
+                label="HS%"
+                icon={<CheckCircle2 size={12} />}
+                val={playerStats?.hs ?? null}
+                unit={playerStats?.hs ? '%' : ''}
+              />
+
+              <StatCard
+                label="Wins"
+                icon={<Award size={12} />}
+                val={playerStats?.wins ?? null}
+              />
+            </div>
+
+            {isPro && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+                <StatCard
+                  label="ADR"
+                  icon={<Target size={12} />}
+                  val={playerStats?.adr ?? null}
+                />
+
+                <StatCard
+                  label="Accuracy"
+                  icon={<CheckCircle2 size={12} />}
+                  val={playerStats?.accuracy ?? null}
+                  unit={playerStats?.accuracy ? '%' : ''}
+                />
+
+                <StatCard
+                  label="MVPs"
+                  icon={<Award size={12} />}
+                  val={playerStats?.mvps ?? null}
+                />
+
+                <StatCard
+                  label="Faceit ELO"
+                  icon={<TrendingUp size={12} />}
+                  val={faceitStats?.elo ?? null}
+                />
+
+                <StatCard
+                  label="Faceit Level"
+                  icon={<Trophy size={12} />}
+                  val={faceitStats?.level ?? null}
+                />
+
+                <StatCard
+                  label="Faceit WR"
+                  icon={<Swords size={12} />}
+                  val={faceitStats?.winRate ?? null}
+                  unit={faceitStats?.winRate ? '%' : ''}
+                />
+              </div>
+            )}
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">

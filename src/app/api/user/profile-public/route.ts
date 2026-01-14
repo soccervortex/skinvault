@@ -20,6 +20,9 @@ const TIMEOUT_USERS_KEY = 'timeout_users';
 const BAN_REASONS_KEY = 'ban_reasons';
 const TIMEOUT_REASONS_KEY = 'timeout_reasons';
 
+const CREDITS_BANNED_KEY = 'credits_banned_steam_ids';
+const CREDITS_TIMEOUT_USERS_KEY = 'credits_timeout_users';
+
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -28,11 +31,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid steamId' }, { status: 400 });
     }
 
-    const [bannedList, timeoutMap, banReasons, timeoutReasons] = await Promise.all([
+    const [bannedList, timeoutMap, banReasons, timeoutReasons, creditsBannedList, creditsTimeoutMap] = await Promise.all([
       dbGet<string[]>(BANNED_KEY, false),
       dbGet<Record<string, string>>(TIMEOUT_USERS_KEY, false),
       dbGet<Record<string, any>>(BAN_REASONS_KEY, false),
       dbGet<Record<string, any>>(TIMEOUT_REASONS_KEY, false),
+      dbGet<string[]>(CREDITS_BANNED_KEY, false),
+      dbGet<Record<string, string>>(CREDITS_TIMEOUT_USERS_KEY, false),
     ]);
 
     const banned = Array.isArray(bannedList) ? bannedList.includes(steamId) : false;
@@ -51,6 +56,16 @@ export async function GET(req: NextRequest) {
     const banReason = banned ? String((reasonsBan as any)?.[steamId]?.reason || (reasonsBan as any)?.[steamId] || '').trim() : '';
     const timeoutReason = timeoutActive ? String((reasonsTimeout as any)?.[steamId]?.reason || (reasonsTimeout as any)?.[steamId] || '').trim() : '';
 
+    const creditsBanned = Array.isArray(creditsBannedList) ? creditsBannedList.includes(steamId) : false;
+    const ctmap = creditsTimeoutMap && typeof creditsTimeoutMap === 'object' ? creditsTimeoutMap : {};
+    const creditsTimeoutUntilRaw = String((ctmap as any)?.[steamId] || '').trim();
+    const creditsTimeoutUntil = creditsTimeoutUntilRaw || null;
+    const creditsUntilMs = creditsTimeoutUntil ? Date.parse(creditsTimeoutUntil) : NaN;
+    const creditsTimeoutActive = Number.isFinite(creditsUntilMs) ? creditsUntilMs > Date.now() : false;
+    const creditsTimeoutMinutesRemaining = creditsTimeoutActive
+      ? Math.max(0, Math.ceil((creditsUntilMs - Date.now()) / (1000 * 60)))
+      : 0;
+
     let creditsBalance = 0;
     if (!hasMongoConfig()) {
       return NextResponse.json(
@@ -64,6 +79,10 @@ export async function GET(req: NextRequest) {
           timeoutActive,
           timeoutMinutesRemaining,
           timeoutReason: timeoutReason || null,
+          creditsBanned,
+          creditsTimeoutUntil,
+          creditsTimeoutActive,
+          creditsTimeoutMinutesRemaining,
         },
         { status: 200 }
       );
@@ -85,6 +104,10 @@ export async function GET(req: NextRequest) {
         timeoutActive,
         timeoutMinutesRemaining,
         timeoutReason: timeoutReason || null,
+        creditsBanned,
+        creditsTimeoutUntil,
+        creditsTimeoutActive,
+        creditsTimeoutMinutesRemaining,
       },
       { status: 200 }
     );

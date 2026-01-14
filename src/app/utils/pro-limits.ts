@@ -121,10 +121,10 @@ async function getExtraWishlistSlots(steamId?: string | null): Promise<number> {
 }
 
 // Helper to get extra price trackers from rewards
-// NOTE: Price trackers are Pro-only, so no free rewards are available
 async function getExtraPriceTrackers(steamId?: string | null): Promise<number> {
-  // Price trackers require Pro subscription - no free rewards
-  return 0;
+  const rewards = await getStoredRewards(steamId);
+  const extra = rewards.filter((reward: any) => reward?.type === 'price_tracker_slot').length;
+  return extra;
 }
 
 // Performance settings
@@ -309,7 +309,9 @@ export async function getPriceTrackerLimit(isProUser: boolean, steamId?: string 
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
   // Free users with Discord access get 3 price trackers
   const hasAccess = await hasDiscordAccess(steamId);
-  return hasAccess ? 3 : PRO_LIMITS.PRICE_TRACKER_FREE; // 3 for Discord access, 0 otherwise
+  const base = hasAccess ? 3 : PRO_LIMITS.PRICE_TRACKER_FREE; // 3 for Discord access, 0 otherwise
+  const extra = await getExtraPriceTrackers(steamId);
+  return base + extra;
 }
 
 // Check if user can add more price trackers
@@ -322,11 +324,44 @@ export async function canAddPriceTracker(currentCount: number, isProUser: boolea
 export function getPriceTrackerLimitSync(isProUser: boolean, steamId?: string | null): number {
   if (isProUser) return PRO_LIMITS.PRICE_TRACKER_PRO;
   // Check cached rewards for Discord access
+  let extra = 0;
   if (steamId && rewardsCache.rewards.length > 0 && rewardsCache.steamId === steamId) {
     const hasAccess = rewardsCache.rewards.some((reward: any) => reward?.type === 'discord_access');
-    if (hasAccess) return 3;
+    extra = rewardsCache.rewards.filter((reward: any) => reward?.type === 'price_tracker_slot').length;
+    if (hasAccess) return 3 + extra;
+    return PRO_LIMITS.PRICE_TRACKER_FREE + extra;
   }
-  return PRO_LIMITS.PRICE_TRACKER_FREE; // 0 for free users without Discord access
+
+  // Fallback to localStorage if cache is empty
+  if (typeof window !== 'undefined' && steamId) {
+    try {
+      const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
+      let hasAccess = false;
+      let extraSlots = 0;
+      themes.forEach((theme) => {
+        const year = theme === 'christmas' || theme === 'oldyear' ? '2025' : '2026';
+        const key = `sv_${theme}_rewards_${year}`;
+        const rewardsStr = localStorage.getItem(key);
+        if (!rewardsStr) return;
+        try {
+          const rewards = JSON.parse(rewardsStr);
+          if (!Array.isArray(rewards)) return;
+          rewards.forEach((stored: any) => {
+            const reward = stored.reward || stored;
+            if (reward?.type === 'discord_access') hasAccess = true;
+            if (reward?.type === 'price_tracker_slot') extraSlots += 1;
+          });
+        } catch {
+          /* ignore */
+        }
+      });
+      return (hasAccess ? 3 : PRO_LIMITS.PRICE_TRACKER_FREE) + extraSlots;
+    } catch {
+      return PRO_LIMITS.PRICE_TRACKER_FREE;
+    }
+  }
+
+  return PRO_LIMITS.PRICE_TRACKER_FREE;
 }
 
 

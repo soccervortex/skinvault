@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
-import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users, CheckCircle2 } from 'lucide-react';
+import { Tag, Wallet, User, Search, X, LogOut, Heart, Shield, Menu, Mail, FileText, Sparkles, ShoppingCart, MessageSquare, HelpCircle, Star, AlertTriangle, Users, CheckCircle2, Coins } from 'lucide-react';
 import HelpTooltip from './HelpTooltip';
 import Link from 'next/link';
 import { FaDiscord } from "react-icons/fa";
@@ -420,17 +420,14 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 <AlertTriangle size={16} /> Report Item
               </Link>
               {isOwner(user?.steamId) && (
-                <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
-                  <Shield size={16} /> Admin Panel
+                <Link href="/admin/credits" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/credits') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}> 
+                  <Coins size={16} /> Credits Admin
                 </Link>
               )}
 
-              {isOwner(user?.steamId) && (
-                <Link href="/admin/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/giveaways') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
-                  <Sparkles size={16} /> Giveaways Admin
-                </Link>
-              )}
-
+              <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+                <Shield size={16} /> Admin Panel
+              </Link>
             </div>
 
             <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
@@ -589,7 +586,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                   </Link>
                 </div>
                 <div className="text-[8px] font-black uppercase tracking-widest text-gray-400 px-2">
-                  © {new Date().getFullYear()} SkinVaults. All rights reserved.
+                  {new Date().getFullYear()} SkinVaults. All rights reserved.
                 </div>
               </div>
             </div>
@@ -665,17 +662,14 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <AlertTriangle size={16} /> Report Item
           </Link>
           {isOwner(user?.steamId) && (
-            <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
-              <Shield size={16} /> Admin Panel
+            <Link href="/admin/credits" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/credits') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}> 
+              <Coins size={16} /> Credits Admin
             </Link>
           )}
 
-          {isOwner(user?.steamId) && (
-            <Link href="/admin/giveaways" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin/giveaways') ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'text-emerald-400 hover:text-emerald-300'}`}>
-              <Sparkles size={16} /> Giveaways Admin
-            </Link>
-          )}
-
+          <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+            <Shield size={16} /> Admin Panel
+          </Link>
         </div>
 
         <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
@@ -881,13 +875,13 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
       {/* --- CATEGORIES MODAL --- */}
       {isCategoriesOpen && pathname === '/' && categories && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsCategoriesOpen(false);
           }}
         >
           <div
-            className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative"
+            className="bg-[#11141d] border border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-hidden flex flex-col min-h-0"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -903,7 +897,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 Choose a category to filter the market.
               </p>
             </div>
-            <div className="mt-6 grid grid-cols-1 gap-2">
+            <div className="mt-6 grid grid-cols-1 gap-2 overflow-y-auto pr-1 flex-1 min-h-0">
               {categories.map((cat: any) => (
                 <button
                   key={cat.name}

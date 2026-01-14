@@ -93,6 +93,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ error: 'No winners to reroll' }, { status: 400 });
     }
 
+    const beforeWinnerIds = new Set<string>();
+    for (const w of existing.winners as any[]) {
+      const sid = String(w?.steamId || '').trim();
+      if (/^\d{17}$/.test(sid)) beforeWinnerIds.add(sid);
+    }
+
     const winnerCount = Math.max(1, Math.floor(Number(giveaway.winnerCount || 1)));
 
     const keep: WinnerRow[] = [];
@@ -172,6 +178,41 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       } as any,
       { upsert: true }
     );
+
+    const afterWinnerIds = new Set<string>();
+    for (const w of picked as any[]) {
+      const sid = String(w?.steamId || '').trim();
+      if (/^\d{17}$/.test(sid)) afterWinnerIds.add(sid);
+    }
+
+    const newlySelected: string[] = [];
+    for (const sid of afterWinnerIds) {
+      if (!beforeWinnerIds.has(sid)) newlySelected.push(sid);
+    }
+
+    for (const sid of newlySelected) {
+      const row = (picked as any[]).find((x) => String(x?.steamId || '').trim() === sid);
+      const claimDeadlineAt = row?.claimDeadlineAt ? new Date(row.claimDeadlineAt).toISOString() : null;
+      await createUserNotification(
+        db,
+        sid,
+        'giveaway_won',
+        'You Won a Giveaway!',
+        'A giveaway prize was rerolled and you are now a winner. Claim your prize within 24 hours in the Giveaways page.',
+        { giveawayId: id, claimDeadlineAt }
+      );
+    }
+
+    if (mode === 'replace' && replaceSteamId && /^\d{17}$/.test(replaceSteamId) && beforeWinnerIds.has(replaceSteamId) && !afterWinnerIds.has(replaceSteamId)) {
+      await createUserNotification(
+        db,
+        replaceSteamId,
+        'giveaway_rerolled',
+        'Winner Rerolled',
+        'A giveaway winner was rerolled by staff and you are no longer selected as a winner for this giveaway.',
+        { giveawayId: id }
+      );
+    }
 
     await giveawaysCol.updateOne({ _id: giveawayId } as any, { $set: { updatedAt: now } } as any);
 
