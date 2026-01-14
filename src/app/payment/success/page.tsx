@@ -10,16 +10,18 @@ function PaymentSuccessContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | null>(null);
+  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | 'credits' | null>(null);
   const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
     const steamId = searchParams.get('steamId');
-    const type = searchParams.get('type'); // 'pro' or 'consumable'
+    const type = searchParams.get('type'); // 'pro' or 'consumable' or 'credits'
     const months = searchParams.get('months');
     const consumableType = searchParams.get('consumableType');
     const quantity = searchParams.get('quantity');
+    const credits = searchParams.get('credits');
+    const pack = searchParams.get('pack');
 
     if (!sessionId || !steamId || !type) {
       setError('Missing payment information');
@@ -40,7 +42,13 @@ function PaymentSuccessContent() {
       return;
     }
 
-    setPurchaseType(type as 'pro' | 'consumable');
+    if (type === 'credits' && (!credits || !pack)) {
+      setError('Missing payment information (credits details)');
+      setLoading(false);
+      return;
+    }
+
+    setPurchaseType(type as 'pro' | 'consumable' | 'credits');
 
     // Give webhook a moment to process, then verify and refresh user data
     const verifyAndRefresh = async (retries = 5) => {
@@ -77,6 +85,8 @@ function PaymentSuccessContent() {
               quantity: fulfillData.quantity,
               months: fulfillData.months,
               proUntil: fulfillData.proUntil,
+              credits: fulfillData.credits,
+              pack: fulfillData.pack,
             });
           } else {
             throw new Error(fulfillData.error || 'Fulfillment failed');
@@ -122,6 +132,19 @@ function PaymentSuccessContent() {
               }
             }
           }
+        } else if (type === 'credits') {
+          // For credits purchases, refresh credits balance (sidebar / profile etc.)
+          const stored = localStorage.getItem('steam_user');
+          if (stored) {
+            const user = JSON.parse(stored);
+            if (user.steamId === steamId) {
+              try {
+                await fetch('/api/credits/balance');
+              } catch (e) {
+                // Ignore errors
+              }
+            }
+          }
         }
 
         setLoading(false);
@@ -131,7 +154,9 @@ function PaymentSuccessContent() {
         } else {
           const errorMsg = type === 'pro' 
             ? 'Failed to verify payment. Your Pro status may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId
-            : 'Failed to verify payment. Your consumable may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId;
+            : type === 'consumable'
+              ? 'Failed to verify payment. Your consumable may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId
+              : 'Failed to verify payment. Your credits may take a few moments to appear. If they don\'t appear, please contact support with your session ID: ' + sessionId;
           setError(errorMsg);
           setLoading(false);
         }
@@ -183,11 +208,15 @@ function PaymentSuccessContent() {
           Payment Successful!
         </h1>
         <p className="text-[10px] md:text-[11px] text-gray-400">
-          {purchaseType === 'pro' 
+          {purchaseType === 'pro'
             ? 'Your Pro subscription has been activated. You can now enjoy all premium features.'
-            : purchaseDetails?.consumableType
-              ? `Your ${purchaseDetails.consumableType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}${purchaseDetails.quantity > 1 ? ` (x${purchaseDetails.quantity})` : ''} has been added to your account.`
-              : 'Your purchase has been processed successfully. Your consumable has been added to your account.'}
+            : purchaseType === 'credits'
+              ? purchaseDetails?.credits
+                ? `Your ${purchaseDetails.credits} credits have been added to your account.`
+                : 'Your purchase has been processed successfully. Your credits will appear shortly.'
+              : purchaseDetails?.consumableType
+                ? `Your ${purchaseDetails.consumableType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}${purchaseDetails.quantity > 1 ? ` (x${purchaseDetails.quantity})` : ''} has been added to your account.`
+                : 'Your purchase has been processed successfully. Your consumable has been added to your account.'}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
           <Link

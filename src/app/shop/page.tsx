@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock, MessageSquare, CheckCircle2, Coins } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { preloadRewards } from '@/app/utils/pro-limits';
@@ -15,6 +15,46 @@ export default function ShopPage() {
   const [userRewards, setUserRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(true);
   const toast = useToast();
+
+  const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega') => {
+    if (!user?.steamId) {
+      toast.error('You must be signed in with Steam to purchase. Please sign in first.');
+      setTimeout(() => window.location.href = '/inventory', 2000);
+      return;
+    }
+
+    setLoading(`credits_${pack}`);
+    try {
+      const res = await fetch('/api/payment/checkout-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pack, steamId: user.steamId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          toast.error('You must be signed in with Steam to purchase. Please sign in first.');
+          setTimeout(() => window.location.href = '/inventory', 2000);
+        } else {
+          toast.error(data.error || 'Failed to create checkout session');
+        }
+        setLoading(null);
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error('Failed to redirect to checkout');
+        setLoading(null);
+      }
+    } catch (error) {
+      toast.error('Failed to process purchase. Please try again.');
+      setLoading(null);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -117,6 +157,92 @@ export default function ShopPage() {
           <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed mb-6 md:mb-8">
             Purchase consumables to enhance your free account. Perfect if you only need specific features without a full Pro subscription.
           </p>
+
+          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-600/20 border border-emerald-500/40">
+                <Coins className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Credits</p>
+                <p className="text-xl md:text-2xl font-black text-white">Buy Credits</p>
+              </div>
+            </div>
+            <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+              Credits can be used for giveaways and other credit-based features.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
+                  <p className="text-lg font-black">250 Credits</p>
+                  <p className="text-[10px] text-gray-400">€1.99</p>
+                </div>
+                <button
+                  onClick={() => handleCreditsCheckout('starter')}
+                  disabled={loading === 'credits_starter' || !user?.steamId}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_starter' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Value</p>
+                  <p className="text-lg font-black">750 Credits</p>
+                  <p className="text-[10px] text-gray-400">€4.99</p>
+                </div>
+                <button
+                  onClick={() => handleCreditsCheckout('value')}
+                  disabled={loading === 'credits_value' || !user?.steamId}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_value' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Mega</p>
+                  <p className="text-lg font-black">2000 Credits</p>
+                  <p className="text-[10px] text-gray-400">€9.99</p>
+                </div>
+                <button
+                  onClick={() => handleCreditsCheckout('mega')}
+                  disabled={loading === 'credits_mega' || !user?.steamId}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_mega' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {/* Wishlist Slots */}

@@ -93,6 +93,67 @@ export async function POST(request: Request) {
     // Fulfill the purchase
     const months = Number(session.metadata?.months || 0);
 
+    // Handle credits purchase
+    if (type === 'credits') {
+      const credits = Number(session.metadata?.credits || 0);
+      const pack = String(session.metadata?.pack || '');
+
+      if (credits <= 0) {
+        return NextResponse.json({ error: 'Invalid credits amount' }, { status: 400 });
+      }
+
+      const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
+      if (!hasMongoConfig()) {
+        return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+      }
+
+      const db = await getDatabase();
+      const creditsCol = db.collection('user_credits');
+      const ledgerCol = db.collection('credits_ledger');
+      const now = new Date();
+
+      await creditsCol.updateOne(
+        { _id: steamId } as any,
+        {
+          $setOnInsert: { _id: steamId, steamId, balance: 0 },
+          $inc: { balance: credits },
+          $set: { updatedAt: now },
+        } as any,
+        { upsert: true }
+      );
+
+      await ledgerCol.insertOne({
+        steamId,
+        delta: credits,
+        type: 'purchase_credits',
+        createdAt: now,
+        meta: { sessionId: session.id, pack, verifiedBy: 'manual_verification' },
+      } as any);
+
+      existingPurchases.push({
+        steamId,
+        type: 'credits',
+        credits,
+        pack,
+        amount: session.amount_total ? (session.amount_total / 100) : 0,
+        currency: session.currency || 'eur',
+        sessionId: session.id,
+        timestamp: new Date().toISOString(),
+        verifiedAt: new Date().toISOString(),
+        verifiedBy: 'manual_verification',
+      });
+
+      await dbSet(purchasesKey, existingPurchases.slice(-1000));
+
+      return NextResponse.json({
+        fulfilled: true,
+        type: 'credits',
+        credits,
+        pack,
+        message: `Granted ${credits} credits to ${steamId}`,
+      });
+    }
+
     // Handle Pro subscription
     if (months > 0 && type !== 'consumable') {
       const { grantPro } = await import('@/app/utils/pro-storage');
@@ -251,6 +312,7 @@ export async function GET(request: Request) {
         currency: purchase.currency,
         ...(purchase.type === 'pro' && { months: purchase.months, proUntil: purchase.proUntil }),
         ...(purchase.type === 'consumable' && { consumableType: purchase.consumableType, quantity: purchase.quantity }),
+        ...(purchase.type === 'credits' && { credits: purchase.credits, pack: purchase.pack }),
       }
     });
 

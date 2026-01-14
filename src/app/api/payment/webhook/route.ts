@@ -84,6 +84,94 @@ export async function POST(request: Request) {
     const months = Number(session.metadata?.months || 0);
     const type = session.metadata?.type;
 
+    // Handle credits purchase
+    if (steamId && type === 'credits') {
+      const credits = Number(session.metadata?.credits || 0);
+      const pack = String(session.metadata?.pack || '');
+
+      if (credits > 0) {
+        try {
+          const purchasesKey = 'purchase_history';
+          const existingPurchases = await dbGet<Array<any>>(purchasesKey) || [];
+          const alreadyFulfilled = existingPurchases.some(p => p.sessionId === session.id);
+
+          if (alreadyFulfilled) {
+            console.log(`⚠️ Purchase ${session.id} already fulfilled, skipping`);
+            return NextResponse.json({ received: true, message: 'Already fulfilled' });
+          }
+
+          const db = await getDatabase();
+          const creditsCol = db.collection('user_credits');
+          const ledgerCol = db.collection('credits_ledger');
+          const now = new Date();
+
+          await creditsCol.updateOne(
+            { _id: steamId } as any,
+            {
+              $setOnInsert: { _id: steamId, steamId, balance: 0 },
+              $inc: { balance: credits },
+              $set: { updatedAt: now },
+            } as any,
+            { upsert: true }
+          );
+
+          await ledgerCol.insertOne({
+            steamId,
+            delta: credits,
+            type: 'purchase_credits',
+            createdAt: now,
+            meta: { sessionId: session.id, pack },
+          } as any);
+
+          try {
+            const amount = session.amount_total ? (session.amount_total / 100) : 0;
+            const currency = session.currency || 'eur';
+
+            existingPurchases.push({
+              steamId,
+              type: 'credits',
+              credits,
+              pack,
+              amount,
+              currency,
+              sessionId: session.id,
+              timestamp: new Date().toISOString(),
+              fulfilled: true,
+              fulfilledAt: new Date().toISOString(),
+              paymentIntentId: session.payment_intent as string || null,
+              customerId: session.customer as string || null,
+            });
+
+            await dbSet(purchasesKey, existingPurchases.slice(-1000));
+            console.log(`✅ Purchase ${session.id} recorded in history`);
+          } catch (error) {
+            console.error('Failed to record purchase history:', error);
+          }
+
+          console.log(`✅ Granted ${credits} credits to ${steamId}`);
+        } catch (error) {
+          console.error('❌ Failed to grant credits:', error);
+          try {
+            const failedKey = 'failed_purchases';
+            const failed = await dbGet<Array<any>>(failedKey) || [];
+            failed.push({
+              sessionId: session.id,
+              steamId,
+              type: 'credits',
+              credits,
+              pack,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: new Date().toISOString(),
+              amount: session.amount_total ? (session.amount_total / 100) : 0,
+            });
+            await dbSet(failedKey, failed.slice(-100));
+          } catch (err) {
+            console.error('Failed to record failed purchase:', err);
+          }
+        }
+      }
+    }
+
     // Handle Pro subscription
     if (steamId && months > 0 && type !== 'consumable') {
       try {

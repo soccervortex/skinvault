@@ -76,16 +76,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const creditsPerEntry = Math.max(1, Math.floor(Number(giveaway.creditsPerEntry || 10)));
     const cost = entriesRequested * creditsPerEntry;
 
-    const creditUpdate = await creditsCol.findOneAndUpdate(
-      { _id: steamId, balance: { $gte: cost } } as any,
-      { $inc: { balance: -cost }, $set: { updatedAt: now } } as any,
-      { returnDocument: 'after' }
-    );
+    const current = await creditsCol.findOne({ _id: steamId } as any);
+    const currentBalance = Number((current as any)?.balance || 0);
+    const safeBalance = Number.isFinite(currentBalance) ? currentBalance : 0;
 
-    const creditDoc = (creditUpdate as any)?.value ?? null;
-    if (!creditDoc) {
+    if (safeBalance < cost) {
       return NextResponse.json({ error: 'Not enough credits' }, { status: 400 });
     }
+
+    const nextBalance = safeBalance - cost;
+    await creditsCol.updateOne(
+      { _id: steamId } as any,
+      { $set: { balance: nextBalance, updatedAt: now } } as any,
+      { upsert: true }
+    );
 
     const entryId = `${id}_${steamId}`;
     const prevRes = await entriesCol.findOneAndUpdate(
@@ -154,7 +158,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         steamId,
         giveawayId: id,
         cost,
-        balance: Number(creditDoc?.balance || 0),
+        balance: nextBalance,
         entry: {
           entries: Number((newEntry as any)?.entries || 0),
           creditsSpent: Number((newEntry as any)?.creditsSpent || 0),
