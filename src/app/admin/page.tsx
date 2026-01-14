@@ -1229,7 +1229,7 @@ export default function AdminPage() {
                         {purchase.steamId}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
-                        {purchase.type === "pro" ? "👑 Pro" : "🎁 Consumable"}
+                        {purchase.type === 'pro' ? '👑 Pro' : (purchase.type === 'credits' ? '💳 Credits' : '🎁 Consumable')}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.currency === "eur" ? "€" : "$"}
@@ -1243,9 +1243,27 @@ export default function AdminPage() {
                         )}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
-                        {purchase.type === "pro"
-                          ? `${purchase.months} month${purchase.months > 1 ? "s" : ""}`
-                          : `${purchase.quantity}x ${purchase.consumableType || "item"}`}
+                        {(() => {
+                          const t = String(purchase.type || '').trim();
+                          if (t === 'pro') {
+                            const months = Math.max(0, Math.floor(Number(purchase.months || 0)));
+                            return months > 0 ? `${months} month${months > 1 ? 's' : ''}` : '—';
+                          }
+
+                          if (t === 'credits') {
+                            const credits = Math.max(0, Math.floor(Number(purchase.credits || 0)));
+                            const pack = String(purchase.pack || '').trim();
+                            if (credits > 0 && pack) return `${credits.toLocaleString('en-US')} credits (${pack})`;
+                            if (credits > 0) return `${credits.toLocaleString('en-US')} credits`;
+                            if (pack) return `Credits pack (${pack})`;
+                            return 'Credits purchase';
+                          }
+
+                          const quantityRaw = Number(purchase.quantity);
+                          const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? Math.floor(quantityRaw) : 1;
+                          const item = String(purchase.consumableType || (purchase as any).itemType || 'item');
+                          return `${quantity}x ${item}`;
+                        })()}
                       </td>
                     </tr>
                   ))}

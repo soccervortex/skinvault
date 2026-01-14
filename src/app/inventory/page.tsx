@@ -1758,7 +1758,7 @@ function InventoryContent() {
     <>
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         {viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
             <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
@@ -1766,9 +1766,10 @@ function InventoryContent() {
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="w-full sm:w-auto min-w-0 text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
+                    <h1 className="w-full sm:w-auto min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
+
                     {vaultRank && (
                       <span
                         className="px-2 md:px-3 py-0.5 md:py-1 rounded-full border text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] shrink-0"
@@ -1808,10 +1809,10 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
+                    <div className="grid grid-cols-2 gap-2 w-full mt-3 md:mt-4 md:flex md:items-center md:gap-3 md:flex-wrap">
                       <button
                         onClick={() => setViewAsOthers(true)}
-                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                         title="Preview your profile as other users see it"
                       >
                         View as others
@@ -1821,7 +1822,7 @@ function InventoryContent() {
                       <button
                         onClick={handleForceRefreshInventory}
                         disabled={refreshingInventory}
-                        className={`flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                        className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
                       >
                         {refreshingInventory ? 'Refreshing...' : 'Refresh Inventory'}
                       </button>
@@ -1841,7 +1842,7 @@ function InventoryContent() {
                                 })
                                 .catch(console.error);
                             }}
-                            className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                           >
                             <MessageSquare size={12} />
                             Connect Discord
@@ -1865,7 +1866,7 @@ function InventoryContent() {
                                 console.error('Failed to disconnect Discord:', error);
                               }
                             }}
-                            className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                           >
                             <MessageSquare size={12} />
                             Disconnect Discord
@@ -1875,7 +1876,7 @@ function InventoryContent() {
                       {/* Manage Trackers Button */}
                       <button
                         onClick={() => setShowManageTrackers(true)}
-                        className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                       >
                         <Settings size={12} />
                         Manage Trackers
@@ -1883,12 +1884,12 @@ function InventoryContent() {
 
                       <div className="w-full mt-2 bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
                         <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Trade URL</div>
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
                           <input
                             value={tradeUrlInput}
                             onChange={(e) => setTradeUrlInput(e.target.value)}
                             placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
-                            className="flex-1 min-w-[240px] bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] md:text-[11px] font-black"
+                            className="w-full md:flex-1 md:min-w-[240px] bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] md:text-[11px] font-black"
                           />
                           <button
                             onClick={handleSaveTradeUrl}

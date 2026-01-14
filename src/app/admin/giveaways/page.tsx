@@ -426,7 +426,7 @@ export default function AdminGiveawaysPage() {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto p-10 flex items-center justify-center text-gray-500 text-[11px]">Sign in first.</div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 flex items-center justify-center text-gray-500 text-[11px]">Sign in first.</div>
       </div>
     );
   }
@@ -435,7 +435,7 @@ export default function AdminGiveawaysPage() {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto p-10 flex items-center justify-center text-gray-500 text-[11px]">Access denied.</div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 flex items-center justify-center text-gray-500 text-[11px]">Access denied.</div>
       </div>
     );
   }
@@ -446,20 +446,20 @@ export default function AdminGiveawaysPage() {
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-24">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
-            <div className="flex items-start justify-between gap-6 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Owner</p>
-                <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter">Giveaways Admin</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black italic uppercase tracking-tighter">Giveaways Admin</h1>
                 <p className="text-[11px] md:text-xs text-gray-400 mt-2">Create giveaways, draw winners, and view trade URLs.</p>
               </div>
-              <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-5 py-4 rounded-[1.5rem]">
+              <div className="w-full sm:w-auto flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-5 py-4 rounded-[1.5rem]">
                 <Shield className="text-emerald-400" size={18} />
                 <div className="text-[10px] uppercase tracking-widest font-black text-emerald-300">Owner only</div>
               </div>
             </div>
           </header>
 
-          <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+          <section className="bg-[#11141d] p-5 md:p-6 rounded-[2rem] border border-white/5 shadow-xl">
             <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-4">Create Giveaway</div>
             <div className="flex items-center gap-2 flex-wrap mb-3">
               <button onClick={() => applyPreset('day')} className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 transition-all">
@@ -476,16 +476,16 @@ export default function AdminGiveawaysPage() {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black" />
               <input
                 value={prizeSearch}
                 onChange={(e) => setPrizeSearch(e.target.value)}
                 placeholder="Search prize skin (e.g. AK-47 | Redline)"
-                className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black"
+                className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black"
               />
-              <input value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="Prize title (optional override)" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
-              <input value={startAt} onChange={(e) => setStartAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
-              <input value={endAt} onChange={(e) => setEndAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
+              <input value={prize} onChange={(e) => setPrize(e.target.value)} placeholder="Prize title (optional override)" className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black" />
+              <input value={startAt} onChange={(e) => setStartAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black" />
+              <input value={endAt} onChange={(e) => setEndAt(e.target.value)} type="datetime-local" className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black" />
               <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <input value={String(creditsPerEntry)} onChange={(e) => setCreditsPerEntry(Math.max(1, Math.floor(Number(e.target.value || '10'))))} type="number" min={1} className="bg-transparent outline-none w-full text-[11px] font-black" />
@@ -501,7 +501,7 @@ export default function AdminGiveawaysPage() {
                 </div>
                 <div className="mt-1 text-[9px] text-gray-500 font-black uppercase tracking-widest">Credits / Entry</div>
               </div>
-              <input value={String(winnerCount)} onChange={(e) => setWinnerCount(Math.max(1, Math.floor(Number(e.target.value || '1'))))} type="number" min={1} className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-black" />
+              <input value={String(winnerCount)} onChange={(e) => setWinnerCount(Math.max(1, Math.floor(Number(e.target.value || '1'))))} type="number" min={1} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black" />
               <div className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -520,11 +520,11 @@ export default function AdminGiveawaysPage() {
               </div>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px]" rows={4} />
             </div>
-            <div className="mt-4 flex items-center gap-2 flex-wrap">
+            <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <button
                 onClick={save}
                 disabled={creating}
-                className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                className={`w-full sm:w-auto px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
               >
                 {creating ? (editingId ? 'Saving...' : 'Creating...') : (editingId ? 'Save' : 'Create')}
               </button>
@@ -532,7 +532,7 @@ export default function AdminGiveawaysPage() {
                 <button
                   onClick={cancelEdit}
                   disabled={creating}
-                  className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                  className={`w-full sm:w-auto px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${creating ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
                 >
                   Cancel
                 </button>
@@ -581,38 +581,38 @@ export default function AdminGiveawaysPage() {
                         </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
                         <button
                           onClick={() => beginEdit(g)}
                           disabled={!!g.drawnAt}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${g.drawnAt ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${g.drawnAt ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => deleteGiveaway(g.id)}
-                          className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white"
                         >
                           Delete
                         </button>
                         <button
                           onClick={() => loadEntrants(g.id)}
                           disabled={entrantsLoading && selectedId === g.id}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(entrantsLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(entrantsLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
                         >
                           {(entrantsLoading && selectedId === g.id) ? 'Loading...' : 'Entrants'}
                         </button>
                         <button
                           onClick={() => loadWinners(g.id, !g.drawnAt)}
                           disabled={winnersLoading && selectedId === g.id}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(winnersLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(winnersLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                         >
                           {(winnersLoading && selectedId === g.id) ? 'Loading...' : (g.drawnAt ? 'View Winners' : 'Draw Winners')}
                         </button>
                         {g.drawnAt ? (
                           <button
                             onClick={() => rerollAll(g.id)}
-                            className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-amber-600 hover:bg-amber-500 text-white"
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-amber-600 hover:bg-amber-500 text-white"
                           >
                             Reroll
                           </button>

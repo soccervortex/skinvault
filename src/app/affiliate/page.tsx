@@ -130,7 +130,7 @@ export default function AffiliatePage() {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto p-10 flex items-center justify-center text-gray-500 text-[11px]">Sign in with Steam first.</div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 flex items-center justify-center text-gray-500 text-[11px]">Sign in with Steam first.</div>
       </div>
     );
   }
@@ -141,15 +141,15 @@ export default function AffiliatePage() {
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-24">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
-            <div className="flex items-start justify-between gap-6 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Affiliate</p>
-                <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter">Invite Friends</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black italic uppercase tracking-tighter">Invite Friends</h1>
                 <p className="text-[11px] md:text-xs text-gray-400 mt-2 max-w-xl">
                   Share your link. When a new user signs in for the first time, it counts as a referral. Claim milestone rewards.
                 </p>
               </div>
-              <div className="flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-5 py-4 rounded-[1.5rem]">
+              <div className="w-full sm:w-auto flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-5 py-4 rounded-[1.5rem]">
                 <Users className="text-blue-400" size={18} />
                 <div>
                   <div className="text-[9px] uppercase tracking-widest font-black text-gray-500">Referrals</div>
@@ -158,10 +158,10 @@ export default function AffiliatePage() {
               </div>
             </div>
 
-            <div className="mt-6 bg-black/40 border border-white/10 rounded-[1.5rem] px-5 py-4 flex items-center justify-between gap-3">
-              <div className="min-w-0">
+            <div className="mt-6 bg-black/40 border border-white/10 rounded-[1.5rem] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0 w-full">
                 <div className="text-[9px] uppercase tracking-widest font-black text-gray-500">Your referral link</div>
-                <div className="text-[11px] font-black break-all mt-1">{referralLink || '—'}</div>
+                <div title={referralLink || ''} className="text-[11px] font-black truncate mt-1">{referralLink || '—'}</div>
               </div>
               <button
                 onClick={() => copy(referralLink)}
@@ -174,7 +174,7 @@ export default function AffiliatePage() {
             </div>
           </header>
 
-          <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+          <section className="bg-[#11141d] p-5 md:p-6 rounded-[2rem] border border-white/5 shadow-xl">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Milestones</div>
               <button
@@ -196,23 +196,23 @@ export default function AffiliatePage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {milestones.map((m) => (
-                  <div key={m.id} className="bg-black/40 border border-white/5 rounded-[1.5rem] p-5">
+                  <div key={m.id} className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4 md:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] uppercase tracking-widest font-black text-gray-500">{m.referralsRequired} referrals</div>
-                        <div className="text-xl font-black italic tracking-tighter mt-1">{getRewardLabel(m.reward)}</div>
+                        <div className="text-lg md:text-xl font-black italic tracking-tighter mt-1">{getRewardLabel(m.reward)}</div>
                       </div>
                       <Gift className="text-yellow-400" size={18} />
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">
                         {m.claimed ? 'CLAIMED' : m.claimable ? 'READY' : `${Math.max(0, m.referralsRequired - referralCount)} to go`}
                       </div>
                       <button
                         onClick={() => claim(m.id)}
                         disabled={!m.claimable || claimingId === m.id}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(!m.claimable || claimingId === m.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(!m.claimable || claimingId === m.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                       >
                         {claimingId === m.id ? 'Claiming...' : (m.claimed ? 'Claimed' : 'Claim')}
                       </button>
