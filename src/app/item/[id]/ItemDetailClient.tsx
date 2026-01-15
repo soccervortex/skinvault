@@ -144,9 +144,22 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   // Fetch item meta once (by id) - only if not provided initially
   useEffect(() => {
     const normalizedInitial = initialItem ? normalizeItem(initialItem) : null;
-    if (normalizedInitial?.image) {
+
+    const initialHasEnrichedFields =
+      !!normalizedInitial &&
+      (Array.isArray((normalizedInitial as any)?.contains) && (normalizedInitial as any).contains.length > 0 ||
+        Array.isArray((normalizedInitial as any)?.contains_rare) && (normalizedInitial as any).contains_rare.length > 0 ||
+        (normalizedInitial as any)?.min_float != null ||
+        (normalizedInitial as any)?.max_float != null);
+
+    if (normalizedInitial) {
       setItem(normalizedInitial);
-      setLoading(false);
+      if (normalizedInitial?.image || initialHasEnrichedFields) {
+        setLoading(false);
+      }
+    }
+
+    if (initialHasEnrichedFields) {
       return;
     }
     
