@@ -348,15 +348,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           setSearchId("");
         } else {
           // Show error - could not resolve
-          alert('Could not find Steam profile. Please check the username or use a Steam64 ID.');
+          alert('Could not find Steam profile. Use a 17-digit SteamID64, or a Steam custom URL (steamcommunity.com/id/<custom-url>).');
         }
       } else {
         const errorData = await resolveRes.json();
-        alert(errorData.error || 'Could not resolve Steam username. Please try a Steam64 ID instead.');
+        alert(errorData.error || 'Could not resolve Steam username. Use a 17-digit SteamID64, or set a Steam custom URL (Edit Profile -> Custom URL).');
       }
     } catch (error) {
       console.error('Failed to resolve Steam username:', error);
-      alert('Failed to resolve Steam username. Please try a Steam64 ID instead.');
+      alert('Failed to resolve Steam username. Use a 17-digit SteamID64, or set a Steam custom URL (Edit Profile -> Custom URL).');
     }
   };
 
@@ -880,9 +880,10 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                 content={
                   <>
                     <p className="mb-2"><strong>Steam ID:</strong> Enter a 17-digit Steam64 ID (e.g., 76561199235618867)</p>
-                    <p className="mb-2"><strong>Username:</strong> Enter a Steam custom URL or username (e.g., ExampleUser)</p>
-                    <p className="mb-2"><strong>With extra text:</strong> You can paste full profile names like "ExampleUser | Website.com" - we'll extract the username automatically</p>
-                    <p className="text-blue-400">💡 Tip: You can find your Steam ID in your Steam profile URL</p>
+                    <p className="mb-2"><strong>Custom URL:</strong> Enter your Steam custom URL name (steamcommunity.com/id/&lt;custom-url&gt;). This is not always the same as your display name.</p>
+                    <p className="mb-2"><strong>Profile URL:</strong> You can paste a full Steam link like steamcommunity.com/id/ExampleUser or steamcommunity.com/profiles/7656...</p>
+                    <p className="mb-2"><strong>If not found:</strong> Set a Custom URL in Steam: Profile -&gt; Edit Profile -&gt; Custom URL, or use your SteamID64.</p>
+                    <p className="text-blue-400">Tip: Your SteamID64 is the 17-digit number in steamcommunity.com/profiles/&lt;steamid64&gt;</p>
                   </>
                 }
                 position="bottom"

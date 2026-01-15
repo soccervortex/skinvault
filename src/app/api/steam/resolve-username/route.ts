@@ -31,21 +31,60 @@ export async function GET(request: Request) {
       });
     }
 
-    // Try to resolve as custom URL/username
-    // Clean username: extract first part before | or special chars
-    // "xottikmw | skinvaults.online" -> "xottikmw"
     let cleanUsername = query.trim();
-    
-    // If it contains |, take the part before it
+
     if (cleanUsername.includes('|')) {
       cleanUsername = cleanUsername.split('|')[0].trim();
     }
-    
-    // Remove special chars that aren't allowed in Steam URLs (keep alphanumeric, underscore, hyphen)
+
+    const tryParseSteamUrl = (raw: string) => {
+      const s = String(raw || '').trim();
+      if (!s) return null;
+      const candidate = s.startsWith('http://') || s.startsWith('https://') ? s : (s.includes('steamcommunity.com/') ? `https://${s.replace(/^\/+/, '')}` : '');
+      if (!candidate) return null;
+      try {
+        const u = new URL(candidate);
+        if (!String(u.hostname || '').includes('steamcommunity.com')) return null;
+        const path = String(u.pathname || '').trim();
+        const mProfiles = path.match(/^\/profiles\/(\d{17})/);
+        if (mProfiles?.[1]) return { steamId: mProfiles[1] };
+        const mId = path.match(/^\/id\/([^/]+)/);
+        if (mId?.[1]) return { vanity: mId[1] };
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
+    const parsed = tryParseSteamUrl(cleanUsername);
+    if (parsed?.steamId && /^\d{17}$/.test(parsed.steamId)) {
+      return NextResponse.json({ steamId: parsed.steamId, isSteamId: true });
+    }
+    if (parsed?.vanity) {
+      cleanUsername = String(parsed.vanity || '').trim();
+    }
+
     cleanUsername = cleanUsername.replace(/[^a-zA-Z0-9_-]/g, '');
     
     if (!cleanUsername || cleanUsername.length < 3) {
       return NextResponse.json({ error: 'Invalid username format' }, { status: 400 });
+    }
+
+    const apiKey = String(process.env.STEAM_API_KEY || '').trim();
+    if (apiKey) {
+      try {
+        const resolveUrl = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=${encodeURIComponent(apiKey)}&vanityurl=${encodeURIComponent(cleanUsername)}`;
+        const res = await fetchWithTimeout(resolveUrl, { cache: 'no-store' }, 5000);
+        if (res.ok) {
+          const j: any = await res.json().catch(() => null);
+          const sid = String(j?.response?.steamid || '').trim();
+          const success = Number(j?.response?.success);
+          if (success === 1 && /^\d{17}$/.test(sid)) {
+            return NextResponse.json({ steamId: sid, isSteamId: false, username: cleanUsername });
+          }
+        }
+      } catch {
+      }
     }
 
     // Method 1: Try Steam Community XML

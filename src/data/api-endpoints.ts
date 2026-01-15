@@ -3,6 +3,9 @@
  * This is the single source of truth for which API files we use
  */
 export const API_FILES = [
+  'collections.json',
+  'skins.json',
+  'skins_grouped.json',
   'skins_not_grouped.json',
   'stickers.json',
   'agents.json',
@@ -16,6 +19,10 @@ export const API_FILES = [
   'keys.json',
   'highlights.json',
   'base_weapons.json',
+] as const;
+
+export const API_LARGE_FILES = [
+  'all.json',
 ] as const;
 
 export const BASE_URL = 'https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en';
