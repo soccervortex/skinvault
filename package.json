@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "steam-bot": "node steam-trade-bot.js",
     "lint": "eslint"
   },
   "dependencies": {
@@ -44,6 +45,10 @@
     "react-icons": "^5.5.0",
     "recharts": "^3.6.0",
     "statsig-node": "^6.5.1",
+    "steam-totp": "^2.1.2",
+    "steam-tradeoffer-manager": "^2.11.0",
+    "steam-user": "^5.2.2",
+    "steamcommunity": "^3.49.0",
     "stripe": "^20.1.0"
   },
   "devDependencies": {

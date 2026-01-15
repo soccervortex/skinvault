@@ -1,0 +1,605 @@
+const { MongoClient, ObjectId } = require('mongodb');
+const SteamUser = require('steam-user');
+const SteamTotp = require('steam-totp');
+const SteamCommunity = require('steamcommunity');
+const TradeOfferManager = require('steam-tradeoffer-manager');
+
+require('dotenv').config();
+
+function normalizeSecret(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (s.includes('BASE64_SHARED_SECRET_FROM_')) return '';
+  if (s.includes('BASE64_IDENTITY_SECRET_FROM_')) return '';
+  if (s.toLowerCase().includes('from_sda')) return '';
+  if (s.toLowerCase().includes('from_steam')) return '';
+  return s;
+}
+
+const CONFIG = {
+  mongoUri: String(process.env.MONGODB_URI || ''),
+  mongoDbName: String(process.env.MONGODB_DB_NAME || 'skinvault'),
+
+  accountName: String(process.env.accountName || process.env.STEAM_BOT_ACCOUNT_NAME || ''),
+  password: String(process.env.password || process.env.STEAM_BOT_PASSWORD || ''),
+  sharedSecret: normalizeSecret(process.env.sharedSecret || process.env.STEAM_BOT_SHARED_SECRET || ''),
+  identitySecret: normalizeSecret(process.env.identitySecret || process.env.STEAM_BOT_IDENTITY_SECRET || ''),
+
+  appId: Number(process.env.STEAM_APP_ID || 730),
+  contextId: String(process.env.STEAM_CONTEXT_ID || '2'),
+
+  pendingLoopMs: Math.max(1000, Number(process.env.PENDING_LOOP_MS || 5000)),
+  pollLoopMs: Math.max(5000, Number(process.env.POLL_LOOP_MS || 30000)),
+  claimBatchSize: Math.min(50, Math.max(1, Number(process.env.CLAIM_BATCH_SIZE || 5))),
+  sentBatchSize: Math.min(50, Math.max(1, Number(process.env.SENT_BATCH_SIZE || 25))),
+  lockTimeoutMs: Math.max(30_000, Number(process.env.CLAIM_LOCK_TIMEOUT_MS || 5 * 60_000)),
+
+  dryRun: String(process.env.DRY_RUN || '').trim() === '1',
+};
+
+function isValidTradeUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return false;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    if (u.hostname !== 'steamcommunity.com') return false;
+    if (u.pathname !== '/tradeoffer/new/') return false;
+    const partner = u.searchParams.get('partner');
+    const token = u.searchParams.get('token');
+    if (!partner || !/^\d+$/.test(partner)) return false;
+    if (!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function createUserNotification(db, steamId, type, title, message, meta) {
+  const id = String(steamId || '').trim();
+  if (!/^\d{17}$/.test(id)) return;
+  const t = String(type || '').trim() || 'info';
+  const ttl = String(title || '').trim().slice(0, 200);
+  const msg = String(message || '').trim().slice(0, 2000);
+
+  await db.collection('user_notifications').insertOne({
+    _id: new ObjectId(),
+    steamId: id,
+    type: t,
+    title: ttl,
+    message: msg,
+    createdAt: new Date(),
+    meta: meta ?? null,
+  });
+}
+
+async function connectMongo() {
+  if (!CONFIG.mongoUri) throw new Error('MONGODB_URI is missing');
+  const client = new MongoClient(CONFIG.mongoUri, {
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+    maxPoolSize: 5,
+  });
+  await client.connect();
+  const db = client.db(CONFIG.mongoDbName);
+  return { client, db };
+}
+
+function makeSteamClients() {
+  const user = new SteamUser();
+  const community = new SteamCommunity();
+  const manager = new TradeOfferManager({
+    steam: user,
+    community,
+    language: 'en',
+  });
+
+  user.on('error', (err) => {
+    console.error('[steam-user] error', err);
+  });
+
+  user.on('disconnected', (eresult, msg) => {
+    console.warn('[steam-user] disconnected', { eresult, msg });
+  });
+
+  user.on('loggedOn', (details) => {
+    console.log('[steam-user] logged on', details);
+  });
+
+  user.on('webSession', (sessionid, cookies) => {
+    console.log('[steam-user] webSession');
+    community.setCookies(cookies);
+    manager.setCookies(cookies, (err) => {
+      if (err) {
+        console.error('[tradeoffer-manager] setCookies failed', err);
+      } else {
+        console.log('[tradeoffer-manager] cookies set');
+      }
+    });
+  });
+
+  return { user, community, manager };
+}
+
+function logOnSteam(user) {
+  if (!CONFIG.accountName || !CONFIG.password) {
+    throw new Error('Missing bot credentials: accountName/password');
+  }
+
+  const details = {
+    accountName: CONFIG.accountName,
+    password: CONFIG.password,
+  };
+
+  if (CONFIG.sharedSecret) {
+    details.twoFactorCode = SteamTotp.generateAuthCode(CONFIG.sharedSecret);
+  }
+
+  user.logOn(details);
+}
+
+function getInventoryContents(manager, appId, contextId, tradableOnly) {
+  return new Promise((resolve, reject) => {
+    manager.getInventoryContents(appId, contextId, tradableOnly, (err, inventory) => {
+      if (err) return reject(err);
+      resolve(Array.isArray(inventory) ? inventory : []);
+    });
+  });
+}
+
+function getOffer(manager, offerId) {
+  return new Promise((resolve, reject) => {
+    manager.getOffer(String(offerId), (err, offer) => {
+      if (err) return reject(err);
+      resolve(offer);
+    });
+  });
+}
+
+function sendOffer(offer) {
+  return new Promise((resolve, reject) => {
+    offer.send((err, status) => {
+      if (err) return reject(err);
+      resolve({ status });
+    });
+  });
+}
+
+function acceptConfirmation(community, identitySecret, tradeOfferId) {
+  if (!identitySecret) return Promise.resolve(false);
+  return new Promise((resolve, reject) => {
+    community.acceptConfirmationForObject(identitySecret, String(tradeOfferId), (err) => {
+      if (err) return reject(err);
+      resolve(true);
+    });
+  });
+}
+
+let inventoryCache = { loadedAt: 0, items: [] };
+async function getBotInventory(manager) {
+  const now = Date.now();
+  if (inventoryCache.items.length && now - inventoryCache.loadedAt < 60_000) {
+    return inventoryCache.items;
+  }
+
+  const items = await getInventoryContents(manager, CONFIG.appId, CONFIG.contextId, true);
+  inventoryCache = { loadedAt: now, items };
+  return items;
+}
+
+function findInventoryItemForMarketHash(inventory, marketHashName) {
+  const key = String(marketHashName || '').trim();
+  if (!key) return null;
+
+  const direct = inventory.find((it) => String(it?.market_hash_name || '').trim() === key);
+  if (direct) return direct;
+
+  const byName = inventory.find((it) => String(it?.name || '').trim() === key);
+  if (byName) return byName;
+
+  return null;
+}
+
+async function setClaimFailed(db, claimId, giveawayIdStr, steamId, reason, extra = {}) {
+  const now = new Date();
+  await db.collection('giveaway_claims').updateOne(
+    { _id: claimId },
+    {
+      $set: {
+        tradeStatus: 'FAILED',
+        lastError: String(reason || 'Failed'),
+        updatedAt: now,
+        ...extra,
+      },
+    }
+  );
+
+  await db.collection('giveaway_winners').updateOne(
+    { _id: giveawayIdStr },
+    {
+      $set: {
+        'winners.$[w].claimStatus': 'pending',
+        updatedAt: now,
+      },
+      $unset: {
+        'winners.$[w].claimedAt': '',
+      },
+    },
+    { arrayFilters: [{ 'w.steamId': String(steamId) }] }
+  );
+
+  try {
+    await createUserNotification(
+      db,
+      steamId,
+      'giveaway_trade_failed',
+      'Trade Failed',
+      'We could not send your giveaway trade. Please try claiming again in the Giveaways page.',
+      { giveawayId: giveawayIdStr, reason: String(reason || '') }
+    );
+  } catch {
+    // ignore
+  }
+}
+
+async function setClaimSuccess(db, claimId, giveawayIdStr, steamId, offerId) {
+  const now = new Date();
+  await db.collection('giveaway_claims').updateOne(
+    { _id: claimId },
+    {
+      $set: {
+        tradeStatus: 'SUCCESS',
+        updatedAt: now,
+        completedAt: now,
+        steamTradeOfferId: String(offerId || ''),
+      },
+    }
+  );
+
+  await db.collection('giveaway_winners').updateOne(
+    { _id: giveawayIdStr },
+    {
+      $set: {
+        'winners.$[w].claimStatus': 'claimed',
+        'winners.$[w].claimedAt': now,
+        updatedAt: now,
+      },
+    },
+    { arrayFilters: [{ 'w.steamId': String(steamId) }] }
+  );
+
+  try {
+    await createUserNotification(
+      db,
+      steamId,
+      'giveaway_trade_accepted',
+      'Prize Delivered',
+      'Your giveaway trade offer was accepted. Enjoy your prize!',
+      { giveawayId: giveawayIdStr, steamTradeOfferId: String(offerId || '') }
+    );
+  } catch {
+    // ignore
+  }
+}
+
+async function pickAndLockPendingClaim(db) {
+  const now = new Date();
+  const lockCutoff = new Date(Date.now() - CONFIG.lockTimeoutMs);
+  const res = await db.collection('giveaway_claims').findOneAndUpdate(
+    {
+      tradeStatus: 'PENDING',
+      $or: [{ botLockedAt: { $exists: false } }, { botLockedAt: { $lt: lockCutoff } }],
+    },
+    {
+      $set: { botLockedAt: now, botLockId: `pid:${process.pid}`, updatedAt: now },
+    },
+    { sort: { updatedAt: 1 }, returnDocument: 'after' }
+  );
+
+  return res?.value || null;
+}
+
+async function processPendingClaimsOnce(db, manager, community) {
+  let processed = 0;
+
+  for (let i = 0; i < CONFIG.claimBatchSize; i++) {
+    const claim = await pickAndLockPendingClaim(db);
+    if (!claim) break;
+
+    const claimId = claim._id;
+    const steamId = String(claim?.steamId || '').trim();
+    const giveawayId = claim?.giveawayId;
+    const giveawayIdStr = String(giveawayId || '').trim();
+    const tradeUrl = String(claim?.tradeUrl || '').trim();
+    const itemId = String(claim?.itemId || '').trim();
+
+    if (!/^\d{17}$/.test(steamId) || !/^[0-9a-fA-F]{24}$/.test(giveawayIdStr)) {
+      await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Invalid claim payload');
+      processed++;
+      continue;
+    }
+
+    if (!isValidTradeUrl(tradeUrl)) {
+      await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Invalid trade URL');
+      processed++;
+      continue;
+    }
+
+    if (!itemId) {
+      await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Missing itemId');
+      processed++;
+      continue;
+    }
+
+    const wdoc = await db
+      .collection('giveaway_winners')
+      .findOne({ _id: giveawayIdStr }, { projection: { winners: 1 } });
+    const winners = Array.isArray(wdoc?.winners) ? wdoc.winners : [];
+    const mine = winners.find((w) => String(w?.steamId || '') === steamId) || null;
+
+    if (!mine) {
+      await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Winner record not found');
+      processed++;
+      continue;
+    }
+
+    const claimStatus = String(mine?.claimStatus || '');
+    if (claimStatus !== 'pending_trade') {
+      await db.collection('giveaway_claims').updateOne(
+        { _id: claimId },
+        {
+          $set: {
+            tradeStatus: 'FAILED',
+            lastError: `Unexpected winner status: ${claimStatus}`,
+            updatedAt: new Date(),
+          },
+        }
+      );
+      processed++;
+      continue;
+    }
+
+    const deadlineMs = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).getTime() : NaN;
+    if (Number.isFinite(deadlineMs) && Date.now() > deadlineMs) {
+      await db.collection('giveaway_claims').updateOne(
+        { _id: claimId },
+        {
+          $set: {
+            tradeStatus: 'FAILED',
+            lastError: 'Claim window expired',
+            updatedAt: new Date(),
+          },
+        }
+      );
+      processed++;
+      continue;
+    }
+
+    try {
+      const inventory = await getBotInventory(manager);
+      const item = findInventoryItemForMarketHash(inventory, itemId);
+
+      if (!item) {
+        await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Item not available in bot inventory');
+        processed++;
+        continue;
+      }
+
+      if (CONFIG.dryRun) {
+        console.log('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId });
+        await db.collection('giveaway_claims').updateOne(
+          { _id: claimId },
+          { $set: { tradeStatus: 'SENT', steamTradeOfferId: 'dry-run', updatedAt: new Date(), sentAt: new Date() } }
+        );
+        processed++;
+        continue;
+      }
+
+      const offer = manager.createOffer(tradeUrl);
+      offer.addMyItem(item);
+      offer.setMessage(`SkinVaults Giveaway Prize: ${String(claim?.prize || itemId).slice(0, 200)}`);
+
+      const { status } = await sendOffer(offer);
+      const tradeOfferId = String(offer?.id || '').trim();
+
+      if (!tradeOfferId) {
+        await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Trade offer ID missing after send');
+        processed++;
+        continue;
+      }
+
+      await db.collection('giveaway_claims').updateOne(
+        { _id: claimId },
+        {
+          $set: {
+            tradeStatus: 'SENT',
+            steamTradeOfferId: tradeOfferId,
+            lastError: null,
+            sentAt: new Date(),
+            updatedAt: new Date(),
+          },
+          $unset: { botLockedAt: '', botLockId: '' },
+        }
+      );
+
+      try {
+        await createUserNotification(
+          db,
+          steamId,
+          'giveaway_trade_sent',
+          'Trade Offer Sent',
+          'Your giveaway trade offer was sent. Please check your Steam trade offers.',
+          { giveawayId: giveawayIdStr, steamTradeOfferId: tradeOfferId }
+        );
+      } catch {
+        // ignore
+      }
+
+      if (String(status || '').toLowerCase() === 'pending') {
+        try {
+          await acceptConfirmation(community, CONFIG.identitySecret, tradeOfferId);
+        } catch (e) {
+          console.warn('[confirm] failed', { tradeOfferId, message: e?.message || String(e) });
+        }
+      }
+
+      processed++;
+    } catch (e) {
+      await setClaimFailed(db, claimId, giveawayIdStr, steamId, e?.message || String(e));
+      processed++;
+    }
+  }
+
+  return processed;
+}
+
+async function pollSentOffersOnce(db, manager) {
+  const claims = await db
+    .collection('giveaway_claims')
+    .find(
+      {
+        tradeStatus: 'SENT',
+        steamTradeOfferId: { $exists: true, $ne: null },
+      },
+      { projection: { _id: 1, giveawayId: 1, steamId: 1, steamTradeOfferId: 1, updatedAt: 1 } }
+    )
+    .sort({ updatedAt: 1 })
+    .limit(CONFIG.sentBatchSize)
+    .toArray();
+
+  if (!claims.length) return 0;
+
+  const E = TradeOfferManager.ETradeOfferState;
+  let processed = 0;
+
+  for (const c of claims) {
+    const claimId = c._id;
+    const steamId = String(c?.steamId || '').trim();
+    const giveawayIdStr = String(c?.giveawayId || '').trim();
+    const offerId = String(c?.steamTradeOfferId || '').trim();
+
+    if (!offerId) continue;
+
+    try {
+      if (offerId === 'dry-run') {
+        await setClaimSuccess(db, claimId, giveawayIdStr, steamId, offerId);
+        processed++;
+        continue;
+      }
+
+      const offer = await getOffer(manager, offerId);
+      const state = offer?.state;
+
+      if (state === E.Accepted) {
+        await setClaimSuccess(db, claimId, giveawayIdStr, steamId, offerId);
+        processed++;
+        continue;
+      }
+
+      if (
+        state === E.Declined ||
+        state === E.Canceled ||
+        state === E.Expired ||
+        state === E.InvalidItems ||
+        state === E.CanceledBySecondFactor
+      ) {
+        await setClaimFailed(db, claimId, giveawayIdStr, steamId, `Trade offer failed (state ${state})`, {
+          steamTradeOfferState: state,
+        });
+        processed++;
+        continue;
+      }
+
+      await db.collection('giveaway_claims').updateOne(
+        { _id: claimId },
+        { $set: { lastSeenOfferState: state, updatedAt: new Date() } }
+      );
+    } catch (e) {
+      await db.collection('giveaway_claims').updateOne(
+        { _id: claimId },
+        { $set: { lastError: e?.message || String(e), updatedAt: new Date() } }
+      );
+    }
+  }
+
+  return processed;
+}
+
+async function main() {
+  console.log('[bot] starting', {
+    mongoDbName: CONFIG.mongoDbName,
+    appId: CONFIG.appId,
+    contextId: CONFIG.contextId,
+    pendingLoopMs: CONFIG.pendingLoopMs,
+    pollLoopMs: CONFIG.pollLoopMs,
+    dryRun: CONFIG.dryRun,
+  });
+
+  const { client, db } = await connectMongo();
+
+  const { user, community, manager } = makeSteamClients();
+  logOnSteam(user);
+
+  let ready = false;
+  const waitReady = () =>
+    new Promise((resolve) => {
+      const tick = () => {
+        if (ready) return resolve();
+        setTimeout(tick, 250);
+      };
+      tick();
+    });
+
+  manager.on('pollData', () => {
+    // When pollData is available, cookies are set and manager is ready.
+    ready = true;
+  });
+
+  await waitReady();
+
+  let stopped = false;
+  const stop = async () => {
+    if (stopped) return;
+    stopped = true;
+    try {
+      user.logOff();
+    } catch {
+      // ignore
+    }
+    try {
+      await client.close();
+    } catch {
+      // ignore
+    }
+  };
+
+  process.on('SIGINT', () => {
+    stop().finally(() => process.exit(0));
+  });
+  process.on('SIGTERM', () => {
+    stop().finally(() => process.exit(0));
+  });
+
+  setInterval(() => {
+    processPendingClaimsOnce(db, manager, community).catch((e) => {
+      console.error('[pending] loop error', e);
+    });
+  }, CONFIG.pendingLoopMs);
+
+  setInterval(() => {
+    pollSentOffersOnce(db, manager).catch((e) => {
+      console.error('[poll] loop error', e);
+    });
+  }, CONFIG.pollLoopMs);
+
+  // Run one immediately
+  await processPendingClaimsOnce(db, manager, community);
+  await pollSentOffersOnce(db, manager);
+}
+
+main().catch((e) => {
+  console.error('[bot] fatal', e);
+  process.exit(1);
+});
+
+module.exports = { pollSentOffersOnce };

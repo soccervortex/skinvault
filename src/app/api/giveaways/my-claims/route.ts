@@ -26,10 +26,23 @@ export async function GET(req: NextRequest) {
     const db = await getDatabase();
     const winnersCol = db.collection('giveaway_winners');
     const giveawaysCol = db.collection<GiveawayDoc>('giveaways');
+    const claimsCol = db.collection('giveaway_claims');
 
     const now = new Date();
 
-    const docs: any[] = await winnersCol
+    const tradeClaims: any[] = await claimsCol
+      .find(
+        {
+          steamId,
+          tradeStatus: { $in: ['PENDING', 'SENT'] },
+        } as any,
+        { projection: { _id: 1, giveawayId: 1, tradeStatus: 1, createdAt: 1, updatedAt: 1 } }
+      )
+      .sort({ updatedAt: -1 })
+      .limit(100)
+      .toArray();
+
+    const winnerDocs: any[] = await winnersCol
       .find(
         {
           winners: {
@@ -40,27 +53,50 @@ export async function GET(req: NextRequest) {
             },
           },
         } as any,
-        { projection: { _id: 1, giveawayId: 1, winners: 1 } }
+        { projection: { _id: 1, winners: 1 } }
       )
       .sort({ pickedAt: -1 })
       .limit(100)
       .toArray();
 
-    const giveawayIds: ObjectId[] = [];
+    const mineByGiveawayId = new Map<
+      string,
+      { entries: number; claimStatus: string; claimDeadlineAt: string | null }
+    >();
 
-    for (const d of docs) {
-      const oid = d?.giveawayId;
-      if (oid && typeof oid === 'object') {
-        giveawayIds.push(oid as ObjectId);
-        continue;
-      }
+    const giveawayIdStrings = new Set<string>();
 
+    for (const d of winnerDocs) {
       const id = String(d?._id || '').trim();
       if (!id) continue;
+      giveawayIdStrings.add(id);
+
+      const winners: any[] = Array.isArray(d?.winners) ? d.winners : [];
+      const mine = winners.find((w) => String(w?.steamId || '') === steamId) || null;
+      if (!mine) continue;
+
+      const claimDeadlineAt = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).toISOString() : null;
+      const deadlineMs = claimDeadlineAt ? Date.parse(claimDeadlineAt) : NaN;
+      if (Number.isFinite(deadlineMs) && deadlineMs <= Date.now()) continue;
+
+      mineByGiveawayId.set(id, {
+        entries: Number(mine?.entries || 0),
+        claimStatus: String(mine?.claimStatus || ''),
+        claimDeadlineAt,
+      });
+    }
+
+    for (const c of tradeClaims) {
+      const gid = String(c?.giveawayId || '').trim();
+      if (gid) giveawayIdStrings.add(gid);
+    }
+
+    const giveawayIds: ObjectId[] = [];
+    for (const id of giveawayIdStrings) {
       try {
         giveawayIds.push(new ObjectId(id));
       } catch {
-        continue;
+        // ignore
       }
     }
 
@@ -77,19 +113,38 @@ export async function GET(req: NextRequest) {
       byId.set(String(g?._id || ''), g as GiveawayDoc);
     }
 
-    const out = docs
-      .map((d) => {
-        const id = String(d?._id || '').trim();
-        const g: any = byId.get(id);
-        if (!g) return null;
+    const missingMineIds = Array.from(giveawayIdStrings).filter((id) => !mineByGiveawayId.has(id));
+    if (missingMineIds.length) {
+      const missingDocs: any[] = await winnersCol
+        .find({ _id: { $in: missingMineIds } } as any, { projection: { _id: 1, winners: 1 } })
+        .limit(200)
+        .toArray();
 
+      for (const d of missingDocs) {
+        const id = String(d?._id || '').trim();
+        if (!id) continue;
         const winners: any[] = Array.isArray(d?.winners) ? d.winners : [];
         const mine = winners.find((w) => String(w?.steamId || '') === steamId) || null;
-        if (!mine) return null;
+        if (!mine) continue;
 
         const claimDeadlineAt = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).toISOString() : null;
         const deadlineMs = claimDeadlineAt ? Date.parse(claimDeadlineAt) : NaN;
-        if (Number.isFinite(deadlineMs) && deadlineMs <= Date.now()) return null;
+        if (Number.isFinite(deadlineMs) && deadlineMs <= Date.now()) continue;
+
+        mineByGiveawayId.set(id, {
+          entries: Number(mine?.entries || 0),
+          claimStatus: String(mine?.claimStatus || ''),
+          claimDeadlineAt,
+        });
+      }
+    }
+
+    const out = Array.from(giveawayIdStrings)
+      .map((id) => {
+        const g: any = byId.get(id);
+        if (!g) return null;
+        const mine = mineByGiveawayId.get(id);
+        if (!mine) return null;
 
         return {
           giveawayId: id,
@@ -103,11 +158,14 @@ export async function GET(req: NextRequest) {
                 image: g.prizeItem?.image ? String(g.prizeItem.image) : null,
               }
             : null,
-          entries: Number(mine?.entries || 0),
-          claimStatus: String(mine?.claimStatus || ''),
-          claimDeadlineAt,
+          entries: Number(mine.entries || 0),
+          claimStatus: String(mine.claimStatus || ''),
+          claimDeadlineAt: mine.claimDeadlineAt,
         };
       })
+      .filter(Boolean);
+
+    const filtered = out
       .filter(Boolean)
       .sort((a: any, b: any) => {
         const am = a?.claimDeadlineAt ? Date.parse(String(a.claimDeadlineAt)) : 0;
@@ -115,7 +173,7 @@ export async function GET(req: NextRequest) {
         return am - bm;
       });
 
-    const res = NextResponse.json({ ok: true, steamId, claims: out }, { status: 200 });
+    const res = NextResponse.json({ ok: true, steamId, claims: filtered }, { status: 200 });
     res.headers.set('cache-control', 'no-store');
     return res;
   } catch (e: any) {

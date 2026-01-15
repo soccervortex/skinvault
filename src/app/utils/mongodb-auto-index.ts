@@ -164,6 +164,52 @@ export async function autoSetupIndexes(): Promise<void> {
         }
       }
 
+      // Giveaway claims: unique per (giveawayId, steamId) + polling helpers
+      try {
+        const giveawayClaims = db.collection('giveaway_claims');
+        await giveawayClaims.createIndex(
+          { giveawayId: 1, steamId: 1 },
+          { name: 'giveawayId_steamId_unique', unique: true }
+        );
+        results.push('✅ Created unique index on giveaway_claims (giveawayId, steamId)');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_claims unique: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const giveawayClaims = db.collection('giveaway_claims');
+        await giveawayClaims.createIndex(
+          { tradeStatus: 1, updatedAt: -1 },
+          { name: 'tradeStatus_updatedAt_desc' }
+        );
+        results.push('✅ Created polling index on giveaway_claims (tradeStatus, updatedAt)');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_claims polling: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const giveawayClaims = db.collection('giveaway_claims');
+        await giveawayClaims.createIndex(
+          { steamTradeOfferId: 1 },
+          { name: 'steamTradeOfferId_lookup' }
+        );
+        results.push('✅ Created lookup index on giveaway_claims.steamTradeOfferId');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_claims steamTradeOfferId: ${error?.message || String(error)}`);
+        }
+      }
+
       // Don't close connection - it's from shared pool
 
       if (results.length > 0) {

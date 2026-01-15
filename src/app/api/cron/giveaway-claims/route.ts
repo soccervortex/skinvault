@@ -232,8 +232,11 @@ export async function GET(req: NextRequest) {
         { upsert: false }
       );
 
-      const anyPending = winners.some((w) => String(w?.claimStatus || '') === 'pending');
-      if (!anyPending) {
+      const anyActive = winners.some((w) => {
+        const st = String(w?.claimStatus || '');
+        return st === 'pending' || st === 'pending_trade';
+      });
+      if (!anyActive) {
         let oid: ObjectId | null = null;
         try {
           oid = new ObjectId(giveawayId);

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
-import { Loader2, Sparkles, Ticket, Wallet } from 'lucide-react';
+import { HelpCircle, Loader2, Sparkles, Ticket, Wallet, X } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 type PrizeItem = {
@@ -163,6 +163,12 @@ export default function GiveawaysPage() {
   const [myClaims, setMyClaims] = useState<MyClaimRow[]>([]);
   const [myClaimsLoading, setMyClaimsLoading] = useState(false);
 
+  const [tradeUrlModalOpen, setTradeUrlModalOpen] = useState(false);
+  const [tradeUrlModalClaimId, setTradeUrlModalClaimId] = useState<string | null>(null);
+  const [tradeUrlInput, setTradeUrlInput] = useState('');
+  const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
+  const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -171,6 +177,56 @@ export default function GiveawaysPage() {
       setUser(null);
     }
   }, []);
+
+  const openTradeUrlModal = (giveawayId: string | null) => {
+    setTradeUrlModalClaimId(giveawayId);
+    setTradeUrlModalOpen(true);
+    setTradeUrlInput('');
+    if (!user?.steamId) return;
+
+    setTradeUrlLoading(true);
+    fetch('/api/user/trade-url', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const t = String(j?.tradeUrl || '').trim();
+        setTradeUrlInput(t);
+      })
+      .catch(() => {
+        setTradeUrlInput('');
+      })
+      .finally(() => {
+        setTradeUrlLoading(false);
+      });
+  };
+
+  const saveTradeUrlFromModal = async () => {
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return;
+    }
+
+    setTradeUrlSaving(true);
+    try {
+      const res = await fetch('/api/user/trade-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tradeUrl: tradeUrlInput }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Trade URL saved');
+      setTradeUrlModalOpen(false);
+      const gid = tradeUrlModalClaimId;
+      setTradeUrlModalClaimId(null);
+      if (gid) {
+        await claimPrizeById(gid);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save trade URL');
+    } finally {
+      setTradeUrlSaving(false);
+    }
+  };
 
   const nowMs = Date.now();
   const active = useMemo(() => giveaways.filter((g) => g.isActive), [giveaways]);
@@ -407,11 +463,18 @@ export default function GiveawaysPage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'Failed');
-      toast.success('Prize claimed');
+      toast.success('Claim queued');
       await loadMyWinner(detail.id);
       await loadGiveaways();
+      await loadMyClaims();
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to claim');
+      const msg = String(e?.message || 'Failed to claim');
+      if (msg.toLowerCase().includes('invalid trade url')) {
+        openTradeUrlModal(detail.id);
+        toast.error('Set your Steam trade URL to claim prizes');
+      } else {
+        toast.error(msg);
+      }
       await loadMyWinner(detail.id);
     } finally {
       setClaimingPrize(false);
@@ -433,14 +496,20 @@ export default function GiveawaysPage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'Failed');
-      toast.success('Prize claimed');
+      toast.success('Claim queued');
       await loadMyClaims();
       if (detail?.id && String(detail.id) === id) {
         await loadMyWinner(id);
       }
       await loadGiveaways();
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to claim');
+      const msg = String(e?.message || 'Failed to claim');
+      if (msg.toLowerCase().includes('invalid trade url')) {
+        openTradeUrlModal(id);
+        toast.error('Set your Steam trade URL to claim prizes');
+      } else {
+        toast.error(msg);
+      }
       await loadMyClaims();
       if (detail?.id && String(detail.id) === id) {
         await loadMyWinner(id);
@@ -613,6 +682,11 @@ export default function GiveawaysPage() {
                         <div className="mt-2 text-[9px] text-emerald-300 font-black uppercase tracking-widest">
                           Deadline: {c.claimDeadlineAt ? new Date(c.claimDeadlineAt).toLocaleString() : '—'}
                         </div>
+                        {String(c.claimStatus || '') === 'pending_trade' && (
+                          <div className="mt-1 text-[9px] text-blue-300 font-black uppercase tracking-widest">
+                            Claim queued
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -623,10 +697,10 @@ export default function GiveawaysPage() {
                         </button>
                         <button
                           onClick={() => claimPrizeById(c.giveawayId)}
-                          disabled={claimingPrize}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                          disabled={claimingPrize || String(c.claimStatus || '') !== 'pending'}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize || String(c.claimStatus || '') !== 'pending' ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                         >
-                          Claim
+                          {String(c.claimStatus || '') === 'pending_trade' ? 'Queued' : 'Claim'}
                         </button>
                       </div>
                     </div>
@@ -911,7 +985,7 @@ export default function GiveawaysPage() {
                               disabled={claimingPrize}
                               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                             >
-                              {claimingPrize ? 'Claiming...' : 'Claim Prize'}
+                              {claimingPrize ? 'Queueing...' : 'Claim Prize'}
                             </button>
                           ) : null}
                         </div>
@@ -955,6 +1029,92 @@ export default function GiveawaysPage() {
           )}
         </div>
       </main>
+
+      {tradeUrlModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="trade-url-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setTradeUrlModalOpen(false);
+              setTradeUrlModalClaimId(null);
+            }
+          }}
+        >
+          <div
+            className="bg-[#11141d] border border-white/10 p-6 md:p-8 rounded-[2rem] w-full max-w-lg shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setTradeUrlModalOpen(false);
+                setTradeUrlModalClaimId(null);
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+              aria-label="Close trade URL modal"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="trade-url-modal-title" className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+                Set your Trade URL
+              </h2>
+              <a
+                href="https://steamcommunity.com/id/xottikmw/tradeoffers/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-white"
+              >
+                <HelpCircle size={16} />
+                Help
+              </a>
+            </div>
+
+            <p className="text-[11px] text-gray-400 mt-3">
+              You need a valid Steam trade URL to receive giveaway prizes.
+            </p>
+
+            <div className="mt-4">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Trade URL</div>
+              <input
+                value={tradeUrlInput}
+                onChange={(e) => setTradeUrlInput(e.target.value)}
+                placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
+                className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black"
+                disabled={tradeUrlLoading || tradeUrlSaving}
+              />
+              {tradeUrlLoading && (
+                <div className="mt-2 flex items-center gap-2 text-gray-500 text-[11px]">
+                  <Loader2 className="animate-spin" size={16} /> Loading
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setTradeUrlModalOpen(false);
+                  setTradeUrlModalClaimId(null);
+                }}
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
+                disabled={tradeUrlSaving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveTradeUrlFromModal}
+                disabled={tradeUrlSaving}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tradeUrlSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+              >
+                {tradeUrlSaving ? 'Saving...' : 'Save & Claim'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -49,6 +49,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const winnersCol = db.collection('giveaway_winners');
     const giveawaysCol = db.collection('giveaways');
     const settingsCol = db.collection('user_settings');
+    const claimsCol = db.collection('giveaway_claims');
 
     const now = new Date();
 
@@ -73,17 +74,89 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const status = String(mine?.claimStatus || '');
     if (status === 'claimed') return NextResponse.json({ error: 'Already claimed' }, { status: 400 });
     if (status === 'forfeited') return NextResponse.json({ error: 'Prize forfeited' }, { status: 400 });
+    if (status === 'pending_trade') return NextResponse.json({ ok: true, queued: true }, { status: 200 });
 
     const deadlineMs = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).getTime() : NaN;
     if (Number.isFinite(deadlineMs) && Date.now() > deadlineMs) {
       return NextResponse.json({ error: 'Claim window expired' }, { status: 400 });
     }
 
+    const giveaway: any = await giveawaysCol.findOne({ _id: giveawayId } as any, {
+      projection: { _id: 1, title: 1, prize: 1, prizeItem: 1 },
+    });
+
+    const prizeItem = giveaway?.prizeItem
+      ? {
+          id: String(giveaway.prizeItem?.id || '').trim(),
+          name: String(giveaway.prizeItem?.name || '').trim(),
+          market_hash_name: String(giveaway.prizeItem?.market_hash_name || giveaway.prizeItem?.marketHashName || '').trim(),
+          image: giveaway.prizeItem?.image ? String(giveaway.prizeItem.image) : null,
+        }
+      : null;
+
+    const itemId = String(prizeItem?.market_hash_name || prizeItem?.id || giveaway?.prize || '').trim();
+
+    const existingClaim: any = await claimsCol.findOne({ giveawayId, steamId } as any);
+    const existingTradeStatus = existingClaim ? String(existingClaim?.tradeStatus || '') : '';
+    if (existingTradeStatus === 'SUCCESS') {
+      return NextResponse.json({ error: 'Already fulfilled' }, { status: 400 });
+    }
+
+    if (existingTradeStatus === 'PENDING' || existingTradeStatus === 'SENT') {
+      await winnersCol.updateOne(
+        { _id: id } as any,
+        {
+          $set: {
+            'winners.$[w].claimStatus': 'pending_trade',
+            'winners.$[w].claimedAt': mine?.claimedAt ? mine.claimedAt : now,
+            updatedAt: now,
+          },
+        } as any,
+        { arrayFilters: [{ 'w.steamId': steamId } as any] }
+      );
+
+      return NextResponse.json({ ok: true, queued: true }, { status: 200 });
+    }
+
+    if (existingClaim) {
+      await claimsCol.updateOne(
+        { _id: existingClaim._id } as any,
+        {
+          $set: {
+            giveawayId,
+            steamId,
+            itemId,
+            prize: String(giveaway?.prize || '').trim(),
+            prizeItem,
+            tradeUrl,
+            tradeStatus: 'PENDING',
+            steamTradeOfferId: null,
+            lastError: null,
+            updatedAt: now,
+          },
+        } as any
+      );
+    } else {
+      await claimsCol.insertOne({
+        giveawayId,
+        steamId,
+        itemId,
+        prize: String(giveaway?.prize || '').trim(),
+        prizeItem,
+        tradeUrl,
+        tradeStatus: 'PENDING',
+        steamTradeOfferId: null,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+    }
+
     const res = await winnersCol.updateOne(
       { _id: id } as any,
       {
         $set: {
-          'winners.$[w].claimStatus': 'claimed',
+          'winners.$[w].claimStatus': 'pending_trade',
           'winners.$[w].claimedAt': now,
           updatedAt: now,
         },
@@ -92,14 +165,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     );
 
     if (!res.matchedCount) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-    const after: any = await winnersCol.findOne({ _id: id } as any);
-    const afterWinners: any[] = Array.isArray(after?.winners) ? after.winners : [];
-    const anyPending = afterWinners.some((w) => String(w?.claimStatus || '') === 'pending');
-
-    if (!anyPending) {
-      await giveawaysCol.updateOne({ _id: giveawayId } as any, { $set: { archivedAt: now, updatedAt: now } } as any);
-    }
 
     await createUserNotification(
       db,
@@ -110,7 +175,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { giveawayId: id }
     );
 
-    return NextResponse.json({ ok: true }, { status: 200 });
+    return NextResponse.json({ ok: true, queued: true }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to claim' }, { status: 500 });
   }
