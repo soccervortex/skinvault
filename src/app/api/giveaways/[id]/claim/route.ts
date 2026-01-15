@@ -77,7 +77,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const status = String(mine?.claimStatus || '');
     if (status === 'claimed') return NextResponse.json({ error: 'Already claimed' }, { status: 400 });
     if (status === 'forfeited') return NextResponse.json({ error: 'Prize forfeited' }, { status: 400 });
-    if (status === 'pending_trade') return NextResponse.json({ ok: true, queued: true }, { status: 200 });
+    if (status === 'pending_trade') {
+      const existingClaim: any = await claimsCol.findOne({ giveawayId, steamId } as any);
+      const existingTradeStatus = existingClaim ? String(existingClaim?.tradeStatus || '') : '';
+      if (existingTradeStatus === 'PENDING') {
+        await claimsCol.updateOne(
+          { _id: existingClaim._id } as any,
+          { $unset: { botLockedAt: '', botLockId: '' }, $set: { lastError: null, updatedAt: now } } as any
+        );
+      }
+      return NextResponse.json({ ok: true, queued: true }, { status: 200 });
+    }
 
     const deadlineMs = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).getTime() : NaN;
     if (Number.isFinite(deadlineMs) && Date.now() > deadlineMs) {

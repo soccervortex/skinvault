@@ -36,6 +36,43 @@ type EntrantRow = {
   tradeUrl: string;
 };
 
+type PrizeStockRow = {
+  id: string;
+  assetId: string;
+  classId: string | null;
+  instanceId: string | null;
+  appId: number;
+  contextId: string;
+  market_hash_name: string | null;
+  name: string | null;
+  status: string;
+  reservedBySteamId: string | null;
+  steamTradeOfferId: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+type GiveawayClaimRow = {
+  id: string;
+  steamId: string;
+  tradeStatus: string;
+  steamTradeOfferId: string | null;
+  lastError: string | null;
+  botLockedAt: string | null;
+  botLockId: string | null;
+  prizeStockId: string | null;
+  itemId: string | null;
+  assetId: string | null;
+  classId: string | null;
+  instanceId: string | null;
+  assetAppIdExact: number | null;
+  assetContextIdExact: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  sentAt: string | null;
+  completedAt: string | null;
+};
+
 function toLocalInputValue(d: Date): string {
   const dt = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return dt.toISOString().slice(0, 16);
@@ -91,8 +128,100 @@ export default function AdminGiveawaysPage() {
     setEndAt(toLocalInputValue(end));
   };
 
+  const loadStock = async (id: string) => {
+    setStockLoading(true);
+    setSelectedId(id);
+    setSelectedPanel('stock');
+    setStockRows([]);
+    setWinners([]);
+    setEntrants([]);
+    setClaims([]);
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/prize-stock`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to load prize stock');
+      setStockRows(Array.isArray(json?.stock) ? json.stock : []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load prize stock');
+      setStockRows([]);
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
+  const addStock = async (giveawayId: string) => {
+    const raw = String(stockInput || '').trim();
+    if (!raw) {
+      toast.error('Paste at least 1 assetId');
+      return;
+    }
+
+    const lines = raw
+      .split(/\r?\n/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+    const items = lines
+      .map((line) => {
+        const parts = line.split(/\s*,\s*|\s+\|\s+|\s*;\s*/).map((p) => p.trim()).filter(Boolean);
+        const assetId = parts[0] ? String(parts[0]) : '';
+        const classId = parts[1] ? String(parts[1]) : '';
+        const instanceId = parts[2] ? String(parts[2]) : '';
+        return {
+          assetId,
+          classId: classId || undefined,
+          instanceId: instanceId || undefined,
+        };
+      })
+      .filter((x) => String(x.assetId || '').trim().length > 0);
+
+    if (!items.length) {
+      toast.error('No valid assetIds');
+      return;
+    }
+
+    setStockAdding(true);
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(giveawayId)}/prize-stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to add stock');
+      toast.success(`Added ${Number(json?.inserted || 0)} assets`);
+      setStockInput('');
+      await loadStock(giveawayId);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add stock');
+    } finally {
+      setStockAdding(false);
+    }
+  };
+
+  const loadClaims = async (id: string) => {
+    setClaimsLoading(true);
+    setSelectedId(id);
+    setSelectedPanel('claims');
+    setClaims([]);
+    setWinners([]);
+    setEntrants([]);
+    setStockRows([]);
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/claims`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to load claims');
+      setClaims(Array.isArray(json?.claims) ? json.claims : []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load claims');
+      setClaims([]);
+    } finally {
+      setClaimsLoading(false);
+    }
+  };
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedPanel, setSelectedPanel] = useState<'winners' | 'entrants' | null>(null);
+  const [selectedPanel, setSelectedPanel] = useState<'winners' | 'entrants' | 'stock' | 'claims' | null>(null);
   const [winnersLoading, setWinnersLoading] = useState(false);
   const [winners, setWinners] = useState<
     Array<{
@@ -107,6 +236,14 @@ export default function AdminGiveawaysPage() {
   >([]);
   const [entrantsLoading, setEntrantsLoading] = useState(false);
   const [entrants, setEntrants] = useState<EntrantRow[]>([]);
+
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockRows, setStockRows] = useState<PrizeStockRow[]>([]);
+  const [stockInput, setStockInput] = useState('');
+  const [stockAdding, setStockAdding] = useState(false);
+
+  const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claims, setClaims] = useState<GiveawayClaimRow[]>([]);
 
   useEffect(() => {
     try {
@@ -323,6 +460,8 @@ export default function AdminGiveawaysPage() {
         setSelectedPanel(null);
         setWinners([]);
         setEntrants([]);
+        setStockRows([]);
+        setClaims([]);
       }
       await load();
     } catch (e: any) {
@@ -375,6 +514,8 @@ export default function AdminGiveawaysPage() {
     setSelectedPanel('winners');
     setWinners([]);
     setEntrants([]);
+    setStockRows([]);
+    setClaims([]);
     try {
       if (shouldDraw) {
         const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/draw`, { method: 'POST' });
@@ -401,6 +542,8 @@ export default function AdminGiveawaysPage() {
     setSelectedPanel('entrants');
     setEntrants([]);
     setWinners([]);
+    setStockRows([]);
+    setClaims([]);
     try {
       const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/entries`, { cache: 'no-store' });
       const json = await res.json();
@@ -590,6 +733,13 @@ export default function AdminGiveawaysPage() {
                           Edit
                         </button>
                         <button
+                          onClick={() => loadStock(g.id)}
+                          disabled={stockLoading && selectedId === g.id}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(stockLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                        >
+                          {(stockLoading && selectedId === g.id) ? 'Loading...' : 'Prize Stock'}
+                        </button>
+                        <button
                           onClick={() => deleteGiveaway(g.id)}
                           className="w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-600 hover:bg-red-500 text-white"
                         >
@@ -601,6 +751,13 @@ export default function AdminGiveawaysPage() {
                           className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(entrantsLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
                         >
                           {(entrantsLoading && selectedId === g.id) ? 'Loading...' : 'Entrants'}
+                        </button>
+                        <button
+                          onClick={() => loadClaims(g.id)}
+                          disabled={claimsLoading && selectedId === g.id}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(claimsLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                        >
+                          {(claimsLoading && selectedId === g.id) ? 'Loading...' : 'Claims'}
                         </button>
                         <button
                           onClick={() => loadWinners(g.id, !g.drawnAt)}
@@ -626,6 +783,14 @@ export default function AdminGiveawaysPage() {
 
                     {selectedId === g.id && selectedPanel === 'entrants' && entrantsLoading && (
                       <div className="mt-4 text-gray-500 text-[11px]">Loading entrants...</div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'stock' && stockLoading && (
+                      <div className="mt-4 text-gray-500 text-[11px]">Loading prize stock...</div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'claims' && claimsLoading && (
+                      <div className="mt-4 text-gray-500 text-[11px]">Loading claims...</div>
                     )}
 
                     {selectedId === g.id && selectedPanel === 'winners' && !winnersLoading && (
@@ -695,6 +860,111 @@ export default function AdminGiveawaysPage() {
                                     <Copy size={14} className="text-gray-300" />
                                   </button>
                                 )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'stock' && !stockLoading && (
+                      <div className="mt-4 bg-[#11141d] border border-white/5 rounded-[1.5rem] p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Prize Stock</div>
+                          <button
+                            onClick={() => loadStock(g.id)}
+                            className="text-[10px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-300"
+                          >
+                            Refresh
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                          <textarea
+                            value={stockInput}
+                            onChange={(e) => setStockInput(e.target.value)}
+                            placeholder="Paste assetIds (one per line). Optional: assetId,classId,instanceId"
+                            className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[11px]"
+                            rows={4}
+                          />
+                          <button
+                            onClick={() => addStock(g.id)}
+                            disabled={stockAdding}
+                            className={`w-full md:w-auto px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${stockAdding ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                          >
+                            {stockAdding ? 'Adding...' : 'Add Stock'}
+                          </button>
+                        </div>
+
+                        {stockRows.length === 0 ? (
+                          <div className="text-gray-500 text-[11px]">No stock for this giveaway.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {stockRows.map((s) => (
+                              <div key={s.id} className="flex items-start justify-between gap-3 bg-black/40 border border-white/5 rounded-xl p-3">
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-black uppercase tracking-widest break-all">{s.assetId}</div>
+                                  <div className="text-[9px] text-gray-500">
+                                    Status: {s.status}
+                                    {s.reservedBySteamId ? ` • Reserved: ${s.reservedBySteamId}` : ''}
+                                    {s.steamTradeOfferId ? ` • Offer: ${s.steamTradeOfferId}` : ''}
+                                  </div>
+                                  <div className="text-[9px] text-gray-600">
+                                    {s.market_hash_name ? s.market_hash_name : (s.name ? s.name : '')}
+                                  </div>
+                                </div>
+                                <button onClick={() => copy(s.assetId)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy asset id">
+                                  <Copy size={14} className="text-gray-300" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'claims' && !claimsLoading && (
+                      <div className="mt-4 bg-[#11141d] border border-white/5 rounded-[1.5rem] p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Claims</div>
+                          <button
+                            onClick={() => loadClaims(g.id)}
+                            className="text-[10px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-300"
+                          >
+                            Refresh
+                          </button>
+                        </div>
+
+                        {claims.length === 0 ? (
+                          <div className="text-gray-500 text-[11px]">No claims for this giveaway.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {claims.map((c) => (
+                              <div key={c.id} className="flex items-start justify-between gap-3 bg-black/40 border border-white/5 rounded-xl p-3">
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-black uppercase tracking-widest">{c.steamId}</div>
+                                  <div className="text-[9px] text-gray-500">
+                                    Status: {c.tradeStatus}
+                                    {c.steamTradeOfferId ? ` • Offer: ${c.steamTradeOfferId}` : ''}
+                                  </div>
+                                  {c.lastError ? (
+                                    <div className="text-[9px] text-red-400 break-all">{c.lastError}</div>
+                                  ) : null}
+                                  <div className="text-[9px] text-gray-600 break-all">
+                                    {c.assetId ? `assetId: ${c.assetId}` : (c.itemId ? `itemId: ${c.itemId}` : '')}
+                                  </div>
+                                  <div className="text-[9px] text-gray-700">
+                                    {c.botLockId ? `Lock: ${c.botLockId}` : ''}
+                                    {c.botLockedAt ? ` • ${c.botLockedAt}` : ''}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {c.steamTradeOfferId ? (
+                                    <button onClick={() => copy(String(c.steamTradeOfferId || ''))} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy offer id">
+                                      <Copy size={14} className="text-gray-300" />
+                                    </button>
+                                  ) : null}
+                                </div>
                               </div>
                             ))}
                           </div>

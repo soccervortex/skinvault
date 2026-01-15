@@ -45,6 +45,18 @@ async function getPendingClaimsCount(db) {
   }
 }
 
+async function getEligiblePendingClaimsCount(db) {
+  try {
+    const lockCutoff = new Date(Date.now() - CONFIG.lockTimeoutMs);
+    return await db.collection('giveaway_claims').countDocuments({
+      tradeStatus: 'PENDING',
+      $or: [{ botLockedAt: { $exists: false } }, { botLockedAt: { $lt: lockCutoff } }],
+    });
+  } catch {
+    return 0;
+  }
+}
+
 const CONFIG = {
   mongoUris: getMongoUriCandidates(),
   mongoDbName: String(process.env.MONGODB_DB_NAME || 'skinvault'),
@@ -65,6 +77,13 @@ const CONFIG = {
 
   dryRun: String(process.env.DRY_RUN || '').trim() === '1',
   verbose: String(process.env.BOT_VERBOSE || '').trim() === '1',
+
+  exportInventory: String(process.env.EXPORT_INVENTORY || '').trim() === '1',
+  exportInventoryAppId: Number(process.env.EXPORT_INVENTORY_APP_ID || process.env.STEAM_APP_ID || 730),
+  exportInventoryContextId: String(process.env.EXPORT_INVENTORY_CONTEXT_ID || process.env.STEAM_CONTEXT_ID || '2').trim() || '2',
+  exportInventoryLimit: Math.min(5000, Math.max(1, Number(process.env.EXPORT_INVENTORY_LIMIT || 2000))),
+  exportInventoryFilter: String(process.env.EXPORT_INVENTORY_FILTER || '').trim(),
+  exportInventoryDetailed: String(process.env.EXPORT_INVENTORY_DETAILED || '').trim() === '1',
 };
 
 function logInfo(tag, data) {
@@ -138,17 +157,23 @@ async function connectMongo() {
       const db = client.db(CONFIG.mongoDbName);
       const host = safeMongoHost(uri);
       const pendingClaims = await getPendingClaimsCount(db);
+      const eligiblePendingClaims = await getEligiblePendingClaimsCount(db);
 
       if (CONFIG.verbose) {
-        logInfo('[mongo] candidate', { host, dbName: CONFIG.mongoDbName, pendingClaims });
+        logInfo('[mongo] candidate', { host, dbName: CONFIG.mongoDbName, pendingClaims, eligiblePendingClaims });
       }
 
       if (!fallback) {
-        fallback = { client, db, uri, pendingClaims };
+        fallback = { client, db, uri, pendingClaims, eligiblePendingClaims };
       }
 
-      if (pendingClaims > 0) {
-        logInfo('[mongo] using candidate with pending claims', { host, dbName: CONFIG.mongoDbName, pendingClaims });
+      if (eligiblePendingClaims > 0) {
+        logInfo('[mongo] using candidate with eligible pending claims', {
+          host,
+          dbName: CONFIG.mongoDbName,
+          pendingClaims,
+          eligiblePendingClaims,
+        });
         if (fallback && fallback.client !== client) {
           try {
             await fallback.client.close();
@@ -179,6 +204,7 @@ async function connectMongo() {
       host: safeMongoHost(fallback.uri),
       dbName: CONFIG.mongoDbName,
       pendingClaims: fallback.pendingClaims,
+      eligiblePendingClaims: fallback.eligiblePendingClaims,
     });
     return { client: fallback.client, db: fallback.db };
   }
@@ -290,6 +316,50 @@ async function getBotInventory(manager, appId, contextId) {
   const items = await getInventoryContents(manager, a, c, true);
   inventoryCacheByKey.set(key, { loadedAt: now, items });
   return items;
+}
+
+function exportInventoryLines(inventory) {
+  const filter = String(CONFIG.exportInventoryFilter || '').toLowerCase();
+
+  const rows = (Array.isArray(inventory) ? inventory : [])
+    .map((it) => {
+      const assetId = String(it?.assetid || it?.assetId || it?.id || '').trim();
+      const classId = String(it?.classid || it?.classId || '').trim();
+      const instanceId = String(it?.instanceid || it?.instanceId || '').trim();
+      const marketHashName = String(it?.market_hash_name || '').trim();
+      const name = String(it?.name || '').trim();
+      return {
+        assetId,
+        classId: classId || null,
+        instanceId: instanceId || null,
+        marketHashName: marketHashName || null,
+        name: name || null,
+      };
+    })
+    .filter((r) => r.assetId);
+
+  const filtered = filter
+    ? rows.filter((r) =>
+        String(r.marketHashName || '').toLowerCase().includes(filter) || String(r.name || '').toLowerCase().includes(filter)
+      )
+    : rows;
+
+  filtered.sort((a, b) => {
+    const ak = String(a.marketHashName || a.name || '');
+    const bk = String(b.marketHashName || b.name || '');
+    if (ak < bk) return -1;
+    if (ak > bk) return 1;
+    if (a.assetId < b.assetId) return -1;
+    if (a.assetId > b.assetId) return 1;
+    return 0;
+  });
+
+  const limited = filtered.slice(0, CONFIG.exportInventoryLimit);
+  return {
+    total: rows.length,
+    matched: filtered.length,
+    limited,
+  };
 }
 
 function findInventoryItemByAssetId(inventory, assetId) {
@@ -463,16 +533,75 @@ async function pickAndLockPendingClaim(db) {
     { sort: { updatedAt: 1 }, returnDocument: 'after' }
   );
 
-  return res?.value || null;
+  // MongoDB Node driver return shapes vary by version/options:
+  // - ModifyResult: { value: <doc|null>, ... }
+  // - Document directly: <doc|null>
+  if (res && typeof res === 'object' && 'value' in res) {
+    return res.value || null;
+  }
+  if (res && typeof res === 'object' && res._id) {
+    return res;
+  }
+  return null;
 }
 
 async function processPendingClaimsOnce(db, manager, community) {
   let processed = 0;
   let foundAny = false;
 
+  if (CONFIG.verbose) {
+    try {
+      const lockCutoff = new Date(Date.now() - CONFIG.lockTimeoutMs);
+      const pendingCount = await db.collection('giveaway_claims').countDocuments({ tradeStatus: 'PENDING' });
+      const eligibleCount = await db.collection('giveaway_claims').countDocuments({
+        tradeStatus: 'PENDING',
+        $or: [{ botLockedAt: { $exists: false } }, { botLockedAt: { $lt: lockCutoff } }],
+      });
+      logInfo('[pending] counts', { pendingCount, eligibleCount });
+    } catch {
+      // ignore
+    }
+  }
+
   for (let i = 0; i < CONFIG.claimBatchSize; i++) {
     const claim = await pickAndLockPendingClaim(db);
-    if (!claim) break;
+    if (!claim) {
+      if (CONFIG.verbose && i === 0) {
+        try {
+          const lockCutoff = new Date(Date.now() - CONFIG.lockTimeoutMs);
+          const pendingCount = await db.collection('giveaway_claims').countDocuments({ tradeStatus: 'PENDING' });
+          const eligibleCount = await db.collection('giveaway_claims').countDocuments({
+            tradeStatus: 'PENDING',
+            $or: [{ botLockedAt: { $exists: false } }, { botLockedAt: { $lt: lockCutoff } }],
+          });
+
+          const sample = await db.collection('giveaway_claims').findOne(
+            { tradeStatus: 'PENDING' },
+            { projection: { _id: 1, giveawayId: 1, steamId: 1, botLockedAt: 1, botLockId: 1, updatedAt: 1, lastError: 1 } }
+          );
+          logInfo('[pending] pick returned null', {
+            pid: process.pid,
+            pendingCount,
+            eligibleCount,
+            lockTimeoutMs: CONFIG.lockTimeoutMs,
+            sample: sample
+              ? {
+                  id: String(sample._id),
+                  giveawayId: String(sample.giveawayId || ''),
+                  steamId: String(sample.steamId || ''),
+                  botLockedAt: sample.botLockedAt ? new Date(sample.botLockedAt).toISOString?.() || String(sample.botLockedAt) : null,
+                  botLockId: sample.botLockId ? String(sample.botLockId) : null,
+                  updatedAt: sample.updatedAt ? new Date(sample.updatedAt).toISOString?.() || String(sample.updatedAt) : null,
+                  lastError: sample.lastError ? String(sample.lastError) : null,
+                }
+              : null,
+          });
+        } catch {
+          // ignore
+        }
+      }
+      break;
+    }
 
     foundAny = true;
 
@@ -497,19 +626,34 @@ async function processPendingClaimsOnce(db, manager, community) {
       dryRun: CONFIG.dryRun,
     });
 
+    const tradeUrlOk = isValidTradeUrl(tradeUrl);
+    if (CONFIG.verbose) {
+      logInfo('[claim] validate', {
+        claimId: String(claimId),
+        giveawayId: giveawayIdStr,
+        steamId,
+        tradeUrlOk,
+        hasItemId: !!itemId,
+        hasAssetId: !!assetId,
+      });
+    }
+
     if (!/^\d{17}$/.test(steamId) || !/^[0-9a-fA-F]{24}$/.test(giveawayIdStr)) {
+      logInfo('[claim] fail', { claimId: String(claimId), giveawayId: giveawayIdStr, steamId, reason: 'Invalid claim payload' });
       await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Invalid claim payload');
       processed++;
       continue;
     }
 
-    if (!isValidTradeUrl(tradeUrl)) {
+    if (!tradeUrlOk) {
+      logInfo('[claim] fail', { claimId: String(claimId), giveawayId: giveawayIdStr, steamId, reason: 'Invalid trade URL' });
       await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Invalid trade URL');
       processed++;
       continue;
     }
 
     if (!itemId && !assetId) {
+      logInfo('[claim] fail', { claimId: String(claimId), giveawayId: giveawayIdStr, steamId, reason: 'Missing itemId/assetId' });
       await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Missing itemId/assetId');
       processed++;
       continue;
@@ -522,6 +666,14 @@ async function processPendingClaimsOnce(db, manager, community) {
     const mine = winners.find((w) => String(w?.steamId || '') === steamId) || null;
 
     if (!mine) {
+      logInfo('[claim] fail', {
+        claimId: String(claimId),
+        giveawayId: giveawayIdStr,
+        steamId,
+        reason: 'Winner record not found',
+        winnersDocFound: !!wdoc,
+        winnersCount: Array.isArray(winners) ? winners.length : 0,
+      });
       await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Winner record not found');
       processed++;
       continue;
@@ -529,6 +681,13 @@ async function processPendingClaimsOnce(db, manager, community) {
 
     const claimStatus = String(mine?.claimStatus || '');
     if (claimStatus !== 'pending_trade') {
+      logInfo('[claim] fail', {
+        claimId: String(claimId),
+        giveawayId: giveawayIdStr,
+        steamId,
+        reason: 'Unexpected winner status',
+        claimStatus,
+      });
       await db.collection('giveaway_claims').updateOne(
         { _id: claimId },
         {
@@ -546,6 +705,13 @@ async function processPendingClaimsOnce(db, manager, community) {
 
     const deadlineMs = mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).getTime() : NaN;
     if (Number.isFinite(deadlineMs) && Date.now() > deadlineMs) {
+      logInfo('[claim] fail', {
+        claimId: String(claimId),
+        giveawayId: giveawayIdStr,
+        steamId,
+        reason: 'Claim window expired',
+        claimDeadlineAt: mine?.claimDeadlineAt ? new Date(mine.claimDeadlineAt).toISOString?.() || String(mine.claimDeadlineAt) : null,
+      });
       await db.collection('giveaway_claims').updateOne(
         { _id: claimId },
         {
@@ -562,6 +728,54 @@ async function processPendingClaimsOnce(db, manager, community) {
     }
 
     try {
+      if (CONFIG.dryRun) {
+        logInfo('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId, assetId, prizeStockId });
+        await db.collection('giveaway_claims').updateOne(
+          { _id: claimId },
+          {
+            $set: { tradeStatus: 'SENT', steamTradeOfferId: 'dry-run', updatedAt: new Date(), sentAt: new Date() },
+            $unset: { botLockedAt: '', botLockId: '' },
+          }
+        );
+
+        if (CONFIG.verbose) {
+          try {
+            const after = await db.collection('giveaway_claims').findOne(
+              { _id: claimId },
+              { projection: { _id: 1, tradeStatus: 1, steamTradeOfferId: 1, updatedAt: 1, lastError: 1 } }
+            );
+            logInfo('[dry-run] claim after update', {
+              claimId: String(claimId),
+              tradeStatus: after?.tradeStatus || null,
+              steamTradeOfferId: after?.steamTradeOfferId || null,
+              lastError: after?.lastError || null,
+            });
+          } catch {
+          }
+        }
+
+        if (prizeStockId) {
+          try {
+            await db.collection('giveaway_prize_stock').updateOne(
+              { _id: prizeStockId },
+              { $set: { status: 'SENT', steamTradeOfferId: 'dry-run', sentAt: new Date(), updatedAt: new Date() } }
+            );
+          } catch {
+          }
+        }
+
+        // Complete the pipeline immediately in dry-run so operators can validate end-to-end
+        // without relying on the poll loop.
+        try {
+          await setClaimSuccess(db, claimId, giveawayIdStr, steamId, 'dry-run');
+        } catch (e) {
+          logInfo('[dry-run] failed to finalize success', { claimId: String(claimId), message: e?.message || String(e) });
+        }
+
+        processed++;
+        continue;
+      }
+
       const inventory = await getBotInventory(manager, assetAppIdExact, assetContextIdExact);
       const item = assetId ? findInventoryItemByAssetId(inventory, assetId) : findInventoryItemForMarketHash(inventory, itemId);
 
@@ -579,30 +793,6 @@ async function processPendingClaimsOnce(db, manager, community) {
         inventoryAssetId: String(item?.assetid || item?.assetId || item?.id || ''),
         marketHashName: String(item?.market_hash_name || ''),
       });
-
-      if (CONFIG.dryRun) {
-        logInfo('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId, assetId, prizeStockId });
-        await db.collection('giveaway_claims').updateOne(
-          { _id: claimId },
-          {
-            $set: { tradeStatus: 'SENT', steamTradeOfferId: 'dry-run', updatedAt: new Date(), sentAt: new Date() },
-            $unset: { botLockedAt: '', botLockId: '' },
-          }
-        );
-
-        if (prizeStockId) {
-          try {
-            await db.collection('giveaway_prize_stock').updateOne(
-              { _id: prizeStockId },
-              { $set: { status: 'SENT', steamTradeOfferId: 'dry-run', sentAt: new Date(), updatedAt: new Date() } }
-            );
-          } catch {
-          }
-        }
-
-        processed++;
-        continue;
-      }
 
       const offer = manager.createOffer(tradeUrl);
       offer.addMyItem(item);
@@ -802,6 +992,7 @@ async function pollSentOffersOnce(db, manager) {
 
 async function main() {
   console.log('[bot] starting', {
+    pid: process.pid,
     mongoDbName: CONFIG.mongoDbName,
     appId: CONFIG.appId,
     contextId: CONFIG.contextId,
@@ -810,8 +1001,6 @@ async function main() {
     dryRun: CONFIG.dryRun,
     verbose: CONFIG.verbose,
   });
-
-  const { client, db } = await connectMongo();
 
   const { user, community, manager } = makeSteamClients();
   logOnSteam(user);
@@ -834,6 +1023,42 @@ async function main() {
   await waitReady();
 
   logInfo('[bot] ready');
+
+  if (CONFIG.exportInventory) {
+    const appId = Number(CONFIG.exportInventoryAppId || CONFIG.appId);
+    const contextId = String(CONFIG.exportInventoryContextId || CONFIG.contextId);
+    const inventory = await getInventoryContents(manager, appId, contextId, true);
+    const { total, matched, limited } = exportInventoryLines(inventory);
+
+    logInfo('[export] inventory', {
+      appId,
+      contextId,
+      total,
+      matched,
+      printed: limited.length,
+      filter: CONFIG.exportInventoryFilter || null,
+    });
+
+    console.log('[export] copy/paste assetIds (one per line)');
+    for (const r of limited) {
+      console.log(r.assetId);
+    }
+
+    if (CONFIG.exportInventoryDetailed) {
+      console.log('[export] detailed (assetId\tclassId\tinstanceId\tmarket_hash_name\tname)');
+      for (const r of limited) {
+        console.log([r.assetId, r.classId || '', r.instanceId || '', r.marketHashName || '', r.name || ''].join('\t'));
+      }
+    }
+
+    try {
+      user.logOff();
+    } catch {
+    }
+    process.exit(0);
+  }
+
+  const { client, db } = await connectMongo();
 
   let stopped = false;
   const stop = async () => {
