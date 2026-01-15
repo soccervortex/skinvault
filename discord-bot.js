@@ -17,6 +17,7 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID || '1453751539792347304'; // SkinV
 const OWNER_STEAM_IDS = [
   '76561199235618867', // Original owner
   '76561199052427203', // Co-owner (TheRembler)
+  '76561198750974604', // Bot Website (Skinvaults)
 ];
 
 if (!DISCORD_TOKEN || !DISCORD_CLIENT_ID) {

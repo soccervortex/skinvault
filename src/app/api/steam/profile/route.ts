@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 export const runtime = 'nodejs';
 
@@ -51,7 +53,7 @@ function parseSteamProfileXml(xml: string): { name: string; avatar: string } | n
 }
 
 // Server-side Steam profile fetcher (no proxies needed - server can fetch directly)
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const steamId = searchParams.get('steamId') || searchParams.get('id');
@@ -61,6 +63,14 @@ export async function GET(request: Request) {
     }
 
     const safeSteamId = String(steamId).trim();
+
+    const blockedSteamId = String(process.env.SV_WEBSITE_PRIVATE_STEAM_ID || '76561198750974604').trim();
+    if (blockedSteamId && safeSteamId === blockedSteamId) {
+      const viewerSteamId = getSteamIdFromRequest(request);
+      if (String(viewerSteamId || '') !== blockedSteamId) {
+        return NextResponse.json({ error: 'Profile is private' }, { status: 403 });
+      }
+    }
 
     const avatarFallback = `${new URL(request.url).origin}/icons/web-app-manifest-192x192.png`;
 

@@ -242,6 +242,7 @@ function InventoryContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
+  const [websiteProfilePrivate, setWebsiteProfilePrivate] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
@@ -633,6 +634,9 @@ function InventoryContent() {
         const data = await res.json();
         return { steamId: id, name: data.name || "User", avatar: data.avatar || "" };
       } else {
+        if (res.status === 403) {
+          setWebsiteProfilePrivate(true);
+        }
         // Silently return null for expected errors (404, 408, etc.)
         return null;
       }
@@ -917,6 +921,11 @@ function InventoryContent() {
           }
           
           if (!res.ok) {
+            if (res.status === 403) {
+              setWebsiteProfilePrivate(true);
+              hasMore = false;
+              break;
+            }
             // Don't log 404s, 502s, or 503s (expected errors - inventory might not be available or API might be down)
             if (res.status !== 404 && res.status !== 502 && res.status !== 503) {
               const errorText = await res.text();
@@ -1126,6 +1135,7 @@ function InventoryContent() {
 
     const loadAll = async () => {
       setLoading(true);
+      setWebsiteProfilePrivate(false);
       
       // Check if user is banned (only for login callbacks)
       if (isLoginCallback) {
@@ -1784,7 +1794,32 @@ function InventoryContent() {
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
-        {viewedUser && (
+        {websiteProfilePrivate && (
+          <div className="max-w-6xl mx-auto space-y-10 pb-32">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
+              <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">
+                Profile is private
+              </h1>
+              <p className="mt-3 text-[10px] md:text-xs text-gray-400 max-w-2xl">
+                You can’t look up this profile.
+                Sign in as the account owner to view it.
+              </p>
+              <div className="mt-6">
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined') window.location.href = '/api/auth/steam';
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
+                >
+                  <User size={14} />
+                  Sign In with Steam
+                </button>
+              </div>
+            </header>
+          </div>
+        )}
+
+        {!websiteProfilePrivate && viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
             <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">

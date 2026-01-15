@@ -210,6 +210,67 @@ export async function autoSetupIndexes(): Promise<void> {
         }
       }
 
+      try {
+        const giveawayClaims = db.collection('giveaway_claims');
+        await giveawayClaims.createIndex(
+          { prizeStockId: 1 },
+          { name: 'prizeStockId_lookup' }
+        );
+        results.push('✅ Created lookup index on giveaway_claims.prizeStockId');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_claims prizeStockId: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const giveawayClaims = db.collection('giveaway_claims');
+        await giveawayClaims.createIndex(
+          { assetId: 1 },
+          { name: 'assetId_lookup' }
+        );
+        results.push('✅ Created lookup index on giveaway_claims.assetId');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_claims assetId: ${error?.message || String(error)}`);
+        }
+      }
+
+      // Giveaway prize stock: unique Steam asset + reserve helpers
+      try {
+        const giveawayPrizeStock = db.collection('giveaway_prize_stock');
+        await giveawayPrizeStock.createIndex(
+          { appId: 1, contextId: 1, assetId: 1 },
+          { name: 'steam_asset_unique', unique: true }
+        );
+        results.push('✅ Created unique index on giveaway_prize_stock (appId, contextId, assetId)');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_prize_stock unique: ${error?.message || String(error)}`);
+        }
+      }
+
+      try {
+        const giveawayPrizeStock = db.collection('giveaway_prize_stock');
+        await giveawayPrizeStock.createIndex(
+          { giveawayId: 1, status: 1, createdAt: 1 },
+          { name: 'giveawayId_status_createdAt' }
+        );
+        results.push('✅ Created reserve index on giveaway_prize_stock (giveawayId, status, createdAt)');
+      } catch (error: any) {
+        if (error?.code === 85 || error?.codeName === 'IndexOptionsConflict') {
+          // Already exists
+        } else {
+          results.push(`⚠️  giveaway_prize_stock reserve: ${error?.message || String(error)}`);
+        }
+      }
+
       // Don't close connection - it's from shared pool
 
       if (results.length > 0) {

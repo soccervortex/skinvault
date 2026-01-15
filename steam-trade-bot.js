@@ -4,7 +4,7 @@ const SteamTotp = require('steam-totp');
 const SteamCommunity = require('steamcommunity');
 const TradeOfferManager = require('steam-tradeoffer-manager');
 
-require('dotenv').config();
+require('dotenv').config(process.env.DOTENV_CONFIG_PATH ? { path: process.env.DOTENV_CONFIG_PATH } : undefined);
 
 function normalizeSecret(raw) {
   const s = String(raw || '').trim();
@@ -175,16 +175,28 @@ function acceptConfirmation(community, identitySecret, tradeOfferId) {
   });
 }
 
-let inventoryCache = { loadedAt: 0, items: [] };
-async function getBotInventory(manager) {
+const inventoryCacheByKey = new Map();
+async function getBotInventory(manager, appId, contextId) {
+  const a = Number(appId || CONFIG.appId);
+  const c = String(contextId || CONFIG.contextId);
+  const key = `${a}:${c}`;
   const now = Date.now();
-  if (inventoryCache.items.length && now - inventoryCache.loadedAt < 60_000) {
-    return inventoryCache.items;
+  const cached = inventoryCacheByKey.get(key);
+  if (cached?.items?.length && now - Number(cached.loadedAt || 0) < 60_000) {
+    return cached.items;
   }
 
-  const items = await getInventoryContents(manager, CONFIG.appId, CONFIG.contextId, true);
-  inventoryCache = { loadedAt: now, items };
+  const items = await getInventoryContents(manager, a, c, true);
+  inventoryCacheByKey.set(key, { loadedAt: now, items });
   return items;
+}
+
+function findInventoryItemByAssetId(inventory, assetId) {
+  const id = String(assetId || '').trim();
+  if (!id) return null;
+  return (
+    inventory.find((it) => String(it?.assetid || it?.assetId || it?.id || '').trim() === id) || null
+  );
 }
 
 function findInventoryItemForMarketHash(inventory, marketHashName) {
@@ -213,6 +225,43 @@ async function setClaimFailed(db, claimId, giveawayIdStr, steamId, reason, extra
       },
     }
   );
+
+  try {
+    const claim = await db.collection('giveaway_claims').findOne({ _id: claimId }, {
+      projection: { prizeStockId: 1 },
+    });
+    const prizeStockId = claim?.prizeStockId || null;
+    if (prizeStockId) {
+      await db.collection('giveaway_prize_stock').updateOne(
+        { _id: prizeStockId },
+        {
+          $set: { status: 'AVAILABLE', updatedAt: now },
+          $unset: {
+            reservedBySteamId: '',
+            reservedAt: '',
+            steamTradeOfferId: '',
+            sentAt: '',
+          },
+        }
+      );
+
+      await db.collection('giveaway_claims').updateOne(
+        { _id: claimId },
+        {
+          $unset: {
+            prizeStockId: '',
+            assetId: '',
+            classId: '',
+            instanceId: '',
+            assetAppIdExact: '',
+            assetContextIdExact: '',
+          },
+          $set: { updatedAt: now },
+        }
+      );
+    }
+  } catch {
+  }
 
   await db.collection('giveaway_winners').updateOne(
     { _id: giveawayIdStr },
@@ -255,6 +304,22 @@ async function setClaimSuccess(db, claimId, giveawayIdStr, steamId, offerId) {
       },
     }
   );
+
+  try {
+    const claim = await db.collection('giveaway_claims').findOne({ _id: claimId }, {
+      projection: { prizeStockId: 1 },
+    });
+    const prizeStockId = claim?.prizeStockId || null;
+    if (prizeStockId) {
+      await db.collection('giveaway_prize_stock').updateOne(
+        { _id: prizeStockId },
+        {
+          $set: { status: 'DELIVERED', steamTradeOfferId: String(offerId || ''), deliveredAt: now, updatedAt: now },
+        }
+      );
+    }
+  } catch {
+  }
 
   await db.collection('giveaway_winners').updateOne(
     { _id: giveawayIdStr },
@@ -312,6 +377,10 @@ async function processPendingClaimsOnce(db, manager, community) {
     const giveawayIdStr = String(giveawayId || '').trim();
     const tradeUrl = String(claim?.tradeUrl || '').trim();
     const itemId = String(claim?.itemId || '').trim();
+    const prizeStockId = claim?.prizeStockId || null;
+    const assetId = String(claim?.assetId || '').trim();
+    const assetAppIdExact = Number(claim?.assetAppIdExact || claim?.assetAppId || CONFIG.appId);
+    const assetContextIdExact = String(claim?.assetContextIdExact || claim?.assetContextId || CONFIG.contextId).trim();
 
     if (!/^\d{17}$/.test(steamId) || !/^[0-9a-fA-F]{24}$/.test(giveawayIdStr)) {
       await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Invalid claim payload');
@@ -325,8 +394,8 @@ async function processPendingClaimsOnce(db, manager, community) {
       continue;
     }
 
-    if (!itemId) {
-      await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Missing itemId');
+    if (!itemId && !assetId) {
+      await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Missing itemId/assetId');
       processed++;
       continue;
     }
@@ -376,8 +445,8 @@ async function processPendingClaimsOnce(db, manager, community) {
     }
 
     try {
-      const inventory = await getBotInventory(manager);
-      const item = findInventoryItemForMarketHash(inventory, itemId);
+      const inventory = await getBotInventory(manager, assetAppIdExact, assetContextIdExact);
+      const item = assetId ? findInventoryItemByAssetId(inventory, assetId) : findInventoryItemForMarketHash(inventory, itemId);
 
       if (!item) {
         await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Item not available in bot inventory');
@@ -386,11 +455,22 @@ async function processPendingClaimsOnce(db, manager, community) {
       }
 
       if (CONFIG.dryRun) {
-        console.log('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId });
+        console.log('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId, assetId, prizeStockId });
         await db.collection('giveaway_claims').updateOne(
           { _id: claimId },
           { $set: { tradeStatus: 'SENT', steamTradeOfferId: 'dry-run', updatedAt: new Date(), sentAt: new Date() } }
         );
+
+        if (prizeStockId) {
+          try {
+            await db.collection('giveaway_prize_stock').updateOne(
+              { _id: prizeStockId },
+              { $set: { status: 'SENT', steamTradeOfferId: 'dry-run', sentAt: new Date(), updatedAt: new Date() } }
+            );
+          } catch {
+          }
+        }
+
         processed++;
         continue;
       }
@@ -421,6 +501,16 @@ async function processPendingClaimsOnce(db, manager, community) {
           $unset: { botLockedAt: '', botLockId: '' },
         }
       );
+
+      if (prizeStockId) {
+        try {
+          await db.collection('giveaway_prize_stock').updateOne(
+            { _id: prizeStockId },
+            { $set: { status: 'SENT', steamTradeOfferId: tradeOfferId, sentAt: new Date(), updatedAt: new Date() } }
+          );
+        } catch {
+        }
+      }
 
       try {
         await createUserNotification(
@@ -461,7 +551,7 @@ async function pollSentOffersOnce(db, manager) {
         tradeStatus: 'SENT',
         steamTradeOfferId: { $exists: true, $ne: null },
       },
-      { projection: { _id: 1, giveawayId: 1, steamId: 1, steamTradeOfferId: 1, updatedAt: 1 } }
+      { projection: { _id: 1, giveawayId: 1, steamId: 1, steamTradeOfferId: 1, updatedAt: 1, prizeStockId: 1 } }
     )
     .sort({ updatedAt: 1 })
     .limit(CONFIG.sentBatchSize)
@@ -477,6 +567,7 @@ async function pollSentOffersOnce(db, manager) {
     const steamId = String(c?.steamId || '').trim();
     const giveawayIdStr = String(c?.giveawayId || '').trim();
     const offerId = String(c?.steamTradeOfferId || '').trim();
+    const prizeStockId = c?.prizeStockId || null;
 
     if (!offerId) continue;
 
@@ -506,6 +597,23 @@ async function pollSentOffersOnce(db, manager) {
         await setClaimFailed(db, claimId, giveawayIdStr, steamId, `Trade offer failed (state ${state})`, {
           steamTradeOfferState: state,
         });
+        if (prizeStockId) {
+          try {
+            await db.collection('giveaway_prize_stock').updateOne(
+              { _id: prizeStockId },
+              {
+                $set: { status: 'AVAILABLE', updatedAt: new Date() },
+                $unset: {
+                  reservedBySteamId: '',
+                  reservedAt: '',
+                  steamTradeOfferId: '',
+                  sentAt: '',
+                },
+              }
+            );
+          } catch {
+          }
+        }
         processed++;
         continue;
       }

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
   const controller = new AbortController();
@@ -582,7 +584,7 @@ async function fetchInventoryViaAPI(steamId: string, apiType: 'steamwebapi' | 'c
 
 // Fetch Steam inventory (server-side proxy to avoid CORS)
 // Uses multiple methods: direct Steam API, proxies, and third-party APIs (like skinpock.com)
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const origin = url.origin;
@@ -617,6 +619,14 @@ export async function GET(request: Request) {
         steamId = resolvedId;
       } else {
         console.warn(`Could not resolve vanity URL: ${steamId}, trying direct access`);
+      }
+    }
+
+    const blockedSteamId = String(process.env.SV_WEBSITE_PRIVATE_STEAM_ID || '76561198750974604').trim();
+    if (blockedSteamId && String(steamId || '').trim() === blockedSteamId) {
+      const viewerSteamId = getSteamIdFromRequest(request);
+      if (String(viewerSteamId || '') !== blockedSteamId) {
+        return NextResponse.json({ error: 'Profile is private' }, { status: 403 });
       }
     }
 

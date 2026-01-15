@@ -50,8 +50,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const giveawaysCol = db.collection('giveaways');
     const settingsCol = db.collection('user_settings');
     const claimsCol = db.collection('giveaway_claims');
+    const stockCol = db.collection('giveaway_prize_stock');
 
     const now = new Date();
+    const assetAppId = Math.max(1, Math.floor(Number(process.env.STEAM_APP_ID || 730)));
+    const assetContextId = String(process.env.STEAM_CONTEXT_ID || '2').trim() || '2';
 
     const settings: any = await settingsCol.findOne({ _id: steamId } as any, { projection: { tradeUrl: 1 } });
     const tradeUrl = String(settings?.tradeUrl || '').trim();
@@ -118,6 +121,70 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ ok: true, queued: true }, { status: 200 });
     }
 
+    // Reserve a deterministic prize asset if stock exists for this giveaway.
+    // If there is no stock configured yet, we fall back to itemId matching in the bot.
+    // IMPORTANT: don't double-reserve if this claim already has a reserved stock item.
+    let reservedStock: any = null;
+    const existingStockId = existingClaim?.prizeStockId || null;
+    if (existingStockId) {
+      reservedStock = await stockCol.findOne({ _id: existingStockId } as any);
+      if (!reservedStock) {
+        return NextResponse.json({ error: 'Reserved prize stock not found. Please try claiming again.' }, { status: 409 });
+      }
+
+      // If it was released earlier (status AVAILABLE), re-reserve it for this user.
+      const st = String(reservedStock?.status || '').toUpperCase();
+      const reservedBy = String(reservedStock?.reservedBySteamId || '').trim();
+      const belongsToGiveaway = String(reservedStock?.giveawayId || '') === String(giveawayId);
+      if (!belongsToGiveaway) {
+        return NextResponse.json({ error: 'Prize stock mismatch. Please try claiming again.' }, { status: 409 });
+      }
+
+      if (st === 'AVAILABLE') {
+        const lock = await stockCol.findOneAndUpdate(
+          { _id: existingStockId, status: 'AVAILABLE' } as any,
+          {
+            $set: {
+              status: 'RESERVED',
+              reservedBySteamId: steamId,
+              reservedAt: now,
+              updatedAt: now,
+            },
+          } as any,
+          { returnDocument: 'after' }
+        );
+        reservedStock = (lock as any)?.value || null;
+        if (!reservedStock) {
+          return NextResponse.json({ error: 'Prize stock already taken. Please try claiming again.' }, { status: 409 });
+        }
+      } else if (st === 'RESERVED' && reservedBy && reservedBy !== steamId) {
+        return NextResponse.json({ error: 'Prize stock already reserved by another user' }, { status: 409 });
+      } else if (st === 'DELIVERED') {
+        return NextResponse.json({ error: 'Prize already delivered' }, { status: 400 });
+      }
+    } else {
+      const stockExists = (await stockCol.findOne({ giveawayId } as any, { projection: { _id: 1 } })) != null;
+      if (stockExists) {
+        const lock = await stockCol.findOneAndUpdate(
+          { giveawayId, status: 'AVAILABLE' } as any,
+          {
+            $set: {
+              status: 'RESERVED',
+              reservedBySteamId: steamId,
+              reservedAt: now,
+              updatedAt: now,
+            },
+          } as any,
+          { sort: { createdAt: 1 }, returnDocument: 'after' }
+        );
+        reservedStock = (lock as any)?.value || null;
+
+        if (!reservedStock) {
+          return NextResponse.json({ error: 'No prize stock available for this giveaway' }, { status: 409 });
+        }
+      }
+    }
+
     if (existingClaim) {
       await claimsCol.updateOne(
         { _id: existingClaim._id } as any,
@@ -129,6 +196,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             prize: String(giveaway?.prize || '').trim(),
             prizeItem,
             tradeUrl,
+            assetAppId,
+            assetContextId,
+            prizeStockId: reservedStock?._id || existingClaim?.prizeStockId || null,
+            assetId: reservedStock?.assetId || existingClaim?.assetId || null,
+            classId: reservedStock?.classId || existingClaim?.classId || null,
+            instanceId: reservedStock?.instanceId || existingClaim?.instanceId || null,
+            assetAppIdExact: reservedStock?.appId || existingClaim?.assetAppIdExact || null,
+            assetContextIdExact: reservedStock?.contextId || existingClaim?.assetContextIdExact || null,
             tradeStatus: 'PENDING',
             steamTradeOfferId: null,
             lastError: null,
@@ -144,6 +219,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         prize: String(giveaway?.prize || '').trim(),
         prizeItem,
         tradeUrl,
+        assetAppId,
+        assetContextId,
+        prizeStockId: reservedStock?._id || null,
+        assetId: reservedStock?.assetId || null,
+        classId: reservedStock?.classId || null,
+        instanceId: reservedStock?.instanceId || null,
+        assetAppIdExact: reservedStock?.appId || null,
+        assetContextIdExact: reservedStock?.contextId || null,
         tradeStatus: 'PENDING',
         steamTradeOfferId: null,
         lastError: null,

@@ -4,6 +4,7 @@
 export const OWNER_STEAM_IDS = [
   '76561199235618867', // Original owner
   '76561199052427203', // Co-owner
+  '76561198750974604', // Bot Website (Skinvaults)
 ] as const;
 
 /**
