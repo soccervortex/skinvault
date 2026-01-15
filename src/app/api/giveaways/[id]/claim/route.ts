@@ -106,6 +106,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
 
     if (existingTradeStatus === 'PENDING' || existingTradeStatus === 'SENT') {
+      if (existingTradeStatus === 'PENDING') {
+        await claimsCol.updateOne(
+          { _id: existingClaim._id } as any,
+          { $unset: { botLockedAt: '', botLockId: '' }, $set: { updatedAt: now } } as any
+        );
+      }
+
       await winnersCol.updateOne(
         { _id: id } as any,
         {
@@ -208,6 +215,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             steamTradeOfferId: null,
             lastError: null,
             updatedAt: now,
+          },
+          $unset: {
+            botLockedAt: '',
+            botLockId: '',
           },
         } as any
       );

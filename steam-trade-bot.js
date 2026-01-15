@@ -16,8 +16,29 @@ function normalizeSecret(raw) {
   return s;
 }
 
+function getMongoUriCandidates() {
+  const candidates = [];
+  for (let i = 1; i <= 5; i++) {
+    const v = process.env[`MONGODB_CLUSTER_${i}`];
+    if (v && String(v).trim()) candidates.push(String(v).trim());
+  }
+  if (process.env.MONGODB_URI && String(process.env.MONGODB_URI).trim()) {
+    candidates.push(String(process.env.MONGODB_URI).trim());
+  }
+  return Array.from(new Set(candidates));
+}
+
+function safeMongoHost(uri) {
+  try {
+    const u = new URL(uri);
+    return u.hostname || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 const CONFIG = {
-  mongoUri: String(process.env.MONGODB_URI || ''),
+  mongoUris: getMongoUriCandidates(),
   mongoDbName: String(process.env.MONGODB_DB_NAME || 'skinvault'),
 
   accountName: String(process.env.accountName || process.env.STEAM_BOT_ACCOUNT_NAME || ''),
@@ -35,7 +56,25 @@ const CONFIG = {
   lockTimeoutMs: Math.max(30_000, Number(process.env.CLAIM_LOCK_TIMEOUT_MS || 5 * 60_000)),
 
   dryRun: String(process.env.DRY_RUN || '').trim() === '1',
+  verbose: String(process.env.BOT_VERBOSE || '').trim() === '1',
 };
+
+function logInfo(tag, data) {
+  if (data !== undefined) {
+    console.log(tag, data);
+  } else {
+    console.log(tag);
+  }
+}
+
+function logDebug(tag, data) {
+  if (!CONFIG.verbose) return;
+  logInfo(tag, data);
+}
+
+function logStructured(tag, data) {
+  console.log(JSON.stringify({ tag, ...data }));
+}
 
 function isValidTradeUrl(raw) {
   const s = String(raw || '').trim();
@@ -74,15 +113,31 @@ async function createUserNotification(db, steamId, type, title, message, meta) {
 }
 
 async function connectMongo() {
-  if (!CONFIG.mongoUri) throw new Error('MONGODB_URI is missing');
-  const client = new MongoClient(CONFIG.mongoUri, {
-    serverSelectionTimeoutMS: 15000,
-    connectTimeoutMS: 15000,
-    maxPoolSize: 5,
-  });
-  await client.connect();
-  const db = client.db(CONFIG.mongoDbName);
-  return { client, db };
+  const candidates = Array.isArray(CONFIG.mongoUris) ? CONFIG.mongoUris : [];
+  if (!candidates.length) throw new Error('MongoDB URI is missing');
+
+  let lastError = null;
+  for (const uri of candidates) {
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
+      maxPoolSize: 5,
+    });
+    try {
+      await client.connect();
+      const db = client.db(CONFIG.mongoDbName);
+      logInfo('[mongo] connected', { host: safeMongoHost(uri), dbName: CONFIG.mongoDbName });
+      return { client, db };
+    } catch (e) {
+      lastError = e;
+      try {
+        await client.close();
+      } catch {
+      }
+    }
+  }
+
+  throw lastError || new Error('MongoDB connection failed');
 }
 
 function makeSteamClients() {
@@ -223,6 +278,7 @@ async function setClaimFailed(db, claimId, giveawayIdStr, steamId, reason, extra
         updatedAt: now,
         ...extra,
       },
+      $unset: { botLockedAt: '', botLockId: '' },
     }
   );
 
@@ -366,10 +422,13 @@ async function pickAndLockPendingClaim(db) {
 
 async function processPendingClaimsOnce(db, manager, community) {
   let processed = 0;
+  let foundAny = false;
 
   for (let i = 0; i < CONFIG.claimBatchSize; i++) {
     const claim = await pickAndLockPendingClaim(db);
     if (!claim) break;
+
+    foundAny = true;
 
     const claimId = claim._id;
     const steamId = String(claim?.steamId || '').trim();
@@ -381,6 +440,16 @@ async function processPendingClaimsOnce(db, manager, community) {
     const assetId = String(claim?.assetId || '').trim();
     const assetAppIdExact = Number(claim?.assetAppIdExact || claim?.assetAppId || CONFIG.appId);
     const assetContextIdExact = String(claim?.assetContextIdExact || claim?.assetContextId || CONFIG.contextId).trim();
+
+    logStructured('[claim] picked', {
+      claimId: String(claimId),
+      giveawayId: giveawayIdStr,
+      steamId,
+      prizeStockId: prizeStockId ? String(prizeStockId) : null,
+      itemId: itemId || null,
+      assetId: assetId || null,
+      dryRun: CONFIG.dryRun,
+    });
 
     if (!/^\d{17}$/.test(steamId) || !/^[0-9a-fA-F]{24}$/.test(giveawayIdStr)) {
       await setClaimFailed(db, claimId, giveawayIdStr, steamId, 'Invalid claim payload');
@@ -422,6 +491,7 @@ async function processPendingClaimsOnce(db, manager, community) {
             lastError: `Unexpected winner status: ${claimStatus}`,
             updatedAt: new Date(),
           },
+          $unset: { botLockedAt: '', botLockId: '' },
         }
       );
       processed++;
@@ -438,6 +508,7 @@ async function processPendingClaimsOnce(db, manager, community) {
             lastError: 'Claim window expired',
             updatedAt: new Date(),
           },
+          $unset: { botLockedAt: '', botLockId: '' },
         }
       );
       processed++;
@@ -454,11 +525,23 @@ async function processPendingClaimsOnce(db, manager, community) {
         continue;
       }
 
+      logDebug('[claim] item selected', {
+        claimId: String(claimId),
+        giveawayId: giveawayIdStr,
+        steamId,
+        usingAssetId: !!assetId,
+        inventoryAssetId: String(item?.assetid || item?.assetId || item?.id || ''),
+        marketHashName: String(item?.market_hash_name || ''),
+      });
+
       if (CONFIG.dryRun) {
-        console.log('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId, assetId, prizeStockId });
+        logInfo('[dry-run] would send offer', { giveawayId: giveawayIdStr, steamId, itemId, assetId, prizeStockId });
         await db.collection('giveaway_claims').updateOne(
           { _id: claimId },
-          { $set: { tradeStatus: 'SENT', steamTradeOfferId: 'dry-run', updatedAt: new Date(), sentAt: new Date() } }
+          {
+            $set: { tradeStatus: 'SENT', steamTradeOfferId: 'dry-run', updatedAt: new Date(), sentAt: new Date() },
+            $unset: { botLockedAt: '', botLockId: '' },
+          }
         );
 
         if (prizeStockId) {
@@ -479,6 +562,14 @@ async function processPendingClaimsOnce(db, manager, community) {
       offer.addMyItem(item);
       offer.setMessage(`SkinVaults Giveaway Prize: ${String(claim?.prize || itemId).slice(0, 200)}`);
 
+      logInfo('[trade] sending offer', {
+        giveawayId: giveawayIdStr,
+        steamId,
+        prizeStockId: prizeStockId ? String(prizeStockId) : null,
+        itemId: itemId || null,
+        assetId: assetId || null,
+      });
+
       const { status } = await sendOffer(offer);
       const tradeOfferId = String(offer?.id || '').trim();
 
@@ -487,6 +578,8 @@ async function processPendingClaimsOnce(db, manager, community) {
         processed++;
         continue;
       }
+
+      logInfo('[trade] offer sent', { tradeOfferId, status, giveawayId: giveawayIdStr, steamId });
 
       await db.collection('giveaway_claims').updateOne(
         { _id: claimId },
@@ -527,7 +620,8 @@ async function processPendingClaimsOnce(db, manager, community) {
 
       if (String(status || '').toLowerCase() === 'pending') {
         try {
-          await acceptConfirmation(community, CONFIG.identitySecret, tradeOfferId);
+          const ok = await acceptConfirmation(community, CONFIG.identitySecret, tradeOfferId);
+          logInfo('[trade] confirmation', { tradeOfferId, ok });
         } catch (e) {
           console.warn('[confirm] failed', { tradeOfferId, message: e?.message || String(e) });
         }
@@ -535,10 +629,27 @@ async function processPendingClaimsOnce(db, manager, community) {
 
       processed++;
     } catch (e) {
-      await setClaimFailed(db, claimId, giveawayIdStr, steamId, e?.message || String(e));
+      const msg = e?.message || String(e);
+      const looksLikeTradeHold =
+        String(msg).includes('Steam Guard') ||
+        String(msg).toLowerCase().includes('not enabled') ||
+        String(msg).toLowerCase().includes('cannot trade');
+      await setClaimFailed(
+        db,
+        claimId,
+        giveawayIdStr,
+        steamId,
+        looksLikeTradeHold ? 'Steam account cannot trade yet (Steam Guard hold)' : msg
+      );
       processed++;
     }
   }
+
+  if (!foundAny) {
+    logDebug('[pending] no pending claims');
+  }
+
+  logDebug('[pending] scan complete', { processed });
 
   return processed;
 }
@@ -557,7 +668,12 @@ async function pollSentOffersOnce(db, manager) {
     .limit(CONFIG.sentBatchSize)
     .toArray();
 
-  if (!claims.length) return 0;
+  if (!claims.length) {
+    logDebug('[poll] no sent offers');
+    return 0;
+  }
+
+  logDebug('[poll] checking offers', { count: claims.length });
 
   const E = TradeOfferManager.ETradeOfferState;
   let processed = 0;
@@ -573,6 +689,7 @@ async function pollSentOffersOnce(db, manager) {
 
     try {
       if (offerId === 'dry-run') {
+        logInfo('[poll] dry-run complete', { giveawayId: giveawayIdStr, steamId, offerId });
         await setClaimSuccess(db, claimId, giveawayIdStr, steamId, offerId);
         processed++;
         continue;
@@ -581,7 +698,10 @@ async function pollSentOffersOnce(db, manager) {
       const offer = await getOffer(manager, offerId);
       const state = offer?.state;
 
+      logDebug('[poll] offer state', { giveawayId: giveawayIdStr, steamId, offerId, state });
+
       if (state === E.Accepted) {
+        logInfo('[poll] offer accepted', { giveawayId: giveawayIdStr, steamId, offerId });
         await setClaimSuccess(db, claimId, giveawayIdStr, steamId, offerId);
         processed++;
         continue;
@@ -594,6 +714,7 @@ async function pollSentOffersOnce(db, manager) {
         state === E.InvalidItems ||
         state === E.CanceledBySecondFactor
       ) {
+        logInfo('[poll] offer failed', { giveawayId: giveawayIdStr, steamId, offerId, state });
         await setClaimFailed(db, claimId, giveawayIdStr, steamId, `Trade offer failed (state ${state})`, {
           steamTradeOfferState: state,
         });
@@ -641,6 +762,7 @@ async function main() {
     pendingLoopMs: CONFIG.pendingLoopMs,
     pollLoopMs: CONFIG.pollLoopMs,
     dryRun: CONFIG.dryRun,
+    verbose: CONFIG.verbose,
   });
 
   const { client, db } = await connectMongo();
@@ -664,6 +786,8 @@ async function main() {
   });
 
   await waitReady();
+
+  logInfo('[bot] ready');
 
   let stopped = false;
   const stop = async () => {
