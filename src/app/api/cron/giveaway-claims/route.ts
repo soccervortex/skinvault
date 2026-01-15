@@ -43,16 +43,18 @@ function pickOneWeighted(pool: EntryRow[]): EntryRow | null {
 }
 
 export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
   const authHeader = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = url.searchParams.get('secret');
+  const expectedSecret = process.env.CRON_SECRET;
+  if (expectedSecret && authHeader !== `Bearer ${expectedSecret}` && secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const limit = Math.min(Math.max(1, Math.floor(Number(searchParams.get('limit') || 50))), 200);
+    const limit = Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('limit') || 50))), 200);
     const reminderWindowMinutes = Math.min(
-      Math.max(1, Math.floor(Number(searchParams.get('reminderWindowMinutes') || 60))),
+      Math.max(1, Math.floor(Number(url.searchParams.get('reminderWindowMinutes') || 60))),
       24 * 60
     );
 

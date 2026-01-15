@@ -43,6 +43,14 @@
     {
       "path": "/api/cron/creators-refresh",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/giveaway-draw?secret=${CRON_SECRET}",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/giveaway-claims?secret=${CRON_SECRET}",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
