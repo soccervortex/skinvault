@@ -34,7 +34,36 @@ export async function GET(request: Request) {
 
     const normalizeItem = (raw: any) => {
       if (!raw) return raw;
-      const img = raw.image || raw.image_inventory || raw.image_large || raw.image_small || null;
+
+      const toSteamImageUrl = (v: any): string | null => {
+        const s = typeof v === 'string' ? v.trim() : '';
+        if (!s) return null;
+        if (/^https?:\/\//i.test(s)) return s;
+        if (s.startsWith('/')) return s;
+
+        // ByMykel sometimes provides the economy image hash/path without the domain.
+        // Accept common hash/path shapes and convert them to a full URL.
+        const cleaned = s.replace(/^economy\/(?:image\/)?/i, '').replace(/^image\//i, '');
+        if (cleaned && /[A-Za-z0-9_-]{20,}/.test(cleaned)) {
+          return `https://steamcommunity-a.akamaihd.net/economy/image/${cleaned}`;
+        }
+
+        return null;
+      };
+
+      const imgCandidate =
+        raw.image ||
+        raw.image_url ||
+        raw.imageUrl ||
+        raw.icon_url ||
+        raw.iconUrl ||
+        raw.icon ||
+        raw.image_inventory ||
+        raw.image_large ||
+        raw.image_small ||
+        null;
+
+      const img = toSteamImageUrl(imgCandidate);
       const mhn = raw.market_hash_name || raw.marketHashName || raw.market_name || raw.marketName || raw.name || itemId;
       return {
         ...raw,
