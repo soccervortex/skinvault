@@ -48,6 +48,47 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing id or market_hash_name parameter' }, { status: 400 });
     }
 
+    const priorityFile = (() => {
+      const id = String(itemId).toLowerCase();
+      if (id.startsWith('crate-')) return 'crates.json';
+      if (id.startsWith('collection-')) return 'collections.json';
+      if (id.startsWith('skin-')) {
+        // Use grouped skins for canonical metadata (min/max float). Wear-specific items are in skins_not_grouped.
+        return id.includes('_') ? 'skins_not_grouped.json' : 'skins.json';
+      }
+      if (id.startsWith('sticker_slab-')) return 'sticker_slabs.json';
+      if (id.startsWith('sticker-')) return 'stickers.json';
+      if (id.startsWith('agent-')) return 'agents.json';
+      if (id.startsWith('patch-')) return 'patches.json';
+      if (id.startsWith('graffiti-')) return 'graffiti.json';
+      if (id.startsWith('music_kit-')) return 'music_kits.json';
+      if (id.startsWith('keychain-')) return 'keychains.json';
+      if (id.startsWith('collectible-')) return 'collectibles.json';
+      if (id.startsWith('key-')) return 'keys.json';
+      if (id.startsWith('highlight-')) return 'highlights.json';
+      if (id.startsWith('base_weapon-')) return 'base_weapons.json';
+      return null;
+    })();
+
+    // Prefer the authoritative dataset first (prevents returning stub references missing fields like `contains`)
+    if (priorityFile) {
+      try {
+        const priorityTimeout =
+          priorityFile === 'skins_not_grouped.json' || priorityFile === 'crates.json' ? 20000 : 12000;
+        const response = await fetchWithTimeout(datasetUrl(priorityFile), priorityTimeout);
+        if (response.ok) {
+          const data = await response.json();
+          const items = Array.isArray(data) ? data : Object.values(data);
+          const match = items.find((i: any) => i?.id === itemId || i?.market_hash_name === itemId || i?.name === itemId);
+          if (match) {
+            return NextResponse.json(normalizeItem(match));
+          }
+        }
+      } catch {
+        // fall through to the general scan
+      }
+    }
+
     // First check custom items with optimized query
     try {
       const db = await getDatabase();
@@ -81,7 +122,8 @@ export async function GET(request: Request) {
     // This is much faster than sequential fetching
     const fetchPromises = API_FILES.map(async (file) => {
       try {
-        const response = await fetchWithTimeout(datasetUrl(file), 5000);
+        const timeout = file === 'skins_not_grouped.json' || file === 'crates.json' ? 20000 : 8000;
+        const response = await fetchWithTimeout(datasetUrl(file), timeout);
         
         if (!response.ok) return null;
         
@@ -122,7 +164,8 @@ export async function GET(request: Request) {
       let allApiItems: any[] = [];
       const fuzzyPromises = API_FILES.map(async (file) => {
         try {
-          const response = await fetchWithTimeout(datasetUrl(file), 5000);
+          const timeout = file === 'skins_not_grouped.json' || file === 'crates.json' ? 20000 : 8000;
+          const response = await fetchWithTimeout(datasetUrl(file), timeout);
           if (!response.ok) return [];
           const data = await response.json();
           return Array.isArray(data) ? data : Object.values(data);

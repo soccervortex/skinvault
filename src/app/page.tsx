@@ -33,7 +33,6 @@ type SortType =
 
 const CATEGORIES = [
   { name: 'All Items', icon: <Tag size={14}/>, file: 'all', filter: 'all' },
-  { name: 'Skins', icon: <Tag size={14}/>, file: 'skins.json', filter: 'skin' },
   { name: 'Rifles', icon: <Crosshair size={14}/>, file: 'skins_not_grouped.json', filter: 'rifle' },
   { name: 'Sniper Rifles', icon: <Target size={14}/>, file: 'skins_not_grouped.json', filter: 'sniper' },
   { name: 'SMGs', icon: <Zap size={14}/>, file: 'skins_not_grouped.json', filter: 'smg' },
@@ -564,7 +563,7 @@ export default function GlobalSkinSearch() {
             <div className="flex gap-2 md:gap-4">
               {compareList.map(i => (
                 <div key={i.id} className="relative bg-black/40 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/5">
-                   <Image src={i.image} width={48} height={48} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name ? `${i.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Category Icon"} unoptimized />
+                   <Image src={i.image || '/icon.png'} width={48} height={48} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name ? `${i.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Category Icon"} unoptimized />
                    <button onClick={() => toggleCompare(i)} className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-red-500 rounded-full p-0.5 md:p-1" aria-label={`Remove ${i.name} from compare`}><X size={8} /></button>
                 </div>
               ))}
@@ -767,7 +766,7 @@ export default function GlobalSkinSearch() {
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                         <Image 
-                          src={item.image} 
+                          src={item.image || '/icon.png'} 
                           width={384} 
                           height={384} 
                           className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500" 

@@ -411,7 +411,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               >
               <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
               <img
-                src={item?.image}
+                src={item?.image || '/icon.png'}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src = '/icon.png';
                 }}
@@ -673,7 +673,14 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                       >
                         <div className="aspect-square rounded-xl bg-black/30 border border-white/5 flex items-center justify-center overflow-hidden">
                           {c?.image ? (
-                            <img src={c.image} alt={c?.name || ''} className="w-[85%] h-auto object-contain" />
+                            <img
+                              src={c.image}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/icon.png';
+                              }}
+                              alt={c?.name || ''}
+                              className="w-[85%] h-auto object-contain"
+                            />
                           ) : (
                             <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">No Image</div>
                           )}
@@ -707,7 +714,14 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                       >
                         <div className="aspect-square rounded-xl bg-black/30 border border-white/5 flex items-center justify-center overflow-hidden">
                           {c?.image ? (
-                            <img src={c.image} alt={c?.name || ''} className="w-[85%] h-auto object-contain" />
+                            <img
+                              src={c.image}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/icon.png';
+                              }}
+                              alt={c?.name || ''}
+                              className="w-[85%] h-auto object-contain"
+                            />
                           ) : (
                             <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">No Image</div>
                           )}
