@@ -37,6 +37,14 @@ function safeMongoHost(uri) {
   }
 }
 
+async function getPendingClaimsCount(db) {
+  try {
+    return await db.collection('giveaway_claims').countDocuments({ tradeStatus: 'PENDING' });
+  } catch {
+    return 0;
+  }
+}
+
 const CONFIG = {
   mongoUris: getMongoUriCandidates(),
   mongoDbName: String(process.env.MONGODB_DB_NAME || 'skinvault'),
@@ -117,6 +125,8 @@ async function connectMongo() {
   if (!candidates.length) throw new Error('MongoDB URI is missing');
 
   let lastError = null;
+  let fallback = null;
+
   for (const uri of candidates) {
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: 15000,
@@ -126,8 +136,35 @@ async function connectMongo() {
     try {
       await client.connect();
       const db = client.db(CONFIG.mongoDbName);
-      logInfo('[mongo] connected', { host: safeMongoHost(uri), dbName: CONFIG.mongoDbName });
-      return { client, db };
+      const host = safeMongoHost(uri);
+      const pendingClaims = await getPendingClaimsCount(db);
+
+      if (CONFIG.verbose) {
+        logInfo('[mongo] candidate', { host, dbName: CONFIG.mongoDbName, pendingClaims });
+      }
+
+      if (!fallback) {
+        fallback = { client, db, uri, pendingClaims };
+      }
+
+      if (pendingClaims > 0) {
+        logInfo('[mongo] using candidate with pending claims', { host, dbName: CONFIG.mongoDbName, pendingClaims });
+        if (fallback && fallback.client !== client) {
+          try {
+            await fallback.client.close();
+          } catch {
+          }
+        }
+        return { client, db };
+      }
+
+      // Not selected; close this client unless it's our fallback.
+      if (fallback.client !== client) {
+        try {
+          await client.close();
+        } catch {
+        }
+      }
     } catch (e) {
       lastError = e;
       try {
@@ -135,6 +172,15 @@ async function connectMongo() {
       } catch {
       }
     }
+  }
+
+  if (fallback) {
+    logInfo('[mongo] using first available connection', {
+      host: safeMongoHost(fallback.uri),
+      dbName: CONFIG.mongoDbName,
+      pendingClaims: fallback.pendingClaims,
+    });
+    return { client: fallback.client, db: fallback.db };
   }
 
   throw lastError || new Error('MongoDB connection failed');
