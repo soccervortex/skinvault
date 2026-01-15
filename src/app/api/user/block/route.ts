@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { sanitizeSteamId } from '@/app/utils/sanitize';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 const USER_BLOCKS_KEY = 'user_blocks'; // Format: { "steamId1_steamId2": true }
+
+export const runtime = 'nodejs';
 
 /**
  * POST: Block a user (user-to-user ban)
@@ -10,9 +16,14 @@ const USER_BLOCKS_KEY = 'user_blocks'; // Format: { "steamId1_steamId2": true }
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { blockerSteamId, blockedSteamId } = body;
+    const blockerSteamId = getSteamIdFromRequest(request as any);
+    const blockedSteamId = sanitizeSteamId(body?.blockedSteamId) || null;
 
-    if (!blockerSteamId || !blockedSteamId) {
+    if (!blockerSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!blockedSteamId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -30,6 +41,21 @@ export async function POST(request: Request) {
     blocks[blockKey] = true;
     await dbSet(USER_BLOCKS_KEY, blocks);
 
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        await createUserNotification(
+          db,
+          String(blockerSteamId),
+          'user_blocked',
+          'User Blocked',
+          'You blocked a user successfully.',
+          { blockedSteamId: String(blockedSteamId) }
+        );
+      }
+    } catch {
+    }
+
     return NextResponse.json({ success: true, message: 'User blocked successfully' });
   } catch (error) {
     console.error('Failed to block user:', error);
@@ -43,10 +69,14 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const blockerSteamId = searchParams.get('blockerSteamId');
-    const blockedSteamId = searchParams.get('blockedSteamId');
+    const blockerSteamId = getSteamIdFromRequest(request as any);
+    const blockedSteamId = sanitizeSteamId(searchParams.get('blockedSteamId')) || null;
 
-    if (!blockerSteamId || !blockedSteamId) {
+    if (!blockerSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!blockedSteamId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -59,6 +89,21 @@ export async function DELETE(request: Request) {
     // Remove block
     delete blocks[blockKey];
     await dbSet(USER_BLOCKS_KEY, blocks);
+
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        await createUserNotification(
+          db,
+          String(blockerSteamId),
+          'user_unblocked',
+          'User Unblocked',
+          'You unblocked a user successfully.',
+          { blockedSteamId: String(blockedSteamId) }
+        );
+      }
+    } catch {
+    }
 
     return NextResponse.json({ success: true, message: 'User unblocked successfully' });
   } catch (error) {

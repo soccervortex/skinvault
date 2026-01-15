@@ -51,6 +51,10 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const limit = Math.min(Math.max(1, Math.floor(Number(searchParams.get('limit') || 50))), 200);
+    const reminderWindowMinutes = Math.min(
+      Math.max(1, Math.floor(Number(searchParams.get('reminderWindowMinutes') || 60))),
+      24 * 60
+    );
 
     const db = await getDatabase();
     const winnersCol = db.collection('giveaway_winners');
@@ -60,8 +64,10 @@ export async function GET(req: NextRequest) {
 
     const now = new Date();
 
+    const reminderCutoff = new Date(now.getTime() + reminderWindowMinutes * 60 * 1000);
+
     const docs: any[] = await winnersCol
-      .find({ winners: { $elemMatch: { claimStatus: 'pending', claimDeadlineAt: { $lte: now } } } } as any)
+      .find({ winners: { $elemMatch: { claimStatus: 'pending', claimDeadlineAt: { $lte: reminderCutoff } } } } as any)
       .sort({ pickedAt: 1 })
       .limit(limit)
       .toArray();
@@ -69,6 +75,7 @@ export async function GET(req: NextRequest) {
     let forfeitedCount = 0;
     let rerolledCount = 0;
     let archivedCount = 0;
+    let reminderCount = 0;
 
     for (const d of docs) {
       const giveawayId = String(d?._id || '').trim();
@@ -86,21 +93,53 @@ export async function GET(req: NextRequest) {
       for (const w of winners) {
         const st = String(w?.claimStatus || '');
         const deadlineMs = w?.claimDeadlineAt ? new Date(w.claimDeadlineAt).getTime() : NaN;
+
+        if (
+          st === 'pending' &&
+          Number.isFinite(deadlineMs) &&
+          deadlineMs > now.getTime() &&
+          deadlineMs <= reminderCutoff.getTime() &&
+          !w?.reminderSentAt
+        ) {
+          const sid = String(w?.steamId || '').trim();
+          if (/^\d{17}$/.test(sid)) {
+            try {
+              await createUserNotification(
+                db,
+                sid,
+                'giveaway_claim_reminder',
+                'Claim Your Prize',
+                'Reminder: your giveaway prize claim window is ending soon. Claim your prize in the Giveaways page before it expires.',
+                { giveawayId, claimDeadlineAt: w?.claimDeadlineAt ? new Date(w.claimDeadlineAt).toISOString() : null }
+              );
+            } catch {
+            }
+          }
+          w.reminderSentAt = now;
+          changed = true;
+          reminderCount++;
+          continue;
+        }
+
         if (st === 'pending' && Number.isFinite(deadlineMs) && deadlineMs <= now.getTime()) {
           const forfeitedSteamId = String(w?.steamId || '').trim();
           w.claimStatus = 'forfeited';
           w.forfeitedAt = now;
+          delete w.reminderSentAt;
           changed = true;
           forfeitedCount++;
 
-          await createUserNotification(
-            db,
-            forfeitedSteamId,
-            'giveaway_forfeited',
-            'Prize Forfeited',
-            'You did not claim your giveaway prize within the 24 hour window, so the prize was forfeited.',
-            { giveawayId }
-          );
+          try {
+            await createUserNotification(
+              db,
+              forfeitedSteamId,
+              'giveaway_forfeited',
+              'Prize Forfeited',
+              'You did not claim your giveaway prize within the 24 hour window, so the prize was forfeited.',
+              { giveawayId }
+            );
+          } catch {
+          }
 
           activeSteamIds.delete(forfeitedSteamId);
 
@@ -135,14 +174,17 @@ export async function GET(req: NextRequest) {
               );
               const tradeUrl = String(settings?.tradeUrl || '').trim();
               if (!isValidTradeUrl(tradeUrl)) {
-                await createUserNotification(
-                  db,
-                  one.steamId,
-                  'giveaway_missing_trade_url',
-                  'Trade URL Required',
-                  'You were selected as a giveaway winner, but you do not have a valid Steam trade URL set. Add your trade URL to claim prizes.',
-                  { giveawayId }
-                );
+                try {
+                  await createUserNotification(
+                    db,
+                    one.steamId,
+                    'giveaway_missing_trade_url',
+                    'Trade URL Required',
+                    'You were selected as a giveaway winner, but you do not have a valid Steam trade URL set. Add your trade URL to claim prizes.',
+                    { giveawayId }
+                  );
+                } catch {
+                }
                 activeSteamIds.add(one.steamId);
                 continue;
               }
@@ -156,6 +198,7 @@ export async function GET(req: NextRequest) {
               w.entries = replacement.entries;
               w.claimStatus = 'pending';
               w.claimDeadlineAt = deadline;
+              delete w.reminderSentAt;
               delete w.forfeitedAt;
               delete w.claimedAt;
 
@@ -163,14 +206,17 @@ export async function GET(req: NextRequest) {
               changed = true;
               rerolledCount++;
 
-              await createUserNotification(
-                db,
-                replacement.steamId,
-                'giveaway_won',
-                'You Won a Giveaway!',
-                'A giveaway prize was rerolled and you are now a winner. Claim your prize within 24 hours in the Giveaways page.',
-                { giveawayId, claimDeadlineAt: deadline.toISOString() }
-              );
+              try {
+                await createUserNotification(
+                  db,
+                  replacement.steamId,
+                  'giveaway_won',
+                  'You Won a Giveaway!',
+                  'A giveaway prize was rerolled and you are now a winner. Claim your prize within 24 hours in the Giveaways page.',
+                  { giveawayId, claimDeadlineAt: deadline.toISOString() }
+                );
+              } catch {
+              }
             }
           }
         }
@@ -199,7 +245,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, processed: docs.length, forfeitedCount, rerolledCount, archivedCount }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, processed: docs.length, forfeitedCount, rerolledCount, archivedCount, reminderCount },
+      { status: 200 }
+    );
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 });
   }

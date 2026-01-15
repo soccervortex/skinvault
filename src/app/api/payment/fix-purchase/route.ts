@@ -122,12 +122,21 @@ export async function POST(request: Request) {
       try {
         if (hasMongoConfig()) {
           const db = await getDatabase();
+          const consumableLabel = (() => {
+            const t = String(consumableType || '').trim();
+            if (t === 'wishlist_slot') return 'Wishlist Slot';
+            if (t === 'price_tracker_slot') return 'Price Tracker Slot';
+            if (t === 'discord_access') return 'Discord Access';
+            if (t === 'price_scan_boost') return 'Price Scan Boost';
+            if (t === 'cache_boost') return 'Cache Boost';
+            return t || 'Consumable';
+          })();
           await createUserNotification(
             db,
             steamId,
             'purchase_fixed',
             'Purchase Fulfilled',
-            `A missing purchase reward was fulfilled: ${quantity}x ${String(consumableType)}.`,
+            `A missing purchase reward was fulfilled: ${quantity}x ${consumableLabel}.`,
             { consumableType, quantity, sessionId }
           );
         }

@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 export const runtime = 'nodejs';
 
@@ -83,16 +84,45 @@ export async function POST(req: NextRequest) {
     const col = db.collection<UserSettingsDoc>('user_settings');
     const now = new Date();
 
+    const prev = await col.findOne({ _id: steamId } as any);
+    const prevTradeUrl = String((prev as any)?.tradeUrl || '').trim();
+    const nextTradeUrl = String(tradeUrl || '').trim();
+
     await col.updateOne(
       { _id: steamId },
       {
         $setOnInsert: { _id: steamId, steamId },
-        $set: { tradeUrl: tradeUrl || '', updatedAt: now },
+        $set: { tradeUrl: nextTradeUrl, updatedAt: now },
       },
       { upsert: true }
     );
 
-    return NextResponse.json({ steamId, tradeUrl: tradeUrl || '' }, { status: 200 });
+    if (prevTradeUrl !== nextTradeUrl) {
+      try {
+        if (nextTradeUrl) {
+          await createUserNotification(
+            db,
+            steamId,
+            'trade_url_updated',
+            'Trade URL Updated',
+            'Your trade URL was updated successfully.',
+            null
+          );
+        } else {
+          await createUserNotification(
+            db,
+            steamId,
+            'trade_url_cleared',
+            'Trade URL Cleared',
+            'Your trade URL was cleared successfully.',
+            null
+          );
+        }
+      } catch {
+      }
+    }
+
+    return NextResponse.json({ steamId, tradeUrl: nextTradeUrl }, { status: 200 });
   } catch (e: any) {
     console.error('POST /api/user/trade-url failed', { name: e?.name, code: e?.code, message: e?.message });
     return NextResponse.json({ error: e?.message || 'Failed to save trade url' }, { status: 500 });
