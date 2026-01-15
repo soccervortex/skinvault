@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { findBestMatch } from '@/app/utils/fuzzy-search';
-import { API_FILES } from '@/data/api-endpoints';
+import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 
 // Fetch with timeout helper
 async function fetchWithTimeout(url: string, timeoutMs: number = 5000): Promise<Response> {
@@ -29,99 +29,8 @@ export async function GET(request: Request) {
     const itemId = url.searchParams.get('id') || url.searchParams.get('market_hash_name');
     const useFuzzy = url.searchParams.get('fuzzy') !== 'false'; // Default to true
 
-    const origin = url.origin;
-    const datasetUrl = (file: string) => `${origin}/api/csgo-api?file=${encodeURIComponent(file)}`;
-
-    const normalizeItem = (raw: any) => {
-      if (!raw) return raw;
-
-      const toSteamImageUrl = (v: any): string | null => {
-        const s = typeof v === 'string' ? v.trim() : '';
-        if (!s) return null;
-        if (/^https?:\/\//i.test(s)) return s;
-        if (s.startsWith('/')) return s;
-
-        // ByMykel sometimes provides the economy image hash/path without the domain.
-        // Accept common hash/path shapes and convert them to a full URL.
-        const cleaned = s.replace(/^economy\/(?:image\/)?/i, '').replace(/^image\//i, '');
-        if (cleaned && /[A-Za-z0-9_-]{20,}/.test(cleaned)) {
-          return `https://steamcommunity-a.akamaihd.net/economy/image/${cleaned}`;
-        }
-
-        return null;
-      };
-
-      const imgCandidate =
-        raw.image ||
-        raw.image_url ||
-        raw.imageUrl ||
-        raw.icon_url ||
-        raw.iconUrl ||
-        raw.icon ||
-        raw.image_inventory ||
-        raw.image_large ||
-        raw.image_small ||
-        null;
-
-      const img = toSteamImageUrl(imgCandidate);
-      const mhn = raw.market_hash_name || raw.marketHashName || raw.market_name || raw.marketName || raw.name || itemId;
-      return {
-        ...raw,
-        id: raw.id || itemId,
-        image: img,
-        market_hash_name: mhn,
-      };
-    };
-
     if (!itemId) {
       return NextResponse.json({ error: 'Missing id or market_hash_name parameter' }, { status: 400 });
-    }
-
-    const priorityFile = (() => {
-      const id = String(itemId).toLowerCase();
-      if (id.startsWith('crate-')) return 'crates.json';
-      if (id.startsWith('collection-')) return 'collections.json';
-      if (id.startsWith('skin-')) {
-        // Use grouped skins for canonical metadata (min/max float). Wear-specific items are in skins_not_grouped.
-        return id.includes('_') ? 'skins_not_grouped.json' : 'skins.json';
-      }
-      if (id.startsWith('sticker_slab-')) return 'sticker_slabs.json';
-      if (id.startsWith('sticker-')) return 'stickers.json';
-      if (id.startsWith('agent-')) return 'agents.json';
-      if (id.startsWith('patch-')) return 'patches.json';
-      if (id.startsWith('graffiti-')) return 'graffiti.json';
-      if (id.startsWith('music_kit-')) return 'music_kits.json';
-      if (id.startsWith('keychain-')) return 'keychains.json';
-      if (id.startsWith('collectible-')) return 'collectibles.json';
-      if (id.startsWith('key-')) return 'keys.json';
-      if (id.startsWith('highlight-')) return 'highlights.json';
-      if (id.startsWith('base_weapon-')) return 'base_weapons.json';
-      return null;
-    })();
-
-    // Prefer the authoritative dataset first (prevents returning stub references missing fields like `contains`)
-    if (priorityFile) {
-      try {
-        const isLargePriority =
-          priorityFile === 'skins_not_grouped.json' ||
-          priorityFile === 'crates.json' ||
-          priorityFile === 'collections.json' ||
-          priorityFile === 'stickers.json';
-
-        // Must be greater than /api/csgo-api's upstream timeout (30s) for large files.
-        const priorityTimeout = isLargePriority ? 45000 : 15000;
-        const response = await fetchWithTimeout(datasetUrl(priorityFile), priorityTimeout);
-        if (response.ok) {
-          const data = await response.json();
-          const items = Array.isArray(data) ? data : Object.values(data);
-          const match = items.find((i: any) => i?.id === itemId || i?.market_hash_name === itemId || i?.name === itemId);
-          if (match) {
-            return NextResponse.json(normalizeItem(match));
-          }
-        }
-      } catch {
-        // fall through to the general scan
-      }
     }
 
     // First check custom items with optimized query
@@ -137,17 +46,15 @@ export async function GET(request: Request) {
       });
       
       if (customItem) {
-        return NextResponse.json(
-          normalizeItem({
-            id: customItem.id,
-            name: customItem.name,
-            image: customItem.image || null,
-            market_hash_name: customItem.marketHashName || customItem.name,
-            rarity: customItem.rarity ? { name: customItem.rarity } : null,
-            weapon: customItem.weapon ? { name: customItem.weapon } : null,
-            isCustom: true,
-          })
-        );
+        return NextResponse.json({
+          id: customItem.id,
+          name: customItem.name,
+          image: customItem.image || null,
+          market_hash_name: customItem.marketHashName || customItem.name,
+          rarity: customItem.rarity ? { name: customItem.rarity } : null,
+          weapon: customItem.weapon ? { name: customItem.weapon } : null,
+          isCustom: true,
+        });
       }
     } catch (error) {
       // Continue to API check if custom items fail
@@ -157,13 +64,7 @@ export async function GET(request: Request) {
     // This is much faster than sequential fetching
     const fetchPromises = API_FILES.map(async (file) => {
       try {
-        const isLarge =
-          file === 'skins_not_grouped.json' ||
-          file === 'crates.json' ||
-          file === 'collections.json' ||
-          file === 'stickers.json';
-        const timeout = isLarge ? 45000 : 12000;
-        const response = await fetchWithTimeout(datasetUrl(file), timeout);
+        const response = await fetchWithTimeout(`${BASE_URL}/${file}`, 5000);
         
         if (!response.ok) return null;
         
@@ -178,7 +79,20 @@ export async function GET(request: Request) {
         );
         
         if (item) {
-          return normalizeItem(item);
+          return {
+            name: item.name || item.market_hash_name || itemId,
+            image: item.image || item.image_inventory || item.image_large || null,
+            market_hash_name: item.market_hash_name || itemId,
+            rarity: item.rarity,
+            weapon: item.weapon,
+            id: item.id,
+            min_float: typeof item.min_float === 'number' ? item.min_float : (typeof item.minFloat === 'number' ? item.minFloat : null),
+            max_float: typeof item.max_float === 'number' ? item.max_float : (typeof item.maxFloat === 'number' ? item.maxFloat : null),
+            wear: item.wear || null,
+            contains: Array.isArray(item.contains) ? item.contains : null,
+            contains_rare: Array.isArray(item.contains_rare) ? item.contains_rare : null,
+            crates: Array.isArray(item.crates) ? item.crates : null,
+          };
         }
         
         return null;
@@ -204,13 +118,7 @@ export async function GET(request: Request) {
       let allApiItems: any[] = [];
       const fuzzyPromises = API_FILES.map(async (file) => {
         try {
-          const isLarge =
-            file === 'skins_not_grouped.json' ||
-            file === 'crates.json' ||
-            file === 'collections.json' ||
-            file === 'stickers.json';
-          const timeout = isLarge ? 45000 : 12000;
-          const response = await fetchWithTimeout(datasetUrl(file), timeout);
+          const response = await fetchWithTimeout(`${BASE_URL}/${file}`, 5000);
           if (!response.ok) return [];
           const data = await response.json();
           return Array.isArray(data) ? data : Object.values(data);
@@ -234,7 +142,14 @@ export async function GET(request: Request) {
       })));
       
       if (match) {
-        return NextResponse.json(normalizeItem(match));
+        return NextResponse.json({
+          name: match.name || match.market_hash_name || itemId,
+          image: match.image || match.image_inventory || match.image_large || null,
+          market_hash_name: match.market_hash_name || itemId,
+          rarity: match.rarity,
+          weapon: match.weapon,
+          id: match.id,
+        });
       }
     }
 

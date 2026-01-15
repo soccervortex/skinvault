@@ -968,14 +968,9 @@ export default async function ItemDetail({ params }: { params: Promise<{ id: str
     image: null,
   };
 
-  const canonicalRouteKey = String(
-    (safeInitialItem as any)?.market_hash_name || (safeInitialItem as any)?.name || ''
-  ).trim();
-  const isTechnicalId = /^(crate|collection|skin|sticker|agent|patch|graffiti|music_kit|keychain|collectible|key|sticker_slab|highlight|base_weapon)-/i.test(
-    decodedId
-  );
-  if (isTechnicalId && canonicalRouteKey && canonicalRouteKey !== decodedId) {
-    redirect(`/item/${encodeURIComponent(canonicalRouteKey)}`);
+  const canonicalId = String((safeInitialItem as any)?.id || '').trim();
+  if (canonicalId && canonicalId !== decodedId) {
+    redirect(`/item/${encodeURIComponent(canonicalId)}`);
   }
 
   // Generate Structured Data (JSON-LD) for Google Product Snippets

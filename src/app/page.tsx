@@ -41,7 +41,6 @@ const CATEGORIES = [
   { name: 'Agents', icon: <User size={14}/>, file: 'agents.json', filter: 'agent' },
   { name: 'Stickers', icon: <Disc size={14}/>, file: 'stickers.json', filter: 'sticker' },
   { name: 'Sticker Slabs', icon: <Disc size={14}/>, file: 'sticker_slabs.json', filter: 'sticker_slab' },
-  { name: 'Collections', icon: <Tag size={14}/>, file: 'collections.json', filter: 'collection' },
   { name: 'Crates', icon: <Package size={14}/>, file: 'crates.json', filter: 'crate' },
   { name: 'Crate Keys', icon: <Package size={14}/>, file: 'keys.json', filter: 'key' },
   { name: 'Patches', icon: <Tag size={14}/>, file: 'patches.json', filter: 'patch' },
@@ -258,7 +257,7 @@ export default function GlobalSkinSearch() {
         if (isFresh) return cached.data;
 
         try {
-          const res = await fetch(`/api/csgo-api?file=${encodeURIComponent(file)}`, { cache: 'force-cache' });
+          const res = await fetch(`${BASE_URL}/${file}`, { cache: 'force-cache' });
           const data = await res.json();
           const items = Array.isArray(data) ? data : Object.values(data);
           const filteredItems = items.filter((item: any) => !isItemExcluded(item.id));
@@ -315,19 +314,6 @@ export default function GlobalSkinSearch() {
     });
   };
 
-  const dedupeItems = (list: any[]) => {
-    const seen = new Set<string>();
-    const out: any[] = [];
-    for (const it of list) {
-      const key = String(it?.market_hash_name || it?.name || it?.id || '').trim();
-      if (!key) continue;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(it);
-    }
-    return out;
-  };
-
   // Fetch items with cache + abort safety
   useEffect(() => {
     let cancelled = false;
@@ -363,7 +349,7 @@ export default function GlobalSkinSearch() {
             }
             
             try {
-              const res = await fetch(`/api/csgo-api?file=${encodeURIComponent(file)}`, { cache: 'force-cache' });
+              const res = await fetch(`${BASE_URL}/${file}`, { cache: 'force-cache' });
               const data = await res.json();
               const items = Array.isArray(data) ? data : Object.values(data);
               // Filter out excluded items
@@ -413,7 +399,7 @@ export default function GlobalSkinSearch() {
         }
 
         if (cancelled) return;
-        setItems(dedupeItems(filterItems(allItems, activeCat)));
+        setItems(filterItems(allItems, activeCat));
         setLoading(false);
         return;
       }
@@ -425,7 +411,7 @@ export default function GlobalSkinSearch() {
 
       if (!rawItems) {
         try {
-          const res = await fetch(`/api/csgo-api?file=${encodeURIComponent(activeCat.file)}`, { cache: 'force-cache' });
+          const res = await fetch(`https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/${activeCat.file}`, { cache: 'force-cache' });
           const data = await res.json();
           rawItems = Array.isArray(data) ? data : Object.values(data);
           // Filter out excluded items
@@ -470,7 +456,7 @@ export default function GlobalSkinSearch() {
       }
 
       if (cancelled) return;
-      setItems(dedupeItems(filterItems(rawItems || [], activeCat)));
+      setItems(filterItems(rawItems || [], activeCat));
       setLoading(false);
     };
 
@@ -576,7 +562,7 @@ export default function GlobalSkinSearch() {
             <div className="flex gap-2 md:gap-4">
               {compareList.map(i => (
                 <div key={i.id} className="relative bg-black/40 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/5">
-                   <Image src={i.image || '/icon.png'} width={48} height={48} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name ? `${i.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Category Icon"} unoptimized />
+                   <Image src={i.image} width={48} height={48} className="w-8 h-8 md:w-12 md:h-12 object-contain" alt={i.name ? `${i.name} - CS2 Skin Portfolio Dashboard Analytics` : "CS2 Skin Category Icon"} unoptimized />
                    <button onClick={() => toggleCompare(i)} className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-red-500 rounded-full p-0.5 md:p-1" aria-label={`Remove ${i.name} from compare`}><X size={8} /></button>
                 </div>
               ))}
@@ -692,7 +678,6 @@ export default function GlobalSkinSearch() {
                   return false;
                 });
                 const rarityColor = item.rarity?.color || "#4b5563";
-                const itemRouteKey = (item.market_hash_name || item.name || item.id) as string;
 
                 return (
                   <div key={item.id} className={`bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-[border-color,transform] duration-300 group relative flex flex-col border ${isOwned ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'border-white/5 hover:border-blue-500/40'}`}>
@@ -776,11 +761,11 @@ export default function GlobalSkinSearch() {
                         </>
                       )}
                     </div>
-                    <Link href={`/item/${encodeURIComponent(itemRouteKey)}`} prefetch={false} className="flex-1">
+                    <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                         <Image 
-                          src={item.image || '/icon.png'} 
+                          src={item.image} 
                           width={384} 
                           height={384} 
                           className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500" 

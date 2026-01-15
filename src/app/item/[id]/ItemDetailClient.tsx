@@ -22,6 +22,8 @@ import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wi
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
+import { API_FILES, BASE_URL as API_BASE_URL } from '@/data/api-endpoints';
+
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
 const DATASET_CACHE_TTL = 1000 * 60 * 60 * 12; // 12h
 const PRICE_CACHE_KEY = 'sv_price_cache_item_v1';
@@ -144,22 +146,9 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   // Fetch item meta once (by id) - only if not provided initially
   useEffect(() => {
     const normalizedInitial = initialItem ? normalizeItem(initialItem) : null;
-
-    const initialHasEnrichedFields =
-      !!normalizedInitial &&
-      (Array.isArray((normalizedInitial as any)?.contains) && (normalizedInitial as any).contains.length > 0 ||
-        Array.isArray((normalizedInitial as any)?.contains_rare) && (normalizedInitial as any).contains_rare.length > 0 ||
-        (normalizedInitial as any)?.min_float != null ||
-        (normalizedInitial as any)?.max_float != null);
-
-    if (normalizedInitial) {
+    if (normalizedInitial?.image) {
       setItem(normalizedInitial);
-      if (normalizedInitial?.image || initialHasEnrichedFields) {
-        setLoading(false);
-      }
-    }
-
-    if (initialHasEnrichedFields) {
+      setLoading(false);
       return;
     }
     
@@ -197,35 +186,28 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
       // If not found in custom items, check API files
       if (!foundItem) {
-        try {
-          const cacheKey = `item-info:${decodedId}`;
-          const cached = datasetCacheRef.current[cacheKey];
-          const fresh = cached && Date.now() - cached.timestamp < DATASET_CACHE_TTL;
+        for (const file of API_FILES) {
+          try {
+            // Try cache first
+            const cached = datasetCacheRef.current[file];
+            const fresh = cached && Date.now() - cached.timestamp < DATASET_CACHE_TTL;
+            let itemArray: any[];
 
-          if (fresh) {
-            foundItem = Array.isArray(cached.data) ? cached.data[0] : cached.data;
-          } else {
-            const shouldFuzzy = !/^(crate|collection|skin|sticker|agent|patch|graffiti|music_kit|keychain|collectible|key|sticker_slab|highlight|base_weapon)-/i.test(decodedId);
-            const res = await fetch(`/api/item/info?id=${encodeURIComponent(decodedId)}&fuzzy=${shouldFuzzy ? 'true' : 'false'}`, { cache: 'no-store' });
-            if (res.ok) {
+            if (fresh) {
+              itemArray = cached.data;
+            } else {
+              const res = await fetch(`${API_BASE_URL}/${file}`, { cache: 'force-cache' });
               const data = await res.json();
-              foundItem = data || null;
-              const hasUsefulData =
-                !!data &&
-                (typeof data?.name === 'string' && data.name !== decodedId ||
-                  !!data?.image ||
-                  Array.isArray(data?.contains) && data.contains.length > 0 ||
-                  Array.isArray(data?.contains_rare) && data.contains_rare.length > 0 ||
-                  data?.min_float != null ||
-                  data?.max_float != null);
-              if (hasUsefulData) {
-                datasetCacheRef.current[cacheKey] = { data: [data], timestamp: Date.now() };
-                persistDatasetCache();
-              }
+              itemArray = Array.isArray(data) ? data : Object.values(data);
+              datasetCacheRef.current[file] = { data: itemArray, timestamp: Date.now() };
+              persistDatasetCache();
             }
+
+            foundItem = itemArray.find((i: any) => i.id === decodedId || i.market_hash_name === decodedId || i.name === decodedId);
+            if (foundItem) break;
+          } catch (e) {
+            console.error(e);
           }
-        } catch (e) {
-          console.error(e);
         }
       }
 
@@ -357,12 +339,26 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const steamId = user?.steamId || null;
   const isWishlisted = wishlist.some((w) => w.key === wishlistKey);
 
-  const minFloatRaw = (item as any)?.min_float;
-  const maxFloatRaw = (item as any)?.max_float;
-  const minFloat = typeof minFloatRaw === 'number' ? minFloatRaw : typeof minFloatRaw === 'string' ? Number.parseFloat(minFloatRaw) : null;
-  const maxFloat = typeof maxFloatRaw === 'number' ? maxFloatRaw : typeof maxFloatRaw === 'string' ? Number.parseFloat(maxFloatRaw) : null;
-  const contains = Array.isArray((item as any)?.contains) ? (item as any).contains : [];
-  const containsRare = Array.isArray((item as any)?.contains_rare) ? (item as any).contains_rare : [];
+  const minFloatRaw = (item as any)?.min_float ?? (item as any)?.minFloat;
+  const maxFloatRaw = (item as any)?.max_float ?? (item as any)?.maxFloat;
+  const minFloat = typeof minFloatRaw === 'number' ? minFloatRaw : Number.isFinite(Number(minFloatRaw)) ? Number(minFloatRaw) : null;
+  const maxFloat = typeof maxFloatRaw === 'number' ? maxFloatRaw : Number.isFinite(Number(maxFloatRaw)) ? Number(maxFloatRaw) : null;
+  const wearName = String((item as any)?.wear?.name || '').trim() || null;
+
+  const contains = Array.isArray((item as any)?.contains) ? ((item as any).contains as any[]) : [];
+  const containsRare = Array.isArray((item as any)?.contains_rare) ? ((item as any).contains_rare as any[]) : [];
+  const crates = Array.isArray((item as any)?.crates) ? ((item as any).crates as any[]) : [];
+
+  const hasFloatRange = minFloat !== null && maxFloat !== null;
+  const hasContents = contains.length > 0 || containsRare.length > 0 || crates.length > 0;
+
+  const makeItemHref = (raw: any) => {
+    const id = String(raw?.id || '').trim();
+    const marketHashName = String(raw?.market_hash_name || raw?.marketHashName || '').trim();
+    const name = String(raw?.name || '').trim();
+    const key = id || marketHashName || name;
+    return `/item/${encodeURIComponent(key)}`;
+  };
 
   return (
     <div className="flex h-dvh bg-[#08090d] text-white overflow-hidden font-sans">
@@ -437,7 +433,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               >
               <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
               <img
-                src={item?.image || '/icon.png'}
+                src={item?.image}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src = '/icon.png';
                 }}
@@ -671,99 +667,78 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             </div>
 
-            {(minFloat !== null || maxFloat !== null) && (
+            {(hasFloatRange || wearName) && (
               <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">Float Range</span>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-2xl md:text-3xl font-black text-white/90 italic">
-                    {(minFloat ?? 0).toFixed(2)} - {(maxFloat ?? 1).toFixed(2)}
-                  </span>
-                  <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    min / max
-                  </span>
+                <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-3">Wear / Float</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                  <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Wear</div>
+                    <div className="mt-1 font-black text-white/90">{wearName || '—'}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Float Range</div>
+                    <div className="mt-1 font-black text-white/90">
+                      {hasFloatRange ? `${minFloat!.toFixed(2)} – ${maxFloat!.toFixed(2)}` : '—'}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {contains.length > 0 && (
+            {hasContents && (
               <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-4">Contains</span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                  {contains.slice(0, 24).map((c: any) => {
-                    const cid = c?.market_hash_name || c?.name || c?.id;
-                    return (
-                      <Link
-                        key={String(cid)}
-                        href={`/item/${encodeURIComponent(String(cid))}`}
-                        className="bg-black/30 border border-white/10 rounded-2xl p-3 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all"
-                      >
-                        <div className="aspect-square rounded-xl bg-black/30 border border-white/5 flex items-center justify-center overflow-hidden">
-                          {c?.image ? (
-                            <img
-                              src={c.image}
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/icon.png';
-                              }}
-                              alt={c?.name || ''}
-                              className="w-[85%] h-auto object-contain"
-                            />
-                          ) : (
-                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">No Image</div>
-                          )}
-                        </div>
-                        <div className="mt-3 text-[10px] font-black uppercase tracking-wider text-white/90 line-clamp-2">
-                          {c?.name || cid}
-                        </div>
-                        {c?.rarity?.name && (
-                          <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                            {c.rarity.name}
-                          </div>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-3">Contains</div>
 
-            {containsRare.length > 0 && (
-              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-4">Rare Special Item</span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                  {containsRare.slice(0, 24).map((c: any) => {
-                    const cid = c?.market_hash_name || c?.name || c?.id;
-                    return (
-                      <Link
-                        key={String(cid)}
-                        href={`/item/${encodeURIComponent(String(cid))}`}
-                        className="bg-black/30 border border-white/10 rounded-2xl p-3 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-                      >
-                        <div className="aspect-square rounded-xl bg-black/30 border border-white/5 flex items-center justify-center overflow-hidden">
-                          {c?.image ? (
-                            <img
-                              src={c.image}
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/icon.png';
-                              }}
-                              alt={c?.name || ''}
-                              className="w-[85%] h-auto object-contain"
-                            />
-                          ) : (
-                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">No Image</div>
-                          )}
-                        </div>
-                        <div className="mt-3 text-[10px] font-black uppercase tracking-wider text-white/90 line-clamp-2">
-                          {c?.name || cid}
-                        </div>
-                        {c?.rarity?.name && (
-                          <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                            {c.rarity.name}
+                {crates.length > 0 && (
+                  <div className="mb-5">
+                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Related Crates</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {crates.slice(0, 20).map((c: any) => (
+                        <Link key={String(c?.id || c?.name || '')} href={makeItemHref(c)} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all">
+                          {c?.image ? <img src={String(c.image)} alt={String(c?.name || '')} className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10" /> : <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />}
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
+                            <div className="text-[9px] text-gray-600 truncate">{String(c?.id || '')}</div>
                           </div>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {contains.length > 0 && (
+                  <div className="mb-5">
+                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Items</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {contains.slice(0, 40).map((c: any) => (
+                        <Link key={String(c?.id || c?.name || '')} href={makeItemHref(c)} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all">
+                          {c?.image ? <img src={String(c.image)} alt={String(c?.name || '')} className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10" /> : <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />}
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
+                            <div className="text-[9px] text-gray-600 truncate">{String(c?.rarity?.name || '')}</div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {containsRare.length > 0 && (
+                  <div>
+                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Rare Special Items</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {containsRare.slice(0, 20).map((c: any) => (
+                        <Link key={String(c?.id || c?.name || '')} href={makeItemHref(c)} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all">
+                          {c?.image ? <img src={String(c.image)} alt={String(c?.name || '')} className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10" /> : <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />}
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
+                            <div className="text-[9px] text-gray-600 truncate">{String(c?.rarity?.name || '')}</div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

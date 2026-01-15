@@ -51,7 +51,7 @@ function CompareContent() {
     const loadItems = async () => {
       try {
         // First try to load from API
-        const res = await fetch('/api/csgo-api?file=skins_not_grouped.json', { cache: 'force-cache' });
+        const res = await fetch('https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json');
         const data = await res.json();
         const arr = Array.isArray(data) ? data : Object.values(data);
         

@@ -6,13 +6,6 @@ export const runtime = 'nodejs';
 const DEFAULT_LANG = 'en';
 const ALLOWED_LANGS = new Set(['en', 'zh-CN']);
 
-const LARGE_REMOTE_FILES = new Set([
-  'crates.json',
-  'skins_not_grouped.json',
-  'stickers.json',
-  'collections.json',
-]);
-
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -46,8 +39,7 @@ export async function GET(request: Request) {
     const safeLang = ALLOWED_LANGS.has(lang) ? lang : DEFAULT_LANG;
     const remoteUrl = `https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/${encodeURIComponent(safeLang)}/${file}`;
 
-    const timeoutMs = LARGE_REMOTE_FILES.has(file) ? 30000 : 15000;
-    const res = await fetchWithTimeout(remoteUrl, timeoutMs);
+    const res = await fetchWithTimeout(remoteUrl, 15000);
     if (!res.ok) {
       return NextResponse.json({ error: 'Upstream not found', status: res.status }, { status: 502 });
     }
