@@ -22,8 +22,6 @@ import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wi
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
-import { API_FILES, BASE_URL as API_BASE_URL } from '@/data/api-endpoints';
-
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
 const DATASET_CACHE_TTL = 1000 * 60 * 60 * 12; // 12h
 const PRICE_CACHE_KEY = 'sv_price_cache_item_v1';
@@ -186,28 +184,24 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
       // If not found in custom items, check API files
       if (!foundItem) {
-        for (const file of API_FILES) {
-          try {
-            // Try cache first
-            const cached = datasetCacheRef.current[file];
-            const fresh = cached && Date.now() - cached.timestamp < DATASET_CACHE_TTL;
-            let itemArray: any[];
+        try {
+          const cacheKey = `item-info:${decodedId}`;
+          const cached = datasetCacheRef.current[cacheKey];
+          const fresh = cached && Date.now() - cached.timestamp < DATASET_CACHE_TTL;
 
-            if (fresh) {
-              itemArray = cached.data;
-            } else {
-              const res = await fetch(`${API_BASE_URL}/${file}`, { cache: 'force-cache' });
+          if (fresh) {
+            foundItem = Array.isArray(cached.data) ? cached.data[0] : cached.data;
+          } else {
+            const res = await fetch(`/api/item/info?id=${encodeURIComponent(decodedId)}&fuzzy=true`, { cache: 'no-store' });
+            if (res.ok) {
               const data = await res.json();
-              itemArray = Array.isArray(data) ? data : Object.values(data);
-              datasetCacheRef.current[file] = { data: itemArray, timestamp: Date.now() };
+              foundItem = data || null;
+              datasetCacheRef.current[cacheKey] = { data: [data], timestamp: Date.now() };
               persistDatasetCache();
             }
-
-            foundItem = itemArray.find((i: any) => i.id === decodedId || i.market_hash_name === decodedId || i.name === decodedId);
-            if (foundItem) break;
-          } catch (e) {
-            console.error(e);
           }
+        } catch (e) {
+          console.error(e);
         }
       }
 

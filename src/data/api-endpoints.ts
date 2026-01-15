@@ -5,7 +5,6 @@
 export const API_FILES = [
   'collections.json',
   'skins.json',
-  'skins_grouped.json',
   'skins_not_grouped.json',
   'stickers.json',
   'agents.json',
