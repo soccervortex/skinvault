@@ -18,7 +18,7 @@ interface CompareModalProps {
   onItemSelect?: (item: CompareItem) => void;
 }
 
-import { API_FILES, BASE_URL as API_BASE_URL } from '@/data/api-endpoints';
+import { API_FILES } from '@/data/api-endpoints';
 
 const DATASET_CACHE_KEY = 'sv_dataset_cache_v1';
 
@@ -123,7 +123,7 @@ export default function CompareModal({ isOpen, onClose, currentItem, onItemSelec
         items = datasetCache[file];
       } else {
         try {
-          const res = await fetch(`${API_BASE_URL}/${file}`, { cache: 'force-cache' });
+          const res = await fetch(`/api/csgo-api?file=${encodeURIComponent(file)}`, { cache: 'force-cache' });
           const data = await res.json();
           items = Array.isArray(data) ? data : Object.values(data);
           

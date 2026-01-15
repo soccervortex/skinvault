@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { findBestMatch } from '@/app/utils/fuzzy-search';
-import { API_FILES, BASE_URL } from '@/data/api-endpoints';
+import { API_FILES } from '@/data/api-endpoints';
 
 // Fetch with timeout helper
 async function fetchWithTimeout(url: string, timeoutMs: number = 5000): Promise<Response> {
@@ -29,6 +29,21 @@ export async function GET(request: Request) {
     const itemId = url.searchParams.get('id') || url.searchParams.get('market_hash_name');
     const useFuzzy = url.searchParams.get('fuzzy') !== 'false'; // Default to true
 
+    const origin = url.origin;
+    const datasetUrl = (file: string) => `${origin}/api/csgo-api?file=${encodeURIComponent(file)}`;
+
+    const normalizeItem = (raw: any) => {
+      if (!raw) return raw;
+      const img = raw.image || raw.image_inventory || raw.image_large || raw.image_small || null;
+      const mhn = raw.market_hash_name || raw.marketHashName || raw.market_name || raw.marketName || raw.name || itemId;
+      return {
+        ...raw,
+        id: raw.id || itemId,
+        image: img,
+        market_hash_name: mhn,
+      };
+    };
+
     if (!itemId) {
       return NextResponse.json({ error: 'Missing id or market_hash_name parameter' }, { status: 400 });
     }
@@ -46,15 +61,17 @@ export async function GET(request: Request) {
       });
       
       if (customItem) {
-        return NextResponse.json({
-          id: customItem.id,
-          name: customItem.name,
-          image: customItem.image || null,
-          market_hash_name: customItem.marketHashName || customItem.name,
-          rarity: customItem.rarity ? { name: customItem.rarity } : null,
-          weapon: customItem.weapon ? { name: customItem.weapon } : null,
-          isCustom: true,
-        });
+        return NextResponse.json(
+          normalizeItem({
+            id: customItem.id,
+            name: customItem.name,
+            image: customItem.image || null,
+            market_hash_name: customItem.marketHashName || customItem.name,
+            rarity: customItem.rarity ? { name: customItem.rarity } : null,
+            weapon: customItem.weapon ? { name: customItem.weapon } : null,
+            isCustom: true,
+          })
+        );
       }
     } catch (error) {
       // Continue to API check if custom items fail
@@ -64,7 +81,7 @@ export async function GET(request: Request) {
     // This is much faster than sequential fetching
     const fetchPromises = API_FILES.map(async (file) => {
       try {
-        const response = await fetchWithTimeout(`${BASE_URL}/${file}`, 5000);
+        const response = await fetchWithTimeout(datasetUrl(file), 5000);
         
         if (!response.ok) return null;
         
@@ -79,14 +96,7 @@ export async function GET(request: Request) {
         );
         
         if (item) {
-          return {
-            name: item.name || item.market_hash_name || itemId,
-            image: item.image || item.image_inventory || item.image_large || null,
-            market_hash_name: item.market_hash_name || itemId,
-            rarity: item.rarity,
-            weapon: item.weapon,
-            id: item.id,
-          };
+          return normalizeItem(item);
         }
         
         return null;
@@ -112,7 +122,7 @@ export async function GET(request: Request) {
       let allApiItems: any[] = [];
       const fuzzyPromises = API_FILES.map(async (file) => {
         try {
-          const response = await fetchWithTimeout(`${BASE_URL}/${file}`, 5000);
+          const response = await fetchWithTimeout(datasetUrl(file), 5000);
           if (!response.ok) return [];
           const data = await response.json();
           return Array.isArray(data) ? data : Object.values(data);
@@ -136,14 +146,7 @@ export async function GET(request: Request) {
       })));
       
       if (match) {
-        return NextResponse.json({
-          name: match.name || match.market_hash_name || itemId,
-          image: match.image || match.image_inventory || match.image_large || null,
-          market_hash_name: match.market_hash_name || itemId,
-          rarity: match.rarity,
-          weapon: match.weapon,
-          id: match.id,
-        });
+        return NextResponse.json(normalizeItem(match));
       }
     }
 

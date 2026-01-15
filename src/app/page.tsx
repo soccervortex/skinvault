@@ -33,6 +33,7 @@ type SortType =
 
 const CATEGORIES = [
   { name: 'All Items', icon: <Tag size={14}/>, file: 'all', filter: 'all' },
+  { name: 'Skins', icon: <Tag size={14}/>, file: 'skins.json', filter: 'skin' },
   { name: 'Rifles', icon: <Crosshair size={14}/>, file: 'skins_not_grouped.json', filter: 'rifle' },
   { name: 'Sniper Rifles', icon: <Target size={14}/>, file: 'skins_not_grouped.json', filter: 'sniper' },
   { name: 'SMGs', icon: <Zap size={14}/>, file: 'skins_not_grouped.json', filter: 'smg' },
@@ -41,6 +42,7 @@ const CATEGORIES = [
   { name: 'Agents', icon: <User size={14}/>, file: 'agents.json', filter: 'agent' },
   { name: 'Stickers', icon: <Disc size={14}/>, file: 'stickers.json', filter: 'sticker' },
   { name: 'Sticker Slabs', icon: <Disc size={14}/>, file: 'sticker_slabs.json', filter: 'sticker_slab' },
+  { name: 'Collections', icon: <Tag size={14}/>, file: 'collections.json', filter: 'collection' },
   { name: 'Crates', icon: <Package size={14}/>, file: 'crates.json', filter: 'crate' },
   { name: 'Crate Keys', icon: <Package size={14}/>, file: 'keys.json', filter: 'key' },
   { name: 'Patches', icon: <Tag size={14}/>, file: 'patches.json', filter: 'patch' },

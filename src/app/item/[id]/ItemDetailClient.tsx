@@ -333,6 +333,11 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const steamId = user?.steamId || null;
   const isWishlisted = wishlist.some((w) => w.key === wishlistKey);
 
+  const minFloat = typeof (item as any)?.min_float === 'number' ? (item as any).min_float : null;
+  const maxFloat = typeof (item as any)?.max_float === 'number' ? (item as any).max_float : null;
+  const contains = Array.isArray((item as any)?.contains) ? (item as any).contains : [];
+  const containsRare = Array.isArray((item as any)?.contains_rare) ? (item as any).contains_rare : [];
+
   return (
     <div className="flex h-dvh bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -639,6 +644,88 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 <BarChart3 className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-white/5 w-16 h-16 md:w-20 md:h-20" />
               </div>
             </div>
+
+            {(minFloat !== null || maxFloat !== null) && (
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">Float Range</span>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-2xl md:text-3xl font-black text-white/90 italic">
+                    {(minFloat ?? 0).toFixed(2)} - {(maxFloat ?? 1).toFixed(2)}
+                  </span>
+                  <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    min / max
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {contains.length > 0 && (
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-4">Contains</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  {contains.slice(0, 24).map((c: any) => {
+                    const cid = c?.id || c?.market_hash_name || c?.name;
+                    return (
+                      <Link
+                        key={String(cid)}
+                        href={`/item/${encodeURIComponent(String(cid))}`}
+                        className="bg-black/30 border border-white/10 rounded-2xl p-3 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all"
+                      >
+                        <div className="aspect-square rounded-xl bg-black/30 border border-white/5 flex items-center justify-center overflow-hidden">
+                          {c?.image ? (
+                            <img src={c.image} alt={c?.name || ''} className="w-[85%] h-auto object-contain" />
+                          ) : (
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">No Image</div>
+                          )}
+                        </div>
+                        <div className="mt-3 text-[10px] font-black uppercase tracking-wider text-white/90 line-clamp-2">
+                          {c?.name || cid}
+                        </div>
+                        {c?.rarity?.name && (
+                          <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                            {c.rarity.name}
+                          </div>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {containsRare.length > 0 && (
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
+                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-4">Rare Special Item</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  {containsRare.slice(0, 24).map((c: any) => {
+                    const cid = c?.id || c?.market_hash_name || c?.name;
+                    return (
+                      <Link
+                        key={String(cid)}
+                        href={`/item/${encodeURIComponent(String(cid))}`}
+                        className="bg-black/30 border border-white/10 rounded-2xl p-3 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
+                      >
+                        <div className="aspect-square rounded-xl bg-black/30 border border-white/5 flex items-center justify-center overflow-hidden">
+                          {c?.image ? (
+                            <img src={c.image} alt={c?.name || ''} className="w-[85%] h-auto object-contain" />
+                          ) : (
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">No Image</div>
+                          )}
+                        </div>
+                        <div className="mt-3 text-[10px] font-black uppercase tracking-wider text-white/90 line-clamp-2">
+                          {c?.name || cid}
+                        </div>
+                        {c?.rarity?.name && (
+                          <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                            {c.rarity.name}
+                          </div>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-3 md:gap-4 w-full py-6 md:py-8 bg-blue-600 hover:bg-blue-500 text-white rounded-[2rem] md:rounded-[2.5rem] font-black text-[10px] md:text-xs uppercase tracking-widest transition-all">
               Trade on Steam Market <ExternalLink size={16} />
