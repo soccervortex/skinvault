@@ -677,7 +677,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-4">Contains</span>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                   {contains.slice(0, 24).map((c: any) => {
-                    const cid = c?.id || c?.market_hash_name || c?.name;
+                    const cid = c?.market_hash_name || c?.name || c?.id;
                     return (
                       <Link
                         key={String(cid)}
@@ -718,7 +718,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-4">Rare Special Item</span>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                   {containsRare.slice(0, 24).map((c: any) => {
-                    const cid = c?.id || c?.market_hash_name || c?.name;
+                    const cid = c?.market_hash_name || c?.name || c?.id;
                     return (
                       <Link
                         key={String(cid)}

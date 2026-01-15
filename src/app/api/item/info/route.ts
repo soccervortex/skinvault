@@ -73,8 +73,14 @@ export async function GET(request: Request) {
     // Prefer the authoritative dataset first (prevents returning stub references missing fields like `contains`)
     if (priorityFile) {
       try {
-        const priorityTimeout =
-          priorityFile === 'skins_not_grouped.json' || priorityFile === 'crates.json' ? 20000 : 12000;
+        const isLargePriority =
+          priorityFile === 'skins_not_grouped.json' ||
+          priorityFile === 'crates.json' ||
+          priorityFile === 'collections.json' ||
+          priorityFile === 'stickers.json';
+
+        // Must be greater than /api/csgo-api's upstream timeout (30s) for large files.
+        const priorityTimeout = isLargePriority ? 45000 : 15000;
         const response = await fetchWithTimeout(datasetUrl(priorityFile), priorityTimeout);
         if (response.ok) {
           const data = await response.json();
@@ -122,7 +128,12 @@ export async function GET(request: Request) {
     // This is much faster than sequential fetching
     const fetchPromises = API_FILES.map(async (file) => {
       try {
-        const timeout = file === 'skins_not_grouped.json' || file === 'crates.json' ? 20000 : 8000;
+        const isLarge =
+          file === 'skins_not_grouped.json' ||
+          file === 'crates.json' ||
+          file === 'collections.json' ||
+          file === 'stickers.json';
+        const timeout = isLarge ? 45000 : 12000;
         const response = await fetchWithTimeout(datasetUrl(file), timeout);
         
         if (!response.ok) return null;
@@ -164,7 +175,12 @@ export async function GET(request: Request) {
       let allApiItems: any[] = [];
       const fuzzyPromises = API_FILES.map(async (file) => {
         try {
-          const timeout = file === 'skins_not_grouped.json' || file === 'crates.json' ? 20000 : 8000;
+          const isLarge =
+            file === 'skins_not_grouped.json' ||
+            file === 'crates.json' ||
+            file === 'collections.json' ||
+            file === 'stickers.json';
+          const timeout = isLarge ? 45000 : 12000;
           const response = await fetchWithTimeout(datasetUrl(file), timeout);
           if (!response.ok) return [];
           const data = await response.json();

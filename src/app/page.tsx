@@ -692,6 +692,7 @@ export default function GlobalSkinSearch() {
                   return false;
                 });
                 const rarityColor = item.rarity?.color || "#4b5563";
+                const itemRouteKey = (item.market_hash_name || item.name || item.id) as string;
 
                 return (
                   <div key={item.id} className={`bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-[border-color,transform] duration-300 group relative flex flex-col border ${isOwned ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'border-white/5 hover:border-blue-500/40'}`}>
@@ -775,7 +776,7 @@ export default function GlobalSkinSearch() {
                         </>
                       )}
                     </div>
-                    <Link href={`/item/${encodeURIComponent(item.id)}`} prefetch={false} className="flex-1">
+                    <Link href={`/item/${encodeURIComponent(itemRouteKey)}`} prefetch={false} className="flex-1">
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
                         <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                         <Image 
