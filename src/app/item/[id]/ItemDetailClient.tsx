@@ -192,12 +192,23 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           if (fresh) {
             foundItem = Array.isArray(cached.data) ? cached.data[0] : cached.data;
           } else {
-            const res = await fetch(`/api/item/info?id=${encodeURIComponent(decodedId)}&fuzzy=true`, { cache: 'no-store' });
+            const shouldFuzzy = !/^(crate|collection|skin|sticker|agent|patch|graffiti|music_kit|keychain|collectible|key|sticker_slab|highlight|base_weapon)-/i.test(decodedId);
+            const res = await fetch(`/api/item/info?id=${encodeURIComponent(decodedId)}&fuzzy=${shouldFuzzy ? 'true' : 'false'}`, { cache: 'no-store' });
             if (res.ok) {
               const data = await res.json();
               foundItem = data || null;
-              datasetCacheRef.current[cacheKey] = { data: [data], timestamp: Date.now() };
-              persistDatasetCache();
+              const hasUsefulData =
+                !!data &&
+                (typeof data?.name === 'string' && data.name !== decodedId ||
+                  !!data?.image ||
+                  Array.isArray(data?.contains) && data.contains.length > 0 ||
+                  Array.isArray(data?.contains_rare) && data.contains_rare.length > 0 ||
+                  data?.min_float != null ||
+                  data?.max_float != null);
+              if (hasUsefulData) {
+                datasetCacheRef.current[cacheKey] = { data: [data], timestamp: Date.now() };
+                persistDatasetCache();
+              }
             }
           }
         } catch (e) {
@@ -333,8 +344,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const steamId = user?.steamId || null;
   const isWishlisted = wishlist.some((w) => w.key === wishlistKey);
 
-  const minFloat = typeof (item as any)?.min_float === 'number' ? (item as any).min_float : null;
-  const maxFloat = typeof (item as any)?.max_float === 'number' ? (item as any).max_float : null;
+  const minFloatRaw = (item as any)?.min_float;
+  const maxFloatRaw = (item as any)?.max_float;
+  const minFloat = typeof minFloatRaw === 'number' ? minFloatRaw : typeof minFloatRaw === 'string' ? Number.parseFloat(minFloatRaw) : null;
+  const maxFloat = typeof maxFloatRaw === 'number' ? maxFloatRaw : typeof maxFloatRaw === 'string' ? Number.parseFloat(maxFloatRaw) : null;
   const contains = Array.isArray((item as any)?.contains) ? (item as any).contains : [];
   const containsRare = Array.isArray((item as any)?.contains_rare) ? (item as any).contains_rare : [];
 

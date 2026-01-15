@@ -315,6 +315,19 @@ export default function GlobalSkinSearch() {
     });
   };
 
+  const dedupeItems = (list: any[]) => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const it of list) {
+      const key = String(it?.market_hash_name || it?.name || it?.id || '').trim();
+      if (!key) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(it);
+    }
+    return out;
+  };
+
   // Fetch items with cache + abort safety
   useEffect(() => {
     let cancelled = false;
@@ -400,7 +413,7 @@ export default function GlobalSkinSearch() {
         }
 
         if (cancelled) return;
-        setItems(filterItems(allItems, activeCat));
+        setItems(dedupeItems(filterItems(allItems, activeCat)));
         setLoading(false);
         return;
       }
@@ -457,7 +470,7 @@ export default function GlobalSkinSearch() {
       }
 
       if (cancelled) return;
-      setItems(filterItems(rawItems || [], activeCat));
+      setItems(dedupeItems(filterItems(rawItems || [], activeCat)));
       setLoading(false);
     };
 
