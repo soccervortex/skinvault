@@ -1667,7 +1667,7 @@ function InventoryContent() {
 
   if (!viewedUser && loading) {
     return (
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
@@ -1690,7 +1690,7 @@ function InventoryContent() {
 
   if (!viewedUser && !loading) {
     return (
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-10 pb-32">
@@ -1790,7 +1790,7 @@ function InventoryContent() {
 
   return (
     <>
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         {websiteProfilePrivate && (

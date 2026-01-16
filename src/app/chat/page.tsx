@@ -1888,7 +1888,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white">
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-[#11141d] border-b border-white/5 p-4">
