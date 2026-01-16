@@ -60,8 +60,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const [containsModalItem, setContainsModalItem] = useState<any | null>(null);
   const [containsModalInfo, setContainsModalInfo] = useState<any | null>(null);
   const [containsModalInfoLoading, setContainsModalInfoLoading] = useState(false);
-  const [containsModalPrice, setContainsModalPrice] = useState<any | null>(null);
-  const [containsModalPriceDone, setContainsModalPriceDone] = useState(false);
+  const [containsModalVariants, setContainsModalVariants] = useState<any[] | null>(null);
+  const [containsModalVariantsLoading, setContainsModalVariantsLoading] = useState(false);
+  const [containsModalVariantPrices, setContainsModalVariantPrices] = useState<Record<string, any>>({});
+  const [containsModalVariantPriceDone, setContainsModalVariantPriceDone] = useState<Record<string, boolean>>({});
 
   const normalizeItem = (raw: any) => {
     if (!raw) return raw;
@@ -373,70 +375,68 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     let cancelled = false;
 
     const run = async () => {
-      const marketName =
-        (containsModalInfo as any)?.market_hash_name ||
-        (containsModalInfo as any)?.name ||
-        (containsModalItem as any)?.market_hash_name ||
-        (containsModalItem as any)?.name ||
-        '';
-      const mhn = String(marketName || '').trim();
-      if (!mhn) {
-        if (!cancelled) {
-          setContainsModalPrice(null);
-          setContainsModalPriceDone(true);
-        }
-        return;
-      }
+      const list = (containsModalVariants && containsModalVariants.length)
+        ? containsModalVariants
+        : [containsModalInfo || containsModalItem].filter(Boolean);
 
-      const cacheKey = `${currency.code}:${mhn}`;
-      const cached = priceCacheRef.current[cacheKey];
-      if (cached) {
-        if (!cancelled) {
-          setContainsModalPrice(cached);
-          setContainsModalPriceDone(true);
-        }
-        return;
-      }
+      const marketNames = list
+        .map((v: any) => String(v?.market_hash_name || v?.name || '').trim())
+        .filter(Boolean);
 
-      if (!cancelled) {
-        setContainsModalPrice(null);
-        setContainsModalPriceDone(false);
-      }
+      const unique = Array.from(new Set(marketNames));
 
-      const hash = encodeURIComponent(mhn);
-      const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
-      const data = await fetchWithProxyRotation(steamUrl, isPro, {
-        parallel: true,
-        marketHashName: mhn,
-        currency: currency.code,
-      });
-
-      const next = data?.success
-        ? {
-            lowest: data.lowest_price || data.median_price || '---',
-            median: data.median_price || '---',
-            volume: data.volume || 'Low',
+      await Promise.all(
+        unique.map(async (mhn) => {
+          const cacheKey = `${currency.code}:${mhn}`;
+          const cached = priceCacheRef.current[cacheKey];
+          if (cached) {
+            if (!cancelled) {
+              setContainsModalVariantPrices((prev) => ({ ...prev, [mhn]: cached }));
+              setContainsModalVariantPriceDone((prev) => ({ ...prev, [mhn]: true }));
+            }
+            return;
           }
-        : {
-            lowest: '---',
-            median: '---',
-            volume: 'Low',
-          };
 
-      priceCacheRef.current[cacheKey] = next;
-      persistPriceCache();
+          if (!cancelled) {
+            setContainsModalVariantPriceDone((prev) => ({ ...prev, [mhn]: false }));
+          }
 
-      if (!cancelled) {
-        setContainsModalPrice(next);
-        setContainsModalPriceDone(true);
-      }
+          const hash = encodeURIComponent(mhn);
+          const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
+          const data = await fetchWithProxyRotation(steamUrl, isPro, {
+            parallel: true,
+            marketHashName: mhn,
+            currency: currency.code,
+          });
+
+          const next = data?.success
+            ? {
+                lowest: data.lowest_price || data.median_price || '---',
+                median: data.median_price || '---',
+                volume: data.volume || 'Low',
+              }
+            : {
+                lowest: '---',
+                median: '---',
+                volume: 'Low',
+              };
+
+          priceCacheRef.current[cacheKey] = next;
+          persistPriceCache();
+
+          if (!cancelled) {
+            setContainsModalVariantPrices((prev) => ({ ...prev, [mhn]: next }));
+            setContainsModalVariantPriceDone((prev) => ({ ...prev, [mhn]: true }));
+          }
+        })
+      );
     };
 
     void run();
     return () => {
       cancelled = true;
     };
-  }, [containsModalItem, containsModalInfo, currency.code, isPro]);
+  }, [containsModalItem, containsModalInfo, containsModalVariants, currency.code, isPro]);
 
   // Simple 3D spin animation when in 3D view
   useEffect(() => {
@@ -591,6 +591,24 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     }
   };
 
+  const stripWearFromMarketName = (s: string) => {
+    return String(s || '')
+      .replace(/\s*\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)\s*$/i, '')
+      .trim();
+  };
+
+  const getWeaponAndSkinLabels = (raw: any): { weaponName: string; skinName: string } => {
+    const mhnRaw = String(raw?.market_hash_name || raw?.name || '').trim();
+    const mhn = stripWearFromMarketName(mhnRaw);
+    const weaponFromField = String(raw?.weapon?.name || '').trim();
+    const parsedWeapon = mhn.includes('|') ? mhn.split('|')[0].trim() : '';
+    const weaponName = weaponFromField || parsedWeapon || '—';
+
+    const parsedSkin = mhn.includes('|') ? mhn.split('|').slice(1).join('|').trim() : mhn;
+    const skinName = parsedSkin || '—';
+    return { weaponName, skinName };
+  };
+
   const rowCardKey = (raw: any) => String(raw?.id || raw?.market_hash_name || raw?.marketHashName || raw?.name || '');
 
   const formatOdds = (raw: any): string | null => {
@@ -638,13 +656,50 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               setContainsModalItem(c);
               setContainsModalInfo(null);
               setContainsModalInfoLoading(true);
-              setContainsModalPrice(null);
-              setContainsModalPriceDone(false);
+              setContainsModalVariants(null);
+              setContainsModalVariantsLoading(false);
+              setContainsModalVariantPrices({});
+              setContainsModalVariantPriceDone({});
               const key = makeItemKey(c);
+
+              const rawId = String((c as any)?.id || '').trim();
+              const baseMatch = rawId.match(/^(skin-[a-z0-9]+)(?:_\d{1,3})?$/i);
+              const baseId = baseMatch ? String(baseMatch[1]) : '';
+
+              if (baseId) {
+                setContainsModalVariantsLoading(true);
+                void Promise.all(
+                  [0, 1, 2, 3, 4].map(async (idx) => {
+                    const requestId = `${baseId}_${idx}`;
+                    try {
+                      const r = await fetch(`/api/item/info?id=${encodeURIComponent(requestId)}&fuzzy=false`, { cache: 'no-store' });
+                      const j = await r.json().catch(() => null);
+                      if (!r.ok) return null;
+                      const isFallback = j && j.market_hash_name === requestId && !j.rarity && !j.weapon;
+                      if (!j || isFallback) return null;
+                      return normalizeItem(j);
+                    } catch {
+                      return null;
+                    }
+                  })
+                )
+                  .then((arr) => {
+                    const found = arr.filter(Boolean) as any[];
+                    setContainsModalVariants(found.length ? found : null);
+                    setContainsModalInfo(found.length ? found[0] : null);
+                  })
+                  .finally(() => {
+                    setContainsModalVariantsLoading(false);
+                    setContainsModalInfoLoading(false);
+                  });
+                return;
+              }
+
               void fetch(`/api/item/info?id=${encodeURIComponent(key)}&fuzzy=true`, { cache: 'no-store' })
                 .then((r) => r.json().catch(() => null))
                 .then((json) => {
-                  if (json && (json?.name || json?.market_hash_name)) {
+                  const isFallback = json && json.market_hash_name === key && !json.rarity && !json.weapon;
+                  if (json && (json?.name || json?.market_hash_name) && !isFallback) {
                     setContainsModalInfo(normalizeItem(json));
                   } else {
                     setContainsModalInfo(null);
@@ -1130,8 +1185,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           if (e.target === e.currentTarget) {
             setContainsModalItem(null);
             setContainsModalInfo(null);
-            setContainsModalPrice(null);
-            setContainsModalPriceDone(false);
+            setContainsModalVariants(null);
+            setContainsModalVariantsLoading(false);
+            setContainsModalVariantPrices({});
+            setContainsModalVariantPriceDone({});
           }
         }}
       >
@@ -1145,8 +1202,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               onClick={() => {
                 setContainsModalItem(null);
                 setContainsModalInfo(null);
-                setContainsModalPrice(null);
-                setContainsModalPriceDone(false);
+                setContainsModalVariants(null);
+                setContainsModalVariantsLoading(false);
+                setContainsModalVariantPrices({});
+                setContainsModalVariantPriceDone({});
               }}
               className="text-gray-500 hover:text-white transition-colors"
               aria-label="Close"
@@ -1156,64 +1215,86 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           </div>
 
           <div className="p-4 md:p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-20 h-20 rounded-2xl bg-[#0b0e14] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                {(() => {
-                  const img = String((containsModalInfo as any)?.image || (containsModalItem as any)?.image || '').trim();
-                  if (!img) return <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />;
-                  return <img src={img} alt={String((containsModalInfo as any)?.name || (containsModalItem as any)?.name || '')} className="w-full h-full object-contain" />;
-                })()}
-              </div>
+            {(() => {
+              const main = containsModalInfo || containsModalItem;
+              const { weaponName, skinName } = getWeaponAndSkinLabels(main);
+              const img = String((containsModalInfo as any)?.image || (containsModalItem as any)?.image || '').trim();
+              const rarity = String((main as any)?.rarity?.name || '').trim();
 
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-white/90 break-words">
-                  {String((containsModalInfo as any)?.name || (containsModalInfo as any)?.market_hash_name || (containsModalItem as any)?.name || (containsModalItem as any)?.market_hash_name || '—')}
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {String((containsModalInfo as any)?.rarity?.name || (containsModalItem as any)?.rarity?.name || '')}
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {String((containsModalInfo as any)?.wear?.name || (containsModalItem as any)?.wear?.name || '')}
-                </div>
-              </div>
-            </div>
+              return (
+                <div className="flex items-start gap-4">
+                  <div className="w-20 h-20 rounded-2xl bg-[#0b0e14] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                    {!img ? (
+                      <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />
+                    ) : (
+                      <img src={img} alt={skinName} className="w-full h-full object-contain" />
+                    )}
+                  </div>
 
-            {containsModalInfoLoading ? (
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-white/90 break-words">{weaponName}</div>
+                    <div className="mt-1 text-xs text-gray-400 break-words">{skinName}</div>
+                    {rarity ? <div className="mt-2 text-xs text-gray-500">{rarity}</div> : null}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {containsModalInfoLoading || containsModalVariantsLoading ? (
               <div className="mt-4 flex items-center gap-2 text-gray-500 text-sm">
                 <Loader2 className="animate-spin" size={16} /> Loading
               </div>
             ) : null}
 
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-                <div className="text-xs font-medium text-gray-500">Float Range</div>
-                <div className="mt-1 text-sm font-semibold text-white/90">
-                  {(() => {
-                    const fr = formatFloatRange(containsModalInfo || containsModalItem);
-                    return fr ? fr : '—';
-                  })()}
-                </div>
-              </div>
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-                <div className="text-xs font-medium text-gray-500">Odds</div>
-                <div className="mt-1 text-sm font-semibold text-white/90">
-                  {formatOdds(containsModalItem) || '—'}
-                </div>
-              </div>
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 sm:col-span-2">
-                <div className="text-xs font-medium text-gray-500">Steam Price</div>
-                <div className="mt-1 text-sm font-semibold text-white/90">
-                  {!containsModalPriceDone ? (
-                    <span className="inline-flex items-center gap-2 text-gray-500">
-                      <Loader2 className="animate-spin" size={14} /> Loading
-                    </span>
-                  ) : (
-                    <span>
-                      {String(containsModalPrice?.lowest || '—')} • Median {String(containsModalPrice?.median || '—')}
-                    </span>
-                  )}
-                </div>
-              </div>
+            <div className="mt-5 space-y-4">
+              {(() => {
+                const variants = (containsModalVariants && containsModalVariants.length)
+                  ? containsModalVariants
+                  : [containsModalInfo || containsModalItem].filter(Boolean);
+
+                return variants.map((v: any) => {
+                  const wearLabel = String(v?.wear?.name || '').trim() || 'Variant';
+                  const floatRange = formatFloatRange(v);
+                  const odds = formatOdds(containsModalItem) || formatOdds(v) || '—';
+                  const mhn = String(v?.market_hash_name || v?.name || '').trim();
+                  const done = mhn ? containsModalVariantPriceDone[mhn] === true : true;
+                  const price = mhn ? containsModalVariantPrices[mhn] : null;
+
+                  return (
+                    <div key={String(v?.id || v?.market_hash_name || wearLabel)} className="bg-black/20 border border-white/5 rounded-2xl p-4">
+                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">{wearLabel}</div>
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                          <div className="text-xs font-medium text-gray-500">Wear</div>
+                          <div className="mt-1 text-sm font-semibold text-white/90">{wearLabel}</div>
+                        </div>
+                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                          <div className="text-xs font-medium text-gray-500">Float Range</div>
+                          <div className="mt-1 text-sm font-semibold text-white/90">{floatRange || '—'}</div>
+                        </div>
+                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                          <div className="text-xs font-medium text-gray-500">Odds</div>
+                          <div className="mt-1 text-sm font-semibold text-white/90">{odds}</div>
+                        </div>
+                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                          <div className="text-xs font-medium text-gray-500">Steam Price</div>
+                          <div className="mt-1 text-sm font-semibold text-white/90">
+                            {!done ? (
+                              <span className="inline-flex items-center gap-2 text-gray-500">
+                                <Loader2 className="animate-spin" size={14} /> Loading
+                              </span>
+                            ) : (
+                              <span>
+                                {String(price?.lowest || '—')} • Median {String(price?.median || '—')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
