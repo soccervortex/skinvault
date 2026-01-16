@@ -498,47 +498,60 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   };
 
   const ContentGrid = ({ items }: { items: any[] }) => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
       {items.map((c: any) => {
         const odds = formatOdds(c);
         const floatRange = formatFloatRange(c);
         const isEstimated = odds && !(c?.chance ?? c?.percentage ?? c?.probability ?? c?.odds);
 
         return (
-          <Link
+          <div
             key={rowCardKey(c)}
-            href={makeItemHref(c)}
-            className="group bg-black/30 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all"
+            className="bg-black/30 border border-white/10 rounded-2xl overflow-hidden hover:bg-white/5 transition-all"
           >
-            <div className="flex items-center gap-3">
-              {c?.image ? (
-                <img
-                  src={String(c.image)}
-                  alt={String(c?.name || '')}
-                  className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10 shrink-0"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 shrink-0" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
-                <div className="text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+            <Link href={makeItemHref(c)} className="block">
+              <div className="aspect-square bg-[#0b0e14] flex items-center justify-center border-b border-white/10">
+                {c?.image ? (
+                  <img
+                    src={String(c.image)}
+                    alt={String(c?.name || '')}
+                    className="w-[70%] h-auto object-contain"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10" />
+                )}
               </div>
-            </div>
 
-            {(odds || floatRange) && (
-              <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
-                <div className="text-gray-500 truncate">
-                  {floatRange ? `Float ${floatRange}` : ''}
-                </div>
-                {odds ? (
-                  <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300 whitespace-nowrap">
-                    {isEstimated ? `~${odds}` : odds}
+              <div className="p-3">
+                <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
+                <div className="mt-1 text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+
+                {(odds || floatRange) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    {floatRange ? (
+                      <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300">
+                        Float {floatRange}
+                      </div>
+                    ) : null}
+                    {odds ? (
+                      <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300">
+                        {isEstimated ? `~${odds}` : odds}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                )}
               </div>
-            )}
-          </Link>
+            </Link>
+
+            <div className="px-3 pb-3">
+              <Link
+                href={makeItemHref(c)}
+                className="w-full inline-flex items-center justify-center rounded-lg border border-white/10 bg-black/30 hover:bg-white/5 transition-all py-2 text-[12px] font-medium text-gray-200"
+              >
+                View
+              </Link>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -640,7 +653,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   onClick={() => setViewMode('3D')}
                   className={`px-3 py-1.5 transition-all ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
                 >
-                  3D
+                  Tilt
                 </button>
               </div>
               <div className="absolute bottom-4 left-4 right-4 hidden md:flex items-center justify-center gap-2 bg-black/30 rounded-xl border border-white/10 p-2 z-20">
@@ -656,13 +669,6 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 >
                   Tilt View
                 </button>
-                <a
-                  href="https://3d.cs.money/start"
-                  target="_blank"
-                  className="px-4 py-2 rounded-lg transition-all text-[12px] font-medium text-gray-300 hover:bg-white/5 border border-white/10"
-                >
-                  3D Viewer
-                </a>
               </div>
             </div>
             <div className="mt-4 md:mt-6 flex flex-wrap items-center gap-2 md:gap-3">
@@ -755,11 +761,11 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
             </div>
 
             <div className="lg:col-span-7 space-y-5 md:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <h1 className="text-2xl md:text-4xl font-semibold text-white leading-tight sm:whitespace-nowrap truncate min-w-0">
+            <div className="space-y-3">
+              <h1 className="text-2xl md:text-4xl font-semibold text-white leading-tight break-words">
                 {item?.name}
               </h1>
-              <div className="flex items-center justify-end gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 {/* Share Button */}
                 {typeof window !== 'undefined' && (
                   <ShareButton
@@ -924,54 +930,54 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             )}
 
-            {(hasContents || containerLikely) && (
-              <div className="bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div className="text-sm font-medium text-gray-200">Contains</div>
-                  <div className="text-xs text-gray-500 font-medium">
-                    {contains.length ? `${contains.length} items` : ''}
-                    {contains.length && containsRare.length ? ' • ' : ''}
-                    {containsRare.length ? `${containsRare.length} rare` : ''}
-                    {(contains.length || containsRare.length) && crates.length ? ' • ' : ''}
-                    {crates.length ? `${crates.length} crates` : ''}
-                  </div>
-                </div>
-
-                {contentsLoading ? (
-                  <div className="text-gray-500 text-[11px]">Loading contents...</div>
-                ) : null}
-
-                {crates.length > 0 && (
-                  <div className="mb-5">
-                    <div className="text-xs font-medium text-gray-400 mb-2">Related Crates</div>
-                    <ContentGrid items={crates} />
-                  </div>
-                )}
-
-                {contains.length > 0 && (
-                  <div className="mb-5">
-                    <div className="text-xs font-medium text-gray-400 mb-2">Items</div>
-                    <ContentGrid items={contains} />
-                  </div>
-                )}
-
-                {containsRare.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-400 mb-2">Rare Special Items</div>
-                    <ContentGrid items={containsRare} />
-                  </div>
-                )}
-
-                {!contentsLoading && !hasContents ? (
-                  <div className="text-gray-500 text-[11px]">No contents data available for this item.</div>
-                ) : null}
-              </div>
-            )}
-
             <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-2 w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold text-sm transition-all">
               Open on Steam Market <ExternalLink size={16} />
             </a>
           </div>
+
+          {(hasContents || containerLikely) && (
+            <div className="lg:col-span-12 bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10">
+              <div className="flex items-center justify-between gap-3 mb-5">
+                <div className="text-sm font-medium text-gray-200">Contains</div>
+                <div className="text-xs text-gray-500 font-medium">
+                  {contains.length ? `${contains.length} items` : ''}
+                  {contains.length && containsRare.length ? ' • ' : ''}
+                  {containsRare.length ? `${containsRare.length} rare` : ''}
+                  {(contains.length || containsRare.length) && crates.length ? ' • ' : ''}
+                  {crates.length ? `${crates.length} crates` : ''}
+                </div>
+              </div>
+
+              {contentsLoading ? (
+                <div className="text-gray-500 text-[11px]">Loading contents...</div>
+              ) : null}
+
+              {crates.length > 0 && (
+                <div className="mb-8">
+                  <div className="text-xs font-medium text-gray-400 mb-3">Related Crates</div>
+                  <ContentGrid items={crates} />
+                </div>
+              )}
+
+              {contains.length > 0 && (
+                <div className="mb-8">
+                  <div className="text-xs font-medium text-gray-400 mb-3">Items</div>
+                  <ContentGrid items={contains} />
+                </div>
+              )}
+
+              {containsRare.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-gray-400 mb-3">Rare Special Items</div>
+                  <ContentGrid items={containsRare} />
+                </div>
+              )}
+
+              {!contentsLoading && !hasContents ? (
+                <div className="text-gray-500 text-[11px]">No contents data available for this item.</div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
     </div>
