@@ -580,15 +580,6 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 )}
               </div>
             </Link>
-
-            <div className="px-3 pb-3">
-              <Link
-                href={makeItemHref(c)}
-                className="w-full inline-flex items-center justify-center rounded-lg border border-white/10 bg-black/30 hover:bg-white/5 transition-all py-2 text-[12px] font-medium text-gray-200"
-              >
-                View
-              </Link>
-            </div>
           </div>
         );
       })}
