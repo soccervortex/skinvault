@@ -468,31 +468,79 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
   const rowCardKey = (raw: any) => String(raw?.id || raw?.market_hash_name || raw?.marketHashName || raw?.name || '');
 
-  const Row = ({ items }: { items: any[] }) => (
-    <div className="-mx-2 px-2 overflow-x-auto">
-      <div className="flex gap-2 min-w-max">
-        {items.map((c: any) => (
+  const formatOdds = (raw: any): string | null => {
+    const direct = raw?.chance ?? raw?.percentage ?? raw?.probability ?? raw?.odds;
+    const directNum = typeof direct === 'number' ? direct : Number.isFinite(Number(direct)) ? Number(direct) : null;
+    if (directNum !== null) {
+      const pct = directNum > 1 ? directNum : directNum * 100;
+      return `${pct.toFixed(pct < 1 ? 2 : 1)}%`;
+    }
+
+    const rarityName = String(raw?.rarity?.name || '').toLowerCase();
+    if (!rarityName) return null;
+
+    // Typical CS case odds by rarity (approx). Only used when no explicit odds are available.
+    if (rarityName.includes('mil-spec')) return '79.9%';
+    if (rarityName.includes('restricted')) return '16.0%';
+    if (rarityName.includes('classified')) return '3.2%';
+    if (rarityName.includes('covert')) return '0.64%';
+    if (rarityName.includes('extraordinary') || rarityName.includes('rare special')) return '0.26%';
+    return null;
+  };
+
+  const formatFloatRange = (raw: any): string | null => {
+    const minRaw = raw?.min_float ?? raw?.minFloat;
+    const maxRaw = raw?.max_float ?? raw?.maxFloat;
+    const min = typeof minRaw === 'number' ? minRaw : Number.isFinite(Number(minRaw)) ? Number(minRaw) : null;
+    const max = typeof maxRaw === 'number' ? maxRaw : Number.isFinite(Number(maxRaw)) ? Number(maxRaw) : null;
+    if (min === null || max === null) return null;
+    return `${min.toFixed(2)}–${max.toFixed(2)}`;
+  };
+
+  const ContentGrid = ({ items }: { items: any[] }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {items.map((c: any) => {
+        const odds = formatOdds(c);
+        const floatRange = formatFloatRange(c);
+        const isEstimated = odds && !(c?.chance ?? c?.percentage ?? c?.probability ?? c?.odds);
+
+        return (
           <Link
             key={rowCardKey(c)}
             href={makeItemHref(c)}
-            className="w-[230px] shrink-0 flex items-center gap-3 bg-black/30 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all"
+            className="group bg-black/30 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all"
           >
-            {c?.image ? (
-              <img
-                src={String(c.image)}
-                alt={String(c?.name || '')}
-                className="w-12 h-12 object-contain rounded-lg bg-white/5 border border-white/10"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10" />
-            )}
-            <div className="min-w-0">
-              <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
-              <div className="text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+            <div className="flex items-center gap-3">
+              {c?.image ? (
+                <img
+                  src={String(c.image)}
+                  alt={String(c?.name || '')}
+                  className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10 shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
+                <div className="text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+              </div>
             </div>
+
+            {(odds || floatRange) && (
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                <div className="text-gray-500 truncate">
+                  {floatRange ? `Float ${floatRange}` : ''}
+                </div>
+                {odds ? (
+                  <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300 whitespace-nowrap">
+                    {isEstimated ? `~${odds}` : odds}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </Link>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 
@@ -524,7 +572,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                     viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-500'
                   }`}
                 >
-                  3D
+                  Tilt
                 </button>
               </div>
 
@@ -606,8 +654,15 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   onClick={() => setViewMode('3D')}
                   className={`px-4 py-2 rounded-lg transition-all text-[12px] font-medium ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
                 >
-                  3D View
+                  Tilt View
                 </button>
+                <a
+                  href="https://3d.cs.money/start"
+                  target="_blank"
+                  className="px-4 py-2 rounded-lg transition-all text-[12px] font-medium text-gray-300 hover:bg-white/5 border border-white/10"
+                >
+                  3D Viewer
+                </a>
               </div>
             </div>
             <div className="mt-4 md:mt-6 flex flex-wrap items-center gap-2 md:gap-3">
@@ -700,9 +755,11 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
             </div>
 
             <div className="lg:col-span-7 space-y-5 md:space-y-6">
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="text-2xl md:text-4xl font-semibold text-white leading-tight">{item?.name}</h1>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <h1 className="text-2xl md:text-4xl font-semibold text-white leading-tight sm:whitespace-nowrap truncate min-w-0">
+                {item?.name}
+              </h1>
+              <div className="flex items-center justify-end gap-2 flex-wrap">
                 {/* Share Button */}
                 {typeof window !== 'undefined' && (
                   <ShareButton
@@ -887,21 +944,21 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {crates.length > 0 && (
                   <div className="mb-5">
                     <div className="text-xs font-medium text-gray-400 mb-2">Related Crates</div>
-                    <Row items={crates} />
+                    <ContentGrid items={crates} />
                   </div>
                 )}
 
                 {contains.length > 0 && (
                   <div className="mb-5">
                     <div className="text-xs font-medium text-gray-400 mb-2">Items</div>
-                    <Row items={contains} />
+                    <ContentGrid items={contains} />
                   </div>
                 )}
 
                 {containsRare.length > 0 && (
                   <div>
                     <div className="text-xs font-medium text-gray-400 mb-2">Rare Special Items</div>
-                    <Row items={containsRare} />
+                    <ContentGrid items={containsRare} />
                   </div>
                 )}
 
