@@ -65,7 +65,7 @@ export default function XPostAdminPage() {
     }
   };
 
-  const triggerPost = async (postType: 'weekly' | 'monthly' | 'test' | 'daily' | 'milestone' | 'new_user') => {
+  const triggerPost = async (postType: 'weekly' | 'monthly' | 'giveaways' | 'test' | 'daily' | 'milestone' | 'new_user') => {
     if (!confirm(`Are you sure you want to post a ${postType} post now?`)) {
       return;
     }
@@ -273,6 +273,23 @@ export default function XPostAdminPage() {
                 </div>
                 {posting === 'monthly' && (
                   <Loader2 className="animate-spin text-purple-400" size={20} />
+                )}
+              </button>
+
+              <button
+                onClick={() => triggerPost('giveaways')}
+                disabled={posting !== null}
+                className="bg-emerald-600/20 border border-emerald-500/40 p-6 rounded-2xl hover:bg-emerald-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-4"
+              >
+                <div className="p-3 rounded-xl bg-emerald-500/20">
+                  <Zap className="text-emerald-400" size={24} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-black uppercase tracking-tighter mb-2">Giveaways Post</h3>
+                  <p className="text-xs text-gray-400">Post active giveaways list + images</p>
+                </div>
+                {posting === 'giveaways' && (
+                  <Loader2 className="animate-spin text-emerald-400" size={20} />
                 )}
               </button>
 

@@ -5,6 +5,7 @@ import {
 } from '@/app/lib/inngest-functions';
 import {
   determinePostType,
+  createGiveawaysDigestPost,
   createWeeklySummaryPost,
   createMonthlyStatsPost,
   createItemHighlightPost,
@@ -50,32 +51,39 @@ export async function GET(request: Request) {
     const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string; reads?: number }>>('x_posting_history')) || [];
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const context = {
+      dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
+      hour: now.getUTCHours(),
+      minute: now.getUTCMinutes(),
+      dayOfMonth: now.getUTCDate(),
+      isFirstOfMonth: now.getUTCDate() === 1,
+    };
+    const postType = determinePostType(context);
+    const isSpecialPost = postType === 'weekly_summary' || postType === 'monthly_stats';
+    let effectivePostType: PostType = postType;
     
-    // Check if we already posted today (check database first)
-    const todayPosts = postHistory.filter(p => {
+    const alreadyPostedThisTypeToday = postHistory.some((p) => {
       const postDate = new Date(p.date);
       const postDay = `${postDate.getFullYear()}-${String(postDate.getMonth() + 1).padStart(2, '0')}-${String(postDate.getDate()).padStart(2, '0')}`;
-      return postDay === today;
+      return postDay === today && p.itemType === postType;
     });
 
-    if (todayPosts.length > 0) {
-      console.log(`[X Cron] Already posted ${todayPosts.length} time(s) today, skipping`);
-      return NextResponse.json({ 
-        skipped: true, 
-        reason: 'already_posted_today', 
-        count: todayPosts.length 
-      });
+    if (alreadyPostedThisTypeToday) {
+      console.log(`[X Cron] Already posted ${postType} today, skipping`);
+      return NextResponse.json({ skipped: true, reason: 'already_posted_today', postType });
     }
 
-    // Also check X API to see if we posted today (double check)
-    try {
-      const alreadyPostedOnX = await checkIfPostedTodayOnX();
-      if (alreadyPostedOnX) {
-        console.log('[X Cron] Found post on X profile today, skipping');
-        return NextResponse.json({ skipped: true, reason: 'already_posted_on_x_today' });
+    if (!isSpecialPost && postType === 'item_highlight') {
+      try {
+        const alreadyPostedOnX = await checkIfPostedTodayOnX();
+        if (alreadyPostedOnX) {
+          console.log('[X Cron] Found post on X profile today, skipping');
+          return NextResponse.json({ skipped: true, reason: 'already_posted_on_x_today' });
+        }
+      } catch (error) {
+        console.warn('[X Cron] Could not check X profile, continuing anyway:', error);
       }
-    } catch (error) {
-      console.warn('[X Cron] Could not check X profile, continuing anyway:', error);
     }
 
     // Check monthly post count (500 limit)
@@ -120,18 +128,6 @@ export async function GET(request: Request) {
         avgReadsPerPost: avgReadsPerPost.toFixed(1)
       });
     }
-    
-    // Determine post type FIRST to check if it's a special post (weekly/monthly)
-    // Weekly and monthly posts ALWAYS post, regardless of engagement
-    const context = {
-      dayOfWeek: now.getUTCDay(), // 0 = Sunday, 1 = Monday, etc.
-      hour: now.getUTCHours(),
-      minute: now.getUTCMinutes(),
-      dayOfMonth: now.getUTCDate(),
-      isFirstOfMonth: now.getUTCDate() === 1,
-    };
-    const postType = determinePostType(context);
-    const isSpecialPost = postType === 'weekly_summary' || postType === 'monthly_stats';
     
     // Additional check: If we're posting too much relative to engagement
     // Skip posting if we have very low engagement rate (< 5 reads per post on average)
@@ -280,6 +276,17 @@ export async function GET(request: Request) {
 
     // Create post based on type
     switch (postType) {
+      case 'giveaways_digest':
+        console.log('[X Cron] Creating giveaways digest post...');
+        postResult = await createGiveawaysDigestPost();
+
+        if (!postResult.success && postResult.error === 'No active giveaways') {
+          console.log('[X Cron] No active giveaways, falling back to item highlight post...');
+          postResult = await createItemHighlightPost(postHistory);
+          effectivePostType = 'item_highlight';
+        }
+        break;
+
       case 'weekly_summary':
         console.log('[X Cron] Creating weekly summary post...');
         postResult = await createWeeklySummaryPost();
@@ -337,7 +344,7 @@ export async function GET(request: Request) {
           postId: postResult.postId,
           itemId: postResult.itemName || '',
           itemName: postResult.itemName || postType,
-          itemType: postType,
+          itemType: effectivePostType,
           reads: 0, // Initial reads count, will be updated by engagement tracking
         },
       ];
@@ -350,7 +357,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         success: true,
-        postType,
+        postType: effectivePostType,
         postId: postResult.postId,
         itemName: postResult.itemName || postType,
         postUrl: `https://x.com/Skinvaults/status/${postResult.postId}`,

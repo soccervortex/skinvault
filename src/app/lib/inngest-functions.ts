@@ -480,6 +480,137 @@ export async function createAutomatedXPostWithImage(item: {
   }
 }
 
+export async function createXPostWithImages(input: {
+  text: string;
+  imageUrls?: string[];
+}): Promise<{ success: boolean; postId?: string; error?: string }> {
+  try {
+    const X_API_KEY = process.env.X_API_KEY;
+    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
+    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
+    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
+
+    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+      return { success: false, error: 'X API credentials not configured' };
+    }
+
+    const crypto = await import('crypto');
+
+    function generateOAuthSignature(
+      method: string,
+      url: string,
+      params: Record<string, string>,
+      consumerSecret: string,
+      tokenSecret: string
+    ): string {
+      const sortedParams = Object.keys(params)
+        .sort()
+        .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join('&');
+
+      const signatureBaseString = [
+        method.toUpperCase(),
+        encodeURIComponent(url),
+        encodeURIComponent(sortedParams),
+      ].join('&');
+
+      const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
+      const signature = crypto.createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
+
+      return signature;
+    }
+
+    function generateOAuthHeader(
+      method: string,
+      url: string,
+      apiKey: string,
+      apiSecret: string,
+      accessToken: string,
+      accessTokenSecret: string
+    ): string {
+      const oauthParams: Record<string, string> = {
+        oauth_consumer_key: apiKey,
+        oauth_token: accessToken,
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+        oauth_nonce: crypto.randomBytes(16).toString('hex'),
+        oauth_version: '1.0',
+      };
+
+      const signature = generateOAuthSignature(method, url, oauthParams, apiSecret, accessTokenSecret);
+      oauthParams.oauth_signature = signature;
+
+      const authHeader =
+        'OAuth ' +
+        Object.keys(oauthParams)
+          .sort()
+          .map((key) => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+          .join(', ');
+
+      return authHeader;
+    }
+
+    const uniqueUrls = (input.imageUrls || [])
+      .map((u) => String(u || '').trim())
+      .filter(Boolean)
+      .filter((u, idx, arr) => arr.indexOf(u) === idx)
+      .slice(0, 4);
+
+    const mediaIds: string[] = [];
+    for (const imageUrl of uniqueUrls) {
+      try {
+        const mediaId = await uploadImageToX(imageUrl, X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET);
+        if (mediaId) mediaIds.push(mediaId);
+      } catch {
+      }
+    }
+
+    const url = 'https://api.x.com/2/tweets';
+    const body: any = {
+      text: String(input.text || '').substring(0, 280),
+    };
+
+    if (mediaIds.length > 0) {
+      body.media = { media_ids: mediaIds };
+    }
+
+    const authHeader = generateOAuthHeader(
+      'POST',
+      url,
+      X_API_KEY,
+      X_API_SECRET,
+      X_ACCESS_TOKEN,
+      X_ACCESS_TOKEN_SECRET
+    );
+
+    const postResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const responseText = await postResponse.text();
+
+    if (!postResponse.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { detail: responseText || 'Unknown error' };
+      }
+      return { success: false, error: errorData.detail || errorData.title || errorData.message || 'Failed to post' };
+    }
+
+    const data = JSON.parse(responseText);
+    return { success: true, postId: data.data?.id };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create post' };
+  }
+}
+
 /**
  * Upload image to X API and return media_id
  * Uses X API v1.1 media/upload endpoint with OAuth 1.0a

@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const today = dayKeyUtc(now);
     const pro = await isProMongoOnly(steamId);
-    const amount = pro ? 20 : 10;
+    const amount = pro ? 150 : 50;
 
     const claimKey = `${steamId}_${today}`;
     try {

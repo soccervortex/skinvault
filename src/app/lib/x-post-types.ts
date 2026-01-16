@@ -4,19 +4,21 @@
  */
 
 import { dbGet, dbSet } from '@/app/utils/database';
-import { getNextItemFromAllDatasets, getItemPrice, createAutomatedXPostWithImage } from '@/app/lib/inngest-functions';
+import { getDatabase } from '@/app/utils/mongodb-client';
+import { getNextItemFromAllDatasets, getItemPrice, createAutomatedXPostWithImage, createXPostWithImages } from '@/app/lib/inngest-functions';
 import { getTopMovers, getTrendingItems, PriceChange } from '@/app/lib/price-tracking';
 import { checkUserCountMilestone, getUnpostedMilestones, markMilestonePosted, UserMilestone } from '@/app/lib/user-milestones';
 import { getUnpostedFeatureAnnouncements, markFeatureAnnouncementPosted, FeatureAnnouncement } from '@/app/lib/feature-announcements';
 import { getUnpostedNewUsers, createNewUserWelcomePost, NewUser } from '@/app/lib/new-user-posts';
 import crypto from 'crypto';
 
-export type PostType = 'weekly_summary' | 'monthly_stats' | 'item_highlight' | 'milestone' | 'alert' | 'new_user';
+export type PostType = 'weekly_summary' | 'monthly_stats' | 'giveaways_digest' | 'item_highlight' | 'milestone' | 'alert' | 'new_user';
 
 function formatPostTypeLabel(type: string): string {
   return type === 'item_highlight' ? 'Item Highlights' :
          type === 'weekly_summary' ? 'Weekly Summaries' :
          type === 'monthly_stats' ? 'Monthly Stats' :
+         type === 'giveaways_digest' ? 'Giveaways' :
          type === 'daily_summary' ? 'Daily Summaries' :
          type === 'new_user' ? 'New Users' :
          type === 'milestone' ? 'Milestones' :
@@ -119,6 +121,11 @@ export function determinePostType(context: PostContext): PostType {
     }
   }
 
+  const digestHour = dayOfWeek === 0 ? 13 : 10;
+  if (hour === digestHour && (minute === 0 || minute === 30)) {
+    return 'giveaways_digest';
+  }
+
   // Weekly summary: Monday or Sunday at 8 PM (19:00 UTC)
   // Monday 8 PM is within best times (9 AM - 8 PM)
   // Sunday 8 PM is outside best times (2 PM - 6 PM), but we keep it for consistency
@@ -174,8 +181,120 @@ export function determinePostType(context: PostContext): PostType {
     return 'item_highlight';
   }
 
-  // Default: No post (outside optimal times)
   return 'item_highlight';
+}
+
+type GiveawayDigestRow = {
+  id: string;
+  title: string;
+  prize: string;
+  prizeItem?: { name?: string; image?: string | null } | null;
+  startAt?: Date;
+  endAt?: Date;
+  creditsPerEntry: number;
+};
+
+function giveawayCadenceLabel(g: GiveawayDigestRow): 'DAILY' | 'WEEKLY' | 'MONTHLY' {
+  const start = g.startAt ? new Date(g.startAt) : null;
+  const end = g.endAt ? new Date(g.endAt) : null;
+  if (!start || !end) return 'MONTHLY';
+  const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  if (days >= 27) return 'MONTHLY';
+  if (days >= 6) return 'WEEKLY';
+  return 'DAILY';
+}
+
+function formatEndsShort(isoOrDate: any): string {
+  try {
+    const d = isoOrDate instanceof Date ? isoOrDate : new Date(String(isoOrDate || ''));
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+  } catch {
+    return '';
+  }
+}
+
+export async function createGiveawaysDigestPost(): Promise<{ success: boolean; postId?: string; error?: string; itemName?: string }> {
+  try {
+    const now = new Date();
+    const db = await getDatabase();
+    const col = db.collection('giveaways');
+
+    const rows = (await col
+      .find(
+        {
+          archivedAt: { $exists: false },
+          startAt: { $lte: now },
+          endAt: { $gt: now },
+          drawnAt: { $exists: false },
+        },
+        { projection: { description: 0 } }
+      )
+      .sort({ endAt: 1 })
+      .limit(10)
+      .toArray()) as any[];
+
+    const active = rows.map((g: any) => {
+      const startAt = g.startAt ? new Date(g.startAt) : null;
+      const endAt = g.endAt ? new Date(g.endAt) : null;
+      return {
+        id: String(g._id),
+        title: String(g.title || ''),
+        prize: String(g.prize || ''),
+        prizeItem: g.prizeItem
+          ? {
+              name: String(g.prizeItem?.name || g.prizeItem?.market_hash_name || ''),
+              image: g.prizeItem?.image ? String(g.prizeItem.image) : null,
+            }
+          : null,
+        startAt: startAt || undefined,
+        endAt: endAt || undefined,
+        creditsPerEntry: Number(g.creditsPerEntry || 10),
+      } satisfies GiveawayDigestRow;
+    });
+
+    if (active.length === 0) {
+      return { success: false, error: 'No active giveaways' };
+    }
+
+    const link = 'https://www.skinvaults.online/giveaways';
+
+    const header = '🎁 GIVEAWAYS LIVE (enter fast)\n\n';
+    const footer = `\nJoin: ${link}\n\n#CS2 #CS2Skins #Giveaway`;
+
+    let text = header;
+    for (let i = 0; i < active.length; i++) {
+      const g = active[i];
+      const cadence = giveawayCadenceLabel(g);
+      const prizeName = String(g.prizeItem?.name || g.prize || g.title || '').trim();
+      const ends = g.endAt ? formatEndsShort(g.endAt) : '';
+      const line = `${i + 1}) [${cadence}] ${prizeName}${ends ? ` — ends ${ends}` : ''} — ${Math.floor(Number(g.creditsPerEntry || 0))}c\n`;
+
+      if ((text + line + footer).length > 280) break;
+      text += line;
+    }
+
+    text += footer;
+
+    const imageUrls = active
+      .map((g) => String(g.prizeItem?.image || '').trim())
+      .filter(Boolean)
+      .slice(0, 4);
+
+    const postResult = await createXPostWithImages({
+      text,
+      imageUrls,
+    });
+
+    if (!postResult.success) {
+      return { success: false, error: postResult.error || 'Failed to post giveaways digest' };
+    }
+
+    const itemName = active.map((g) => String(g.prizeItem?.name || g.prize || g.title || '').trim()).filter(Boolean).slice(0, 3).join(' | ');
+    return { success: true, postId: postResult.postId, itemName: itemName || 'Giveaways Digest' };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to create giveaways digest' };
+  }
 }
 
 /**

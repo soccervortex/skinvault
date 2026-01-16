@@ -3,6 +3,7 @@ import { dbGet } from '@/app/utils/database';
 import {
   createWeeklySummaryPost,
   createMonthlyStatsPost,
+  createGiveawaysDigestPost,
   createItemHighlightPost,
   createTestPost,
   createDailySummaryPost,
@@ -25,11 +26,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { postType } = body; // 'weekly', 'monthly', 'test', 'daily', 'milestone', or 'new_user'
+    const { postType } = body; // 'weekly', 'monthly', 'giveaways', 'test', 'daily', 'milestone', or 'new_user'
 
-    if (!postType || !['weekly', 'monthly', 'test', 'daily', 'milestone', 'new_user'].includes(postType)) {
+    if (!postType || !['weekly', 'monthly', 'giveaways', 'test', 'daily', 'milestone', 'new_user'].includes(postType)) {
       return NextResponse.json(
-        { error: 'Invalid postType. Must be: weekly, monthly, test, daily, milestone, or new_user' },
+        { error: 'Invalid postType. Must be: weekly, monthly, giveaways, test, daily, milestone, or new_user' },
         { status: 400 }
       );
     }
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
       
       case 'monthly':
         result = await createMonthlyStatsPost();
+        break;
+
+      case 'giveaways':
+        result = await createGiveawaysDigestPost();
         break;
       
       case 'test':
