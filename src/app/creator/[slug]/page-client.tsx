@@ -365,7 +365,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   }, [slug, tiktokConfigured, pauseRealtimeUntil]);
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-6 pb-24">

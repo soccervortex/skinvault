@@ -6,7 +6,7 @@ import ReviewSection from '@/app/components/ReviewSection';
 
 export default function ReviewsPage() {
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-32">

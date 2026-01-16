@@ -9,6 +9,7 @@ import PriceTrackerModal from '@/app/components/PriceTrackerModal';
 import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
+import { getWearFloatRange, getWearNameFromSkin } from '@/app/utils/skin-utils';
 
 type CompareSkin = {
   id: string;
@@ -204,11 +205,11 @@ function CompareContent() {
   }
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
-        <div className="max-w-6xl mx-auto space-y-8 md:space-y-12 pb-32">
+        <div className="max-w-5xl mx-auto space-y-8 md:space-y-12 pb-32">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
             <div className="flex items-center gap-4 md:gap-6">
               <Swords className="text-blue-500 shrink-0" size={28} />
@@ -366,11 +367,11 @@ function CompareContent() {
                     </div>
                     <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 relative overflow-hidden">
                       <span className="text-[8px] md:text-[9px] font-black text-gray-500 uppercase block mb-1">
-                        24h Median
+                        24h Median / Vol.
                       </span>
                       <p className="text-base md:text-lg font-black text-white/90 italic">
                         {price?.median
-                          ? price.median
+                          ? <span>{price.median} <span className="text-xs text-gray-500">({price.volume})</span></span>
                           : priceLoading
                           ? <span className="text-[9px] md:text-[10px] text-gray-500 flex items-center gap-1">
                               <Loader2 className="w-3 h-3 animate-spin" /> SCANNING...
@@ -391,6 +392,11 @@ function CompareContent() {
           const collection1 = items[0]?.collections?.[0]?.name || "";
           const collection2 = items[1]?.collections?.[0]?.name || "";
           const showCollectionRow = !!(collection1 || collection2);
+
+          const wearName1 = getWearNameFromSkin(items[0]?.name || "");
+          const wearName2 = getWearNameFromSkin(items[1]?.name || "");
+          const floatRange1 = wearName1 ? getWearFloatRange(wearName1) : null;
+          const floatRange2 = wearName2 ? getWearFloatRange(wearName2) : null;
 
           return (
         <section className="space-y-3 md:space-y-4">
@@ -424,6 +430,14 @@ function CompareContent() {
               val1={collection1 || "N/A"}
               val2={collection2 || "N/A"}
               icon={<Target size={14} />}
+            />
+          )}
+          {(floatRange1 || floatRange2) && (
+            <DuelRow
+              label="Float Range"
+              val1={floatRange1 ? `${floatRange1.min.toFixed(2)} - ${floatRange1.max.toFixed(2)}` : "N/A"}
+              val2={floatRange2 ? `${floatRange2.min.toFixed(2)} - ${floatRange2.max.toFixed(2)}` : "N/A"}
+              icon={<BarChart3 size={14} />}
             />
           )}
           <DuelRow

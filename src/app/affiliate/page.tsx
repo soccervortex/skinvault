@@ -128,7 +128,7 @@ export default function AffiliatePage() {
 
   if (!user?.steamId) {
     return (
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <div className="flex-1 overflow-y-auto p-6 md:p-10 flex items-center justify-center text-gray-500 text-[11px]">Sign in with Steam first.</div>
       </div>
@@ -136,7 +136,7 @@ export default function AffiliatePage() {
   }
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-24">

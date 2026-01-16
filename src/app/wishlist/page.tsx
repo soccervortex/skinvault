@@ -208,10 +208,10 @@ export default function WishlistPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-10 custom-scrollbar flex items-center justify-center">
+          <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar flex items-center justify-center">
             <div className="text-center space-y-4">
               <Heart className="animate-pulse text-rose-500 mx-auto" size={40} />
               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Loading wishlist...</p>
@@ -223,7 +223,7 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 md:space-y-12 pb-32">

@@ -1667,9 +1667,9 @@ function InventoryContent() {
 
   if (!viewedUser && loading) {
     return (
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
             <ProfileHeaderSkeleton />
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
@@ -1690,9 +1690,9 @@ function InventoryContent() {
 
   if (!viewedUser && !loading) {
     return (
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-10 pb-32">
             <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
               <div className="flex items-start justify-between gap-6 flex-wrap">
@@ -1718,69 +1718,68 @@ function InventoryContent() {
             </header>
 
             <section className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
-              <div className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500 mb-4">
-                <HelpCircle size={14} />
-                What you can do here
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                    <TrendingUp size={12} />
-                    Vault value
+              <div className="flex items-center gap-2 flex-wrap mb-4">
+                <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">What you can do here</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                      <TrendingUp size={12} />
+                      Vault value
+                    </div>
+                    <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                      Total inventory value with live market pricing.
+                    </div>
                   </div>
-                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Total inventory value with live market pricing.
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                      <PackageOpen size={12} />
+                      Top items
+                    </div>
+                    <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                      Quickly spot your most valuable skins.
+                    </div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                      <Trophy size={12} />
+                      CS2 overview
+                    </div>
+                    <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                      Public playtime data (Steam).
+                    </div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                      <Scale size={12} />
+                      Compare
+                    </div>
+                    <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                      Compare items side-by-side (requires sign-in).
+                    </div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                      <Bell size={12} />
+                      Price trackers
+                    </div>
+                    <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                      Track price changes and alerts (requires sign-in).
+                    </div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
+                      <Heart size={12} />
+                      Wishlist
+                    </div>
+                    <div className="mt-2 text-[10px] md:text-xs text-gray-400">
+                      Save items and monitor prices (requires sign-in).
+                    </div>
                   </div>
                 </div>
-                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                    <PackageOpen size={12} />
-                    Top items
-                  </div>
-                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Quickly spot your most valuable skins.
-                  </div>
-                </div>
-                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                    <Trophy size={12} />
-                    CS2 overview
-                  </div>
-                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Public playtime data (Steam).
-                  </div>
-                </div>
-                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                    <Scale size={12} />
-                    Compare
-                  </div>
-                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Compare items side-by-side (requires sign-in).
-                  </div>
-                </div>
-                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                    <Bell size={12} />
-                    Price trackers
-                  </div>
-                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Track price changes and alerts (requires sign-in).
-                  </div>
-                </div>
-                <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
-                    <Heart size={12} />
-                    Wishlist
-                  </div>
-                  <div className="mt-2 text-[10px] md:text-xs text-gray-400">
-                    Save items and monitor prices (requires sign-in).
-                  </div>
-                </div>
-              </div>
 
-              <div className="mt-5 text-[10px] md:text-xs text-gray-500">
-                Use the sidebar Search to open any profile by SteamID64 or username.
+                <div className="mt-5 text-[10px] md:text-xs text-gray-500">
+                  Use the sidebar Search to open any profile by SteamID64 or username.
+                </div>
               </div>
             </section>
           </div>
@@ -1791,7 +1790,7 @@ function InventoryContent() {
 
   return (
     <>
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         {websiteProfilePrivate && (
@@ -2503,7 +2502,7 @@ function InventoryContent() {
           >
             <div className="p-5 border-b border-white/5 flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Notifications</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 truncate">{notificationPreview?.title || 'Notification'}</div>
                 <div className="text-[11px] text-gray-400 mt-1">
                   {loggedInIsOwner && String(loggedInUser?.steamId || '').trim() !== String(viewedUser?.steamId || '').trim()
                     ? `Viewing ${formatProfileName(viewedUser?.name || 'User')}`
@@ -2707,7 +2706,7 @@ function InventoryContent() {
 export default function InventoryPage() { 
   return (
     <Suspense fallback={
-      <div className="h-screen bg-[#08090d] flex flex-col items-center justify-center gap-4">
+      <div className="min-h-[100dvh] bg-[#08090d] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-blue-500" size={40} />
         <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Loading...</p>
       </div>

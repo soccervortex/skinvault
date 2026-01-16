@@ -66,6 +66,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const [containsModalVariantPriceDone, setContainsModalVariantPriceDone] = useState<Record<string, boolean>>({});
   const containsModalScrollRef = useRef<HTMLDivElement>(null);
   const containsModalDialogRef = useRef<HTMLDivElement>(null);
+  const containsModalVariantIndexRef = useRef(0);
 
   const closeContainsModal = () => {
     setContainsModalItem(null);
@@ -383,6 +384,8 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   useEffect(() => {
     if (!containsModalItem) return;
 
+    containsModalVariantIndexRef.current = 0;
+
     let cancelled = false;
 
     const run = async () => {
@@ -470,21 +473,45 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
       const el = containsModalScrollRef.current;
       if (!el) return;
 
+      const tiles = Array.from(el.querySelectorAll<HTMLElement>('[data-contains-variant-tile="true"]'));
+      const hasTiles = tiles.length > 0;
+      const jumpToTile = (idx: number) => {
+        if (!hasTiles) return;
+        const clamped = Math.max(0, Math.min(tiles.length - 1, idx));
+        containsModalVariantIndexRef.current = clamped;
+        const target = tiles[clamped];
+        try {
+          target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        } catch {
+          el.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
+        }
+      };
+
       const line = 64;
       const page = Math.max(240, Math.floor(el.clientHeight * 0.85));
       let delta = 0;
 
-      if (e.key === 'ArrowDown') delta = line;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        jumpToTile(containsModalVariantIndexRef.current + 1);
+        return;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        jumpToTile(containsModalVariantIndexRef.current - 1);
+        return;
+      } else if (e.key === 'ArrowDown') delta = line;
       else if (e.key === 'ArrowUp') delta = -line;
       else if (e.key === 'PageDown') delta = page;
       else if (e.key === 'PageUp') delta = -page;
       else if (e.key === 'Home') {
         e.preventDefault();
         el.scrollTo({ top: 0, behavior: 'smooth' });
+        containsModalVariantIndexRef.current = 0;
         return;
       } else if (e.key === 'End') {
         e.preventDefault();
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        containsModalVariantIndexRef.current = Math.max(0, tiles.length - 1);
         return;
       } else {
         return;
@@ -1259,7 +1286,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between gap-3 shrink-0">
             <div>
               <div className="text-sm font-medium text-gray-200">Item details</div>
-              <div className="mt-1 text-[10px] text-gray-600 hidden sm:block">Esc to close • ↑/↓, PgUp/PgDn to scroll</div>
+              <div className="mt-1 text-[10px] text-gray-600 hidden sm:block">Esc to close • ↑/↓, PgUp/PgDn to scroll • ←/→ to jump</div>
             </div>
             <button
               onClick={() => {
@@ -1323,6 +1350,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   return (
                     <div
                       key={String(v?.id || v?.market_hash_name || wearLabel)}
+                      data-contains-variant-tile="true"
                       className="bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border border-white/5"
                     >
                       <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 relative overflow-hidden">

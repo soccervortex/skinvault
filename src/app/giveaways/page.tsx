@@ -397,7 +397,7 @@ export default function GiveawaysPage() {
     setMyEntries(0);
     setMyWinner(null);
     setTradeUrlModalClaimId(null);
-    scrollToDetail();
+    let didLoad = false;
 
     setDetailLoading(true);
     try {
@@ -405,6 +405,7 @@ export default function GiveawaysPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setDetail((json?.giveaway as GiveawayDetail) || null);
+      didLoad = true;
 
       const key = String(json?.giveaway?.prizeItem?.market_hash_name || json?.giveaway?.prizeItem?.id || '').trim();
       if (key) void ensureItemInfo(key);
@@ -412,6 +413,13 @@ export default function GiveawaysPage() {
       toast.error(e?.message || 'Failed to load giveaway');
     } finally {
       setDetailLoading(false);
+      if (didLoad) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToDetail();
+          });
+        });
+      }
     }
 
     if (user?.steamId) {
@@ -632,7 +640,7 @@ export default function GiveawaysPage() {
   }, [myWinner]);
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-24">

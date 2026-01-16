@@ -156,9 +156,9 @@ export default function NotificationsPage() {
 
   if (!user?.steamId) {
     return (
-      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+      <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-3xl mx-auto">
             <div className="bg-[#11141d] p-8 rounded-[2rem] border border-white/5 shadow-xl">
               <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
@@ -183,9 +183,9 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+    <div className="flex min-h-[100dvh] bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
-      <main id="main-content" className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+      <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-8 pb-24">
           <header className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
             <div className="flex items-center justify-between gap-4 flex-wrap">
