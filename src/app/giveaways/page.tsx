@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
 import { HelpCircle, Loader2, Sparkles, Ticket, Wallet, X } from 'lucide-react';
@@ -136,6 +136,7 @@ function formatShortTime(iso: string | null | undefined): string {
 
 export default function GiveawaysPage() {
   const toast = useToast();
+  const detailSectionRef = useRef<HTMLElement | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [giveaways, setGiveaways] = useState<GiveawaySummary[]>([]);
@@ -198,6 +199,19 @@ export default function GiveawaysPage() {
       .finally(() => {
         setTradeUrlLoading(false);
       });
+  };
+
+  const scrollToDetail = () => {
+    if (typeof window === 'undefined') return;
+    requestAnimationFrame(() => {
+      const el = detailSectionRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const inView = rect.top >= 0 && rect.top <= window.innerHeight * 0.25;
+      const shouldScroll = window.innerWidth < 1024 || !inView;
+      if (!shouldScroll) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   const saveTradeUrlFromModal = async () => {
@@ -377,6 +391,45 @@ export default function GiveawaysPage() {
     }
   };
 
+  const loadDetail = async (id: string) => {
+    setSelectedId(id);
+    setDetail(null);
+    setMyEntries(0);
+    setMyWinner(null);
+    setTradeUrlModalClaimId(null);
+    scrollToDetail();
+
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}`, { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setDetail((json?.giveaway as GiveawayDetail) || null);
+
+      const key = String(json?.giveaway?.prizeItem?.market_hash_name || json?.giveaway?.prizeItem?.id || '').trim();
+      if (key) void ensureItemInfo(key);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load giveaway');
+    } finally {
+      setDetailLoading(false);
+    }
+
+    if (user?.steamId) {
+      setMyEntryLoading(true);
+      try {
+        const r2 = await fetch(`/api/giveaways/${encodeURIComponent(id)}/my-entry`, { cache: 'no-store' });
+        const j2 = await r2.json();
+        if (r2.ok) setMyEntries(Number(j2?.entries || 0));
+      } catch {
+        setMyEntries(0);
+      } finally {
+        setMyEntryLoading(false);
+      }
+
+      void loadMyWinner(id);
+    }
+  };
+
   useEffect(() => {
     loadGiveaways();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -414,42 +467,6 @@ export default function GiveawaysPage() {
     const id = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [user?.steamId, claimStatus?.canClaim, claimStatus?.nextEligibleAt]);
-
-  const loadDetail = async (id: string) => {
-    setSelectedId(id);
-    setDetail(null);
-    setMyEntries(0);
-    setMyWinner(null);
-    setDetailLoading(true);
-    try {
-      const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}`, { cache: 'no-store' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Failed');
-      setDetail(json?.giveaway || null);
-
-      const key = String(json?.giveaway?.prizeItem?.market_hash_name || json?.giveaway?.prizeItem?.id || '').trim();
-      if (key) void ensureItemInfo(key);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to load giveaway');
-    } finally {
-      setDetailLoading(false);
-    }
-
-    if (user?.steamId) {
-      setMyEntryLoading(true);
-      try {
-        const r2 = await fetch(`/api/giveaways/${encodeURIComponent(id)}/my-entry`, { cache: 'no-store' });
-        const j2 = await r2.json();
-        if (r2.ok) setMyEntries(Number(j2?.entries || 0));
-      } catch {
-        setMyEntries(0);
-      } finally {
-        setMyEntryLoading(false);
-      }
-
-      void loadMyWinner(id);
-    }
-  };
 
   const claimPrize = async () => {
     if (!detail?.id) return;
@@ -905,7 +922,7 @@ export default function GiveawaysPage() {
                 </div>
               </section>
 
-              <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+              <section ref={detailSectionRef} className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">
                 {!selectedId ? (
                   <div className="text-gray-500 text-[11px]">Select a giveaway to see details.</div>
                 ) : detailLoading ? (
