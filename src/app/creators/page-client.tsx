@@ -142,7 +142,7 @@ export default function CreatorsIndexClient() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+    <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-4">

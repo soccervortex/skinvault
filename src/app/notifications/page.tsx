@@ -156,7 +156,7 @@ export default function NotificationsPage() {
 
   if (!user?.steamId) {
     return (
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+      <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-3xl mx-auto">
@@ -183,7 +183,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+    <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
       <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
         <div className="max-w-4xl mx-auto space-y-8 pb-24">

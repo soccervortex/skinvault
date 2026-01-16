@@ -552,7 +552,7 @@ export default function GlobalSkinSearch() {
   }, [processedItems.length]);
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+    <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar categories={CATEGORIES} activeCat={activeCat} setActiveCat={setActiveCat} />
       
       <div className="flex-1 flex flex-col relative overflow-hidden">

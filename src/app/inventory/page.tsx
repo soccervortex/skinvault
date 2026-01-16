@@ -1667,7 +1667,7 @@ function InventoryContent() {
 
   if (!viewedUser && loading) {
     return (
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+      <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
@@ -1690,7 +1690,7 @@ function InventoryContent() {
 
   if (!viewedUser && !loading) {
     return (
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+      <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
           <div className="max-w-6xl mx-auto space-y-10 pb-32">
@@ -1790,7 +1790,7 @@ function InventoryContent() {
 
   return (
     <>
-      <div className="flex min-h-[100dvh] bg-[#08090d] text-white font-sans">
+      <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         {websiteProfilePrivate && (
@@ -2706,7 +2706,7 @@ function InventoryContent() {
 export default function InventoryPage() { 
   return (
     <Suspense fallback={
-      <div className="min-h-[100dvh] bg-[#08090d] flex flex-col items-center justify-center gap-4">
+      <div className="h-dvh bg-[#08090d] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-blue-500" size={40} />
         <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">Loading...</p>
       </div>
