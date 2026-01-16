@@ -462,7 +462,32 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     const id = String(raw?.id || '').trim();
     const marketHashName = String(raw?.market_hash_name || raw?.marketHashName || '').trim();
     const name = String(raw?.name || '').trim();
-    const key = id || marketHashName || name;
+
+    let key = id || marketHashName || name;
+
+    // Some datasets use hashed ids like `skin-<hash>` where the actual route is suffixed by rarity.
+    // Example: `skin-b75169b00be8_3`
+    if (id && /^skin-[a-z0-9]+$/i.test(id) && !/_\d{1,3}$/.test(id)) {
+      const rarityCandidate =
+        raw?.rarity?.id ??
+        raw?.rarity?.value ??
+        raw?.rarityId ??
+        raw?.rarity_id ??
+        raw?.rarityLevel ??
+        raw?.rarity_level;
+
+      const rarityNum =
+        typeof rarityCandidate === 'number'
+          ? rarityCandidate
+          : Number.isFinite(Number(rarityCandidate))
+            ? Number(rarityCandidate)
+            : null;
+
+      if (rarityNum !== null) {
+        key = `${id}_${rarityNum}`;
+      }
+    }
+
     return `/item/${encodeURIComponent(key)}`;
   };
 
