@@ -42,6 +42,7 @@ const CATEGORIES = [
   { name: 'Stickers', icon: <Disc size={14}/>, file: 'stickers.json', filter: 'sticker' },
   { name: 'Sticker Slabs', icon: <Disc size={14}/>, file: 'sticker_slabs.json', filter: 'sticker_slab' },
   { name: 'Crates', icon: <Package size={14}/>, file: 'crates.json', filter: 'crate' },
+  { name: 'Collections', icon: <Package size={14}/>, file: 'collections.json', filter: 'collection' },
   { name: 'Crate Keys', icon: <Package size={14}/>, file: 'keys.json', filter: 'key' },
   { name: 'Patches', icon: <Tag size={14}/>, file: 'patches.json', filter: 'patch' },
   { name: 'Graffiti', icon: <Tag size={14}/>, file: 'graffiti.json', filter: 'graffiti' },

@@ -149,6 +149,12 @@ export async function GET(request: Request) {
           rarity: match.rarity,
           weapon: match.weapon,
           id: match.id,
+          min_float: typeof (match as any).min_float === 'number' ? (match as any).min_float : (typeof (match as any).minFloat === 'number' ? (match as any).minFloat : null),
+          max_float: typeof (match as any).max_float === 'number' ? (match as any).max_float : (typeof (match as any).maxFloat === 'number' ? (match as any).maxFloat : null),
+          wear: (match as any).wear || null,
+          contains: Array.isArray((match as any).contains) ? (match as any).contains : null,
+          contains_rare: Array.isArray((match as any).contains_rare) ? (match as any).contains_rare : null,
+          crates: Array.isArray((match as any).crates) ? (match as any).crates : null,
         });
       }
     }

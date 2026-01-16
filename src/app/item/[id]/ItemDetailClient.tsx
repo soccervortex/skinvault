@@ -54,6 +54,9 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const priceCacheRef = useRef<Record<string, any>>({});
   const [priceDone, setPriceDone] = useState(false);
 
+  const [contentsHydrated, setContentsHydrated] = useState(false);
+  const [contentsLoading, setContentsLoading] = useState(false);
+
   const normalizeItem = (raw: any) => {
     if (!raw) return raw;
     const baseImg =
@@ -225,6 +228,83 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     fetchItem();
   }, [decodedId, initialItem]);
 
+  useEffect(() => {
+    if (!item) return;
+    if (contentsHydrated) return;
+
+    const currentContains = Array.isArray((item as any)?.contains) ? ((item as any).contains as any[]) : [];
+    const currentContainsRare = Array.isArray((item as any)?.contains_rare) ? ((item as any).contains_rare as any[]) : [];
+    const currentCrates = Array.isArray((item as any)?.crates) ? ((item as any).crates as any[]) : [];
+    const hasAny = currentContains.length > 0 || currentContainsRare.length > 0 || currentCrates.length > 0;
+
+    const nm = String((item as any)?.market_hash_name || (item as any)?.name || '').toLowerCase();
+    const t = String((item as any)?.type || '').toLowerCase();
+    const containerLikely =
+      t.includes('case') ||
+      t.includes('capsule') ||
+      t.includes('package') ||
+      nm.includes('case') ||
+      nm.includes('capsule') ||
+      nm.includes('package') ||
+      nm.includes('souvenir') ||
+      nm.includes('collection');
+
+    if (!containerLikely || hasAny) {
+      setContentsHydrated(true);
+      return;
+    }
+
+    setContentsLoading(true);
+
+    const findMatchIn = (arr: any[]) => {
+      const id = String((item as any)?.id || '').trim();
+      const mh = String((item as any)?.market_hash_name || '').trim();
+      const name = String((item as any)?.name || '').trim();
+      return (
+        arr.find((x: any) => String(x?.id || '').trim() === id) ||
+        arr.find((x: any) => String(x?.market_hash_name || '').trim() === mh) ||
+        arr.find((x: any) => String(x?.name || '').trim() === name) ||
+        null
+      );
+    };
+
+    (async () => {
+      const files = ['crates', 'collections'];
+      for (const f of files) {
+        try {
+          const res = await fetch(`/api/csgo-api?file=${encodeURIComponent(f)}&lang=en`, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const json = await res.json().catch(() => null);
+          const arr = Array.isArray(json) ? json : json && typeof json === 'object' ? Object.values(json as any) : [];
+          const found = findMatchIn(arr as any[]);
+          if (!found) continue;
+
+          const nextContains = Array.isArray((found as any)?.contains) ? (found as any).contains : null;
+          const nextContainsRare = Array.isArray((found as any)?.contains_rare) ? (found as any).contains_rare : null;
+          const nextCrates = Array.isArray((found as any)?.crates) ? (found as any).crates : null;
+
+          if ((nextContains && nextContains.length) || (nextContainsRare && nextContainsRare.length) || (nextCrates && nextCrates.length)) {
+            setItem((prev: any) => ({
+              ...prev,
+              contains: nextContains ?? (prev as any)?.contains,
+              contains_rare: nextContainsRare ?? (prev as any)?.contains_rare,
+              crates: nextCrates ?? (prev as any)?.crates,
+              type: (found as any)?.type ?? (prev as any)?.type,
+              rarity: (found as any)?.rarity ?? (prev as any)?.rarity,
+            }));
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    })()
+      .finally(() => {
+        setContentsLoading(false);
+        setContentsHydrated(true);
+      });
+  }, [item, contentsHydrated]);
+
   // Fetch price when item or currency changes
   useEffect(() => {
     if (!item) return;
@@ -351,6 +431,29 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
   const hasFloatRange = minFloat !== null && maxFloat !== null;
   const hasContents = contains.length > 0 || containsRare.length > 0 || crates.length > 0;
+
+  const itemTypeLabel = String((item as any)?.type || '').trim() || null;
+  const categoryLabel = String((item as any)?.category?.name || '').trim() || null;
+  const patternLabel = String((item as any)?.pattern?.name || '').trim() || null;
+  const teamLabel = String((item as any)?.team?.name || '').trim() || null;
+  const paintIndexLabel = String((item as any)?.paint_index || '').trim() || null;
+  const isStatTrak = Boolean((item as any)?.stattrak);
+  const isSouvenir = Boolean((item as any)?.souvenir);
+
+  const containerLikely = (() => {
+    const nm = String((item as any)?.market_hash_name || (item as any)?.name || '').toLowerCase();
+    const t = String((item as any)?.type || '').toLowerCase();
+    return (
+      t.includes('case') ||
+      t.includes('capsule') ||
+      t.includes('package') ||
+      nm.includes('case') ||
+      nm.includes('capsule') ||
+      nm.includes('package') ||
+      nm.includes('souvenir') ||
+      nm.includes('collection')
+    );
+  })();
 
   const makeItemHref = (raw: any) => {
     const id = String(raw?.id || '').trim();
@@ -685,9 +788,70 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             )}
 
-            {hasContents && (
+            {(itemTypeLabel || categoryLabel || patternLabel || teamLabel || paintIndexLabel || isStatTrak || isSouvenir) && (
               <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-3">Contains</div>
+                <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-3">Details</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                  {itemTypeLabel ? (
+                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Type</div>
+                      <div className="mt-1 font-black text-white/90">{itemTypeLabel}</div>
+                    </div>
+                  ) : null}
+                  {categoryLabel ? (
+                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Category</div>
+                      <div className="mt-1 font-black text-white/90">{categoryLabel}</div>
+                    </div>
+                  ) : null}
+                  {patternLabel ? (
+                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Finish</div>
+                      <div className="mt-1 font-black text-white/90">{patternLabel}</div>
+                    </div>
+                  ) : null}
+                  {paintIndexLabel ? (
+                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Paint Index</div>
+                      <div className="mt-1 font-black text-white/90">{paintIndexLabel}</div>
+                    </div>
+                  ) : null}
+                  {teamLabel ? (
+                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Team</div>
+                      <div className="mt-1 font-black text-white/90">{teamLabel}</div>
+                    </div>
+                  ) : null}
+                  {(isStatTrak || isSouvenir) ? (
+                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
+                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Flags</div>
+                      <div className="mt-1 font-black text-white/90">
+                        {isStatTrak ? 'StatTrak™' : ''}
+                        {isStatTrak && isSouvenir ? ' • ' : ''}
+                        {isSouvenir ? 'Souvenir' : ''}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            {(hasContents || containerLikely) && (
+              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase">Contains</div>
+                  <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest">
+                    {contains.length ? `${contains.length} items` : ''}
+                    {contains.length && containsRare.length ? ' • ' : ''}
+                    {containsRare.length ? `${containsRare.length} rare` : ''}
+                    {(contains.length || containsRare.length) && crates.length ? ' • ' : ''}
+                    {crates.length ? `${crates.length} crates` : ''}
+                  </div>
+                </div>
+
+                {contentsLoading ? (
+                  <div className="text-gray-500 text-[11px]">Loading contents...</div>
+                ) : null}
 
                 {crates.length > 0 && (
                   <div className="mb-5">
@@ -739,6 +903,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                     </div>
                   </div>
                 )}
+
+                {!contentsLoading && !hasContents ? (
+                  <div className="text-gray-500 text-[11px]">No contents data available for this item.</div>
+                ) : null}
               </div>
             )}
 

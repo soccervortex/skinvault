@@ -408,9 +408,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
                     setIsMobileMenuOpen(false);
                   }}
                   className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
-                  aria-label="Weapon Categories"
+                  aria-label="Categories"
                 >
-                  <Tag size={16} /> Weapon Categories
+                  <Tag size={16} /> Categories
                 </button>
               )}
               <Link href={user?.steamId ? `/inventory/${user.steamId}` : '/inventory'} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/inventory') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="My Vault">
@@ -646,9 +646,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <button
               onClick={() => setIsCategoriesOpen(true)}
               className="w-full flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-white/5 hover:text-blue-500 transition-all text-left"
-              aria-label="Weapon Categories"
+              aria-label="Categories"
             >
-              <Tag size={16} /> Weapon Categories
+              <Tag size={16} /> Categories
             </button>
           )}
           <Link
@@ -921,12 +921,12 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             <button
               onClick={() => setIsCategoriesOpen(false)}
               className="absolute top-4 md:top-8 right-4 md:right-8 text-gray-500 hover:text-white transition-colors"
-              aria-label="Close weapon categories"
+              aria-label="Close categories"
             >
               <X size={20} />
             </button>
             <div className="pr-12">
-              <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Weapon Categories</h2>
+              <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Categories</h2>
               <p className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black mt-2 tracking-[0.2em]">
                 Choose a category to filter the market.
               </p>
