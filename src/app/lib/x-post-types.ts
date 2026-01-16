@@ -331,7 +331,7 @@ export async function createGiveawaysDigestPost(): Promise<{ success: boolean; p
     let text = '';
     if (active.length === 1) {
       const titleLine = primaryPrize ? `🎁 WIN ${primaryPrize}` : '🎁 GIVEAWAY LIVE';
-      const checklist = `✅ Follow @Skinvaults\n✅ Enter → ${link}`;
+      const checklist = `✅ Follow @Skinvaults\n✅ Like + RT\n✅ Enter → ${link}`;
 
       const statsParts = [
         primaryEntrants > 0 ? `👥 ${formatCountShort(primaryEntrants)} entrants` : '',
