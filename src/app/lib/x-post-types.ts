@@ -195,23 +195,37 @@ type GiveawayDigestRow = {
 };
 
 function giveawayCadenceLabel(g: GiveawayDigestRow): 'DAILY' | 'WEEKLY' | 'MONTHLY' {
-  const start = g.startAt ? new Date(g.startAt) : null;
-  const end = g.endAt ? new Date(g.endAt) : null;
-  if (!start || !end) return 'MONTHLY';
-  const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-  if (days >= 27) return 'MONTHLY';
-  if (days >= 6) return 'WEEKLY';
+  const end = g.endAt ? new Date(g.endAt).getTime() : 0;
+  const start = g.startAt ? new Date(g.startAt).getTime() : 0;
+  const diffDays = start && end ? Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24))) : 0;
+  if (diffDays >= 27) return 'MONTHLY';
+  if (diffDays >= 6) return 'WEEKLY';
   return 'DAILY';
 }
 
-function formatEndsShort(isoOrDate: any): string {
-  try {
-    const d = isoOrDate instanceof Date ? isoOrDate : new Date(String(isoOrDate || ''));
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
-  } catch {
-    return '';
+function formatEndsShort(d: Date): string {
+  const dt = new Date(d);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const mm = months[dt.getUTCMonth()] || '';
+  const dd = dt.getUTCDate();
+  return `${mm} ${dd}`;
+}
+
+function formatCreditsShort(value: number): string {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) return '';
+  if (v >= 1_000_000) {
+    const m = Math.round((v / 1_000_000) * 10) / 10;
+    return String(m).replace(/\.0$/, '') + 'm';
   }
+  if (v >= 10_000) {
+    return String(Math.round(v / 1_000)) + 'k';
+  }
+  if (v >= 1_000) {
+    const k = Math.round((v / 1_000) * 10) / 10;
+    return String(k).replace(/\.0$/, '') + 'k';
+  }
+  return String(Math.round(v));
 }
 
 export async function createGiveawaysDigestPost(): Promise<{ success: boolean; postId?: string; error?: string; itemName?: string }> {
@@ -259,27 +273,51 @@ export async function createGiveawaysDigestPost(): Promise<{ success: boolean; p
 
     const link = 'https://www.skinvaults.online/giveaways';
 
-    const header = '🎁 GIVEAWAYS LIVE (enter fast)\n\n';
-    const footer = `\nJoin: ${link}\n\n#CS2 #CS2Skins #Giveaway`;
+    const primary = active[0];
+    const primaryPrize = String(primary.prizeItem?.name || primary.prize || primary.title || '').trim();
+    const primaryCadence = giveawayCadenceLabel(primary);
+    const primaryEnds = primary.endAt ? formatEndsShort(primary.endAt) : '';
+    const primaryEntry = formatCreditsShort(primary.creditsPerEntry);
+    const hashtag = '\n#CS2 #CS2Skins #Giveaway #SkinVaults #CS2Giveaway';
 
-    let text = header;
-    for (let i = 0; i < active.length; i++) {
-      const g = active[i];
-      const cadence = giveawayCadenceLabel(g);
-      const prizeName = String(g.prizeItem?.name || g.prize || g.title || '').trim();
-      const ends = g.endAt ? formatEndsShort(g.endAt) : '';
-      const line = `${i + 1}) [${cadence}] ${prizeName}${ends ? ` — ends ${ends}` : ''} — ${Math.floor(Number(g.creditsPerEntry || 0))}c\n`;
-
-      if ((text + line + footer).length > 280) break;
-      text += line;
+    let text = '';
+    if (active.length === 1) {
+      const line1 = primaryPrize ? `🎁 WIN ${primaryPrize}` : '🎁 GIVEAWAY LIVE';
+      const line2Parts = [
+        `[${primaryCadence}]`,
+        primaryEnds ? `Ends ${primaryEnds}` : '',
+        primaryEntry ? `Entry ${primaryEntry} credits` : '',
+      ].filter(Boolean);
+      const line2 = line2Parts.join(' • ');
+      text = `${line1}\n${line2}\n\nEnter now → ${link}${hashtag}`;
+      if (text.length > 280) {
+        text = `🎁 GIVEAWAY LIVE\n\nEnter now → ${link}${hashtag}`;
+      }
+    } else {
+      const header = `🎁 GIVEAWAYS LIVE\nEnter now → ${link}\n\n`;
+      let body = '';
+      for (let i = 0; i < active.length; i++) {
+        const g = active[i];
+        const cadence = giveawayCadenceLabel(g);
+        const prizeName = String(g.prizeItem?.name || g.prize || g.title || '').trim();
+        const ends = g.endAt ? formatEndsShort(g.endAt) : '';
+        const entry = formatCreditsShort(g.creditsPerEntry);
+        const bits = [
+          `${i + 1}) [${cadence}] ${prizeName}`,
+          ends ? `Ends ${ends}` : '',
+          entry ? `Entry ${entry}` : '',
+        ].filter(Boolean);
+        const line = bits.join(' • ') + '\n';
+        if ((header + body + line + hashtag).length > 280) break;
+        body += line;
+      }
+      text = header + body.trimEnd() + hashtag;
     }
-
-    text += footer;
 
     const imageUrls = active
       .map((g) => String(g.prizeItem?.image || '').trim())
       .filter(Boolean)
-      .slice(0, 4);
+      .slice(0, 1);
 
     const postResult = await createXPostWithImages({
       text,

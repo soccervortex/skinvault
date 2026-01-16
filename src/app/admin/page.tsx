@@ -1283,6 +1283,7 @@ export default function AdminPage() {
                     <th className="py-2 pr-2">Amount</th>
                     <th className="py-2 pr-2">Status</th>
                     <th className="py-2 pr-2">Details</th>
+                    <th className="py-2 pr-2">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1330,6 +1331,40 @@ export default function AdminPage() {
                           const item = String(purchase.consumableType || (purchase as any).itemType || 'item');
                           return `${quantity}x ${item}`;
                         })()}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <button
+                          onClick={async () => {
+                            const sid = String((purchase as any).sessionId || '').trim();
+                            if (!sid) {
+                              setError('Missing session id for this purchase.');
+                              return;
+                            }
+                            if (!confirm('Hide this purchase from Recent Purchases?')) return;
+                            try {
+                              const res = await fetch('/api/admin/purchases', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+                                },
+                                body: JSON.stringify({ action: 'hide', sessionId: sid }),
+                              });
+                              const data = await res.json().catch(() => ({}));
+                              if (!res.ok) {
+                                setError(data?.error || 'Failed to hide purchase.');
+                                return;
+                              }
+                              setPurchases((prev) => prev.filter((p: any) => String(p?.sessionId || '').trim() !== sid));
+                            } catch (e: any) {
+                              setError(e?.message || 'Failed to hide purchase.');
+                            }
+                          }}
+                          className="p-1 text-red-400 hover:text-red-300"
+                          title="Hide from Recent Purchases"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </td>
                     </tr>
                   ))}
