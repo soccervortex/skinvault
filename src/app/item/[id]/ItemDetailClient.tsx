@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale, AlertTriangle, X } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import dynamic from 'next/dynamic';
@@ -56,6 +56,12 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
   const [contentsHydrated, setContentsHydrated] = useState(false);
   const [contentsLoading, setContentsLoading] = useState(false);
+
+  const [containsModalItem, setContainsModalItem] = useState<any | null>(null);
+  const [containsModalInfo, setContainsModalInfo] = useState<any | null>(null);
+  const [containsModalInfoLoading, setContainsModalInfoLoading] = useState(false);
+  const [containsModalPrice, setContainsModalPrice] = useState<any | null>(null);
+  const [containsModalPriceDone, setContainsModalPriceDone] = useState(false);
 
   const normalizeItem = (raw: any) => {
     if (!raw) return raw;
@@ -361,6 +367,77 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     fetchPrice();
   }, [item, currency.code, isPro]);
 
+  useEffect(() => {
+    if (!containsModalItem) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      const marketName =
+        (containsModalInfo as any)?.market_hash_name ||
+        (containsModalInfo as any)?.name ||
+        (containsModalItem as any)?.market_hash_name ||
+        (containsModalItem as any)?.name ||
+        '';
+      const mhn = String(marketName || '').trim();
+      if (!mhn) {
+        if (!cancelled) {
+          setContainsModalPrice(null);
+          setContainsModalPriceDone(true);
+        }
+        return;
+      }
+
+      const cacheKey = `${currency.code}:${mhn}`;
+      const cached = priceCacheRef.current[cacheKey];
+      if (cached) {
+        if (!cancelled) {
+          setContainsModalPrice(cached);
+          setContainsModalPriceDone(true);
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setContainsModalPrice(null);
+        setContainsModalPriceDone(false);
+      }
+
+      const hash = encodeURIComponent(mhn);
+      const steamUrl = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=${currency.code}&market_hash_name=${hash}&t=${Date.now()}`;
+      const data = await fetchWithProxyRotation(steamUrl, isPro, {
+        parallel: true,
+        marketHashName: mhn,
+        currency: currency.code,
+      });
+
+      const next = data?.success
+        ? {
+            lowest: data.lowest_price || data.median_price || '---',
+            median: data.median_price || '---',
+            volume: data.volume || 'Low',
+          }
+        : {
+            lowest: '---',
+            median: '---',
+            volume: 'Low',
+          };
+
+      priceCacheRef.current[cacheKey] = next;
+      persistPriceCache();
+
+      if (!cancelled) {
+        setContainsModalPrice(next);
+        setContainsModalPriceDone(true);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [containsModalItem, containsModalInfo, currency.code, isPro]);
+
   // Simple 3D spin animation when in 3D view
   useEffect(() => {
     if (viewMode !== '3D') {
@@ -504,6 +581,16 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     return `/item/${encodeURIComponent(key)}`;
   };
 
+  const makeItemKey = (raw: any) => {
+    const href = makeItemHref(raw);
+    const encoded = href.startsWith('/item/') ? href.slice('/item/'.length) : href;
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  };
+
   const rowCardKey = (raw: any) => String(raw?.id || raw?.market_hash_name || raw?.marketHashName || raw?.name || '');
 
   const formatOdds = (raw: any): string | null => {
@@ -543,44 +630,66 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         const isEstimated = odds && !(c?.chance ?? c?.percentage ?? c?.probability ?? c?.odds);
 
         return (
-          <div
+          <button
+            type="button"
             key={rowCardKey(c)}
-            className="bg-black/30 border border-white/10 rounded-2xl overflow-hidden hover:bg-white/5 transition-all"
+            className="text-left bg-black/30 border border-white/10 rounded-2xl overflow-hidden hover:bg-white/5 transition-all"
+            onClick={() => {
+              setContainsModalItem(c);
+              setContainsModalInfo(null);
+              setContainsModalInfoLoading(true);
+              setContainsModalPrice(null);
+              setContainsModalPriceDone(false);
+              const key = makeItemKey(c);
+              void fetch(`/api/item/info?id=${encodeURIComponent(key)}&fuzzy=true`, { cache: 'no-store' })
+                .then((r) => r.json().catch(() => null))
+                .then((json) => {
+                  if (json && (json?.name || json?.market_hash_name)) {
+                    setContainsModalInfo(normalizeItem(json));
+                  } else {
+                    setContainsModalInfo(null);
+                  }
+                })
+                .catch(() => {
+                  setContainsModalInfo(null);
+                })
+                .finally(() => {
+                  setContainsModalInfoLoading(false);
+                });
+            }}
           >
-            <Link href={makeItemHref(c)} className="block">
-              <div className="aspect-square bg-[#0b0e14] flex items-center justify-center border-b border-white/10">
-                {c?.image ? (
-                  <img
-                    src={String(c.image)}
-                    alt={String(c?.name || '')}
-                    className="w-[70%] h-auto object-contain"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10" />
-                )}
-              </div>
+            <div className="aspect-square bg-[#0b0e14] flex items-center justify-center border-b border-white/10">
+              {c?.image ? (
+                <img
+                  src={String(c.image)}
+                  alt={String(c?.name || '')}
+                  className="w-[70%] h-auto object-contain"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10" />
+              )}
+            </div>
 
-              <div className="p-3">
-                <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
-                <div className="mt-1 text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+            <div className="p-3">
+              <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
+              <div className="mt-1 text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
 
-                {(odds || floatRange) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                    {floatRange ? (
-                      <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300">
-                        Float {floatRange}
-                      </div>
-                    ) : null}
-                    {odds ? (
-                      <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300">
-                        {isEstimated ? `~${odds}` : odds}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            </Link>
-          </div>
+              {(odds || floatRange) && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  {floatRange ? (
+                    <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300">
+                      Float {floatRange}
+                    </div>
+                  ) : null}
+                  {odds ? (
+                    <div className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300">
+                      {isEstimated ? `~${odds}` : odds}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </button>
         );
       })}
     </div>
@@ -1011,6 +1120,105 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
       </div>
     </div>
     </div>
+
+    {containsModalItem && (
+      <div
+        className="fixed inset-0 z-[180] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setContainsModalItem(null);
+            setContainsModalInfo(null);
+            setContainsModalPrice(null);
+            setContainsModalPriceDone(false);
+          }
+        }}
+      >
+        <div
+          className="bg-[#11141d] border border-white/10 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between gap-3">
+            <div className="text-sm font-medium text-gray-200">Item details</div>
+            <button
+              onClick={() => {
+                setContainsModalItem(null);
+                setContainsModalInfo(null);
+                setContainsModalPrice(null);
+                setContainsModalPriceDone(false);
+              }}
+              className="text-gray-500 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="p-4 md:p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-[#0b0e14] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                {(() => {
+                  const img = String((containsModalInfo as any)?.image || (containsModalItem as any)?.image || '').trim();
+                  if (!img) return <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />;
+                  return <img src={img} alt={String((containsModalInfo as any)?.name || (containsModalItem as any)?.name || '')} className="w-full h-full object-contain" />;
+                })()}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-white/90 break-words">
+                  {String((containsModalInfo as any)?.name || (containsModalInfo as any)?.market_hash_name || (containsModalItem as any)?.name || (containsModalItem as any)?.market_hash_name || '—')}
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {String((containsModalInfo as any)?.rarity?.name || (containsModalItem as any)?.rarity?.name || '')}
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {String((containsModalInfo as any)?.wear?.name || (containsModalItem as any)?.wear?.name || '')}
+                </div>
+              </div>
+            </div>
+
+            {containsModalInfoLoading ? (
+              <div className="mt-4 flex items-center gap-2 text-gray-500 text-sm">
+                <Loader2 className="animate-spin" size={16} /> Loading
+              </div>
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                <div className="text-xs font-medium text-gray-500">Float Range</div>
+                <div className="mt-1 text-sm font-semibold text-white/90">
+                  {(() => {
+                    const fr = formatFloatRange(containsModalInfo || containsModalItem);
+                    return fr ? fr : '—';
+                  })()}
+                </div>
+              </div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                <div className="text-xs font-medium text-gray-500">Odds</div>
+                <div className="mt-1 text-sm font-semibold text-white/90">
+                  {formatOdds(containsModalItem) || '—'}
+                </div>
+              </div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 sm:col-span-2">
+                <div className="text-xs font-medium text-gray-500">Steam Price</div>
+                <div className="mt-1 text-sm font-semibold text-white/90">
+                  {!containsModalPriceDone ? (
+                    <span className="inline-flex items-center gap-2 text-gray-500">
+                      <Loader2 className="animate-spin" size={14} /> Loading
+                    </span>
+                  ) : (
+                    <span>
+                      {String(containsModalPrice?.lowest || '—')} • Median {String(containsModalPrice?.median || '—')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     <ProUpgradeModal
         isOpen={showUpgradeModal}
