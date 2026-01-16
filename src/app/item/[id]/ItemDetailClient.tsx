@@ -64,6 +64,17 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const [containsModalVariantsLoading, setContainsModalVariantsLoading] = useState(false);
   const [containsModalVariantPrices, setContainsModalVariantPrices] = useState<Record<string, any>>({});
   const [containsModalVariantPriceDone, setContainsModalVariantPriceDone] = useState<Record<string, boolean>>({});
+  const containsModalScrollRef = useRef<HTMLDivElement>(null);
+  const containsModalDialogRef = useRef<HTMLDivElement>(null);
+
+  const closeContainsModal = () => {
+    setContainsModalItem(null);
+    setContainsModalInfo(null);
+    setContainsModalVariants(null);
+    setContainsModalVariantsLoading(false);
+    setContainsModalVariantPrices({});
+    setContainsModalVariantPriceDone({});
+  };
 
   const normalizeItem = (raw: any) => {
     if (!raw) return raw;
@@ -437,6 +448,58 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
       cancelled = true;
     };
   }, [containsModalItem, containsModalInfo, containsModalVariants, currency.code, isPro]);
+
+  useEffect(() => {
+    if (!containsModalItem) return;
+
+    const focus = () => {
+      try {
+        containsModalDialogRef.current?.focus();
+      } catch {}
+    };
+    const id = requestAnimationFrame(focus);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!containsModalItem) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeContainsModal();
+        return;
+      }
+
+      const el = containsModalScrollRef.current;
+      if (!el) return;
+
+      const line = 64;
+      const page = Math.max(240, Math.floor(el.clientHeight * 0.85));
+      let delta = 0;
+
+      if (e.key === 'ArrowDown') delta = line;
+      else if (e.key === 'ArrowUp') delta = -line;
+      else if (e.key === 'PageDown') delta = page;
+      else if (e.key === 'PageUp') delta = -page;
+      else if (e.key === 'Home') {
+        e.preventDefault();
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        return;
+      } else {
+        return;
+      }
+
+      e.preventDefault();
+      el.scrollTo({ top: el.scrollTop + delta, behavior: 'smooth' });
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      cancelAnimationFrame(id);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [containsModalItem]);
 
   // Simple 3D spin animation when in 3D view
   useEffect(() => {
@@ -1183,29 +1246,24 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         aria-modal="true"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
-            setContainsModalItem(null);
-            setContainsModalInfo(null);
-            setContainsModalVariants(null);
-            setContainsModalVariantsLoading(false);
-            setContainsModalVariantPrices({});
-            setContainsModalVariantPriceDone({});
+            closeContainsModal();
           }
         }}
       >
         <div
-          className="bg-[#11141d] border border-white/10 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden"
+          ref={containsModalDialogRef}
+          tabIndex={-1}
+          className="bg-[#11141d] border border-white/10 rounded-2xl w-full max-w-xl max-h-[85vh] shadow-2xl overflow-hidden flex flex-col outline-none"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-gray-200">Item details</div>
+          <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between gap-3 shrink-0">
+            <div>
+              <div className="text-sm font-medium text-gray-200">Item details</div>
+              <div className="mt-1 text-[10px] text-gray-600 hidden sm:block">Esc to close • ↑/↓, PgUp/PgDn to scroll</div>
+            </div>
             <button
               onClick={() => {
-                setContainsModalItem(null);
-                setContainsModalInfo(null);
-                setContainsModalVariants(null);
-                setContainsModalVariantsLoading(false);
-                setContainsModalVariantPrices({});
-                setContainsModalVariantPriceDone({});
+                closeContainsModal();
               }}
               className="text-gray-500 hover:text-white transition-colors"
               aria-label="Close"
@@ -1214,7 +1272,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
             </button>
           </div>
 
-          <div className="p-4 md:p-6">
+          <div ref={containsModalScrollRef} className="p-4 md:p-6 overflow-y-auto no-scrollbar">
             {(() => {
               const main = containsModalInfo || containsModalItem;
               const { weaponName, skinName } = getWeaponAndSkinLabels(main);
@@ -1246,7 +1304,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             ) : null}
 
-            <div className="mt-5 space-y-4">
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               {(() => {
                 const variants = (containsModalVariants && containsModalVariants.length)
                   ? containsModalVariants
@@ -1259,35 +1317,46 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   const mhn = String(v?.market_hash_name || v?.name || '').trim();
                   const done = mhn ? containsModalVariantPriceDone[mhn] === true : true;
                   const price = mhn ? containsModalVariantPrices[mhn] : null;
+                  const rarityColor = String(v?.rarity?.color || (containsModalInfo as any)?.rarity?.color || (containsModalItem as any)?.rarity?.color || '#4b5563');
+                  const img = String(v?.image || (containsModalInfo as any)?.image || (containsModalItem as any)?.image || '').trim();
 
                   return (
-                    <div key={String(v?.id || v?.market_hash_name || wearLabel)} className="bg-black/20 border border-white/5 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">{wearLabel}</div>
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-                          <div className="text-xs font-medium text-gray-500">Wear</div>
-                          <div className="mt-1 text-sm font-semibold text-white/90">{wearLabel}</div>
-                        </div>
-                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-                          <div className="text-xs font-medium text-gray-500">Float Range</div>
-                          <div className="mt-1 text-sm font-semibold text-white/90">{floatRange || '—'}</div>
-                        </div>
-                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-                          <div className="text-xs font-medium text-gray-500">Odds</div>
-                          <div className="mt-1 text-sm font-semibold text-white/90">{odds}</div>
-                        </div>
-                        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-                          <div className="text-xs font-medium text-gray-500">Steam Price</div>
-                          <div className="mt-1 text-sm font-semibold text-white/90">
-                            {!done ? (
-                              <span className="inline-flex items-center gap-2 text-gray-500">
-                                <Loader2 className="animate-spin" size={14} /> Loading
-                              </span>
-                            ) : (
-                              <span>
-                                {String(price?.lowest || '—')} • Median {String(price?.median || '—')}
-                              </span>
-                            )}
+                    <div
+                      key={String(v?.id || v?.market_hash_name || wearLabel)}
+                      className="bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border border-white/5"
+                    >
+                      <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 relative overflow-hidden">
+                        <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
+                        {img ? (
+                          <img src={img} alt={String(v?.name || v?.market_hash_name || wearLabel)} className="w-full h-full object-contain relative z-10" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 relative z-10" />
+                        )}
+
+                        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/85 via-black/35 to-transparent">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-white/90 truncate">{wearLabel}</div>
+                            <div className="text-[9px] font-black text-white/90">
+                              {!done ? (
+                                <span className="inline-flex items-center gap-1.5 text-gray-300">
+                                  <Loader2 className="animate-spin" size={12} />
+                                  <span className="text-[8px] uppercase tracking-widest">Price</span>
+                                </span>
+                              ) : (
+                                <span className="truncate">{String(price?.lowest || '—')}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                              <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Float</div>
+                              <div className="text-[9px] font-semibold text-white/90 truncate">{floatRange || '—'}</div>
+                            </div>
+                            <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                              <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Odds</div>
+                              <div className="text-[9px] font-semibold text-white/90 truncate">{odds}</div>
+                            </div>
                           </div>
                         </div>
                       </div>

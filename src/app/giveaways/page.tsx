@@ -731,12 +731,12 @@ export default function GiveawaysPage() {
                 {active.length === 0 ? (
                   <div className="text-gray-500 text-[11px]">No active giveaways right now.</div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     {active.map((g) => (
                       <button
                         key={g.id}
                         onClick={() => loadDetail(g.id)}
-                        className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/40 hover:border-white/10'}`}
+                        className={`w-full text-left bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-[border-color,transform] duration-300 group relative flex flex-col border ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
                       >
                         {(() => {
                           const st = getGiveawayStatus(Date.now(), g);
@@ -749,58 +749,59 @@ export default function GiveawaysPage() {
 
                           return (
                             <>
-                              <div className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest mb-3 ${st.className}`}>
-                                {st.label}
+                              <div className="absolute top-2 md:top-3 lg:top-4 left-2 md:left-3 lg:left-4 z-20">
+                                <div className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest ${st.className}`}>
+                                  {st.label}
+                                </div>
                               </div>
 
-                              <div className="flex items-start gap-4">
-                                <div
-                                  className="w-16 h-16 rounded-2xl bg-[#0b0e14] border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
-                                  style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
-                                >
-                                  {img ? (
-                                    <img src={img} alt={g.prize || 'Prize'} className="w-full h-full object-contain" />
-                                  ) : (
-                                    <div className="text-[8px] text-gray-500 font-black uppercase tracking-widest">—</div>
-                                  )}
+                              {href ? (
+                                <div className="absolute top-2 md:top-3 lg:top-4 right-2 md:right-3 lg:right-4 z-20">
+                                  <Link
+                                    href={href}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-xl bg-black/60 border border-white/10 hover:bg-white/5 transition-all text-[9px] font-black uppercase tracking-widest"
+                                  >
+                                    View
+                                  </Link>
                                 </div>
+                              ) : null}
 
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="text-[12px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                                      <div className="text-[11px] mt-1 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
-                                        {g.prize || info?.name || 'Prize TBA'}
-                                      </div>
-                                    </div>
+                              <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
+                                <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
+                                {img ? (
+                                  <img
+                                    src={img}
+                                    alt={g.prize || info?.name || 'Prize'}
+                                    className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
+                                    style={{ transform: 'translateZ(0)' }}
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 relative z-10" />
+                                )}
 
-                                    {href ? (
-                                      <Link
-                                        href={href}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="shrink-0 inline-flex items-center justify-center px-3 py-2 rounded-xl bg-black/40 border border-white/10 hover:bg-white/5 transition-all text-[10px] font-black uppercase tracking-widest"
-                                      >
-                                        View
-                                      </Link>
-                                    ) : null}
-                                  </div>
-
-                                  <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-gray-500">
-                                    <div className="bg-black/30 border border-white/5 rounded-xl p-2">
-                                      <div className="uppercase tracking-widest">Entry</div>
-                                      <div className="text-[10px] font-black text-white">{g.creditsPerEntry}</div>
+                                <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/85 via-black/35 to-transparent">
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                      <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Entry</div>
+                                      <div className="text-[9px] font-black text-white/90 truncate">{g.creditsPerEntry}</div>
                                     </div>
-                                    <div className="bg-black/30 border border-white/5 rounded-xl p-2">
-                                      <div className="uppercase tracking-widest">Players</div>
-                                      <div className="text-[10px] font-black text-white">{g.totalParticipants}</div>
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                      <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Players</div>
+                                      <div className="text-[9px] font-black text-white/90 truncate">{g.totalParticipants}</div>
                                     </div>
-                                    <div className="bg-black/30 border border-white/5 rounded-xl p-2">
-                                      <div className="uppercase tracking-widest">Winners</div>
-                                      <div className="text-[10px] font-black text-white">{g.winnerCount}</div>
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                      <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Winners</div>
+                                      <div className="text-[9px] font-black text-white/90 truncate">{g.winnerCount}</div>
                                     </div>
                                   </div>
                                 </div>
                               </div>
+
+                              <p className="text-[10px] md:text-[11px] font-black uppercase truncate tracking-widest text-white/90">{g.title}</p>
+                              <p className="text-[9px] md:text-[10px] font-black mt-1 opacity-80 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
+                                {g.prize || info?.name || 'Prize TBA'}
+                              </p>
                             </>
                           );
                         })()}
@@ -814,12 +815,12 @@ export default function GiveawaysPage() {
                   {upcoming.length === 0 ? (
                     <div className="text-gray-500 text-[11px]">No upcoming giveaways.</div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {upcoming.slice(0, 12).map((g) => (
                         <button
                           key={g.id}
                           onClick={() => loadDetail(g.id)}
-                          className={`w-full text-left p-4 rounded-[1.75rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/20 hover:border-white/10'}`}
+                          className={`w-full text-left bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border transition-[border-color,transform] duration-300 group ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
                         >
                           {(() => {
                             const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
@@ -827,27 +828,28 @@ export default function GiveawaysPage() {
                             const rarityColor = (info?.rarityColor || rarityColorFallback(info?.rarityName)) as string;
                             const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
                             return (
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="w-12 h-12 rounded-[1.25rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
-                                  style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
-                                >
+                              <>
+                                <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 relative overflow-hidden">
+                                  <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
                                   {img ? (
-                                    <img src={img} alt={g.prize || 'Prize'} className="w-full h-full object-contain" />
+                                    <img src={img} alt={g.prize || info?.name || 'Prize'} className="w-full h-full object-contain relative z-10" />
                                   ) : (
-                                    <div className="text-[8px] text-gray-600 font-black uppercase">—</div>
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 relative z-10" />
                                   )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="text-[11px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                                    <div className="text-[10px] text-gray-600">Starts {formatShortDate(g.startAt)}</div>
-                                  </div>
-                                  <div className="mt-1 text-[10px] truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
-                                    {g.prize || info?.name || 'Prize TBA'}
+
+                                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/85 via-black/35 to-transparent">
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                      <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Starts</div>
+                                      <div className="text-[9px] font-black text-white/90 truncate">{formatShortDate(g.startAt)}</div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
+
+                                <p className="text-[10px] font-black uppercase truncate tracking-widest text-white/90">{g.title}</p>
+                                <p className="text-[9px] font-black mt-1 opacity-80 truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
+                                  {g.prize || info?.name || 'Prize TBA'}
+                                </p>
+                              </>
                             );
                           })()}
                         </button>
@@ -859,12 +861,12 @@ export default function GiveawaysPage() {
                   {past.length === 0 ? (
                     <div className="text-gray-500 text-[11px]">No past giveaways yet.</div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {past.slice(0, 12).map((g) => (
                         <button
                           key={g.id}
                           onClick={() => loadDetail(g.id)}
-                          className={`w-full text-left p-3 rounded-[1.5rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/20 hover:border-white/10'}`}
+                          className={`w-full text-left bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border transition-[border-color,transform] duration-300 group ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
                         >
                           {(() => {
                             const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
@@ -872,27 +874,28 @@ export default function GiveawaysPage() {
                             const rarityColor = (info?.rarityColor || rarityColorFallback(info?.rarityName)) as string;
                             const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
                             return (
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="w-9 h-9 rounded-xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
-                                  style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
-                                >
+                              <>
+                                <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 relative overflow-hidden">
+                                  <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
                                   {img ? (
-                                    <img src={img} alt={g.prize || 'Prize'} className="w-full h-full object-contain" />
+                                    <img src={img} alt={g.prize || info?.name || 'Prize'} className="w-full h-full object-contain relative z-10" />
                                   ) : (
-                                    <div className="text-[8px] text-gray-600 font-black uppercase">—</div>
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 relative z-10" />
                                   )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="text-[10px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                                    <div className="text-[9px] text-gray-600">{g.drawnAt ? 'Drawn' : 'Ended'}</div>
-                                  </div>
-                                  <div className="mt-1 text-[9px] truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
-                                    {g.prize || info?.name || 'Prize TBA'}
+
+                                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/85 via-black/35 to-transparent">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Status</div>
+                                      <div className="text-[9px] font-black text-white/90 truncate">{g.drawnAt ? 'Drawn' : 'Ended'}</div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
+
+                                <p className="text-[10px] font-black uppercase truncate tracking-widest text-white/90">{g.title}</p>
+                                <p className="text-[9px] font-black mt-1 opacity-80 truncate" style={{ color: hexToRgba(rarityColor, 0.9) }}>
+                                  {g.prize || info?.name || 'Prize TBA'}
+                                </p>
+                              </>
                             );
                           })()}
                         </button>

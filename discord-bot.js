@@ -38,6 +38,19 @@ const client = new Client({
   ],
 });
 
+function UpdatePresence() {
+  if (!client?.user) return;
+  client.user.setPresence({
+    activities: [
+      {
+        name: 'https://skinvaults.online',
+        type: ActivityType.Watching,
+      },
+    ],
+    status: PresenceUpdateStatus.Idle,
+  });
+}
+
 // Register slash commands
 // Note: For User Installs, commands must be registered globally and the bot must have
 // "applications.commands" scope. Global commands can take up to 1 hour to appear.
@@ -2615,13 +2628,12 @@ client.once('clientReady', async () => {
 
   // Set bot presence/status to show as online
   try {
-    client.user.setPresence({
-      activities: [{
-        name: 'CS2 Skin Analytics',
-        type: ActivityType.Watching,
-      }],
-      status: PresenceUpdateStatus.Online,
-    });
+    UpdatePresence();
+    setInterval(() => {
+      try {
+        UpdatePresence();
+      } catch {}
+    }, 10 * 60 * 1000);
     log('✅ Bot presence set to online');
   } catch (error) {
     log(`⚠️ Failed to set bot presence: ${error.message}`);
