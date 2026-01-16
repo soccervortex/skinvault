@@ -731,12 +731,12 @@ export default function GiveawaysPage() {
                 {active.length === 0 ? (
                   <div className="text-gray-500 text-[11px]">No active giveaways right now.</div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                     {active.map((g) => (
                       <button
                         key={g.id}
                         onClick={() => loadDetail(g.id)}
-                        className={`w-full text-left bg-[#11141d] p-3 md:p-4 lg:p-5 rounded-[1.5rem] md:rounded-[2rem] lg:rounded-[2.5rem] transition-[border-color,transform] duration-300 group relative flex flex-col border ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
+                        className={`w-full text-left bg-[#11141d] p-3 md:p-3.5 rounded-[1.25rem] md:rounded-[1.75rem] transition-[border-color,transform] duration-300 group relative flex flex-col border ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
                       >
                         {(() => {
                           const st = getGiveawayStatus(Date.now(), g);
@@ -767,7 +767,7 @@ export default function GiveawaysPage() {
                                 </div>
                               ) : null}
 
-                              <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 md:mb-4 relative overflow-hidden">
+                              <div className="aspect-square bg-black/20 rounded-[1.25rem] md:rounded-[1.75rem] flex items-center justify-center p-2.5 md:p-3 mb-3 relative overflow-hidden">
                                 <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                                 {img ? (
                                   <img
@@ -782,15 +782,15 @@ export default function GiveawaysPage() {
 
                                 <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/85 via-black/35 to-transparent">
                                   <div className="grid grid-cols-3 gap-2">
-                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1">
                                       <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Entry</div>
                                       <div className="text-[9px] font-black text-white/90 truncate">{g.creditsPerEntry}</div>
                                     </div>
-                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1">
                                       <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Players</div>
                                       <div className="text-[9px] font-black text-white/90 truncate">{g.totalParticipants}</div>
                                     </div>
-                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1.5">
+                                    <div className="bg-black/40 border border-white/10 rounded-xl px-2 py-1">
                                       <div className="text-[8px] font-black uppercase tracking-widest text-gray-400">Winners</div>
                                       <div className="text-[9px] font-black text-white/90 truncate">{g.winnerCount}</div>
                                     </div>
@@ -798,8 +798,8 @@ export default function GiveawaysPage() {
                                 </div>
                               </div>
 
-                              <p className="text-[10px] md:text-[11px] font-black uppercase truncate tracking-widest text-white/90">{g.title}</p>
-                              <p className="text-[9px] md:text-[10px] font-black mt-1 opacity-80 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
+                              <p className="text-[10px] font-black uppercase truncate tracking-widest text-white/90">{g.title}</p>
+                              <p className="text-[9px] font-black mt-1 opacity-80 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
                                 {g.prize || info?.name || 'Prize TBA'}
                               </p>
                             </>
@@ -815,12 +815,12 @@ export default function GiveawaysPage() {
                   {upcoming.length === 0 ? (
                     <div className="text-gray-500 text-[11px]">No upcoming giveaways.</div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                       {upcoming.slice(0, 12).map((g) => (
                         <button
                           key={g.id}
                           onClick={() => loadDetail(g.id)}
-                          className={`w-full text-left bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border transition-[border-color,transform] duration-300 group ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
+                          className={`w-full text-left bg-[#11141d] p-3 md:p-3.5 rounded-[1.25rem] md:rounded-[1.75rem] border transition-[border-color,transform] duration-300 group ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
                         >
                           {(() => {
                             const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
@@ -829,7 +829,7 @@ export default function GiveawaysPage() {
                             const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
                             return (
                               <>
-                                <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 relative overflow-hidden">
+                                <div className="aspect-square bg-black/20 rounded-[1.25rem] md:rounded-[1.75rem] flex items-center justify-center p-2.5 md:p-3 mb-3 relative overflow-hidden">
                                   <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
                                   {img ? (
                                     <img src={img} alt={g.prize || info?.name || 'Prize'} className="w-full h-full object-contain relative z-10" />
@@ -861,12 +861,12 @@ export default function GiveawaysPage() {
                   {past.length === 0 ? (
                     <div className="text-gray-500 text-[11px]">No past giveaways yet.</div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                       {past.slice(0, 12).map((g) => (
                         <button
                           key={g.id}
                           onClick={() => loadDetail(g.id)}
-                          className={`w-full text-left bg-[#11141d] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border transition-[border-color,transform] duration-300 group ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
+                          className={`w-full text-left bg-[#11141d] p-3 md:p-3.5 rounded-[1.25rem] md:rounded-[1.75rem] border transition-[border-color,transform] duration-300 group ${selectedId === g.id ? 'border-blue-500/40' : 'border-white/5 hover:border-blue-500/40'}`}
                         >
                           {(() => {
                             const key = String(g?.prizeItem?.market_hash_name || g?.prizeItem?.id || '').trim();
@@ -875,7 +875,7 @@ export default function GiveawaysPage() {
                             const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
                             return (
                               <>
-                                <div className="aspect-square bg-black/20 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center p-3 md:p-4 mb-3 relative overflow-hidden">
+                                <div className="aspect-square bg-black/20 rounded-[1.25rem] md:rounded-[1.75rem] flex items-center justify-center p-2.5 md:p-3 mb-3 relative overflow-hidden">
                                   <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
                                   {img ? (
                                     <img src={img} alt={g.prize || info?.name || 'Prize'} className="w-full h-full object-contain relative z-10" />
