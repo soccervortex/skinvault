@@ -150,13 +150,16 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   useEffect(() => {
     const normalizedInitial = initialItem ? normalizeItem(initialItem) : null;
     if (normalizedInitial?.image) {
+      // Use initial payload for fast paint, but still hydrate full fields (contains/float/type/etc)
+      // from the upstream datasets in the background.
       setItem(normalizedInitial);
       setLoading(false);
-      return;
     }
     
     const fetchItem = async () => {
-      setLoading(true);
+      if (!normalizedInitial?.image) {
+        setLoading(true);
+      }
       let foundItem: any = null;
 
       // First check custom items
@@ -407,7 +410,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     return (
       <div className="min-h-screen bg-[#08090d] text-white flex items-center justify-center font-sans">
         <div className="text-center space-y-3">
-          <p className="text-xs uppercase tracking-[0.4em] text-gray-500">Item not found</p>
+          <p className="text-sm font-medium text-gray-300">Item not found</p>
           <p className="text-sm text-gray-400">This skin could not be loaded from the CS:GO API dataset.</p>
         </div>
       </div>
@@ -472,20 +475,20 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
           <Link
             key={rowCardKey(c)}
             href={makeItemHref(c)}
-            className="w-[240px] shrink-0 flex items-center gap-3 bg-black/40 border border-white/10 rounded-2xl p-3 hover:bg-white/5 transition-all"
+            className="w-[230px] shrink-0 flex items-center gap-3 bg-black/30 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all"
           >
             {c?.image ? (
               <img
                 src={String(c.image)}
                 alt={String(c?.name || '')}
-                className="w-12 h-12 object-contain rounded-xl bg-white/5 border border-white/10"
+                className="w-12 h-12 object-contain rounded-lg bg-white/5 border border-white/10"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10" />
+              <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10" />
             )}
             <div className="min-w-0">
-              <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
-              <div className="text-[9px] text-gray-600 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+              <div className="text-[12px] font-semibold text-white/90 truncate">{String(c?.name || '—')}</div>
+              <div className="text-[11px] text-gray-500 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
             </div>
           </Link>
         ))}
@@ -494,74 +497,74 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   );
 
   return (
-    <div className="flex h-dvh bg-[#08090d] text-white overflow-hidden font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar">
-          <div className="w-full max-w-6xl mx-auto">
-            <div className="flex justify-between items-center mb-6 md:mb-8 gap-4">
-              <Link href="/" className="inline-flex items-center gap-2 text-gray-500 hover:text-white font-bold text-[9px] md:text-[10px] uppercase tracking-widest transition-all shrink-0">
-                <ChevronLeft size={12} /> <span className="hidden sm:inline">Back</span>
-              </Link>
-              
-              <div className="flex items-center gap-2 md:gap-3">
-                {/* VIEW MODE SWITCHER */}
-                <div className="hidden md:flex bg-[#11141d] p-1 rounded-2xl border border-white/5">
-                  <button
-                    onClick={() => setViewMode('2D')}
-                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
-                      viewMode === '2D' ? 'bg-white text-black' : 'text-gray-500'
-                    }`}
-                  >
-                    2D
-                  </button>
-                  <button
-                    onClick={() => setViewMode('3D')}
-                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
-                      viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-500'
-                    }`}
-                  >
-                    3D
-                  </button>
-                </div>
+  <div className="flex h-dvh bg-[#08090d] text-white overflow-hidden font-sans">
+    <Sidebar />
+    <div className="flex-1 flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar">
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-6 md:mb-8 gap-4">
+            <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-medium text-xs transition-all shrink-0">
+              <ChevronLeft size={12} /> <span className="hidden sm:inline">Back</span>
+            </Link>
+            
+            <div className="flex items-center gap-2 md:gap-3">
+              {/* VIEW MODE SWITCHER */}
+              <div className="hidden md:flex bg-[#11141d] p-1 rounded-lg border border-white/10">
+                <button
+                  onClick={() => setViewMode('2D')}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    viewMode === '2D' ? 'bg-white text-black' : 'text-gray-500'
+                  }`}
+                >
+                  2D
+                </button>
+                <button
+                  onClick={() => setViewMode('3D')}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-500'
+                  }`}
+                >
+                  3D
+                </button>
+              </div>
 
-                {/* CURRENCY SWITCHER */}
-                <div className="flex bg-[#11141d] p-1 rounded-xl md:rounded-2xl border border-white/5">
-                  <button
-                    onClick={() => {
-                      setCurrency({ code: '3', symbol: '€' });
-                      try {
-                        if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                    className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                  >
-                    EUR
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCurrency({ code: '1', symbol: '$' });
-                      try {
-                        if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                    className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                  >
-                    USD
-                  </button>
-                </div>
+              {/* CURRENCY SWITCHER */}
+              <div className="flex bg-[#11141d] p-1 rounded-lg border border-white/10">
+                <button
+                  onClick={() => {
+                    setCurrency({ code: '3', symbol: '€' });
+                    try {
+                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className={`px-3 md:px-4 py-2 rounded-lg text-xs font-medium transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                >
+                  EUR
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrency({ code: '1', symbol: '$' });
+                    try {
+                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className={`px-3 md:px-4 py-2 rounded-lg text-xs font-medium transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
+                >
+                  USD
+                </button>
               </div>
             </div>
+          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 items-start">
             <div className="lg:col-span-5">
               <div
                 ref={cardRef}
-                className="bg-[#11141d] rounded-[2rem] md:rounded-[3.5rem] aspect-square border border-white/5 flex items-center justify-center relative overflow-hidden shadow-2xl"
+                className="bg-[#11141d] rounded-2xl aspect-square border border-white/10 flex items-center justify-center relative overflow-hidden"
                 style={{ perspective: '1200px' }}
               >
               <div className="absolute inset-0 opacity-20 blur-[120px]" style={{ backgroundColor: rarityColor }} />
@@ -578,7 +581,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   transition: viewMode === '2D' ? 'transform 0.4s ease-out' : undefined,
                 }}
               />
-              <div className="absolute top-4 right-4 flex bg-black/40 rounded-2xl border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] overflow-hidden md:hidden z-20">
+              <div className="absolute top-4 right-4 flex bg-black/30 rounded-xl border border-white/10 text-xs font-medium overflow-hidden md:hidden z-20">
                 <button
                   onClick={() => setViewMode('2D')}
                   className={`px-3 py-1.5 transition-all ${viewMode === '2D' ? 'bg-white text-black' : 'text-gray-400'}`}
@@ -592,35 +595,35 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   3D
                 </button>
               </div>
-              <div className="absolute bottom-4 left-4 right-4 hidden md:flex items-center justify-center gap-2 bg-black/40 rounded-2xl border border-white/10 p-2 z-20">
+              <div className="absolute bottom-4 left-4 right-4 hidden md:flex items-center justify-center gap-2 bg-black/30 rounded-xl border border-white/10 p-2 z-20">
                 <button
                   onClick={() => setViewMode('2D')}
-                  className={`px-4 py-2 rounded-xl transition-all text-[9px] font-black uppercase tracking-widest ${viewMode === '2D' ? 'bg-white text-black' : 'text-gray-400'}`}
+                  className={`px-4 py-2 rounded-lg transition-all text-[12px] font-medium ${viewMode === '2D' ? 'bg-white text-black' : 'text-gray-300'}`}
                 >
                   2D View
                 </button>
                 <button
                   onClick={() => setViewMode('3D')}
-                  className={`px-4 py-2 rounded-xl transition-all text-[9px] font-black uppercase tracking-widest ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+                  className={`px-4 py-2 rounded-lg transition-all text-[12px] font-medium ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
                 >
                   3D View
                 </button>
               </div>
             </div>
             <div className="mt-4 md:mt-6 flex flex-wrap items-center gap-2 md:gap-3">
-              <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-[#11141d] border border-white/5">
+              <div className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
                 <Tag size={12} className="text-gray-400" />
-                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-400">{item?.rarity?.name || 'Standard'}</span>
+                <span className="text-[11px] font-medium text-gray-300">{item?.rarity?.name || 'Standard'}</span>
               </div>
               {item?.weapon?.name && (
-                <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-[#11141d] border border-white/5">
+                <div className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
                   <Box size={12} className="text-gray-400" />
-                  <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-gray-400">{item.weapon.name}</span>
+                  <span className="text-[11px] font-medium text-gray-300">{item.weapon.name}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-[#11141d] border border-white/5">
+              <div className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
                 <ShieldCheck size={12} className="text-green-400" />
-                <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-green-400">Verified</span>
+                <span className="text-[11px] font-medium text-green-300">Verified</span>
               </div>
               <div className="md:hidden flex-1 flex justify-end gap-2">
                 {/* Share Button (Mobile) */}
@@ -637,7 +640,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {/* Compare Button (Mobile) */}
                 <button
                   onClick={() => setShowCompareModal(true)}
-                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-xl border border-white/10 bg-black/40 hover:bg-white/5 transition-all"
                   aria-label="Compare items"
                 >
                   <Scale size={16} className="text-blue-400" />
@@ -647,7 +650,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {user && (
                   <button
                     onClick={() => setShowTrackerModal(true)}
-                    className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                    className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-xl border border-white/10 bg-black/40 hover:bg-white/5 transition-all"
                     aria-label="Set price tracker"
                   >
                     <Bell size={16} className="text-blue-400" />
@@ -657,7 +660,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {/* Report Button (Mobile) */}
                 <button
                   onClick={() => setShowReportModal(true)}
-                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-yellow-500 hover:bg-yellow-500/10 transition-all"
+                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-xl border border-white/10 bg-black/40 hover:bg-white/5 transition-all"
                   aria-label="Report missing item"
                 >
                   <AlertTriangle size={16} className="text-yellow-400" />
@@ -684,7 +687,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                       setShowUpgradeModal(true);
                     }
                   }}
-                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all"
+                  className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-xl border border-white/10 bg-black/40 hover:bg-white/5 transition-all"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <Heart
@@ -696,9 +699,9 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             </div>
 
-            <div className="lg:col-span-7 space-y-6 md:space-y-8">
-            <div className="flex items-center justify-between gap-4">
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black italic uppercase text-white tracking-tighter leading-tight">{item?.name}</h1>
+            <div className="lg:col-span-7 space-y-5 md:space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-2xl md:text-4xl font-semibold text-white leading-tight">{item?.name}</h1>
               <div className="flex items-center gap-2">
                 {/* Share Button */}
                 {typeof window !== 'undefined' && (
@@ -716,30 +719,30 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                     // Just show modal - it will handle adding the current item automatically
                     setShowCompareModal(true);
                   }}
-                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0 min-h-[44px]"
+                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all shrink-0 min-h-[40px]"
                   aria-label="Compare items"
                 >
                   <Scale size={18} className="text-blue-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Compare</span>
+                  <span className="text-[12px] font-medium text-gray-200">Compare</span>
                 </button>
                 {/* Report Missing Item Button */}
                 <button
                   onClick={() => setShowReportModal(true)}
-                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-yellow-500 hover:bg-yellow-500/10 transition-all shrink-0 min-h-[44px]"
+                  className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all shrink-0 min-h-[40px]"
                   aria-label="Report missing item"
                 >
                   <AlertTriangle size={18} className="text-yellow-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400">Report</span>
+                  <span className="text-[12px] font-medium text-gray-200">Report</span>
                 </button>
                 {/* Price Tracker Button */}
                 {user && (
                   <button
                     onClick={() => setShowTrackerModal(true)}
-                    className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-white/10 bg-black/40 hover:border-blue-500 hover:bg-blue-500/10 transition-all shrink-0 min-h-[44px]"
+                    className="hidden md:inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all shrink-0 min-h-[40px]"
                     aria-label="Set price tracker"
                   >
                     <Bell size={18} className="text-blue-400" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Tracker</span>
+                    <span className="text-[12px] font-medium text-gray-200">Tracker</span>
                   </button>
                 )}
                 {/* Wishlist Button */}
@@ -764,7 +767,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                       setShowUpgradeModal(true);
                     }
                   }}
-                  className="hidden md:inline-flex items-center justify-center p-3 rounded-2xl border border-white/10 bg-black/40 hover:border-rose-500 hover:bg-rose-500/10 transition-all shrink-0 min-h-[44px]"
+                  className="hidden md:inline-flex items-center justify-center p-2.5 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all shrink-0 min-h-[40px]"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <Heart
@@ -775,87 +778,85 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
-              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 relative overflow-hidden">
-                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">Current Value</span>
-                <p className="text-3xl md:text-4xl font-black text-green-400 italic">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10 relative overflow-hidden">
+                <span className="text-[12px] text-gray-400 block mb-2">Current Value</span>
+                <p className="text-2xl md:text-3xl font-semibold text-green-400">
                   {priceData?.lowest
                     ? priceData.lowest
                     : priceDone
-                      ? <span className="text-[12px] md:text-[14px] text-gray-500">NO PRICE</span>
-                      : <span className="text-[12px] md:text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
+                      ? <span className="text-[12px] md:text-[13px] text-gray-500">No price</span>
+                      : <span className="text-[12px] md:text-[13px] text-gray-500 animate-pulse">Scanning…</span>}
                 </p>
                 <TrendingUp className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-green-500/5 w-16 h-16 md:w-20 md:h-20" />
               </div>
-              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 relative">
-                <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-2">24h Median</span>
-                <p className="text-3xl md:text-4xl font-black text-white/90 italic">
+              <div className="bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10 relative">
+                <span className="text-[12px] text-gray-400 block mb-2">24h Median</span>
+                <p className="text-2xl md:text-3xl font-semibold text-white/90">
                   {priceData?.median
                     ? priceData.median
                     : priceDone
-                      ? <span className="text-[12px] md:text-[14px] text-gray-500">NO PRICE</span>
-                      : <span className="text-[12px] md:text-[14px] text-gray-500 animate-pulse">SCANNING...</span>}
+                      ? <span className="text-[12px] md:text-[13px] text-gray-500">No price</span>
+                      : <span className="text-[12px] md:text-[13px] text-gray-500 animate-pulse">Scanning…</span>}
                 </p>
                 <BarChart3 className="absolute right-4 md:right-6 bottom-4 md:bottom-6 text-white/5 w-16 h-16 md:w-20 md:h-20" />
               </div>
             </div>
 
             {(hasFloatRange || wearName) && (
-              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-3">Wear / Float</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-                  <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Wear</div>
-                    <div className="mt-1 font-black text-white/90">{wearName || '—'}</div>
+              <div className="bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10">
+                <div className="text-xs font-medium text-gray-400 mb-4">Wear / Float</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                    <div className="text-xs font-medium text-gray-500">Wear</div>
+                    <div className="mt-1 text-sm font-semibold text-white/90">{wearName || '—'}</div>
                   </div>
-                  <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Float Range</div>
-                    <div className="mt-1 font-black text-white/90">
-                      {hasFloatRange ? `${minFloat!.toFixed(2)} – ${maxFloat!.toFixed(2)}` : '—'}
-                    </div>
+                  <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                    <div className="text-xs font-medium text-gray-500">Float Range</div>
+                    <div className="mt-1 text-sm font-semibold text-white/90">{hasFloatRange ? `${minFloat!.toFixed(2)} – ${maxFloat!.toFixed(2)}` : '—'}</div>
                   </div>
                 </div>
               </div>
             )}
 
             {(itemTypeLabel || categoryLabel || patternLabel || teamLabel || paintIndexLabel || isStatTrak || isSouvenir) && (
-              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase block mb-3">Details</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+              <div className="bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10">
+                <div className="text-xs font-medium text-gray-400 mb-4">Details</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {itemTypeLabel ? (
-                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Type</div>
-                      <div className="mt-1 font-black text-white/90">{itemTypeLabel}</div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <div className="text-xs font-medium text-gray-500">Type</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">{itemTypeLabel}</div>
                     </div>
                   ) : null}
                   {categoryLabel ? (
-                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Category</div>
-                      <div className="mt-1 font-black text-white/90">{categoryLabel}</div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <div className="text-xs font-medium text-gray-500">Category</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">{categoryLabel}</div>
                     </div>
                   ) : null}
                   {patternLabel ? (
-                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Finish</div>
-                      <div className="mt-1 font-black text-white/90">{patternLabel}</div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <div className="text-xs font-medium text-gray-500">Finish</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">{patternLabel}</div>
                     </div>
                   ) : null}
                   {paintIndexLabel ? (
-                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Paint Index</div>
-                      <div className="mt-1 font-black text-white/90">{paintIndexLabel}</div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <div className="text-xs font-medium text-gray-500">Paint Index</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">{paintIndexLabel}</div>
                     </div>
                   ) : null}
                   {teamLabel ? (
-                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Team</div>
-                      <div className="mt-1 font-black text-white/90">{teamLabel}</div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <div className="text-xs font-medium text-gray-500">Team</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">{teamLabel}</div>
                     </div>
                   ) : null}
                   {(isStatTrak || isSouvenir) ? (
-                    <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Flags</div>
-                      <div className="mt-1 font-black text-white/90">
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-4">
+                      <div className="text-xs font-medium text-gray-500">Flags</div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">
                         {isStatTrak ? 'StatTrak™' : ''}
                         {isStatTrak && isSouvenir ? ' • ' : ''}
                         {isSouvenir ? 'Souvenir' : ''}
@@ -867,10 +868,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
             )}
 
             {(hasContents || containerLikely) && (
-              <div className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase">Contains</div>
-                  <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest">
+              <div className="bg-[#11141d] p-5 md:p-6 rounded-2xl border border-white/10">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="text-sm font-medium text-gray-200">Contains</div>
+                  <div className="text-xs text-gray-500 font-medium">
                     {contains.length ? `${contains.length} items` : ''}
                     {contains.length && containsRare.length ? ' • ' : ''}
                     {containsRare.length ? `${containsRare.length} rare` : ''}
@@ -885,21 +886,21 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
                 {crates.length > 0 && (
                   <div className="mb-5">
-                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Related Crates</div>
+                    <div className="text-xs font-medium text-gray-400 mb-2">Related Crates</div>
                     <Row items={crates} />
                   </div>
                 )}
 
                 {contains.length > 0 && (
                   <div className="mb-5">
-                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Items</div>
+                    <div className="text-xs font-medium text-gray-400 mb-2">Items</div>
                     <Row items={contains} />
                   </div>
                 )}
 
                 {containsRare.length > 0 && (
                   <div>
-                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Rare Special Items</div>
+                    <div className="text-xs font-medium text-gray-400 mb-2">Rare Special Items</div>
                     <Row items={containsRare} />
                   </div>
                 )}
@@ -910,15 +911,16 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             )}
 
-            <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-3 md:gap-4 w-full py-6 md:py-8 bg-blue-600 hover:bg-blue-500 text-white rounded-[2rem] md:rounded-[2.5rem] font-black text-[10px] md:text-xs uppercase tracking-widest transition-all">
-              Trade on Steam Market <ExternalLink size={16} />
+            <a href={`https://steamcommunity.com/market/listings/730/${encodeURIComponent(item?.market_hash_name)}`} target="_blank" className="flex items-center justify-center gap-2 w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold text-sm transition-all">
+              Open on Steam Market <ExternalLink size={16} />
             </a>
-          </div>
           </div>
         </div>
       </div>
-      
-      <ProUpgradeModal
+    </div>
+    </div>
+
+    <ProUpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         title="Wishlist Limit Reached"
@@ -962,8 +964,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         itemId={item?.id || decodedId}
         itemImage={item?.image}
       />
-        </div>
-      </div>
+  </div>
   );
 }
 
