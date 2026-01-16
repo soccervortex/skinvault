@@ -463,6 +463,36 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     return `/item/${encodeURIComponent(key)}`;
   };
 
+  const rowCardKey = (raw: any) => String(raw?.id || raw?.market_hash_name || raw?.marketHashName || raw?.name || '');
+
+  const Row = ({ items }: { items: any[] }) => (
+    <div className="-mx-2 px-2 overflow-x-auto">
+      <div className="flex gap-2 min-w-max">
+        {items.map((c: any) => (
+          <Link
+            key={rowCardKey(c)}
+            href={makeItemHref(c)}
+            className="w-[240px] shrink-0 flex items-center gap-3 bg-black/40 border border-white/10 rounded-2xl p-3 hover:bg-white/5 transition-all"
+          >
+            {c?.image ? (
+              <img
+                src={String(c.image)}
+                alt={String(c?.name || '')}
+                className="w-12 h-12 object-contain rounded-xl bg-white/5 border border-white/10"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10" />
+            )}
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
+              <div className="text-[9px] text-gray-600 truncate">{String(c?.rarity?.name || c?.id || '')}</div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-dvh bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -856,51 +886,21 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {crates.length > 0 && (
                   <div className="mb-5">
                     <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Related Crates</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {crates.slice(0, 20).map((c: any) => (
-                        <Link key={String(c?.id || c?.name || '')} href={makeItemHref(c)} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all">
-                          {c?.image ? <img src={String(c.image)} alt={String(c?.name || '')} className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10" /> : <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />}
-                          <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
-                            <div className="text-[9px] text-gray-600 truncate">{String(c?.id || '')}</div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
+                    <Row items={crates} />
                   </div>
                 )}
 
                 {contains.length > 0 && (
                   <div className="mb-5">
                     <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Items</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {contains.slice(0, 40).map((c: any) => (
-                        <Link key={String(c?.id || c?.name || '')} href={makeItemHref(c)} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all">
-                          {c?.image ? <img src={String(c.image)} alt={String(c?.name || '')} className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10" /> : <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />}
-                          <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
-                            <div className="text-[9px] text-gray-600 truncate">{String(c?.rarity?.name || '')}</div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
+                    <Row items={contains} />
                   </div>
                 )}
 
                 {containsRare.length > 0 && (
                   <div>
                     <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Rare Special Items</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {containsRare.slice(0, 20).map((c: any) => (
-                        <Link key={String(c?.id || c?.name || '')} href={makeItemHref(c)} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 hover:bg-white/5 transition-all">
-                          {c?.image ? <img src={String(c.image)} alt={String(c?.name || '')} className="w-10 h-10 object-contain rounded-lg bg-white/5 border border-white/10" /> : <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10" />}
-                          <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-widest truncate">{String(c?.name || '—')}</div>
-                            <div className="text-[9px] text-gray-600 truncate">{String(c?.rarity?.name || '')}</div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
+                    <Row items={containsRare} />
                   </div>
                 )}
 
