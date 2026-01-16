@@ -468,23 +468,36 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     // Some datasets use hashed ids like `skin-<hash>` where the actual route is suffixed by rarity.
     // Example: `skin-b75169b00be8_3`
     if (id && /^skin-[a-z0-9]+$/i.test(id) && !/_\d{1,3}$/.test(id)) {
-      const rarityCandidate =
-        raw?.rarity?.id ??
-        raw?.rarity?.value ??
-        raw?.rarityId ??
-        raw?.rarity_id ??
-        raw?.rarityLevel ??
-        raw?.rarity_level;
+      const wearId = String(raw?.wear?.id ?? raw?.wearId ?? raw?.wear_id ?? '').trim();
+      const wearIdNum = (() => {
+        const m = wearId.match(/_(\d{1,3})$/);
+        return m ? Number(m[1]) : null;
+      })();
 
-      const rarityNum =
-        typeof rarityCandidate === 'number'
-          ? rarityCandidate
-          : Number.isFinite(Number(rarityCandidate))
-            ? Number(rarityCandidate)
-            : null;
+      const wearNameFromField = String(raw?.wear?.name ?? raw?.wearName ?? raw?.wear_name ?? '').trim();
+      const wearNameFromMhn = (() => {
+        const m = marketHashName.match(/\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)\s*$/i);
+        return m ? String(m[1]) : '';
+      })();
 
-      if (rarityNum !== null) {
-        key = `${id}_${rarityNum}`;
+      const wearName = wearNameFromField || wearNameFromMhn;
+      const wearNameNum = (() => {
+        const w = wearName.toLowerCase();
+        if (!w) return null;
+        if (w.includes('factory new')) return 0;
+        if (w.includes('minimal wear')) return 1;
+        if (w.includes('field-tested') || w.includes('field tested')) return 2;
+        if (w.includes('well-worn') || w.includes('well worn')) return 3;
+        if (w.includes('battle-scarred') || w.includes('battle scarred')) return 4;
+        return null;
+      })();
+
+      const suffixNum = wearIdNum !== null ? wearIdNum : wearNameNum;
+
+      if (suffixNum !== null) {
+        key = `${id}_${suffixNum}`;
+      } else if (marketHashName) {
+        key = marketHashName;
       }
     }
 

@@ -33,6 +33,7 @@ type GiveawayDetail = GiveawaySummary & {
 };
 
 type ItemInfo = {
+  id: string | null;
   name: string;
   image: string | null;
   market_hash_name: string;
@@ -292,6 +293,7 @@ export default function GiveawaysPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'Failed');
       const info: ItemInfo = {
+        id: json?.id ? String(json.id) : null,
         name: String(json?.name || json?.market_hash_name || k),
         image: json?.image ? String(json.image) : null,
         market_hash_name: String(json?.market_hash_name || k),
@@ -600,6 +602,9 @@ export default function GiveawaysPage() {
   const detailItemInfo = detailItemKey ? itemInfoByKey[detailItemKey] : null;
   const detailRarityColor = detailItemInfo?.rarityColor || rarityColorFallback(detailItemInfo?.rarityName);
   const detailPrizeImage = (detail?.prizeItem?.image ? String(detail.prizeItem.image) : null) || detailItemInfo?.image || null;
+  const detailItemHref = detailItemInfo?.id
+    ? `/item/${encodeURIComponent(detailItemInfo.id)}`
+    : (detailItemKey ? `/item/${encodeURIComponent(detailItemKey)}` : null);
 
   const winnerCanClaim = useMemo(() => {
     if (!myWinner?.isWinner) return false;
@@ -731,7 +736,7 @@ export default function GiveawaysPage() {
                       <button
                         key={g.id}
                         onClick={() => loadDetail(g.id)}
-                        className={`w-full text-left p-5 rounded-[1.75rem] border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/40 hover:border-white/10'}`}
+                        className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedId === g.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/5 bg-black/40 hover:border-white/10'}`}
                       >
                         {(() => {
                           const st = getGiveawayStatus(Date.now(), g);
@@ -740,6 +745,7 @@ export default function GiveawaysPage() {
                           const info = key ? itemInfoByKey[key] : null;
                           const rarityColor = (info?.rarityColor || rarityColorFallback(info?.rarityName)) as string;
                           const img = (g?.prizeItem?.image ? String(g.prizeItem.image) : null) || info?.image || null;
+                          const href = info?.id ? `/item/${encodeURIComponent(info.id)}` : (key ? `/item/${encodeURIComponent(key)}` : null);
 
                           return (
                             <>
@@ -749,7 +755,7 @@ export default function GiveawaysPage() {
 
                               <div className="flex items-start gap-4">
                                 <div
-                                  className="w-14 h-14 rounded-[1.5rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
+                                  className="w-16 h-16 rounded-2xl bg-[#0b0e14] border border-white/10 overflow-hidden flex items-center justify-center shrink-0"
                                   style={{ boxShadow: `0 0 0 1px ${hexToRgba(rarityColor, 0.25)} inset` }}
                                 >
                                   {img ? (
@@ -760,20 +766,35 @@ export default function GiveawaysPage() {
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[12px] font-black uppercase tracking-widest truncate">{g.title}</div>
-                                  <div className="text-[11px] mt-1 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
-                                    {g.prize || info?.name || 'Prize TBA'}
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="text-[12px] font-black uppercase tracking-widest truncate">{g.title}</div>
+                                      <div className="text-[11px] mt-1 truncate" style={{ color: hexToRgba(rarityColor, 0.95) }}>
+                                        {g.prize || info?.name || 'Prize TBA'}
+                                      </div>
+                                    </div>
+
+                                    {href ? (
+                                      <Link
+                                        href={href}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="shrink-0 inline-flex items-center justify-center px-3 py-2 rounded-xl bg-black/40 border border-white/10 hover:bg-white/5 transition-all text-[10px] font-black uppercase tracking-widest"
+                                      >
+                                        View
+                                      </Link>
+                                    ) : null}
                                   </div>
+
                                   <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-gray-500">
-                                    <div>
+                                    <div className="bg-black/30 border border-white/5 rounded-xl p-2">
                                       <div className="uppercase tracking-widest">Entry</div>
                                       <div className="text-[10px] font-black text-white">{g.creditsPerEntry}</div>
                                     </div>
-                                    <div>
+                                    <div className="bg-black/30 border border-white/5 rounded-xl p-2">
                                       <div className="uppercase tracking-widest">Players</div>
                                       <div className="text-[10px] font-black text-white">{g.totalParticipants}</div>
                                     </div>
-                                    <div>
+                                    <div className="bg-black/30 border border-white/5 rounded-xl p-2">
                                       <div className="uppercase tracking-widest">Winners</div>
                                       <div className="text-[10px] font-black text-white">{g.winnerCount}</div>
                                     </div>
@@ -935,6 +956,15 @@ export default function GiveawaysPage() {
                               </div>
                             )}
                           </div>
+
+                          {detailItemHref && (
+                            <Link
+                              href={detailItemHref}
+                              className="ml-auto shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-black/40 border border-white/10 hover:bg-white/5 transition-all text-[10px] font-black uppercase tracking-widest"
+                            >
+                              View
+                            </Link>
+                          )}
                         </div>
                         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-[10px]">
                           <div className="bg-black/30 border border-white/5 rounded-[1.5rem] p-3">
