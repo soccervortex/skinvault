@@ -10,6 +10,7 @@ import { getTopMovers, getTrendingItems, PriceChange } from '@/app/lib/price-tra
 import { checkUserCountMilestone, getUnpostedMilestones, markMilestonePosted, UserMilestone } from '@/app/lib/user-milestones';
 import { getUnpostedFeatureAnnouncements, markFeatureAnnouncementPosted, FeatureAnnouncement } from '@/app/lib/feature-announcements';
 import { getUnpostedNewUsers, createNewUserWelcomePost, NewUser } from '@/app/lib/new-user-posts';
+import { getWearFloatRange, getWearNameFromSkin } from '@/app/utils/skin-utils';
 import crypto from 'crypto';
 
 export type PostType = 'weekly_summary' | 'monthly_stats' | 'giveaways_digest' | 'item_highlight' | 'milestone' | 'alert' | 'new_user';
@@ -192,6 +193,9 @@ type GiveawayDigestRow = {
   startAt?: Date;
   endAt?: Date;
   creditsPerEntry: number;
+  totalEntries?: number;
+  totalParticipants?: number;
+  winnerCount?: number;
 };
 
 function giveawayCadenceLabel(g: GiveawayDigestRow): 'DAILY' | 'WEEKLY' | 'MONTHLY' {
@@ -209,6 +213,43 @@ function formatEndsShort(d: Date): string {
   const mm = months[dt.getUTCMonth()] || '';
   const dd = dt.getUTCDate();
   return `${mm} ${dd}`;
+}
+
+function formatCountShort(value: number): string {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) return '';
+  if (v >= 1_000_000) {
+    const m = Math.round((v / 1_000_000) * 10) / 10;
+    return String(m).replace(/\.0$/, '') + 'm';
+  }
+  if (v >= 10_000) {
+    return String(Math.round(v / 1_000)) + 'k';
+  }
+  if (v >= 1_000) {
+    const k = Math.round((v / 1_000) * 10) / 10;
+    return String(k).replace(/\.0$/, '') + 'k';
+  }
+  return String(Math.round(v));
+}
+
+function formatEndsLabel(now: Date, endAt?: Date): string {
+  if (!endAt) return '';
+  const diffMs = new Date(endAt).getTime() - now.getTime();
+  if (!Number.isFinite(diffMs)) return '';
+  if (diffMs <= 0) return 'Ended';
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffHours < 48) return `Ends in ${Math.max(1, diffHours)}h`;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 14) return `Ends in ${Math.max(1, diffDays)}d`;
+  return `Ends ${formatEndsShort(new Date(endAt))}`;
+}
+
+function inferFloatRangeFromName(prizeName: string): string {
+  const wear = getWearNameFromSkin(prizeName);
+  if (!wear) return '';
+  const range = getWearFloatRange(wear);
+  if (!range) return '';
+  return `${range.min.toFixed(2)}–${range.max.toFixed(2)}`;
 }
 
 function formatCreditsShort(value: number): string {
@@ -264,6 +305,9 @@ export async function createGiveawaysDigestPost(): Promise<{ success: boolean; p
         startAt: startAt || undefined,
         endAt: endAt || undefined,
         creditsPerEntry: Number(g.creditsPerEntry || 10),
+        totalEntries: Number(g.totalEntries || 0),
+        totalParticipants: Number(g.totalParticipants || 0),
+        winnerCount: Number(g.winnerCount || 1),
       } satisfies GiveawayDigestRow;
     });
 
@@ -271,40 +315,67 @@ export async function createGiveawaysDigestPost(): Promise<{ success: boolean; p
       return { success: false, error: 'No active giveaways' };
     }
 
-    const link = 'https://www.skinvaults.online/giveaways';
+    const link = 'skinvaults.online/giveaways';
 
     const primary = active[0];
     const primaryPrize = String(primary.prizeItem?.name || primary.prize || primary.title || '').trim();
     const primaryCadence = giveawayCadenceLabel(primary);
-    const primaryEnds = primary.endAt ? formatEndsShort(primary.endAt) : '';
+    const primaryEnds = formatEndsLabel(now, primary.endAt);
     const primaryEntry = formatCreditsShort(primary.creditsPerEntry);
-    const hashtag = '\n#CS2 #CS2Skins #Giveaway #SkinVaults #CS2Giveaway';
+    const primaryFloat = inferFloatRangeFromName(primaryPrize);
+    const primaryEntrants = Math.max(0, Math.floor(Number(primary.totalParticipants || 0)));
+    const primaryEntries = Math.max(0, Math.floor(Number(primary.totalEntries || 0)));
+    const primaryWinners = Math.max(1, Math.floor(Number(primary.winnerCount || 1)));
+    const hashtag = '\n#CS2 #Giveaway #CS2Skins #CS2Giveaway #SkinVaults';
 
     let text = '';
     if (active.length === 1) {
-      const line1 = primaryPrize ? `🎁 WIN ${primaryPrize}` : '🎁 GIVEAWAY LIVE';
-      const line2Parts = [
+      const titleLine = primaryPrize ? `🎁 WIN ${primaryPrize}` : '🎁 GIVEAWAY LIVE';
+      const checklist = `✅ Follow @Skinvaults\n✅ Enter → ${link}`;
+
+      const statsParts = [
+        primaryEntrants > 0 ? `👥 ${formatCountShort(primaryEntrants)} entrants` : '',
+        primaryEntries > 0 ? `🎟 ${formatCountShort(primaryEntries)} entries` : '',
+        primaryWinners > 0 ? `🏆 ${primaryWinners} winner${primaryWinners > 1 ? 's' : ''}` : '',
+      ].filter(Boolean);
+      const statsLine = statsParts.join(' • ');
+
+      const infoParts = [
         `[${primaryCadence}]`,
-        primaryEnds ? `Ends ${primaryEnds}` : '',
+        primaryEnds ? `⏳ ${primaryEnds}` : '',
+        primaryFloat ? `Float ${primaryFloat}` : '',
         primaryEntry ? `Entry ${primaryEntry} credits` : '',
       ].filter(Boolean);
-      const line2 = line2Parts.join(' • ');
-      text = `${line1}\n${line2}\n\nEnter now → ${link}${hashtag}`;
+      const infoLine = infoParts.join(' • ');
+
+      const mid = [statsLine, infoLine].filter(Boolean).join('\n');
+      text = `${titleLine}\n${checklist}${mid ? `\n\n${mid}` : ''}${hashtag}`;
       if (text.length > 280) {
-        text = `🎁 GIVEAWAY LIVE\n\nEnter now → ${link}${hashtag}`;
+        const compactInfo = [
+          primaryEnds ? `⏳ ${primaryEnds}` : '',
+          primaryEntry ? `Entry ${primaryEntry}` : '',
+        ].filter(Boolean).join(' • ');
+        text = `${titleLine}\n✅ Enter → ${link}${compactInfo ? `\n${compactInfo}` : ''}${hashtag}`;
+      }
+      if (text.length > 280) {
+        text = `🎁 GIVEAWAY LIVE\n✅ Enter → ${link}${hashtag}`;
       }
     } else {
-      const header = `🎁 GIVEAWAYS LIVE\nEnter now → ${link}\n\n`;
+      const header = `🎁 GIVEAWAYS LIVE\n✅ Enter → ${link}\n\n`;
       let body = '';
       for (let i = 0; i < active.length; i++) {
         const g = active[i];
         const cadence = giveawayCadenceLabel(g);
         const prizeName = String(g.prizeItem?.name || g.prize || g.title || '').trim();
-        const ends = g.endAt ? formatEndsShort(g.endAt) : '';
+        const ends = formatEndsLabel(now, g.endAt);
         const entry = formatCreditsShort(g.creditsPerEntry);
+        const entrants = Math.max(0, Math.floor(Number(g.totalParticipants || 0)));
+        const winners = Math.max(1, Math.floor(Number(g.winnerCount || 1)));
         const bits = [
           `${i + 1}) [${cadence}] ${prizeName}`,
-          ends ? `Ends ${ends}` : '',
+          ends ? `⏳ ${ends}` : '',
+          entrants > 0 ? `👥 ${formatCountShort(entrants)}` : '',
+          winners > 0 ? `🏆 ${winners}` : '',
           entry ? `Entry ${entry}` : '',
         ].filter(Boolean);
         const line = bits.join(' • ') + '\n';
