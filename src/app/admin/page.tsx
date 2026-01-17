@@ -112,14 +112,78 @@ export default function AdminPage() {
   const [sendingAdminNotification, setSendingAdminNotification] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = window.localStorage.getItem("steam_user");
-      setUser(stored ? JSON.parse(stored) : null);
-    } catch {
-      setUser(null);
-    }
+    const checkUser = () => {
+      try {
+        if (typeof window === 'undefined') return;
+        const stored = window.localStorage.getItem('steam_user');
+        setUser(stored ? JSON.parse(stored) : null);
+      } catch {
+        setUser(null);
+      }
+    };
+
+    checkUser();
+
+    const handleUserUpdate = () => checkUser();
+    const handlePageShow = () => checkUser();
+    const handleFocus = () => checkUser();
+    const handleVisibility = () => {
+      try {
+        if (document.visibilityState === 'visible') checkUser();
+      } catch {
+      }
+    };
+
+    window.addEventListener('userUpdated', handleUserUpdate);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdate);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
+
+  useEffect(() => {
+    if (user?.steamId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const sessionRes = await fetch('/api/auth/steam/session', { cache: 'no-store' });
+        if (!sessionRes.ok) return;
+        const sessionJson = await sessionRes.json().catch(() => null);
+        const steamId = String(sessionJson?.steamId || '').trim();
+        if (!steamId || !/^\d{17}$/.test(steamId)) return;
+
+        const profileRes = await fetch(`/api/steam/profile?steamId=${encodeURIComponent(steamId)}`, { cache: 'no-store' });
+        if (!profileRes.ok) return;
+        const profile = await profileRes.json().catch(() => null);
+
+        const hydratedUser = {
+          steamId,
+          name: profile?.name || 'User',
+          avatar: profile?.avatar || '',
+        };
+
+        try {
+          window.localStorage.setItem('steam_user', JSON.stringify(hydratedUser));
+        } catch {
+        }
+
+        if (!cancelled) {
+          setUser(hydratedUser);
+          window.dispatchEvent(new CustomEvent('userUpdated'));
+        }
+      } catch {
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.steamId]);
 
   const userIsOwner = isOwner(user?.steamId);
 
