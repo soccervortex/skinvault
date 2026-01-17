@@ -1255,6 +1255,26 @@ async function setupFAQ(guild) {
   }
 }
 
+const messageQueue = [];
+
+function queueMessage(channel, message) {
+  messageQueue.push({ channel, message });
+}
+
+async function processQueuedMessages() {
+  if (messageQueue.length === 0) {
+    return;
+  }
+
+  const { channel, message } = messageQueue.shift();
+  try {
+    await channel.send(message);
+  } catch (error) {
+    log(`❌ Error sending queued message: ${error.message}`);
+    // Optional: re-queue or handle error
+  }
+}
+
 // Send welcome DM to new member
 async function sendWelcomeDM(member) {
   try {
