@@ -5,8 +5,6 @@ import { fetchSteamProfile, getCurrentUserInfo } from '../messages/route';
 import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
 interface DMMessage {
   _id?: string;
   dmId: string; // Format: steamId1_steamId2 (sorted)

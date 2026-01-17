@@ -1,0 +1,164 @@
+import { NextResponse } from 'next/server';
+import { getCachedMongoUri, getMongoClient, getMongoUriCandidates, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { dbGet, dbSet } from '@/app/utils/database';
+
+const ADMIN_HEADER = 'x-admin-key';
+const PENDING_KEY = 'admin_pending_mongo_clusters';
+
+type PendingCluster = {
+  idx: number;
+  envKey: string;
+  host: string | null;
+  createdAt: string;
+  deployed?: boolean;
+  deployedAt?: string;
+};
+
+type ConnectionInfo = {
+  envKey: string;
+  idx: number | null;
+  configured: boolean;
+  host: string | null;
+  masked: string;
+  active: boolean;
+};
+
+function checkAuth(request: Request): boolean {
+  const adminKey = request.headers.get(ADMIN_HEADER);
+  const expected = process.env.ADMIN_PRO_TOKEN;
+  if (expected && adminKey !== expected) return false;
+  return true;
+}
+
+function safeHostFromUri(uri: string): string | null {
+  try {
+    const u = new URL(uri);
+    return u.hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+function maskMongoUri(uri: string): string {
+  const host = safeHostFromUri(uri);
+  if (!host) return 'mongodb://***';
+  return `mongodb://***@${host}/***`;
+}
+
+function buildConnections(): ConnectionInfo[] {
+  const activeUri = getCachedMongoUri();
+
+  const clusterEntries = Object.entries(process.env)
+    .filter(([key, value]) => key.startsWith('MONGODB_CLUSTER_') && value && String(value).trim())
+    .map(([key, value]) => {
+      const rawIdx = key.slice('MONGODB_CLUSTER_'.length);
+      const idx = Number.parseInt(rawIdx, 10);
+      return {
+        key,
+        idx: Number.isFinite(idx) ? idx : Number.POSITIVE_INFINITY,
+        uri: String(value).trim(),
+      };
+    })
+    .sort((a, b) => {
+      if (a.idx !== b.idx) return a.idx - b.idx;
+      return a.key.localeCompare(b.key);
+    });
+
+  const out: ConnectionInfo[] = [];
+  for (const entry of clusterEntries) {
+    out.push({
+      envKey: entry.key,
+      idx: Number.isFinite(entry.idx) ? entry.idx : null,
+      configured: true,
+      host: safeHostFromUri(entry.uri),
+      masked: maskMongoUri(entry.uri),
+      active: !!activeUri && activeUri === entry.uri,
+    });
+  }
+
+  const fallbackUri = process.env.MONGODB_URI ? String(process.env.MONGODB_URI).trim() : '';
+  if (fallbackUri) {
+    out.push({
+      envKey: 'MONGODB_URI',
+      idx: null,
+      configured: true,
+      host: safeHostFromUri(fallbackUri),
+      masked: maskMongoUri(fallbackUri),
+      active: !!activeUri && activeUri === fallbackUri,
+    });
+  }
+
+  // If nothing is configured, still show a placeholder entry for MONGODB_URI
+  if (!out.length) {
+    out.push({
+      envKey: 'MONGODB_URI',
+      idx: null,
+      configured: false,
+      host: null,
+      masked: 'not configured',
+      active: false,
+    });
+  }
+
+  return out;
+}
+
+export async function GET(request: Request) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const dbName = String(process.env.MONGODB_DB_NAME || 'skinvault');
+
+  let pending = (await dbGet<PendingCluster[]>(PENDING_KEY, false)) || [];
+  if (!Array.isArray(pending)) pending = [];
+
+  // Update pending entries with deployed status (if env var exists now).
+  let changed = false;
+  const nowIso = new Date().toISOString();
+  pending = pending.map((p) => {
+    const envVal = (process.env as any)?.[p.envKey];
+    const isDeployed = !!(envVal && String(envVal).trim());
+    if (isDeployed && !p.deployed) {
+      changed = true;
+      return { ...p, deployed: true, deployedAt: nowIso };
+    }
+    return { ...p, deployed: !!p.deployed };
+  });
+
+  if (changed) {
+    const ok = await dbSet(PENDING_KEY, pending);
+    if (!ok) {
+      // If storage isn't available, don't fail status endpoint.
+      // The UI will still show the updated computed state.
+    }
+  }
+
+  const connections = buildConnections();
+
+  let poolConnected = false;
+  let poolError: string | null = null;
+  try {
+    if (hasMongoConfig()) {
+      const client = await getMongoClient();
+      await client.db('admin').command({ ping: 1 });
+      poolConnected = true;
+    }
+  } catch (e: any) {
+    poolConnected = false;
+    poolError = e?.message || String(e);
+  }
+
+  return NextResponse.json({
+    dbName,
+    mongodb: {
+      configured: hasMongoConfig(),
+      uriCandidatesCount: getMongoUriCandidates().length,
+      cachedUriHost: getCachedMongoUri() ? safeHostFromUri(getCachedMongoUri() as string) : null,
+      poolConnected,
+      poolError,
+    },
+    connections,
+    pending,
+  });
+}

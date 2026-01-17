@@ -5,8 +5,6 @@ import { getDatabase } from '@/app/utils/mongodb-client';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
 interface ChatMessage {
   _id?: string;
   steamId: string;

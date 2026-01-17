@@ -18,9 +18,24 @@ function normalizeSecret(raw) {
 
 function getMongoUriCandidates() {
   const candidates = [];
-  for (let i = 1; i <= 5; i++) {
-    const v = process.env[`MONGODB_CLUSTER_${i}`];
-    if (v && String(v).trim()) candidates.push(String(v).trim());
+  const clusterEntries = Object.entries(process.env)
+    .filter(([key, value]) => key.startsWith('MONGODB_CLUSTER_') && value && String(value).trim())
+    .map(([key, value]) => {
+      const rawIdx = key.slice('MONGODB_CLUSTER_'.length);
+      const idx = Number.parseInt(rawIdx, 10);
+      return {
+        key,
+        idx: Number.isFinite(idx) ? idx : Number.POSITIVE_INFINITY,
+        uri: String(value).trim(),
+      };
+    })
+    .sort((a, b) => {
+      if (a.idx !== b.idx) return a.idx - b.idx;
+      return a.key.localeCompare(b.key);
+    });
+ 
+  for (const entry of clusterEntries) {
+    candidates.push(entry.uri);
   }
   if (process.env.MONGODB_URI && String(process.env.MONGODB_URI).trim()) {
     candidates.push(String(process.env.MONGODB_URI).trim());

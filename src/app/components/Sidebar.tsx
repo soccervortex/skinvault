@@ -51,6 +51,15 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
         const savedUser = window.localStorage.getItem('steam_user');
         const parsedUser = savedUser ? JSON.parse(savedUser) : null;
 
+        const logoutTsRaw = window.localStorage.getItem('sv_logout_ts');
+        const logoutTs = logoutTsRaw ? Number(logoutTsRaw) : 0;
+        const recentlyLoggedOut = Number.isFinite(logoutTs) && Date.now() - logoutTs < 15000;
+
+        if (!parsedUser?.steamId && recentlyLoggedOut) {
+          setUser(null);
+          return;
+        }
+
         if (!parsedUser?.steamId && !didTrySessionHydrationRef.current) {
           didTrySessionHydrationRef.current = true;
           void (async () => {
@@ -312,16 +321,27 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   };
 
   // 3. Logout Handler (Zorgt voor directe UI update)
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
-      fetch('/api/auth/steam/logout', { method: 'POST' }).catch(() => {});
+      localStorage.setItem('sv_logout_ts', String(Date.now()));
+      localStorage.removeItem('steam_user');
+      localStorage.removeItem('user_inventory');
     } catch {
-      /* ignore */
     }
-    localStorage.removeItem('steam_user');
-    localStorage.removeItem('user_inventory');
+
     setUser(null);
-    window.location.href = '/'; // Reset de gehele app state
+    try {
+      window.dispatchEvent(new CustomEvent('userUpdated'));
+    } catch {
+    }
+
+    try {
+      await fetch('/api/auth/steam/logout', { method: 'POST' });
+    } catch {
+    }
+
+    setIsMobileMenuOpen(false);
+    window.location.href = '/';
   };
 
   const handleSearch = async (e: React.FormEvent) => {

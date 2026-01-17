@@ -48,6 +48,30 @@ export async function getProUntil(steamId: string): Promise<string | null> {
   return proUntil;
 }
 
+export async function grantProDays(steamId: string, days: number): Promise<string> {
+  const data = await readProData();
+  const now = new Date();
+  const existing = data[steamId] ? new Date(data[steamId]) : null;
+  const base = existing && existing > now ? existing : now;
+
+  const safeDays = Number.isFinite(days) ? Math.floor(days) : 0;
+  if (safeDays <= 0) {
+    const proUntil = base.toISOString();
+    data[steamId] = proUntil;
+    await writeProData(data);
+    return proUntil;
+  }
+
+  const newDate = new Date(base);
+  newDate.setDate(newDate.getDate() + safeDays);
+  const proUntil = newDate.toISOString();
+
+  data[steamId] = proUntil;
+  await writeProData(data);
+
+  return proUntil;
+}
+
 export async function grantPro(steamId: string, months: number): Promise<string> {
   const data = await readProData();
   const now = new Date();

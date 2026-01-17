@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { 
   getProUntil, 
-  grantPro, 
+  grantProDays, 
   getFirstLoginDate, 
   hasClaimedFreeMonth, 
   markFreeMonthClaimed 
@@ -12,6 +12,7 @@ import { createUserNotification } from '@/app/utils/user-notifications';
 // New user bonus: Users can activate 2 weeks of Pro access within 7 days of first login
 const FREE_MONTH_DAYS = 7;
 const FREE_WEEKS = 2; // 2 weeks = 0.5 months
+const FREE_DAYS = 14;
 
 export async function POST(request: Request) {
   try {
@@ -33,6 +34,38 @@ export async function POST(request: Request) {
     // Check if user has already claimed the bonus (one-time only)
     const alreadyClaimed = await hasClaimedFreeMonth(steamId);
     if (alreadyClaimed) {
+      const nowMs = Date.now();
+      const curMs = currentProUntil ? new Date(currentProUntil).getTime() : NaN;
+      const isValidCur = Number.isFinite(curMs);
+      const recentlyClaimed = isValidCur ? curMs > nowMs - FREE_DAYS * 24 * 60 * 60 * 1000 : true;
+
+      // Repair path: if the user claimed within the last 14 days but ended up expired (historical bug)
+      if ((!currentProUntil || (isValidCur && curMs <= nowMs && recentlyClaimed))) {
+        const newProUntil = await grantProDays(steamId, FREE_DAYS);
+
+        try {
+          if (hasMongoConfig()) {
+            const db = await getDatabase();
+            await createUserNotification(
+              db,
+              steamId,
+              'pro_bonus_activated',
+              'Pro Bonus Activated',
+              'Your new user Pro bonus is now active (2 weeks).',
+              { proUntil: newProUntil }
+            );
+          }
+        } catch {
+        }
+
+        return NextResponse.json({
+          success: true,
+          proUntil: newProUntil,
+          message: 'Success! Your 2-week Pro bonus is now active.',
+          repaired: true,
+        });
+      }
+
       return NextResponse.json({ 
         error: 'You have already activated the new user Pro bonus. This offer is available once per account.',
         alreadyClaimed: true 
@@ -61,7 +94,7 @@ export async function POST(request: Request) {
     }
 
     // All checks passed - grant 2 weeks of Pro access
-    const newProUntil = await grantPro(steamId, 0.5);
+    const newProUntil = await grantProDays(steamId, FREE_DAYS);
     
     // Mark as claimed (one-time only)
     await markFreeMonthClaimed(steamId);
@@ -116,6 +149,23 @@ export async function GET(request: Request) {
     // Check if already claimed
     const alreadyClaimed = await hasClaimedFreeMonth(steamId);
     if (alreadyClaimed) {
+      const nowMs = Date.now();
+      const curMs = currentProUntil ? new Date(currentProUntil).getTime() : NaN;
+      const isValidCur = Number.isFinite(curMs);
+      const recentlyClaimed = isValidCur ? curMs > nowMs - FREE_DAYS * 24 * 60 * 60 * 1000 : true;
+      const looksBugged = !currentProUntil || (isValidCur && curMs <= nowMs && recentlyClaimed);
+
+      if (looksBugged) {
+        return NextResponse.json({
+          eligible: true,
+          hasPro: false,
+          alreadyClaimed: true,
+          repair: true,
+          daysRemaining: 0,
+          message: 'Your Pro bonus needs re-activation. Click activate to finish enabling your 2-week bonus.',
+        });
+      }
+
       return NextResponse.json({
         eligible: false,
         alreadyClaimed: true,

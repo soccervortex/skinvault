@@ -3,8 +3,6 @@ import { ObjectId } from 'mongodb';
 import { fetchSteamProfile } from '../../messages/route';
 import { getDatabase } from '@/app/utils/mongodb-client';
 
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
 interface DMInvite {
   _id?: string;
   fromSteamId: string;

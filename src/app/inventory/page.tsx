@@ -293,6 +293,36 @@ function InventoryContent() {
 
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const toast = useToast();
+
+  useEffect(() => {
+    const onUserUpdated = () => {
+      try {
+        const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
+        const parsed = stored ? JSON.parse(stored) : null;
+        const sid = String(parsed?.steamId || '').trim();
+
+        if (sid && /^\d{17}$/.test(sid)) {
+          setLoggedInUser(parsed);
+          setWishlist(loadWishlist(sid));
+          checkProStatus(sid).then(setLoggedInUserPro).catch(() => setLoggedInUserPro(false));
+          return;
+        }
+
+        setLoggedInUser(null);
+        setWishlist([]);
+        setLoggedInUserPro(false);
+      } catch {
+        setLoggedInUser(null);
+        setWishlist([]);
+        setLoggedInUserPro(false);
+      }
+    };
+
+    onUserUpdated();
+    window.addEventListener('userUpdated', onUserUpdated);
+    return () => window.removeEventListener('userUpdated', onUserUpdated);
+  }, []);
+
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
   const isPro = useMemo(() => {
     if (!loggedInUser?.steamId) return false;
@@ -1256,6 +1286,9 @@ function InventoryContent() {
               
               // This is your actual login - update the logged-in user completely
               window.localStorage.setItem('steam_user', JSON.stringify(combinedUser));
+              setLoggedInUser(combinedUser);
+              setWishlist(loadWishlist(String(combinedUser.steamId)));
+              checkProStatus(String(combinedUser.steamId)).then(setLoggedInUserPro).catch(() => setLoggedInUserPro(false));
               // Trigger 'userUpdated' event so sidebar updates
               window.dispatchEvent(new CustomEvent('userUpdated'));
             } else if (isViewingOwnProfile && loggedInUser) {

@@ -730,7 +730,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     return `${min.toFixed(2)}–${max.toFixed(2)}`;
   };
 
-  const ContentGrid = ({ items }: { items: any[] }) => (
+  const renderContentGrid = (items: any[]) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
       {items.map((c: any) => {
         const odds = formatOdds(c);
@@ -1238,21 +1238,21 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               {crates.length > 0 && (
                 <div className="mb-8">
                   <div className="text-xs font-medium text-gray-400 mb-3">Related Crates</div>
-                  <ContentGrid items={crates} />
+                  {renderContentGrid(crates)}
                 </div>
               )}
 
               {contains.length > 0 && (
                 <div className="mb-8">
                   <div className="text-xs font-medium text-gray-400 mb-3">Items</div>
-                  <ContentGrid items={contains} />
+                  {renderContentGrid(contains)}
                 </div>
               )}
 
               {containsRare.length > 0 && (
                 <div>
                   <div className="text-xs font-medium text-gray-400 mb-3">Rare Special Items</div>
-                  <ContentGrid items={containsRare} />
+                  {renderContentGrid(containsRare)}
                 </div>
               )}
 

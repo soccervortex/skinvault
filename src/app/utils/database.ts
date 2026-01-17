@@ -14,7 +14,7 @@
 
 import { kv } from '@vercel/kv';
 import { MongoClient, Db, Collection } from 'mongodb';
-import { getMongoClient, getDatabase as getSharedDatabase } from './mongodb-client';
+import { getMongoClient, getDatabase as getSharedDatabase, hasMongoConfig } from './mongodb-client';
 
 // Database status
 // If KV isn't configured, default to MongoDB to avoid unnecessary KV calls.
@@ -26,19 +26,6 @@ let previousKVAvailable: boolean | null = null; // Track KV availability to dete
 export const readCache: Map<string, { value: any; timestamp: number }> = new Map();
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes cache
 const MAX_CACHE_SIZE = 1000; // Max cached items
-
-// MongoDB connection string
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
-function hasMongoConfig(): boolean {
-  if (MONGODB_URI && String(MONGODB_URI).trim()) return true;
-  for (let i = 1; i <= 5; i++) {
-    const v = (process.env as any)[`MONGODB_CLUSTER_${i}`];
-    if (v && String(v).trim()) return true;
-  }
-  return false;
-}
 
 // Initialize MongoDB connection using shared connection pool
 async function initMongoDB(): Promise<Db | null> {

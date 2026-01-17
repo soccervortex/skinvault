@@ -4,8 +4,6 @@ import { getTodayCollectionName, getCollectionNamesForDays } from '@/app/utils/c
 import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'skinvault';
-
 interface ChatMessage {
   _id?: string;
   steamId: string;

@@ -30,6 +30,7 @@ export function useChatStream(
   const isMountedRef = useRef(true);
   const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
+  const reconnectRef = useRef<(() => void) | null>(null);
 
   // Update lastMessageId ref when prop changes
   useEffect(() => {
@@ -177,15 +178,19 @@ export function useChatStream(
           // Reconnect on error - only if connection is closed or connecting
           // Suppress console errors for SSE failures (common on Vercel)
           if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
-            reconnect();
+            reconnectRef.current?.();
           }
         };
       } catch (error) {
         // If EventSource creation fails, try to reconnect
-        reconnect();
+        reconnectRef.current?.();
       }
     }, delay);
   }, [channel, currentUserId, enabled]);
+
+  useEffect(() => {
+    reconnectRef.current = reconnect;
+  }, [reconnect]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -295,13 +300,13 @@ export function useChatStream(
 
         // Reconnect on error - suppress console errors for SSE failures
         if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
-          reconnect();
+          reconnectRef.current?.();
         }
       };
     } catch (error) {
       isConnectingRef.current = false;
       // If EventSource creation fails, try to reconnect
-      reconnect();
+      reconnectRef.current?.();
     }
     }, channelChanged ? 300 : 50); // 300ms delay on channel change, 50ms otherwise
 
