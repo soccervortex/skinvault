@@ -57,6 +57,24 @@ type MigrateChatCacheResponse = {
   };
 };
 
+ type BackfillChatNamesResponse = {
+  success: boolean;
+  summary?: {
+    dryRun: boolean;
+    days: number;
+    maxSteamIds: number;
+    maxUpdates: number;
+    includeChat: boolean;
+    includeCore: boolean;
+    collections: number;
+    steamIds: number;
+    matched: number;
+    modified: number;
+    skippedNoProfile: number;
+    errors: number;
+  };
+ };
+
 type TestResponse = {
   ok: boolean;
   host: string | null;
@@ -103,6 +121,12 @@ export default function AdminDatabasesPage() {
   const [lastTest, setLastTest] = useState<TestResponse | null>(null);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [migrateSummary, setMigrateSummary] = useState<MigrateChatCacheResponse['summary'] | null>(null);
+
+  const [backfillDays, setBackfillDays] = useState(14);
+  const [backfillMaxUpdates, setBackfillMaxUpdates] = useState(5000);
+  const [backfillIncludeChat, setBackfillIncludeChat] = useState(true);
+  const [backfillIncludeCore, setBackfillIncludeCore] = useState(true);
+  const [backfillSummary, setBackfillSummary] = useState<BackfillChatNamesResponse['summary'] | null>(null);
 
   const [addIdx, setAddIdx] = useState('');
   const [addUri, setAddUri] = useState('');
@@ -209,6 +233,37 @@ export default function AdminDatabasesPage() {
       setStatus(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const backfillChatNames = async (dryRun: boolean) => {
+    setLoadingAction(dryRun ? 'backfill_dry' : 'backfill');
+    setBackfillSummary(null);
+    try {
+      const res = await fetch('/api/admin/mongo-manager/backfill-chat-names', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({
+          dryRun,
+          days: backfillDays,
+          maxUpdates: backfillMaxUpdates,
+          includeChat: backfillIncludeChat,
+          includeCore: backfillIncludeCore,
+        }),
+      });
+
+      const json = (await res.json().catch(() => null)) as BackfillChatNamesResponse | null;
+      if (!res.ok) throw new Error((json as any)?.error || 'Backfill failed');
+
+      setBackfillSummary(json?.summary || null);
+      toast.success(dryRun ? 'Dry run complete' : 'Backfill complete');
+    } catch (e: any) {
+      toast.error(e?.message || 'Backfill failed');
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -672,6 +727,106 @@ export default function AdminDatabasesPage() {
                       <div className="bg-black/30 border border-white/10 rounded-xl p-3">
                         <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Errors</div>
                         <div className={`text-sm font-black ${migrateSummary.errors ? 'text-red-400' : ''}`}>{migrateSummary.errors}</div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="bg-[#11141d] border border-white/10 rounded-2xl p-6 mb-8">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Backfill chat names/avatars</div>
+                      <div className="text-sm font-black">Fix old "Unknown User" messages</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => backfillChatNames(true)}
+                        disabled={loadingAction === 'backfill_dry' || loadingAction === 'backfill'}
+                        className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-60"
+                      >
+                        {loadingAction === 'backfill_dry' ? 'Running…' : 'Dry run'}
+                      </button>
+                      <button
+                        onClick={() => backfillChatNames(false)}
+                        disabled={loadingAction === 'backfill_dry' || loadingAction === 'backfill'}
+                        className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-60"
+                      >
+                        {loadingAction === 'backfill' ? 'Updating…' : 'Run backfill'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                      <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black mb-2">Days</div>
+                      <input
+                        value={backfillDays}
+                        onChange={(e) => setBackfillDays(Number(e.target.value || 0))}
+                        className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm"
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                      <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black mb-2">Max updates</div>
+                      <input
+                        value={backfillMaxUpdates}
+                        onChange={(e) => setBackfillMaxUpdates(Number(e.target.value || 0))}
+                        className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm"
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                      <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black mb-2">Targets</div>
+                      <label className="flex items-center gap-2 text-[10px] text-gray-300 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={backfillIncludeChat}
+                          onChange={(e) => setBackfillIncludeChat(e.target.checked)}
+                        />
+                        Chat cluster
+                      </label>
+                      <label className="flex items-center gap-2 text-[10px] text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={backfillIncludeCore}
+                          onChange={(e) => setBackfillIncludeCore(e.target.checked)}
+                        />
+                        Core cluster
+                      </label>
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                      <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black mb-2">Notes</div>
+                      <div className="text-[10px] text-gray-400">
+                        Uses Steam Web API to fill missing names/avatars. Dry run is recommended first.
+                      </div>
+                    </div>
+                  </div>
+
+                  {backfillSummary ? (
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-3">
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Matched</div>
+                        <div className="text-sm font-black">{backfillSummary.matched}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Modified</div>
+                        <div className="text-sm font-black">{backfillSummary.modified}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">SteamIDs</div>
+                        <div className="text-sm font-black">{backfillSummary.steamIds}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">No profile</div>
+                        <div className="text-sm font-black">{backfillSummary.skippedNoProfile}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Errors</div>
+                        <div className={`text-sm font-black ${backfillSummary.errors ? 'text-red-400' : ''}`}>{backfillSummary.errors}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Dry run</div>
+                        <div className="text-sm font-black">{backfillSummary.dryRun ? 'Yes' : 'No'}</div>
                       </div>
                     </div>
                   ) : null}
