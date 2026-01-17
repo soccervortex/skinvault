@@ -2143,7 +2143,7 @@ export default function ChatPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-300 break-words">
+                      <p className="text-sm text-gray-300 break-words whitespace-pre-wrap">
                         {msg.message}
                         {msg.editedAt && (
                           <span className="text-xs text-gray-500 ml-2 italic">(edited)</span>
@@ -2480,7 +2480,7 @@ export default function ChatPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <p className="text-sm text-gray-300 break-words">
+                                <p className="text-sm text-gray-300 break-words whitespace-pre-wrap">
                                   {msg.message}
                                   {msg.editedAt && (
                                     <span className="text-xs text-gray-500 ml-2 italic">(edited)</span>

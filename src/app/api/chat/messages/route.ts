@@ -3,6 +3,8 @@ import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayCollectionName, getCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
+import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
+import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 
 interface ChatMessage {
   _id?: string;
@@ -301,6 +303,25 @@ export async function POST(request: Request) {
         delete timeoutUsers[steamId];
         await dbSet('timeout_users', timeoutUsers);
       }
+    }
+
+    // Automod
+    try {
+      const rawSettings = await dbGet<any>('chat_automod_settings', false);
+      const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
+      const decision = checkAutomod(message, settings);
+      if (!decision.allowed) {
+        await appendChatAutomodEvent({
+          channel: 'global',
+          senderId: steamId,
+          receiverId: null,
+          dmId: null,
+          reason: decision.reason || 'Message blocked by automod',
+          message: String(message || ''),
+        });
+        return NextResponse.json({ error: decision.reason || 'Message blocked by automod' }, { status: 400 });
+      }
+    } catch {
     }
 
     // Fetch current user information (name, avatar, pro status) - optimize with timeout

@@ -4,6 +4,8 @@ import { getTodayDMCollectionName, getDMCollectionNamesForDays } from '@/app/uti
 import { fetchSteamProfile, getCurrentUserInfo } from '../messages/route';
 import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
+import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
+import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 
 interface DMMessage {
   _id?: string;
@@ -252,6 +254,25 @@ export async function POST(request: Request) {
         delete timeoutUsers[senderId];
         await dbSet('timeout_users', timeoutUsers);
       }
+    }
+
+    // Automod
+    try {
+      const rawSettings = await dbGet<any>('chat_automod_settings', false);
+      const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
+      const decision = checkAutomod(message, settings);
+      if (!decision.allowed) {
+        await appendChatAutomodEvent({
+          channel: 'dm',
+          senderId: senderId,
+          receiverId: receiverId,
+          dmId: generateDMId(senderId, receiverId),
+          reason: decision.reason || 'Message blocked by automod',
+          message: String(message || ''),
+        });
+        return NextResponse.json({ error: decision.reason || 'Message blocked by automod' }, { status: 400 });
+      }
+    } catch {
     }
 
     // Check if DM exists (check invites)

@@ -5,6 +5,8 @@ import { getTodayDMCollectionName } from '@/app/utils/chat-collections';
 import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 import { fetchSteamProfile } from '@/app/api/chat/messages/route';
+import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
+import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 
 interface DMMessage {
   _id?: string;
@@ -74,6 +76,25 @@ export async function sendDMMessage(
         delete timeoutUsers[senderId];
         await dbSet('timeout_users', timeoutUsers);
       }
+    }
+
+    // Automod
+    try {
+      const rawSettings = await dbGet<any>('chat_automod_settings', false);
+      const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
+      const decision = checkAutomod(message, settings);
+      if (!decision.allowed) {
+        await appendChatAutomodEvent({
+          channel: 'dm',
+          senderId,
+          receiverId,
+          dmId: generateDMId(senderId, receiverId),
+          reason: decision.reason || 'Message blocked by automod',
+          message: String(message || ''),
+        });
+        return { success: false, error: decision.reason || 'Message blocked by automod' };
+      }
+    } catch {
     }
 
     // Check if DM exists (check invites)
@@ -385,6 +406,25 @@ export async function sendGlobalMessage(
         delete timeoutUsers[steamId];
         await dbSet('timeout_users', timeoutUsers);
       }
+    }
+
+    // Automod
+    try {
+      const rawSettings = await dbGet<any>('chat_automod_settings', false);
+      const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
+      const decision = checkAutomod(message, settings);
+      if (!decision.allowed) {
+        await appendChatAutomodEvent({
+          channel: 'global',
+          senderId: steamId,
+          receiverId: null,
+          dmId: null,
+          reason: decision.reason || 'Message blocked by automod',
+          message: String(message || ''),
+        });
+        return { success: false, error: decision.reason || 'Message blocked by automod' };
+      }
+    } catch {
     }
 
     // Fetch current user information
