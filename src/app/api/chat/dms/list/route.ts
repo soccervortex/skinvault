@@ -6,7 +6,10 @@ import { getChatDatabase } from '@/app/utils/mongodb-client';
 async function fetchSteamProfile(steamId: string): Promise<{ name: string; avatar: string }> {
   try {
     // Use internal server-side fetch (no proxies needed)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl =
+      (process.env.NEXT_PUBLIC_BASE_URL && String(process.env.NEXT_PUBLIC_BASE_URL).trim()) ||
+      (process.env.VERCEL_URL && `https://${String(process.env.VERCEL_URL).trim()}`) ||
+      'http://localhost:3000';
     const res = await fetch(`${baseUrl}/api/steam/profile?steamId=${steamId}`, {
       cache: 'no-store', // Don't cache in API routes
     });

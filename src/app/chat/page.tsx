@@ -10,6 +10,7 @@ import { useToast } from '@/app/components/Toast';
 import MessageActionMenu from '@/app/components/MessageActionMenu';
 import { addUnreadDM, markDMAsRead, addUnreadInvite, markInviteAsRead, getLastCheckTime, updateLastCheckTime, markAllDMsAsRead, getUnreadCounts } from '@/app/utils/chat-notifications';
 import { usePusherChat } from '@/app/hooks/usePusherChat';
+import { useChatStream } from '@/app/hooks/useChatStream';
 import { getCachedMessages, setCachedMessages, clearCache } from '@/app/utils/chat-cache';
 import { saveDMList, mergeDMList, loadDMList } from '@/app/utils/dm-list-persistence';
 import { sendDMMessage, acceptDMInvite, sendDMInvite, sendGlobalMessage } from '@/app/actions/chat-actions';
@@ -141,20 +142,39 @@ export default function ChatPage() {
   const dmChannel = activeTab === 'dms' && user?.steamId ? `dm_${user.steamId}` : null;
   const lastGlobalMessageId = optimisticMessages.length > 0 ? optimisticMessages[optimisticMessages.length - 1]?.id : undefined;
   const lastDMMessageId = optimisticDMMessages.length > 0 ? optimisticDMMessages[optimisticDMMessages.length - 1]?.id : undefined;
+
+  const pusherAvailable = !!getPusherClient();
   
-  const globalStream = usePusherChat(
+  const globalPusherStream = usePusherChat(
     globalChannel || '',
     user?.steamId || null,
-    activeTab === 'global' && !globalChatDisabled && !searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly,
+    pusherAvailable && activeTab === 'global' && !globalChatDisabled && !searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly,
+    lastGlobalMessageId
+  );
+
+  const globalSseStream = useChatStream(
+    globalChannel || '',
+    user?.steamId || null,
+    !pusherAvailable && activeTab === 'global' && !globalChatDisabled && !searchQuery && !filterUser && !filterDateFrom && !filterDateTo && !filterPinnedOnly && !filterProOnly,
     lastGlobalMessageId
   );
   
-  const dmStream = usePusherChat(
+  const dmPusherStream = usePusherChat(
     dmChannel || '',
     user?.steamId || null,
-    activeTab === 'dms' && !!user?.steamId && !dmChatDisabled,
+    pusherAvailable && activeTab === 'dms' && !!user?.steamId && !dmChatDisabled,
     lastDMMessageId
   );
+
+  const dmSseStream = useChatStream(
+    dmChannel || '',
+    user?.steamId || null,
+    !pusherAvailable && activeTab === 'dms' && !!user?.steamId && !dmChatDisabled,
+    lastDMMessageId
+  );
+
+  const globalStream = pusherAvailable ? globalPusherStream : globalSseStream;
+  const dmStream = pusherAvailable ? dmPusherStream : dmSseStream;
 
   // Temporarily force activeTab to always be 'global' (DM tab disabled)
   useEffect(() => {
