@@ -1160,7 +1160,7 @@ export default function ChatPage() {
     try {
       if (activeTab === 'global') {
         // Use server action with useOptimistic
-        const result = await sendGlobalMessage(user.steamId, messageText);
+        const result = await sendGlobalMessage(user.steamId, messageText, user.name || '', user.avatar || '');
 
         if (result.success) {
           // Server action succeeded - Pusher will update messages via usePusherChat hook
@@ -1177,7 +1177,7 @@ export default function ChatPage() {
         const receiverId = steamId1 === user.steamId ? steamId2 : steamId1;
         
         // Use server action with useOptimistic
-        const result = await sendDMMessage(user.steamId, receiverId, messageText);
+        const result = await sendDMMessage(user.steamId, receiverId, messageText, user.name || '', user.avatar || '');
 
         if (result.success) {
           // Server action succeeded - Pusher will update messages via usePusherChat hook

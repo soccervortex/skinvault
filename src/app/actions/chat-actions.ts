@@ -32,7 +32,9 @@ function generateDMId(steamId1: string, steamId2: string): string {
 export async function sendDMMessage(
   senderId: string,
   receiverId: string,
-  message: string
+  message: string,
+  senderName?: string,
+  senderAvatar?: string
 ): Promise<{ success: true; message: DMMessage } | { success: false; error: string }> {
   try {
     if (!senderId || !receiverId || !message?.trim()) {
@@ -97,8 +99,14 @@ export async function sendDMMessage(
       getProUntil(senderId),
     ]);
 
-    const senderName = profileInfo.name || 'Unknown User';
-    const senderAvatar = profileInfo.avatar || '';
+    const resolvedSenderName =
+      (profileInfo.name && profileInfo.name !== 'Unknown User' ? profileInfo.name : '') ||
+      (senderName && senderName !== 'Unknown User' ? senderName : '') ||
+      'Unknown User';
+    const resolvedSenderAvatar =
+      (profileInfo.avatar && String(profileInfo.avatar).trim() ? profileInfo.avatar : '') ||
+      (senderAvatar && String(senderAvatar).trim() ? senderAvatar : '') ||
+      '';
     const senderIsPro = proUntil ? new Date(proUntil) > new Date() : false;
 
     // Use today's date-based collection
@@ -146,8 +154,8 @@ export async function sendDMMessage(
             dmId: insertedMessage.dmId,
             senderId: insertedMessage.senderId,
             receiverId: insertedMessage.receiverId,
-            senderName,
-            senderAvatar,
+            senderName: resolvedSenderName,
+            senderAvatar: resolvedSenderAvatar,
             senderIsPro,
             message: insertedMessage.message,
             timestamp: insertedMessage.timestamp,
@@ -342,7 +350,9 @@ interface GlobalMessage {
 
 export async function sendGlobalMessage(
   steamId: string,
-  message: string
+  message: string,
+  steamName?: string,
+  avatar?: string
 ): Promise<{ success: true; message: GlobalMessage } | { success: false; error: string }> {
   try {
     if (!steamId || !message?.trim()) {
@@ -382,14 +392,20 @@ export async function sendGlobalMessage(
       Promise.race([
         fetchSteamProfile(steamId),
         new Promise<{ name: string; avatar: string }>((resolve) => 
-          setTimeout(() => resolve({ name: 'Unknown User', avatar: '' }), 2000)
+          setTimeout(() => resolve({ name: steamName || '', avatar: avatar || '' }), 2000)
         )
       ]),
       getProUntil(steamId),
     ]);
 
-    const currentSteamName = profileInfo.name || 'Unknown User';
-    const currentAvatar = profileInfo.avatar || '';
+    const currentSteamName =
+      (profileInfo.name && profileInfo.name !== 'Unknown User' ? profileInfo.name : '') ||
+      (steamName && steamName !== 'Unknown User' ? steamName : '') ||
+      'Unknown User';
+    const currentAvatar =
+      (profileInfo.avatar && String(profileInfo.avatar).trim() ? profileInfo.avatar : '') ||
+      (avatar && String(avatar).trim() ? avatar : '') ||
+      '';
     const currentIsPro = proUntil ? new Date(proUntil) > new Date() : false;
 
     // Use today's date-based collection

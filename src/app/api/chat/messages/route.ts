@@ -36,13 +36,15 @@ export async function fetchSteamProfile(steamId: string): Promise<{ name: string
     
     if (res.ok) {
       const data = await res.json();
-      return { name: data.name || 'Unknown User', avatar: data.avatar || '' };
+      const name = String(data?.name || '').trim();
+      const avatar = String(data?.avatar || '').trim();
+      return { name: name === 'Unknown User' ? '' : name, avatar };
     }
   } catch (error) {
     // Silently fail
   }
   
-  return { name: 'Unknown User', avatar: '' };
+  return { name: '', avatar: '' };
 }
 
 // Get current user info for all unique users in messages
@@ -222,28 +224,34 @@ export async function GET(request: Request) {
         const messageId = msg._id?.toString() || '';
         const isPinned = pinnedMessages[messageId]?.messageType === 'global';
         
-        // Use current user info if available, otherwise fall back to stored info
-        const steamName = currentUserInfo?.steamName || msg.steamName;
-        const avatar = currentUserInfo?.avatar || msg.avatar;
+        const resolvedSteamName =
+          (currentUserInfo?.steamName && currentUserInfo.steamName !== 'Unknown User' ? currentUserInfo.steamName : '') ||
+          msg.steamName ||
+          'Unknown User';
+        const resolvedAvatar =
+          (currentUserInfo?.avatar && String(currentUserInfo.avatar).trim() ? currentUserInfo.avatar : '') ||
+          msg.avatar ||
+          '';
         const isPro = currentUserInfo?.isPro ?? msg.isPro;
         
         return {
           id: messageId,
           steamId: msg.steamId,
-          steamName,
-          avatar,
+          steamName: resolvedSteamName,
+          avatar: resolvedAvatar,
           message: msg.message,
           timestamp: msg.timestamp,
           editedAt: msg.editedAt,
           isPro,
           isBanned,
           isTimedOut,
-          timeoutUntil: isTimedOut ? timeoutUntil : null,
           isPinned,
         };
       }),
       hasMore,
-      nextCursor: nextCursor?.toISOString() || null, // Return cursor for next page
+      total: messages.length,
+      page: 1,
+      nextCursor: nextCursor ? nextCursor.toISOString() : null,
     });
   } catch (error: any) {
     console.error('Failed to get chat messages:', error);
@@ -306,8 +314,11 @@ export async function POST(request: Request) {
       getProUntil(steamId),
     ]);
 
-    const currentSteamName = profileInfo.name || steamName || 'Unknown User';
-    const currentAvatar = profileInfo.avatar || avatar || '';
+    const currentSteamName =
+      (profileInfo.name && profileInfo.name !== 'Unknown User' ? profileInfo.name : '') ||
+      steamName ||
+      'Unknown User';
+    const currentAvatar = (profileInfo.avatar && String(profileInfo.avatar).trim() ? profileInfo.avatar : '') || avatar || '';
     const currentIsPro = proUntil ? new Date(proUntil) > new Date() : false;
 
     // Use connection pool

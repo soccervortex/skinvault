@@ -223,8 +223,11 @@ export async function GET(request: Request) {
                       dmId: msg.dmId,
                       senderId: msg.senderId,
                       receiverId: msg.receiverId,
-                      senderName: senderInfo?.steamName || 'Unknown User',
-                      senderAvatar: senderInfo?.avatar || '',
+                      senderName:
+                        (senderInfo?.steamName && senderInfo.steamName !== 'Unknown User' ? senderInfo.steamName : '') ||
+                        msg.senderId ||
+                        'Unknown User',
+                      senderAvatar: (senderInfo?.avatar && String(senderInfo.avatar).trim() ? senderInfo.avatar : '') || '',
                       senderIsPro: senderInfo?.isPro || false,
                       message: msg.message,
                       timestamp: msg.timestamp,
