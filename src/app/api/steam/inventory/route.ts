@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase, getDatabase } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
@@ -638,8 +638,8 @@ export async function GET(request: NextRequest) {
     // We still allow paginated fetches for very large inventories, but the primary cache is base.
     const baseCacheKey = `inv_${steamId}_${currency}_${variant}`;
     const pageCacheKey = `inv_${steamId}_${currency}_${variant}_${normalizedStart}`;
-    const db = await getDatabase();
-    const cacheCollection = db.collection<InventoryCacheDoc>('inventory_cache');
+    const cacheDb = await getChatDatabase();
+    const cacheCollection = cacheDb.collection<InventoryCacheDoc>('inventory_cache');
 
     const respond = async (payload: any, cacheState: 'miss' | 'refresh' = 'miss') => {
       try {

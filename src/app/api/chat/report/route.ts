@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
-import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { notifyChatReport } from '@/app/utils/discord-webhook';
 
@@ -27,7 +27,7 @@ interface Report {
 // POST: Create a report
 export async function POST(request: Request) {
   try {
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cannot report yourself' }, { status: 400 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
 
     // Fetch conversation log
     const conversationLog: Array<{
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
 // GET: Get reports (admin only)
 export async function GET(request: Request) {
   try {
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ reports: [] });
     }
 
@@ -163,7 +163,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const reportsCollection = db.collection<Report>('chat_reports');
 
     const query: any = {};
@@ -180,7 +180,7 @@ export async function GET(request: Request) {
     // Don't close connection - it's from shared pool
 
     return NextResponse.json({
-      reports: reports.map(report => ({
+      reports: reports.map((report: any) => ({
         id: report._id?.toString(),
         reporterSteamId: report.reporterSteamId,
         reporterName: report.reporterName,
@@ -203,7 +203,7 @@ export async function GET(request: Request) {
 // PATCH: Update report status (admin only)
 export async function PATCH(request: Request) {
   try {
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -224,7 +224,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const reportsCollection = db.collection<Report>('chat_reports');
 
     const update: any = { 

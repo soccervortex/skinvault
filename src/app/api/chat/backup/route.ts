@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isOwner } from '@/app/utils/owner-ids';
-import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 // Backup current chat messages before clearing
@@ -14,11 +14,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const backupsCollection = db.collection('chat_backups');
 
     // Get all messages from last 24 hours using date-based collections
@@ -75,11 +75,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ backups: [] });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const backupsCollection = db.collection('chat_backups');
 
     const backups = await backupsCollection

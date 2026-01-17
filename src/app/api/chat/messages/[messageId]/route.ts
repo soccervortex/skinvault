@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { isOwner } from '@/app/utils/owner-ids';
 import Pusher from 'pusher';
@@ -30,7 +30,7 @@ export async function PATCH(
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -46,7 +46,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
 
     let updated = false;
 
@@ -122,7 +122,7 @@ export async function DELETE(
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -140,7 +140,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Missing messageId' }, { status: 400 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
 
     let deleted = false;
     let messageOwner: string | null = null;

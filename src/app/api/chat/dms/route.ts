@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayDMCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { fetchSteamProfile, getCurrentUserInfo } from '../messages/route';
-import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 
 interface DMMessage {
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
     const dmId = generateDMId(steamId1, steamId2);
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
 
     // Get messages from last 30 days initially (can load more with cursor)
     // This is much faster than querying 365 days of collections
@@ -255,7 +255,7 @@ export async function POST(request: Request) {
     }
 
     // Check if DM exists (check invites)
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const invitesCollection = db.collection<DMInvite>('dm_invites');
     
     const dmId = generateDMId(senderId, receiverId);

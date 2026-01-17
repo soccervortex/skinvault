@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase, getDatabase } from '@/app/utils/mongodb-client';
 import { API_FILES, BASE_URL, isItemExcluded } from '@/data/api-endpoints';
 
 function parsePriceNumber(value: any): number | null {
@@ -200,9 +200,10 @@ export async function GET(req: NextRequest) {
     const isMinuteBoundary = msIntoMinute < 1000;
     const ttlMs = 60_000 - msIntoMinute;
 
-    const db = await getDatabase();
-    const cacheCol = db.collection('surprise_cache');
-    const marketPricesCol = db.collection('market_prices');
+    const cacheDb = await getChatDatabase();
+    const coreDb = await getDatabase();
+    const cacheCol = cacheDb.collection('surprise_cache');
+    const marketPricesCol = coreDb.collection('market_prices');
 
     const cacheKey = `surprise_${currency}_${q}_${wear}_${min ?? ''}_${max ?? ''}`;
 
@@ -225,7 +226,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const pool = await loadItemPool(db);
+    const pool = await loadItemPool(cacheDb);
 
     const matchesQuery = (item: PoolItem) => {
       if (!q) return true;
@@ -304,7 +305,7 @@ export async function GET(req: NextRequest) {
       .map(buildMarketHashName)
       .filter((m) => !!m && !m.includes('---')) as string[];
 
-    const priceMap = await getCachedMarketPrices(db, currency, marketHashes);
+    const priceMap = await getCachedMarketPrices(coreDb, currency, marketHashes);
 
     for (let i = 0; i < maxAttempts; i++) {
       const candidate = picked.length
@@ -317,7 +318,7 @@ export async function GET(req: NextRequest) {
 
       if (marketHash.includes('---')) {
         badDashTries++;
-        await logBadPrize(db, marketHash);
+        await logBadPrize(cacheDb, marketHash);
         if (badDashTries < 3) continue;
         continue;
       }

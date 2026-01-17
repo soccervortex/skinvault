@@ -1,5 +1,5 @@
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase } from '@/app/utils/mongodb-client';
 
 // Vercel needs nodejs runtime for SSE streaming
 export const runtime = 'nodejs';
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
         }
 
         try {
-          const db = await getDatabase();
+          const db = await getChatDatabase();
 
           if (channel === 'global') {
             // Global chat messages

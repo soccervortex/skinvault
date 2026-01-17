@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayCollectionName, getCollectionNamesForDays } from '@/app/utils/chat-collections';
-import { getMongoClient, getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 
 interface ChatMessage {
@@ -113,7 +113,7 @@ export async function GET(request: Request) {
     }
 
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
 
     // Get messages from last 24 hours using date-based collections
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -308,7 +308,7 @@ export async function POST(request: Request) {
     const currentIsPro = proUntil ? new Date(proUntil) > new Date() : false;
 
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     
     // Use today's date-based collection
     const collectionName = getTodayCollectionName();

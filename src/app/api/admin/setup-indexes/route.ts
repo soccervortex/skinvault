@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { setupChatIndexes, CHAT_INDEXES } from '@/app/utils/mongodb-indexes';
 
 /**
@@ -10,7 +10,7 @@ import { setupChatIndexes, CHAT_INDEXES } from '@/app/utils/mongodb-indexes';
  */
 export async function POST(request: Request) {
   try {
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
@@ -28,12 +28,12 @@ export async function POST(request: Request) {
     }
 
     // Use shared connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     
     try {
       // Get client from database for setupChatIndexes
-      const { getMongoClient } = await import('@/app/utils/mongodb-client');
-      const client = await getMongoClient();
+      const { getChatMongoClient } = await import('@/app/utils/mongodb-client');
+      const client = await getChatMongoClient();
       await setupChatIndexes(client, db.databaseName);
       
       // Also create indexes on existing collections manually

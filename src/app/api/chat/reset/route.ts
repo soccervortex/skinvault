@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 // This endpoint can be called by a cron job (e.g., Vercel Cron) to reset chat daily
@@ -13,11 +13,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!hasMongoConfig()) {
+    if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const backupsCollection = db.collection('chat_backups');
     const dmBackupsCollection = db.collection('dm_backups');
 

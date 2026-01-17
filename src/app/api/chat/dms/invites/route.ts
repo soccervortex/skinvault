@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { fetchSteamProfile } from '../../messages/route';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase } from '@/app/utils/mongodb-client';
 
 interface DMInvite {
   _id?: string;
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   try {
     // Check if MongoDB is configured via connection pool
     try {
-      await getDatabase();
+      await getChatDatabase();
     } catch {
       return NextResponse.json({ invites: [] });
     }
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     }
 
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     let query: any = {};
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
   try {
     // Check if MongoDB is configured via connection pool
     try {
-      await getDatabase();
+      await getChatDatabase();
     } catch {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     }
 
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     // Check if invite already exists
@@ -186,7 +186,7 @@ export async function PATCH(request: Request) {
   try {
     // Check if MongoDB is configured via connection pool
     try {
-      await getDatabase();
+      await getChatDatabase();
     } catch {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
@@ -203,7 +203,7 @@ export async function PATCH(request: Request) {
     }
 
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     // Convert inviteId string to ObjectId

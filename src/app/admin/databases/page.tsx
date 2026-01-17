@@ -44,6 +44,19 @@ type StatusResponse = {
   pending: PendingCluster[];
 };
 
+type MigrateChatCacheResponse = {
+  success: boolean;
+  summary?: {
+    collections: number;
+    remainingCollections: number;
+    sourceDocs: number;
+    upserted: number;
+    modified: number;
+    errors: number;
+    dryRun: boolean;
+  };
+};
+
 type TestResponse = {
   ok: boolean;
   host: string | null;
@@ -89,6 +102,7 @@ export default function AdminDatabasesPage() {
   const [selectedEnvKey, setSelectedEnvKey] = useState<string | null>(null);
   const [lastTest, setLastTest] = useState<TestResponse | null>(null);
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [migrateSummary, setMigrateSummary] = useState<MigrateChatCacheResponse['summary'] | null>(null);
 
   const [addIdx, setAddIdx] = useState('');
   const [addUri, setAddUri] = useState('');
@@ -195,6 +209,34 @@ export default function AdminDatabasesPage() {
       setStatus(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const migrateChatCache = async (dryRun: boolean) => {
+    setLoadingAction(dryRun ? 'migrate_dry' : 'migrate');
+    setMigrateSummary(null);
+    try {
+      const res = await fetch('/api/admin/mongo-manager/migrate-chat-cache', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({
+          dryRun,
+          batchSize: 500,
+          maxCollections: 40,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as MigrateChatCacheResponse | null;
+      if (!res.ok) throw new Error((json as any)?.error || 'Migration failed');
+
+      setMigrateSummary(json?.summary || null);
+      toast.success(dryRun ? 'Dry run complete' : 'Migration complete');
+    } catch (e: any) {
+      toast.error(e?.message || 'Migration failed');
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -575,6 +617,64 @@ export default function AdminDatabasesPage() {
                     <div className="text-[10px] text-gray-400">Discord client: {status.integrations.discordClientIdConfigured ? 'Configured' : 'Missing'}</div>
                     <div className="text-[10px] text-gray-400">Steam API key: {status.integrations.steamApiKeyConfigured ? 'Configured' : 'Missing'}</div>
                   </div>
+                </div>
+
+                <div className="bg-[#11141d] border border-white/10 rounded-2xl p-6 mb-8">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Migrate chat/cache data</div>
+                      <div className="text-sm font-black">Copy old collections to the chat/cache cluster</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => migrateChatCache(true)}
+                        disabled={loadingAction === 'migrate_dry' || loadingAction === 'migrate'}
+                        className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-60"
+                      >
+                        {loadingAction === 'migrate_dry' ? 'Running…' : 'Dry run'}
+                      </button>
+                      <button
+                        onClick={() => migrateChatCache(false)}
+                        disabled={loadingAction === 'migrate_dry' || loadingAction === 'migrate'}
+                        className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-60"
+                      >
+                        {loadingAction === 'migrate' ? 'Migrating…' : 'Run migration'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-gray-400">
+                    This copies chat/caches from the core cluster (Cluster 1) to the chat/cache cluster (Cluster 2+). It does not delete from the source.
+                  </div>
+
+                  {migrateSummary ? (
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-3">
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Collections</div>
+                        <div className="text-sm font-black">{migrateSummary.collections}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Remaining</div>
+                        <div className="text-sm font-black">{migrateSummary.remainingCollections}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Source docs</div>
+                        <div className="text-sm font-black">{migrateSummary.sourceDocs}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Upserted</div>
+                        <div className="text-sm font-black">{migrateSummary.upserted}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Modified</div>
+                        <div className="text-sm font-black">{migrateSummary.modified}</div>
+                      </div>
+                      <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Errors</div>
+                        <div className={`text-sm font-black ${migrateSummary.errors ? 'text-red-400' : ''}`}>{migrateSummary.errors}</div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="bg-[#11141d] border border-white/10 rounded-2xl p-6 mb-8">

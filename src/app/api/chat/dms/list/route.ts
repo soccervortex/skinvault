@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase } from '@/app/utils/mongodb-client';
 
 // Fetch Steam profile helper using server-side API route
 async function fetchSteamProfile(steamId: string): Promise<{ name: string; avatar: string }> {
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
 
     // Use connection pool
-    const db = await getDatabase();
+    const db = await getChatDatabase();
 
     // Get all accepted DM invites for this user
     // Use index for faster query

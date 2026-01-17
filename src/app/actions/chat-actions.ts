@@ -2,7 +2,7 @@
 
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayDMCollectionName } from '@/app/utils/chat-collections';
-import { getDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 import { fetchSteamProfile } from '@/app/api/chat/messages/route';
 
@@ -75,7 +75,7 @@ export async function sendDMMessage(
     }
 
     // Check if DM exists (check invites)
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const invitesCollection = db.collection<DMInvite>('dm_invites');
     
     const dmId = generateDMId(senderId, receiverId);
@@ -184,7 +184,7 @@ export async function acceptDMInvite(
     }
 
     const { ObjectId } = await import('mongodb');
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     // Convert inviteId string to ObjectId
@@ -289,7 +289,7 @@ export async function sendDMInvite(
       return { success: false, error: 'Cannot send DM invite to this user' };
     }
 
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const collection = db.collection<DMInvite>('dm_invites');
 
     // Check if invite already exists
@@ -395,7 +395,7 @@ export async function sendGlobalMessage(
     // Use today's date-based collection
     const { getTodayCollectionName } = await import('@/app/utils/chat-collections');
     const collectionName = getTodayCollectionName();
-    const db = await getDatabase();
+    const db = await getChatDatabase();
     const collection = db.collection<GlobalMessage>(collectionName);
     
     // Auto-setup index for new collection if needed
