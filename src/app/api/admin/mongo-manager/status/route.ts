@@ -21,6 +21,7 @@ type ConnectionInfo = {
   host: string | null;
   masked: string;
   active: boolean;
+  inUse: boolean;
 };
 
 function checkAuth(request: Request): boolean {
@@ -65,26 +66,32 @@ function buildConnections(): ConnectionInfo[] {
     });
 
   const out: ConnectionInfo[] = [];
+  const seenUris = new Set<string>();
   for (const entry of clusterEntries) {
+    seenUris.add(entry.uri);
+    const inUse = !!activeUri && activeUri === entry.uri;
     out.push({
       envKey: entry.key,
       idx: Number.isFinite(entry.idx) ? entry.idx : null,
       configured: true,
       host: safeHostFromUri(entry.uri),
       masked: maskMongoUri(entry.uri),
-      active: !!activeUri && activeUri === entry.uri,
+      active: inUse,
+      inUse,
     });
   }
 
   const fallbackUri = process.env.MONGODB_URI ? String(process.env.MONGODB_URI).trim() : '';
-  if (fallbackUri) {
+  if (fallbackUri && !seenUris.has(fallbackUri)) {
+    const inUse = !!activeUri && activeUri === fallbackUri;
     out.push({
       envKey: 'MONGODB_URI',
       idx: null,
       configured: true,
       host: safeHostFromUri(fallbackUri),
       masked: maskMongoUri(fallbackUri),
-      active: !!activeUri && activeUri === fallbackUri,
+      active: inUse,
+      inUse,
     });
   }
 
@@ -97,6 +104,7 @@ function buildConnections(): ConnectionInfo[] {
       host: null,
       masked: 'not configured',
       active: false,
+      inUse: false,
     });
   }
 
@@ -157,6 +165,11 @@ export async function GET(request: Request) {
       cachedUriHost: getCachedMongoUri() ? safeHostFromUri(getCachedMongoUri() as string) : null,
       poolConnected,
       poolError,
+    },
+    integrations: {
+      discordBotConfigured: !!(process.env.DISCORD_BOT_TOKEN && String(process.env.DISCORD_BOT_TOKEN).trim()),
+      discordClientIdConfigured: !!(process.env.DISCORD_CLIENT_ID && String(process.env.DISCORD_CLIENT_ID).trim()),
+      steamApiKeyConfigured: !!(process.env.STEAM_API_KEY && String(process.env.STEAM_API_KEY).trim()),
     },
     connections,
     pending,

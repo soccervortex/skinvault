@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -23,6 +23,7 @@ type ConnectionInfo = {
   host: string | null;
   masked: string;
   active: boolean;
+  inUse: boolean;
 };
 
 type StatusResponse = {
@@ -33,6 +34,11 @@ type StatusResponse = {
     cachedUriHost: string | null;
     poolConnected: boolean;
     poolError: string | null;
+  };
+  integrations: {
+    discordBotConfigured: boolean;
+    discordClientIdConfigured: boolean;
+    steamApiKeyConfigured: boolean;
   };
   connections: ConnectionInfo[];
   pending: PendingCluster[];
@@ -77,6 +83,8 @@ export default function AdminDatabasesPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [liveRefreshEnabled, setLiveRefreshEnabled] = useState(true);
+  const lastInteractAtRef = useRef<number>(0);
 
   const [selectedEnvKey, setSelectedEnvKey] = useState<string | null>(null);
   const [lastTest, setLastTest] = useState<TestResponse | null>(null);
@@ -107,13 +115,39 @@ export default function AdminDatabasesPage() {
   }, [userIsOwner]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const bump = () => {
+      lastInteractAtRef.current = Date.now();
+    };
+    window.addEventListener('pointerdown', bump, true);
+    window.addEventListener('keydown', bump, true);
+    window.addEventListener('focusin', bump, true);
+    return () => {
+      window.removeEventListener('pointerdown', bump, true);
+      window.removeEventListener('keydown', bump, true);
+      window.removeEventListener('focusin', bump, true);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!userIsOwner) return;
     const interval = setInterval(() => {
+      if (!liveRefreshEnabled) return;
       if (loadingAction) return;
+      try {
+        const active = document.activeElement as any;
+        const tag = String(active?.tagName || '').toLowerCase();
+        const isEditing = tag === 'input' || tag === 'textarea' || tag === 'select' || !!active?.isContentEditable;
+        if (isEditing) return;
+      } catch {
+      }
+
+      const last = lastInteractAtRef.current || 0;
+      if (Date.now() - last < 2500) return;
       void loadStatus();
     }, 5000);
     return () => clearInterval(interval);
-  }, [userIsOwner, loadingAction]);
+  }, [userIsOwner, loadingAction, liveRefreshEnabled]);
 
   const loadStatus = async () => {
     setLoading(true);
@@ -413,14 +447,23 @@ export default function AdminDatabasesPage() {
 
             <div className="flex items-center justify-between mb-6 md:mb-8">
               <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Database Manager</h1>
-              <button
-                onClick={loadStatus}
-                disabled={loading || !!loadingAction}
-                className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-60 flex items-center gap-2"
-              >
-                {loading ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLiveRefreshEnabled((v) => !v)}
+                  disabled={loading || !!loadingAction}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-60"
+                >
+                  Live: {liveRefreshEnabled ? 'On' : 'Off'}
+                </button>
+                <button
+                  onClick={loadStatus}
+                  disabled={loading || !!loadingAction}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-60 flex items-center gap-2"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {loading ? (
@@ -433,7 +476,7 @@ export default function AdminDatabasesPage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                   <div className="bg-[#11141d] border border-white/10 rounded-2xl p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30">
@@ -488,6 +531,21 @@ export default function AdminDatabasesPage() {
                       Add new Mongo clusters by creating Vercel env vars.
                     </div>
                   </div>
+
+                  <div className="bg-[#11141d] border border-white/10 rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                        <Server className="text-gray-300" size={16} />
+                      </div>
+                      <div>
+                        <div className="text-[9px] uppercase tracking-[0.4em] text-gray-500 font-black">Integrations</div>
+                        <div className="text-sm font-black">Status</div>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-gray-400">Discord bot: {status.integrations.discordBotConfigured ? 'Configured' : 'Missing'}</div>
+                    <div className="text-[10px] text-gray-400">Discord client: {status.integrations.discordClientIdConfigured ? 'Configured' : 'Missing'}</div>
+                    <div className="text-[10px] text-gray-400">Steam API key: {status.integrations.steamApiKeyConfigured ? 'Configured' : 'Missing'}</div>
+                  </div>
                 </div>
 
                 <div className="bg-[#11141d] border border-white/10 rounded-2xl p-6 mb-8">
@@ -501,9 +559,13 @@ export default function AdminDatabasesPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <div className="text-[11px] font-black">{c.envKey}</div>
-                            {c.active ? (
+                            {c.inUse ? (
                               <span className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase text-emerald-400">
-                                Active
+                                In use
+                              </span>
+                            ) : c.configured ? (
+                              <span className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase text-emerald-400">
+                                Available
                               </span>
                             ) : null}
                             {c.configured ? (
@@ -721,7 +783,7 @@ export default function AdminDatabasesPage() {
                         .filter((c) => c.configured)
                         .map((c) => (
                           <option key={c.envKey} value={c.envKey}>
-                            {c.envKey}{c.active ? ' (active)' : ''}
+                            {c.envKey}{c.inUse ? ' (in use)' : ''}
                           </option>
                         ))}
                     </select>
