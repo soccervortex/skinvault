@@ -94,6 +94,35 @@ export default function AdminDatabasesPage() {
   const [addUri, setAddUri] = useState('');
   const [applyTarget, setApplyTarget] = useState<'production' | 'preview' | 'development' | 'prod_preview'>('prod_preview');
 
+  const suggestedNextIdx = useMemo(() => {
+    try {
+      const s = status;
+      const idxs: number[] = [];
+
+      for (const c of s?.connections || []) {
+        if (typeof c?.idx === 'number' && Number.isFinite(c.idx) && c.idx >= 1) idxs.push(c.idx);
+      }
+
+      for (const p of s?.pending || []) {
+        if (typeof p?.idx === 'number' && Number.isFinite(p.idx) && p.idx >= 1) idxs.push(p.idx);
+      }
+
+      const max = idxs.length ? Math.max(...idxs) : 0;
+      return Math.max(1, max + 1);
+    } catch {
+      return 1;
+    }
+  }, [status]);
+
+  const parseClusterIdxOrSuggested = () => {
+    const raw = String(addIdx || '').trim();
+    if (!raw) return suggestedNextIdx;
+    if (!/^\d+$/.test(raw)) return null;
+    const idx = Number.parseInt(raw, 10);
+    if (!Number.isFinite(idx) || idx < 1) return null;
+    return idx;
+  };
+
   const [dangerEnvKey, setDangerEnvKey] = useState<string>('');
   const [dangerCollection, setDangerCollection] = useState('');
   const [dangerConfirm, setDangerConfirm] = useState('');
@@ -238,10 +267,10 @@ export default function AdminDatabasesPage() {
   };
 
   const addPending = async () => {
-    const idx = Number(addIdx);
+    const idx = parseClusterIdxOrSuggested();
     const uri = String(addUri || '').trim();
 
-    if (!Number.isFinite(idx) || idx < 1 || !Number.isInteger(idx)) {
+    if (!Number.isFinite(idx as any) || (idx as any) < 1 || !Number.isInteger(idx as any)) {
       toast.error('Enter a valid cluster number (>= 1)');
       return;
     }
@@ -296,10 +325,10 @@ export default function AdminDatabasesPage() {
   };
 
   const applyToVercel = async () => {
-    const idx = Number(addIdx);
+    const idx = parseClusterIdxOrSuggested();
     const uri = String(addUri || '').trim();
 
-    if (!Number.isFinite(idx) || idx < 1 || !Number.isInteger(idx)) {
+    if (!Number.isFinite(idx as any) || (idx as any) < 1 || !Number.isInteger(idx as any)) {
       toast.error('Enter a valid cluster number (>= 1)');
       return;
     }
@@ -657,7 +686,7 @@ export default function AdminDatabasesPage() {
                       <input
                         value={addIdx}
                         onChange={(e) => setAddIdx(e.target.value)}
-                        placeholder="6"
+                        placeholder={String(suggestedNextIdx)}
                         className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
                       />
                     </div>
@@ -687,7 +716,7 @@ export default function AdminDatabasesPage() {
                       </select>
                     </div>
                     <div className="md:col-span-2 text-[10px] text-gray-500 flex items-end">
-                      Apply will upsert `MONGODB_CLUSTER_${addIdx || 'N'}` in your Vercel project and optionally trigger a redeploy hook.
+                      Apply will upsert `MONGODB_CLUSTER_${String(addIdx || suggestedNextIdx || 'N')}` in your Vercel project and optionally trigger a redeploy hook.
                     </div>
                   </div>
 
