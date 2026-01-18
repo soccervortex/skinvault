@@ -55,6 +55,7 @@ const SpinWheel = ({
   const [finalReward, setFinalReward] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState<number>(0);
   const [readyToAnimate, setReadyToAnimate] = useState(false);
+  const [animationStarted, setAnimationStarted] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const targetRef = useRef<HTMLDivElement | null>(null);
   const didComputeTargetRef = useRef(false);
@@ -66,6 +67,7 @@ const SpinWheel = ({
     const startSpin = async () => {
       setIsSpinning(true);
       setReadyToAnimate(false);
+      setAnimationStarted(false);
       didComputeTargetRef.current = false;
       setTranslateX(0);
       setReelItems(generateRandomReelItems());
@@ -73,10 +75,13 @@ const SpinWheel = ({
         const response = await fetch('/api/spins', { method: 'POST' });
         const data = await response.json();
         if (response.ok) {
-          setFinalReward(data.reward);
+          const reward = Number(data.reward);
+          if (!Number.isFinite(reward)) throw new Error('Invalid reward');
+
+          setFinalReward(reward);
           setReelItems((prev) => {
             const next = Array.isArray(prev) && prev.length === 50 ? [...prev] : generateRandomReelItems();
-            next[targetIndex] = getTierByReward(data.reward);
+            next[targetIndex] = getTierByReward(reward);
             return next;
           });
         } else {
@@ -118,6 +123,9 @@ const SpinWheel = ({
   }, [reelItems.length, finalReward]);
 
   const handleAnimationComplete = () => {
+    // Framer-motion can fire onAnimationComplete for the initial (non-animated) render.
+    // Only treat completion as a real spin once the measured animation actually started.
+    if (!readyToAnimate || !animationStarted) return;
     if (finalReward !== null) {
       onSpinComplete(finalReward);
     }
@@ -156,6 +164,9 @@ const SpinWheel = ({
                   initial={{ x: 0 }}
                   animate={{ x: readyToAnimate ? translateX : 0 }}
                   transition={readyToAnimate ? { duration: 5, ease: 'easeOut' } : { duration: 0 }}
+                  onAnimationStart={() => {
+                    if (readyToAnimate) setAnimationStarted(true);
+                  }}
                   onAnimationComplete={handleAnimationComplete}
                 >
                   {reelItems.map((tier, i) => (
