@@ -489,9 +489,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
                 <ShoppingCart size={16} /> Shop
               </Link>
-              <Link href="/spins" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/spins' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Spins">
-                <Star size={16} /> Spins
-              </Link>
               <Link href="/giveaways" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
                 <Sparkles size={16} /> Giveaways
               </Link>
@@ -730,9 +727,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
           <Link href="/shop" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/shop' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-blue-400 hover:text-blue-300'}`} aria-label="Shop">
             <ShoppingCart size={16} /> Shop
-          </Link>
-          <Link href="/spins" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/spins' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Spins">
-            <Star size={16} /> Spins
           </Link>
           <Link href="/giveaways" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/giveaways') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Giveaways">
             <Sparkles size={16} /> Giveaways
