@@ -44,15 +44,16 @@ const generateRandomReelItems = (): RewardTier[] => {
 };
 
 const SpinWheel = ({
+  reward,
   onSpinComplete,
   onClose,
 }: {
+  reward: number;
   onSpinComplete: (reward: number) => void;
   onClose?: () => void;
 }) => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [reelItems, setReelItems] = useState<RewardTier[]>([]);
-  const [finalReward, setFinalReward] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState<number>(0);
   const [readyToAnimate, setReadyToAnimate] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -64,44 +65,25 @@ const SpinWheel = ({
   const targetIndex = 45;
 
   useEffect(() => {
-    // Trigger the spin on mount
-    const startSpin = async () => {
-      setIsSpinning(true);
-      setReadyToAnimate(false);
-      didComputeTargetRef.current = false;
-      didStartAnimationRef.current = false;
-      setTranslateX(0);
-      setReelItems(generateRandomReelItems());
-      controls.set({ x: 0 });
-      try {
-        const response = await fetch('/api/spins', { method: 'POST' });
-        const data = await response.json();
-        if (response.ok) {
-          const reward = Number(data.reward);
-          if (!Number.isFinite(reward)) throw new Error('Invalid reward');
+    const r = Number(reward);
+    if (!Number.isFinite(r)) {
+      onSpinComplete(0);
+      return;
+    }
 
-          setFinalReward(reward);
-          setReelItems((prev) => {
-            const next = Array.isArray(prev) && prev.length === 50 ? [...prev] : generateRandomReelItems();
-            next[targetIndex] = getTierByReward(reward);
-            return next;
-          });
-        } else {
-          throw new Error(data.error || 'Failed to spin');
-        }
-      } catch (error) {
-        console.error(error);
-        onSpinComplete(0); // Indicate error
-      }
-    };
-    startSpin();
-  }, [controls, onSpinComplete]);
+    setIsSpinning(true);
+    setReadyToAnimate(false);
+    didComputeTargetRef.current = false;
+    didStartAnimationRef.current = false;
+    setTranslateX(0);
+    controls.set({ x: 0 });
+    setReelItems(generateReelItems(r));
+  }, [controls, onSpinComplete, reward]);
 
   useEffect(() => {
     if (didComputeTargetRef.current) return;
     if (!containerRef.current || !targetRef.current) return;
     if (reelItems.length === 0) return;
-    if (finalReward === null) return;
 
     let cancelled = false;
 
@@ -137,16 +119,21 @@ const SpinWheel = ({
     return () => {
       cancelled = true;
     };
-  }, [reelItems.length, finalReward]);
+  }, [reelItems.length]);
 
   useEffect(() => {
     if (!readyToAnimate) return;
-    if (finalReward === null) return;
     if (didStartAnimationRef.current) return;
     if (!isSpinning) return;
 
     let cancelled = false;
     didStartAnimationRef.current = true;
+
+    const r = Number(reward);
+    if (!Number.isFinite(r)) {
+      onSpinComplete(0);
+      return;
+    }
 
     const run = async () => {
       try {
@@ -156,7 +143,7 @@ const SpinWheel = ({
           transition: { duration: 5, ease: 'easeOut' },
         });
         if (cancelled) return;
-        onSpinComplete(finalReward);
+        onSpinComplete(r);
       } catch (e) {
         if (cancelled) return;
         console.error(e);
@@ -169,7 +156,7 @@ const SpinWheel = ({
     return () => {
       cancelled = true;
     };
-  }, [controls, finalReward, isSpinning, onSpinComplete, readyToAnimate, translateX]);
+  }, [controls, isSpinning, onSpinComplete, readyToAnimate, reward, translateX]);
 
   return (
     <div
@@ -192,7 +179,7 @@ const SpinWheel = ({
         <div className="w-full bg-[#0f111a] border border-white/10 rounded-[2rem] p-4 md:p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase tracking-[0.35em] text-gray-500 font-black">
-              {finalReward !== null ? `Winning: ${finalReward} CR` : 'Opening...'}
+              Opening...
             </div>
           </div>
           <div ref={containerRef} className="relative h-36 md:h-40 w-full overflow-hidden">

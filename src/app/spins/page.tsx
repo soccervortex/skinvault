@@ -19,6 +19,8 @@ export default function SpinPage() {
   const [nextEligibleAt, setNextEligibleAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSpinner, setShowSpinner] = useState(false);
+  const [spinOpening, setSpinOpening] = useState(false);
+  const [spinReward, setSpinReward] = useState<number | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -78,15 +80,36 @@ export default function SpinPage() {
       });
   }, [steamId]);
 
-  const handleSpinClick = () => {
-    if (canSpin) {
+  const handleSpinClick = async () => {
+    if (!canSpin || spinOpening || showSpinner) return;
+    setSpinOpening(true);
+    try {
+      const res = await fetch('/api/spins', { method: 'POST' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed to spin'));
+      const reward = Number(json?.reward);
+      if (!Number.isFinite(reward)) throw new Error('Invalid reward');
+      setSpinReward(reward);
       setShowSpinner(true);
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Failed to spin'));
+      fetch('/api/spins', { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => {
+          setCanSpin(!!data.canSpin);
+          setNextEligibleAt(data.nextEligibleAt || null);
+        })
+        .catch(() => {
+        });
+    } finally {
+      setSpinOpening(false);
     }
   };
 
   const onSpinComplete = (reward: number) => {
     toast.success(`You won ${reward} credits!`);
     setShowSpinner(false);
+    setSpinReward(null);
     setCanSpin(false);
     // Refetch eligibility to get the next eligible time
     fetch('/api/spins').then(res => res.json()).then(data => setNextEligibleAt(data.nextEligibleAt));
@@ -114,9 +137,10 @@ export default function SpinPage() {
       {canSpin ? (
         <button
           onClick={handleSpinClick}
-          className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-all"
+          disabled={spinOpening || showSpinner}
+          className={`bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-all ${spinOpening || showSpinner ? 'opacity-60 cursor-not-allowed' : ''}`}
         >
-          Spin Now!
+          {spinOpening || showSpinner ? 'Opening...' : 'Spin Now!'}
         </button>
       ) : (
         <div className='p-5'>
@@ -124,7 +148,16 @@ export default function SpinPage() {
           {nextEligibleAt && <p>Next spin available in {formatTimeLeft(nextEligibleAt)}</p>}
         </div>
       )}
-      {showSpinner && <SpinWheel onSpinComplete={onSpinComplete} />}
+      {showSpinner && spinReward !== null && (
+        <SpinWheel
+          reward={spinReward}
+          onSpinComplete={onSpinComplete}
+          onClose={() => {
+            setShowSpinner(false);
+            setSpinReward(null);
+          }}
+        />
+      )}
     </div>
   );
 }

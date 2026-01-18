@@ -167,10 +167,21 @@ export default function GiveawaysPage() {
   const [nowTick, setNowTick] = useState(0);
 
   const [spinStatusLoading, setSpinStatusLoading] = useState(false);
-  const [spinStatus, setSpinStatus] = useState<{ canSpin: boolean; nextEligibleAt: string; } | null>(null);
+  const [spinStatus, setSpinStatus] = useState<{
+    canSpin: boolean;
+    nextEligibleAt: string;
+    role?: string;
+    dailyLimit?: number | null;
+    usedSpins?: number;
+    remainingSpins?: number | null;
+  } | null>(null);
 
   const [spinModalOpen, setSpinModalOpen] = useState(false);
   const [spinWheelOpen, setSpinWheelOpen] = useState(false);
+  const [spinOpening, setSpinOpening] = useState(false);
+  const [spinWheelReward, setSpinWheelReward] = useState<number | null>(null);
+  const [spinResultOpen, setSpinResultOpen] = useState(false);
+  const [spinResultReward, setSpinResultReward] = useState<number | null>(null);
   const [lastSpinReward, setLastSpinReward] = useState<number | null>(null);
 
   const [entriesToBuy, setEntriesToBuy] = useState<number>(1);
@@ -404,7 +415,14 @@ export default function GiveawaysPage() {
       const res = await fetch('/api/spins', { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
-      setSpinStatus({ canSpin: !!json.canSpin, nextEligibleAt: json.nextEligibleAt });
+      setSpinStatus({
+        canSpin: !!json.canSpin,
+        nextEligibleAt: String(json.nextEligibleAt || ''),
+        role: json.role,
+        dailyLimit: typeof json.dailyLimit === 'number' ? json.dailyLimit : (json.dailyLimit === null ? null : undefined),
+        usedSpins: typeof json.usedSpins === 'number' ? json.usedSpins : undefined,
+        remainingSpins: typeof json.remainingSpins === 'number' ? json.remainingSpins : (json.remainingSpins === null ? null : undefined),
+      });
     } catch {
       setSpinStatus(null);
     } finally {
@@ -515,15 +533,48 @@ export default function GiveawaysPage() {
       return;
     }
     setLastSpinReward(null);
+    setSpinResultOpen(false);
+    setSpinResultReward(null);
     setSpinWheelOpen(false);
+    setSpinWheelReward(null);
     setSpinModalOpen(true);
   };
 
-  const handleSpinComplete = (reward: number) => {
+  const handleSpinComplete = async (reward: number) => {
     setSpinWheelOpen(false);
+    setSpinWheelReward(null);
     if (reward > 0) setLastSpinReward(reward);
+    if (reward > 0) {
+      setSpinResultReward(reward);
+      setSpinResultOpen(true);
+    }
     void loadCredits();
     void loadDailySpinStatus();
+  };
+
+  const startSpin = async () => {
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return;
+    }
+    if (!canSpin || spinWheelOpen || spinOpening) return;
+
+    setSpinOpening(true);
+    try {
+      const res = await fetch('/api/spins', { method: 'POST' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed to spin'));
+      const reward = Number(json?.reward);
+      if (!Number.isFinite(reward)) throw new Error('Invalid reward');
+
+      setSpinWheelReward(reward);
+      setSpinWheelOpen(true);
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Failed to spin'));
+      void loadDailySpinStatus();
+    } finally {
+      setSpinOpening(false);
+    }
   };
 
   useEffect(() => {
@@ -816,20 +867,78 @@ export default function GiveawaysPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!canSpin || spinWheelOpen) return;
-                      setSpinWheelOpen(true);
-                    }}
-                    disabled={!canSpin || spinWheelOpen}
-                    className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                    onClick={startSpin}
+                    disabled={!canSpin || spinWheelOpen || spinOpening}
+                    className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen || spinOpening ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
                   >
-                    {spinWheelOpen ? 'Opening...' : 'Open Case'}
+                    {spinOpening || spinWheelOpen ? 'Opening...' : 'Open Case'}
                   </button>
                 </div>
 
-                {spinWheelOpen && (
-                  <SpinWheel onSpinComplete={handleSpinComplete} onClose={() => setSpinWheelOpen(false)} />
+                {spinWheelOpen && spinWheelReward !== null && (
+                  <SpinWheel
+                    reward={spinWheelReward}
+                    onSpinComplete={handleSpinComplete}
+                    onClose={() => {
+                      setSpinWheelOpen(false);
+                      setSpinWheelReward(null);
+                    }}
+                  />
                 )}
+              </div>
+            </div>
+          )}
+
+          {spinResultOpen && (
+            <div
+              className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-4"
+              onClick={() => setSpinResultOpen(false)}
+            >
+              <div
+                className="w-full max-w-xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-5 md:p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
+                    <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">You opened</div>
+                    <div className="mt-3 text-4xl font-black italic tracking-tighter text-white">
+                      {spinResultReward ?? 0}
+                      <span className="text-[12px] text-gray-400 ml-2">CREDITS</span>
+                    </div>
+                    <div className="mt-3 text-[11px] text-gray-400">
+                      {spinStatus?.dailyLimit === null
+                        ? 'Unlimited spins available.'
+                        : typeof spinStatus?.remainingSpins === 'number'
+                          ? `Spins left today: ${spinStatus.remainingSpins}`
+                          : (!canSpin ? `Next spin in ${formatHms(spinRemainingSeconds)}.` : 'Spin available now.')}
+                    </div>
+                  </div>
+                  <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => setSpinResultOpen(false)} aria-label="Close">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setSpinResultOpen(false)}
+                    className="px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
+                  >
+                    Go back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSpinResultOpen(false);
+                      await startSpin();
+                    }}
+                    disabled={!canSpin || spinWheelOpen || spinOpening}
+                    className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen || spinOpening ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                  >
+                    {canSpin ? 'Open case again' : `Next in ${formatHms(spinRemainingSeconds)}`}
+                  </button>
+                </div>
               </div>
             </div>
           )}
