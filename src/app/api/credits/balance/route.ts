@@ -13,8 +13,24 @@ type UserCreditsDoc = {
   lastDailyClaimDay?: string;
 };
 
+function getSteamIdFromRequestOrBot(req: NextRequest): string | null {
+  const sessionSteamId = getSteamIdFromRequest(req);
+  if (sessionSteamId) return sessionSteamId;
+
+  const expected = process.env.DISCORD_BOT_API_TOKEN;
+  if (!expected) return null;
+  const auth = req.headers.get('authorization');
+  if (auth !== `Bearer ${expected}`) return null;
+
+  const url = new URL(req.url);
+  const fromQuery = String(url.searchParams.get('steamId') || '').trim();
+  const fromHeader = String(req.headers.get('x-steam-id') || '').trim();
+  const steamId = fromQuery || fromHeader;
+  return /^\d{17}$/.test(steamId) ? steamId : null;
+}
+
 export async function GET(req: NextRequest) {
-  const steamId = getSteamIdFromRequest(req);
+  const steamId = getSteamIdFromRequestOrBot(req);
   if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {

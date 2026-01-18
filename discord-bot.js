@@ -236,6 +236,20 @@ async function registerCommands() {
     log('Started refreshing application (/) commands.');
     log(`Registering ${commands.length} commands: ${commands.map(c => c.name).join(', ')}`);
 
+    // Prevent duplicate command lists: if we previously registered guild commands,
+    // they will show alongside global commands. Clear guild commands first.
+    if (GUILD_ID) {
+      try {
+        await rest.put(
+          Routes.applicationGuildCommands(DISCORD_CLIENT_ID, GUILD_ID),
+          { body: [] }
+        );
+        log(`🧹 Cleared guild commands for guild ${GUILD_ID}`);
+      } catch (e) {
+        log(`⚠️ Failed to clear guild commands: ${e.message}`);
+      }
+    }
+
     // Register commands globally (works for both server and user installs)
     // Global commands can take up to 1 hour to propagate, but work everywhere
     await rest.put(
@@ -907,8 +921,18 @@ client.on('interactionCreate', async (interaction) => {
       if (!steamId) {
         return interaction.editReply({ content: '❌ **Not Connected**\n\nYou need to connect your Discord account to SkinVaults first on the website.' });
       }
+
+      if (!API_TOKEN) {
+        return interaction.editReply({ content: '❌ Bot API token is not configured. Contact the bot owner.' });
+      }
       try {
-        const response = await fetch(`${API_BASE_URL}/api/credits/balance?steamId=${steamId}`, { headers: { 'Cookie': `steamId=${steamId}` } });
+        const response = await fetch(`${API_BASE_URL}/api/credits/balance?steamId=${encodeURIComponent(steamId)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${API_TOKEN}`,
+            }
+          }
+        );
         if (!response.ok) throw new Error('Failed to fetch balance.');
         const data = await response.json();
         const embed = new EmbedBuilder()
@@ -927,14 +951,31 @@ client.on('interactionCreate', async (interaction) => {
       if (!steamId) {
         return interaction.editReply({ content: '❌ **Not Connected**\n\nYou need to connect your Discord account first on the website.' });
       }
+
+      if (!API_TOKEN) {
+        return interaction.editReply({ content: '❌ Bot API token is not configured. Contact the bot owner.' });
+      }
       try {
-        const postResponse = await fetch(`${API_BASE_URL}/api/credits/daily-claim`, { method: 'POST', headers: { 'Cookie': `steamId=${steamId}` } });
+        const postResponse = await fetch(`${API_BASE_URL}/api/credits/daily-claim?steamId=${encodeURIComponent(steamId)}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${API_TOKEN}`,
+            }
+          }
+        );
         const data = await postResponse.json();
         if (postResponse.ok) {
           await interaction.editReply({ content: `🎉 You successfully claimed **${data.claimed}** credits! Your new balance is **${data.balance.toLocaleString()}** credits.` });
         } else {
           if (data.error === 'Already claimed today') {
-            const getResponse = await fetch(`${API_BASE_URL}/api/credits/daily-claim`, { headers: { 'Cookie': `steamId=${steamId}` } });
+            const getResponse = await fetch(`${API_BASE_URL}/api/credits/daily-claim?steamId=${encodeURIComponent(steamId)}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${API_TOKEN}`,
+                }
+              }
+            );
             const statusData = await getResponse.json();
             const nextEligibleDate = new Date(statusData.nextEligibleAt);
             await interaction.editReply({ content: `⌛ You have already claimed your daily reward. You can claim again <t:${Math.floor(nextEligibleDate.getTime() / 1000)}:R>.` });
@@ -953,18 +994,32 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply({ content: '❌ **Not Connected**\n\nYou need to connect your Discord account first on the website.' });
       }
 
+      if (!API_TOKEN) {
+        return interaction.editReply({ content: '❌ Bot API token is not configured. Contact the bot owner.' });
+      }
+
       try {
-        const response = await fetch(`${API_BASE_URL}/api/spins`, { 
-          method: 'POST',
-          headers: { 'Cookie': `steamId=${steamId}` } 
-        });
+        const response = await fetch(`${API_BASE_URL}/api/spins?steamId=${encodeURIComponent(steamId)}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${API_TOKEN}`,
+            }
+          }
+        );
         const data = await response.json();
 
         if (response.ok) {
           await interaction.editReply({ content: `🎉 You spun the wheel and won **${data.reward}** credits! Your new balance is **${data.newBalance.toLocaleString()}** credits.` });
         } else {
           if (data.error === 'Already spun today') {
-            const statusRes = await fetch(`${API_BASE_URL}/api/spins`, { headers: { 'Cookie': `steamId=${steamId}` } });
+            const statusRes = await fetch(`${API_BASE_URL}/api/spins?steamId=${encodeURIComponent(steamId)}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${API_TOKEN}`,
+                }
+              }
+            );
             const statusData = await statusRes.json();
             const nextEligibleDate = new Date(statusData.nextEligibleAt);
             await interaction.editReply({ content: `⌛ You have already used your spin for today. You can spin again <t:${Math.floor(nextEligibleDate.getTime() / 1000)}:R>.` });
