@@ -5,6 +5,7 @@ import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
 import { HelpCircle, Loader2, Sparkles, Ticket, Wallet, X } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
+import SpinWheel from '@/app/components/SpinWheel';
 
 type PrizeItem = {
   id?: string;
@@ -54,6 +55,19 @@ type DailyClaimStatus = {
   nextEligibleAt: string;
   serverNow: string;
 };
+
+const SPIN_TIERS = [
+  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9', odds: '50%' },
+  { reward: 25, label: 'Industrial Grade', color: '#5e98d9', odds: '30%' },
+  { reward: 50, label: 'Mil-Spec', color: '#4b69ff', odds: '15%' },
+  { reward: 100, label: 'Restricted', color: '#8847ff', odds: '4%' },
+  { reward: 500, label: 'Classified', color: '#d32ce6', odds: '0.9%' },
+  { reward: 1000, label: 'Covert', color: '#eb4b4b', odds: '0.08%' },
+  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b', odds: '0.015%' },
+  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b', odds: '0.003%' },
+  { reward: 10000, label: 'Contraband', color: '#ffd700', odds: '0.0007%' },
+  { reward: 30000, label: 'Contraband', color: '#ffd700', odds: '0.0003%' },
+];
 
 type MyClaimRow = {
   giveawayId: string;
@@ -154,6 +168,10 @@ export default function GiveawaysPage() {
 
   const [spinStatusLoading, setSpinStatusLoading] = useState(false);
   const [spinStatus, setSpinStatus] = useState<{ canSpin: boolean; nextEligibleAt: string; } | null>(null);
+
+  const [spinModalOpen, setSpinModalOpen] = useState(false);
+  const [spinWheelOpen, setSpinWheelOpen] = useState(false);
+  const [lastSpinReward, setLastSpinReward] = useState<number | null>(null);
 
   const [entriesToBuy, setEntriesToBuy] = useState<number>(1);
   const [entering, setEntering] = useState(false);
@@ -491,6 +509,23 @@ export default function GiveawaysPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.steamId]);
 
+  const openSpinModal = () => {
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return;
+    }
+    setLastSpinReward(null);
+    setSpinWheelOpen(false);
+    setSpinModalOpen(true);
+  };
+
+  const handleSpinComplete = (reward: number) => {
+    setSpinWheelOpen(false);
+    if (reward > 0) setLastSpinReward(reward);
+    void loadCredits();
+    void loadDailySpinStatus();
+  };
+
   useEffect(() => {
     if (!user?.steamId) return;
     if (!claimStatus || claimStatus.canClaim) return;
@@ -710,10 +745,11 @@ export default function GiveawaysPage() {
                           ? 'Daily Claim'
                           : `Next in ${formatHms(claimRemainingSeconds)}`}
                 </button>
-                <Link
-                  href={canSpin ? '/spins' : '#'}
-                  onClick={(e) => { if (!canSpin) e.preventDefault(); }}
-                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!canSpin ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                <button
+                  type="button"
+                  onClick={openSpinModal}
+                  disabled={spinStatusLoading || !user?.steamId}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${spinStatusLoading || !user?.steamId ? 'bg-white/5 text-gray-500 cursor-not-allowed' : (canSpin ? 'bg-yellow-600 hover:bg-yellow-500 text-white' : 'bg-white/10 hover:bg-white/15 text-white')}`}
                 >
                   {spinStatusLoading
                     ? 'Loading...'
@@ -722,7 +758,7 @@ export default function GiveawaysPage() {
                       : canSpin
                         ? 'Daily Spin'
                         : `Next in ${formatHms(spinRemainingSeconds)}`}
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -733,6 +769,57 @@ export default function GiveawaysPage() {
               </div>
             )}
           </header>
+
+          {spinModalOpen && (
+            <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }}>
+              <div className="w-full max-w-4xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-6 md:p-8" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
+                    <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">Open Your Reward</div>
+                    <div className="text-[11px] text-gray-400 mt-2">Once every 24h (UTC). Odds are shown below.</div>
+                  </div>
+                  <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }} aria-label="Close">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {SPIN_TIERS.map((t) => (
+                    <div key={t.reward} className="rounded-2xl border border-white/10 bg-black/30 p-4 relative overflow-hidden">
+                      <div className="absolute inset-0 opacity-15" style={{ background: `radial-gradient(circle at 30% 20%, ${t.color}, transparent 55%)` }} />
+                      <div className="relative">
+                        <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: t.color }}>{t.label}</div>
+                        <div className="mt-2 text-2xl font-black italic tracking-tighter">{t.reward} <span className="text-[12px] text-gray-400">CREDITS</span></div>
+                        <div className="mt-1 text-[9px] text-gray-500 font-black uppercase tracking-widest">Odds: {t.odds}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="text-[11px] text-gray-400">
+                    {canSpin ? 'Spin available now.' : `Next spin in ${formatHms(spinRemainingSeconds)}.`}
+                    {lastSpinReward !== null && lastSpinReward > 0 && (
+                      <span className="ml-2 text-emerald-300 font-black uppercase tracking-widest text-[10px]">Last win: {lastSpinReward} credits</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSpinWheelOpen(true)}
+                    disabled={!canSpin || spinWheelOpen}
+                    className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                  >
+                    {spinWheelOpen ? 'Opening...' : 'Open Case'}
+                  </button>
+                </div>
+
+                {spinWheelOpen && (
+                  <SpinWheel onSpinComplete={handleSpinComplete} />
+                )}
+              </div>
+            </div>
+          )}
 
           {!!user?.steamId && (
             <section className="bg-[#11141d] p-6 rounded-[2rem] border border-white/5 shadow-xl">

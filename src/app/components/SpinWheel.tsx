@@ -3,22 +3,40 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const REWARDS = [10, 25, 50, 100, 500, 1000];
+const REWARD_TIERS = [
+  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9' },
+  { reward: 25, label: 'Industrial Grade', color: '#5e98d9' },
+  { reward: 50, label: 'Mil-Spec', color: '#4b69ff' },
+  { reward: 100, label: 'Restricted', color: '#8847ff' },
+  { reward: 500, label: 'Classified', color: '#d32ce6' },
+  { reward: 1000, label: 'Covert', color: '#eb4b4b' },
+  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b' },
+  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b' },
+  { reward: 10000, label: 'Contraband', color: '#ffd700' },
+  { reward: 30000, label: 'Contraband', color: '#ffd700' },
+] as const;
+
+type RewardTier = (typeof REWARD_TIERS)[number];
+
+function getTierByReward(reward: number): RewardTier {
+  const found = REWARD_TIERS.find((t) => t.reward === reward);
+  return found || REWARD_TIERS[0];
+}
 
 // Generate a list of items for the spinner reel
-const generateReelItems = (finalReward: number) => {
-  let items = [];
+const generateReelItems = (finalReward: number): RewardTier[] => {
+  const items: RewardTier[] = [];
   for (let i = 0; i < 50; i++) {
-    items.push(REWARDS[Math.floor(Math.random() * REWARDS.length)]);
+    const idx = Math.floor(Math.random() * REWARD_TIERS.length);
+    items.push(REWARD_TIERS[idx]);
   }
-  // Ensure the final reward is in the right place
-  items[45] = finalReward;
+  items[45] = getTierByReward(finalReward);
   return items;
 };
 
 const SpinWheel = ({ onSpinComplete }: { onSpinComplete: (reward: number) => void }) => {
   const [isSpinning, setIsSpinning] = useState(false);
-  const [reelItems, setReelItems] = useState<number[]>([]);
+  const [reelItems, setReelItems] = useState<RewardTier[]>([]);
   const [finalReward, setFinalReward] = useState<number | null>(null);
 
   useEffect(() => {
@@ -50,9 +68,9 @@ const SpinWheel = ({ onSpinComplete }: { onSpinComplete: (reward: number) => voi
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="w-full max-w-4xl bg-gray-900 border border-yellow-500 rounded-lg p-4">
+      <div className="w-full max-w-5xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-4 md:p-6">
         <div className="relative h-40 w-full overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-44 bg-yellow-500 z-20"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-44 bg-yellow-500 z-20 rounded-full"></div>
           <AnimatePresence>
             {isSpinning && reelItems.length > 0 && (
               <motion.div
@@ -62,9 +80,24 @@ const SpinWheel = ({ onSpinComplete }: { onSpinComplete: (reward: number) => voi
                 transition={{ duration: 5, ease: 'easeOut' }}
                 onAnimationComplete={handleAnimationComplete}
               >
-                {reelItems.map((reward, i) => (
-                  <div key={i} className="flex-shrink-0 w-44 h-36 flex items-center justify-center text-white text-2xl font-bold bg-gray-800 border-2 border-gray-700 rounded-lg mx-1">
-                    {reward}
+                {reelItems.map((tier, i) => (
+                  <div
+                    key={i}
+                    className="flex-shrink-0 w-44 h-36 rounded-2xl mx-1 border border-white/10 bg-black/30 relative overflow-hidden"
+                  >
+                    <div
+                      className="absolute inset-0 opacity-20"
+                      style={{ background: `radial-gradient(circle at 30% 20%, ${tier.color}, transparent 60%)` }}
+                    />
+                    <div className="relative h-full w-full flex flex-col justify-center px-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: tier.color }}>
+                        {tier.label}
+                      </div>
+                      <div className="mt-2 text-white text-3xl font-black italic tracking-tighter">
+                        {tier.reward}
+                        <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </motion.div>
