@@ -527,6 +527,16 @@ export default function GiveawaysPage() {
   };
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!spinModalOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [spinModalOpen]);
+
+  useEffect(() => {
     if (!user?.steamId) return;
     if (!claimStatus || claimStatus.canClaim) return;
     const id = window.setInterval(() => setNowTick(Date.now()), 1000);
@@ -771,8 +781,8 @@ export default function GiveawaysPage() {
           </header>
 
           {spinModalOpen && (
-            <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }}>
-              <div className="w-full max-w-4xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-6 md:p-8" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-4" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }}>
+              <div className="w-full max-w-4xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-5 md:p-8 max-h-[88vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
@@ -806,7 +816,10 @@ export default function GiveawaysPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSpinWheelOpen(true)}
+                    onClick={() => {
+                      if (!canSpin || spinWheelOpen) return;
+                      setSpinWheelOpen(true);
+                    }}
                     disabled={!canSpin || spinWheelOpen}
                     className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
                   >
@@ -815,7 +828,9 @@ export default function GiveawaysPage() {
                 </div>
 
                 {spinWheelOpen && (
-                  <SpinWheel onSpinComplete={handleSpinComplete} />
+                  <div className="mt-6">
+                    <SpinWheel onSpinComplete={handleSpinComplete} />
+                  </div>
                 )}
               </div>
             </div>

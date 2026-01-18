@@ -39,16 +39,17 @@ const SpinWheel = ({ onSpinComplete }: { onSpinComplete: (reward: number) => voi
   const [reelItems, setReelItems] = useState<RewardTier[]>([]);
   const [finalReward, setFinalReward] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState<number>(0);
+  const [readyToAnimate, setReadyToAnimate] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const itemRef = useRef<HTMLDivElement | null>(null);
+  const targetRef = useRef<HTMLDivElement | null>(null);
 
   const targetIndex = 45;
-  const gapPx = 8;
 
   useEffect(() => {
     // Trigger the spin on mount
     const startSpin = async () => {
       setIsSpinning(true);
+      setReadyToAnimate(false);
       try {
         const response = await fetch('/api/spins', { method: 'POST' });
         const data = await response.json();
@@ -67,15 +68,26 @@ const SpinWheel = ({ onSpinComplete }: { onSpinComplete: (reward: number) => voi
   }, [onSpinComplete]);
 
   useEffect(() => {
-    if (!containerRef.current || !itemRef.current) return;
+    if (!containerRef.current || !targetRef.current) return;
     if (reelItems.length === 0) return;
 
-    const containerWidth = containerRef.current.getBoundingClientRect().width;
-    const itemWidth = itemRef.current.getBoundingClientRect().width;
+    // Wait a frame to ensure layout is fully calculated (fonts, responsive widths, etc.)
+    const raf = requestAnimationFrame(() => {
+      if (!containerRef.current || !targetRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const targetRect = targetRef.current.getBoundingClientRect();
 
-    const full = itemWidth + gapPx;
-    const centerOffset = containerWidth / 2 - itemWidth / 2;
-    setTranslateX(-(full * targetIndex) + centerOffset);
+      // Compute the winning card's center relative to the container's left edge.
+      const targetCenter = (targetRect.left - containerRect.left) + targetRect.width / 2;
+      const containerCenter = containerRect.width / 2;
+      const delta = targetCenter - containerCenter;
+
+      // Move reel left by delta so the target center aligns with container center.
+      setTranslateX(-delta);
+      setReadyToAnimate(true);
+    });
+
+    return () => cancelAnimationFrame(raf);
   }, [reelItems.length]);
 
   const handleAnimationComplete = () => {
@@ -85,49 +97,47 @@ const SpinWheel = ({ onSpinComplete }: { onSpinComplete: (reward: number) => voi
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="w-full max-w-5xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-4 md:p-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-[10px] uppercase tracking-[0.35em] text-gray-500 font-black">
-            {finalReward !== null ? `Winning: ${finalReward} CR` : 'Opening...'}
-          </div>
+    <div className="w-full bg-[#0f111a] border border-white/10 rounded-[2rem] p-4 md:p-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.35em] text-gray-500 font-black">
+          {finalReward !== null ? `Winning: ${finalReward} CR` : 'Opening...'}
         </div>
-        <div ref={containerRef} className="relative h-40 w-full overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-44 bg-yellow-500 z-20 rounded-full"></div>
-          <AnimatePresence>
-            {isSpinning && reelItems.length > 0 && (
-              <motion.div
-                className="flex h-full items-center gap-2"
-                initial={{ x: 0 }}
-                animate={{ x: translateX }}
-                transition={{ duration: 5, ease: 'easeOut' }}
-                onAnimationComplete={handleAnimationComplete}
-              >
-                {reelItems.map((tier, i) => (
+      </div>
+      <div ref={containerRef} className="relative h-36 md:h-40 w-full overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 md:h-44 bg-yellow-500 z-20 rounded-full"></div>
+        <AnimatePresence>
+          {isSpinning && reelItems.length > 0 && readyToAnimate && (
+            <motion.div
+              className="flex h-full items-center gap-2"
+              initial={{ x: 0 }}
+              animate={{ x: translateX }}
+              transition={{ duration: 5, ease: 'easeOut' }}
+              onAnimationComplete={handleAnimationComplete}
+            >
+              {reelItems.map((tier, i) => (
+                <div
+                  key={i}
+                  ref={i === targetIndex ? targetRef : undefined}
+                  className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] h-32 md:h-36 rounded-2xl border border-white/10 bg-black/30 relative overflow-hidden"
+                >
                   <div
-                    key={i}
-                    ref={i === 0 ? itemRef : undefined}
-                    className="flex-shrink-0 w-[180px] h-36 rounded-2xl border border-white/10 bg-black/30 relative overflow-hidden"
-                  >
-                    <div
-                      className="absolute inset-0 opacity-20"
-                      style={{ background: `radial-gradient(circle at 30% 20%, ${tier.color}, transparent 60%)` }}
-                    />
-                    <div className="relative h-full w-full flex flex-col justify-center px-4">
-                      <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: tier.color }}>
-                        {tier.label}
-                      </div>
-                      <div className="mt-2 text-white text-3xl font-black italic tracking-tighter">
-                        {tier.reward}
-                        <span className="text-[12px] text-gray-400 ml-1">CR</span>
-                      </div>
+                    className="absolute inset-0 opacity-20"
+                    style={{ background: `radial-gradient(circle at 30% 20%, ${tier.color}, transparent 60%)` }}
+                  />
+                  <div className="relative h-full w-full flex flex-col justify-center px-4">
+                    <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: tier.color }}>
+                      {tier.label}
+                    </div>
+                    <div className="mt-2 text-white text-2xl md:text-3xl font-black italic tracking-tighter">
+                      {tier.reward}
+                      <span className="text-[12px] text-gray-400 ml-1">CR</span>
                     </div>
                   </div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

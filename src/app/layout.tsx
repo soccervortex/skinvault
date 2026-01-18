@@ -9,7 +9,6 @@ import "./easter-theme.css";
 import "./sinterklaas-theme.css";
 import "./newyear-theme.css";
 import "./oldyear-theme.css";
-import NextAuthProvider from "./components/NextAuthProvider";
 import ThemeProviderWrapper from "./components/ThemeProviderWrapper";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toast";
@@ -193,9 +192,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Suspense fallback={null}>
               <CreatorAnalyticsTracker />
             </Suspense>
-            <NextAuthProvider>
-              <main id="main-content">{children}</main>
-            </NextAuthProvider>
+            <main id="main-content">{children}</main>
             <ProExpirationWarning />
             <NetworkStatus />
             <ThemeProviderWrapper />
