@@ -60,10 +60,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           return;
         }
 
-        if (parsedUser?.steamId) {
-          didTrySessionHydrationRef.current = false;
-        }
-
         if (!parsedUser?.steamId && !didTrySessionHydrationRef.current) {
           didTrySessionHydrationRef.current = true;
           void (async () => {
@@ -129,19 +125,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     // Also listen for custom user update events
     const handleUserUpdate = () => checkUser();
     window.addEventListener('userUpdated', handleUserUpdate);
-
-    const handlePageShow = () => checkUser();
-    const handleFocus = () => checkUser();
-    const handleVisibility = () => {
-      try {
-        if (document.visibilityState === 'visible') checkUser();
-      } catch {
-      }
-    };
-
-    window.addEventListener('pageshow', handlePageShow);
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibility);
     
     // Periodically check for user updates (every 5 seconds)
     const interval = setInterval(checkUser, 5000);
@@ -149,9 +132,6 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     return () => {
       window.removeEventListener('storage', checkUser);
       window.removeEventListener('userUpdated', handleUserUpdate);
-      window.removeEventListener('pageshow', handlePageShow);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibility);
       clearInterval(interval);
     };
   }, []);
@@ -356,12 +336,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     }
 
     try {
-      await fetch('/api/auth/steam/logout', {
-        method: 'POST',
-        cache: 'no-store',
-        credentials: 'include',
-        keepalive: true,
-      });
+      await fetch('/api/auth/steam/logout', { method: 'POST' });
     } catch {
     }
 
