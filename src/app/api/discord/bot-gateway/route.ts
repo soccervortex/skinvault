@@ -16,6 +16,16 @@ type DMQueueDoc = {
   createdAt: Date;
 };
 
+function isValidDiscordId(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{17,20}$/.test(value);
+}
+
+function getTimestamp(value: unknown): number | null {
+  const d = value instanceof Date ? value : new Date(value as any);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 async function withAuth(request: Request, handler: (request: Request) => Promise<NextResponse>) {
   const authHeader = request.headers.get('authorization');
   const expectedToken = process.env.DISCORD_BOT_API_TOKEN;
@@ -46,30 +56,45 @@ async function postHandler(request: Request): Promise<NextResponse> {
     switch (action) {
       case 'send_dm':
       case 'send_welcome':
-        if (!discordId || !message) {
+        if (!isValidDiscordId(discordId)) {
+          return NextResponse.json({ error: 'Missing discordId or message' }, { status: 400 });
+        }
+        const finalMessage =
+          action === 'send_welcome' && !message
+            ? `🎉 **Thanks for connecting with SkinVaults Bot!**\n\nYou can now:\n• Set up **price alerts** for CS2 skins\n• Get notified when prices hit your target\n• Use **/wishlist** to view your tracked items\n• Use **/vault** to view your total vault value\n\nHappy trading!`
+            : String(message || '').trim();
+        if (!finalMessage) {
           return NextResponse.json({ error: 'Missing discordId or message' }, { status: 400 });
         }
         await collection.insertOne({
           discordId,
-          message,
+          message: finalMessage,
           createdAt: new Date(),
         });
         return NextResponse.json({ success: true, queued: true });
 
       case 'check_alerts': // This now handles fetching and clearing the queue
         const messages = await collection.find({}).sort({ createdAt: 1 }).limit(100).toArray();
-        if (messages.length > 0) {
-          const idsToDelete = messages.map(m => m._id);
+
+        const valid: Array<{ discordId: string; message: string; timestamp: number }> = [];
+        const idsToDelete: any[] = [];
+
+        for (const m of messages) {
+          if (m?._id) idsToDelete.push(m._id);
+
+          const did = isValidDiscordId((m as any)?.discordId) ? (m as any).discordId : null;
+          const msg = typeof (m as any)?.message === 'string' ? String((m as any).message).trim() : '';
+          const ts = getTimestamp((m as any)?.createdAt);
+
+          if (!did || !msg || ts === null || ts <= 0) continue;
+          valid.push({ discordId: did, message: msg, timestamp: ts });
+        }
+
+        if (idsToDelete.length > 0) {
           await collection.deleteMany({ _id: { $in: idsToDelete } });
         }
-        return NextResponse.json({
-          success: true,
-          queue: messages.map((m) => ({
-            discordId: m.discordId,
-            message: m.message,
-            timestamp: new Date(m.createdAt).getTime(),
-          })),
-        });
+
+        return NextResponse.json({ success: true, queue: valid });
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

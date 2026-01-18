@@ -289,7 +289,10 @@ async function fetchQueuedMessages() {
     if (queue.length > 0) {
       log(`📬 Found ${queue.length} message(s) in queue`);
       queue.forEach((msg, idx) => {
-        log(`   Message ${idx + 1}: Discord ID ${msg.discordId}, timestamp: ${new Date(msg.timestamp).toISOString()}`);
+        const did = String(msg?.discordId || '').trim();
+        const ts = typeof msg?.timestamp === 'number' ? msg.timestamp : NaN;
+        const tsLabel = Number.isFinite(ts) ? new Date(ts).toISOString() : 'unknown';
+        log(`   Message ${idx + 1}: Discord ID ${did || 'unknown'}, timestamp: ${tsLabel}`);
       });
     } else {
       log(`📭 No messages in queue`);
@@ -367,9 +370,17 @@ async function processQueuedMessages() {
     let failCount = 0;
 
     for (const msg of messages) {
-      log(`📤 Processing message for Discord ID: ${msg.discordId}`);
-      const success = await sendDM(msg.discordId, msg.message);
-      if (success) {
+      const discordId = String(msg?.discordId || '').trim();
+      const messageText = typeof msg?.message === 'string' ? msg.message : '';
+      if (!/^\d{17,20}$/.test(discordId) || !messageText.trim()) {
+        failCount++;
+        log(`⚠️ Skipping invalid queued message (missing discordId/message)`);
+        continue;
+      }
+
+      log(`📤 Processing message for Discord ID: ${discordId}`);
+      const sent = await sendDM(discordId, messageText);
+      if (sent) {
         successCount++;
       } else {
         failCount++;
