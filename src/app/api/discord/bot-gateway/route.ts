@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 
+export const runtime = 'nodejs';
+
 interface BotGatewayRequest {
   action: 'send_dm' | 'send_welcome' | 'check_alerts';
   discordId?: string;
   message?: string;
 }
+
+type DMQueueDoc = {
+  _id?: any;
+  discordId: string;
+  message: string;
+  createdAt: Date;
+};
 
 async function withAuth(request: Request, handler: (request: Request) => Promise<NextResponse>) {
   const authHeader = request.headers.get('authorization');
@@ -32,7 +41,7 @@ async function postHandler(request: Request): Promise<NextResponse> {
     const body: BotGatewayRequest = await request.json();
     const { action, discordId, message } = body;
     const db = await getDatabase();
-    const collection = db.collection('discord_dm_queue');
+    const collection = db.collection<DMQueueDoc>('discord_dm_queue');
 
     switch (action) {
       case 'send_dm':
@@ -48,19 +57,27 @@ async function postHandler(request: Request): Promise<NextResponse> {
         return NextResponse.json({ success: true, queued: true });
 
       case 'check_alerts': // This now handles fetching and clearing the queue
-        const messages = await collection.find({}).sort({ createdAt: 1 }).toArray();
+        const messages = await collection.find({}).sort({ createdAt: 1 }).limit(100).toArray();
         if (messages.length > 0) {
           const idsToDelete = messages.map(m => m._id);
           await collection.deleteMany({ _id: { $in: idsToDelete } });
         }
-        return NextResponse.json({ success: true, queue: messages });
+        return NextResponse.json({
+          success: true,
+          queue: messages.map((m) => ({
+            discordId: m.discordId,
+            message: m.message,
+            timestamp: new Date(m.createdAt).getTime(),
+          })),
+        });
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error) {
-    console.error('Bot gateway POST error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error('Bot gateway POST error:', reason);
+    return NextResponse.json({ error: 'Internal server error', reason }, { status: 500 });
   }
 }
 
@@ -72,12 +89,18 @@ async function getHandler(request: Request): Promise<NextResponse> {
 
   try {
     const db = await getDatabase();
-    const collection = db.collection('discord_dm_queue');
-    const messages = await collection.find({}).sort({ createdAt: 1 }).toArray();
-    return NextResponse.json({ success: true, queue: messages, count: messages.length });
+    const collection = db.collection<DMQueueDoc>('discord_dm_queue');
+    const messages = await collection.find({}).sort({ createdAt: 1 }).limit(100).toArray();
+    const queue = messages.map((m) => ({
+      discordId: m.discordId,
+      message: m.message,
+      timestamp: new Date(m.createdAt).getTime(),
+    }));
+    return NextResponse.json({ success: true, queue, count: queue.length });
   } catch (error) {
-    console.error('Bot gateway GET error:', error instanceof Error ? error.message : String(error));
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error('Bot gateway GET error:', reason);
+    return NextResponse.json({ error: 'Internal server error', reason }, { status: 500 });
   }
 }
 

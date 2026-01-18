@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import SpinWheel from '@/app/components/SpinWheel';
 import { useToast } from '@/app/components/Toast';
 
@@ -14,7 +13,8 @@ function formatTimeLeft(endTime: string) {
 }
 
 export default function SpinPage() {
-  const { data: session } = useSession();
+  const [steamId, setSteamId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [canSpin, setCanSpin] = useState(false);
   const [nextEligibleAt, setNextEligibleAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,16 +22,61 @@ export default function SpinPage() {
   const toast = useToast();
 
   useEffect(() => {
-    if (session?.user?.steamId) {
-      fetch('/api/spins')
-        .then(res => res.json())
-        .then(data => {
-          setCanSpin(data.canSpin);
-          setNextEligibleAt(data.nextEligibleAt);
-          setIsLoading(false);
-        });
+    let cancelled = false;
+
+    const initAuth = async () => {
+      try {
+        const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
+        const parsed = stored ? JSON.parse(stored) : null;
+        const sidFromStorage = String(parsed?.steamId || '').trim();
+        if (/^\d{17}$/.test(sidFromStorage)) {
+          if (!cancelled) setSteamId(sidFromStorage);
+          return;
+        }
+
+        const sessionRes = await fetch('/api/auth/steam/session', { cache: 'no-store' });
+        if (!sessionRes.ok) return;
+        const sessionJson = await sessionRes.json().catch(() => null);
+        const sid = String(sessionJson?.steamId || '').trim();
+        if (!/^\d{17}$/.test(sid)) return;
+
+        if (!cancelled) setSteamId(sid);
+        try {
+          const prevRaw = window.localStorage.getItem('steam_user');
+          const prev = prevRaw ? JSON.parse(prevRaw) : null;
+          const next = prev && typeof prev === 'object' ? { ...prev, steamId: sid } : { steamId: sid };
+          window.localStorage.setItem('steam_user', JSON.stringify(next));
+        } catch {
+        }
+      } catch {
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    };
+
+    void initAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!steamId) {
+      setIsLoading(false);
+      return;
     }
-  }, [session]);
+
+    setIsLoading(true);
+    fetch('/api/spins', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        setCanSpin(!!data.canSpin);
+        setNextEligibleAt(data.nextEligibleAt || null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [steamId]);
 
   const handleSpinClick = () => {
     if (canSpin) {
@@ -47,7 +92,11 @@ export default function SpinPage() {
     fetch('/api/spins').then(res => res.json()).then(data => setNextEligibleAt(data.nextEligibleAt));
   };
 
-  if (!session) {
+  if (authLoading) {
+    return <div className="text-center p-10">Loading...</div>;
+  }
+
+  if (!steamId) {
     return (
       <div className="text-center p-10">
         <p>Please sign in to use the daily spin.</p>
