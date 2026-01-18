@@ -184,6 +184,16 @@ export default function GiveawaysPage() {
   const [spinResultReward, setSpinResultReward] = useState<number | null>(null);
   const [lastSpinReward, setLastSpinReward] = useState<number | null>(null);
 
+  const canSpin = !!user?.steamId && !!spinStatus?.canSpin;
+
+  const spinModalOpenRef = useRef(spinModalOpen);
+  const spinWheelOpenRef = useRef(spinWheelOpen);
+  const spinResultOpenRef = useRef(spinResultOpen);
+  const spinOpeningRef = useRef(spinOpening);
+  const canSpinRef = useRef(canSpin);
+  const startSpinRef = useRef<null | (() => Promise<void>)>(null);
+  const closeAllSpinModalsRef = useRef<null | (() => void)>(null);
+
   const [entriesToBuy, setEntriesToBuy] = useState<number>(1);
   const [entering, setEntering] = useState(false);
   const [myEntries, setMyEntries] = useState<number>(0);
@@ -577,15 +587,92 @@ export default function GiveawaysPage() {
     }
   };
 
+  const closeAllSpinModals = () => {
+    setSpinWheelOpen(false);
+    setSpinWheelReward(null);
+    setSpinResultOpen(false);
+    setSpinResultReward(null);
+    setSpinModalOpen(false);
+  };
+
+  useEffect(() => {
+    spinModalOpenRef.current = spinModalOpen;
+  }, [spinModalOpen]);
+
+  useEffect(() => {
+    spinWheelOpenRef.current = spinWheelOpen;
+  }, [spinWheelOpen]);
+
+  useEffect(() => {
+    spinResultOpenRef.current = spinResultOpen;
+  }, [spinResultOpen]);
+
+  useEffect(() => {
+    spinOpeningRef.current = spinOpening;
+  }, [spinOpening]);
+
+  useEffect(() => {
+    canSpinRef.current = canSpin;
+  }, [canSpin]);
+
+  useEffect(() => {
+    startSpinRef.current = startSpin;
+  }, [startSpin]);
+
+  useEffect(() => {
+    closeAllSpinModalsRef.current = closeAllSpinModals;
+  }, [closeAllSpinModals]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isSpace = e.code === 'Space' || e.key === ' ';
+      const isEsc = e.code === 'Escape' || e.key === 'Escape';
+      if (!isSpace && !isEsc) return;
+
+      const target = e.target as HTMLElement | null;
+      const tag = String(target?.tagName || '').toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || (target as any)?.isContentEditable;
+      if (isTyping) return;
+
+      const anySpinOverlayOpen =
+        !!spinModalOpenRef.current || !!spinWheelOpenRef.current || !!spinResultOpenRef.current;
+
+      if (isEsc && anySpinOverlayOpen) {
+        e.preventDefault();
+        closeAllSpinModalsRef.current?.();
+        return;
+      }
+
+      if (!isSpace) return;
+      if (!anySpinOverlayOpen) return;
+
+      e.preventDefault();
+      if (spinResultOpenRef.current) {
+        if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
+        setSpinResultOpen(false);
+        void startSpinRef.current?.();
+        return;
+      }
+
+      if (!spinModalOpenRef.current) return;
+      if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
+      void startSpinRef.current?.();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    if (!spinModalOpen) return;
+    const anySpinOverlayOpen = spinModalOpen || spinWheelOpen || spinResultOpen;
+    if (!anySpinOverlayOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [spinModalOpen]);
+  }, [spinModalOpen, spinWheelOpen, spinResultOpen]);
 
   useEffect(() => {
     if (!user?.steamId) return;
@@ -716,7 +803,11 @@ export default function GiveawaysPage() {
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, [spinStatus, serverOffsetMs, nowTick]);
 
-  const canSpin = !!user?.steamId && !!spinStatus?.canSpin;
+  const spinResultTier = useMemo(() => {
+    const r = Number(spinResultReward);
+    if (!Number.isFinite(r)) return SPIN_TIERS[0];
+    return SPIN_TIERS.find((t) => t.reward === r) || SPIN_TIERS[0];
+  }, [spinResultReward]);
 
   const enterGiveaway = async () => {
     if (!detail?.id) return;
@@ -771,7 +862,9 @@ export default function GiveawaysPage() {
   return (
     <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+      <main
+        className={`flex-1 p-6 md:p-10 custom-scrollbar ${spinModalOpen || spinWheelOpen || spinResultOpen ? 'overflow-hidden' : 'overflow-y-auto'}`}
+      >
         <div className="max-w-6xl mx-auto space-y-8 pb-24">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
             <div className="flex items-start justify-between gap-6 flex-wrap">
@@ -832,8 +925,17 @@ export default function GiveawaysPage() {
           </header>
 
           {spinModalOpen && (
-            <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-4" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }}>
-              <div className="w-full max-w-4xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-5 md:p-8 max-h-[88vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
+              onClick={() => {
+                setSpinModalOpen(false);
+                setSpinWheelOpen(false);
+              }}
+            >
+              <div
+                className="w-full h-dvh md:h-auto md:max-h-[88dvh] md:max-w-4xl bg-[#0f111a] border border-white/10 rounded-none md:rounded-[2rem] p-5 md:p-8 overflow-y-auto custom-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
@@ -845,7 +947,7 @@ export default function GiveawaysPage() {
                   </button>
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {SPIN_TIERS.map((t) => (
                     <div key={t.reward} className="rounded-2xl border border-white/10 bg-black/30 p-4 relative overflow-hidden">
                       <div className="absolute inset-0 opacity-15" style={{ background: `radial-gradient(circle at 30% 20%, ${t.color}, transparent 55%)` }} />
@@ -891,22 +993,51 @@ export default function GiveawaysPage() {
 
           {spinResultOpen && (
             <div
-              className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-4"
+              className="fixed inset-0 z-[10001] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
               onClick={() => setSpinResultOpen(false)}
             >
               <div
-                className="w-full max-w-xl bg-[#0f111a] border border-white/10 rounded-[2rem] p-5 md:p-6"
+                className="w-full h-dvh md:h-auto md:max-h-[90dvh] md:max-w-xl bg-[#0f111a] border border-white/10 rounded-none md:rounded-[2rem] p-5 md:p-6 overflow-y-auto custom-scrollbar"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
                     <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">You opened</div>
-                    <div className="mt-3 text-4xl font-black italic tracking-tighter text-white">
-                      {spinResultReward ?? 0}
-                      <span className="text-[12px] text-gray-400 ml-2">CREDITS</span>
+                  </div>
+                  <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => setSpinResultOpen(false)} aria-label="Close">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="mt-6 rounded-[2rem] border border-white/10 bg-black/30 relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 opacity-20"
+                    style={{ background: `radial-gradient(circle at 30% 20%, ${spinResultTier.color}, transparent 60%)` }}
+                  />
+                  <div className="relative p-6">
+                    <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: spinResultTier.color }}>
+                      {spinResultTier.label}
                     </div>
-                    <div className="mt-3 text-[11px] text-gray-400">
+                    <div className="mt-2 flex items-end gap-3 flex-wrap">
+                      <div className="text-5xl md:text-6xl font-black italic tracking-tighter text-white">
+                        {spinResultReward ?? 0}
+                      </div>
+                      <div className="pb-2 text-[12px] md:text-[13px] text-gray-300 font-black uppercase tracking-widest">
+                        CREDITS
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
+                        <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Odds</div>
+                        <div className="text-[10px] text-white font-black uppercase tracking-widest">{spinResultTier.odds}</div>
+                      </div>
+                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
+                        <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Shortcut</div>
+                        <div className="text-[10px] text-white font-black uppercase tracking-widest">Space</div>
+                      </div>
+                    </div>
+                    <div className="mt-4 text-[11px] text-gray-400">
                       {spinStatus?.dailyLimit === null
                         ? 'Unlimited spins available.'
                         : typeof spinStatus?.remainingSpins === 'number'
@@ -914,9 +1045,6 @@ export default function GiveawaysPage() {
                           : (!canSpin ? `Next spin in ${formatHms(spinRemainingSeconds)}.` : 'Spin available now.')}
                     </div>
                   </div>
-                  <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => setSpinResultOpen(false)} aria-label="Close">
-                    <X size={18} />
-                  </button>
                 </div>
 
                 <div className="mt-6 flex items-center justify-end gap-3 flex-wrap">

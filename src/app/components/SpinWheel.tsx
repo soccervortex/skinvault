@@ -61,6 +61,7 @@ const SpinWheel = ({
   const didComputeTargetRef = useRef(false);
   const didStartAnimationRef = useRef(false);
   const controls = useAnimationControls();
+  const controlsRef = useRef(controls);
   const onSpinCompleteRef = useRef(onSpinComplete);
   const onCloseRef = useRef(onClose);
 
@@ -86,9 +87,9 @@ const SpinWheel = ({
     didComputeTargetRef.current = false;
     didStartAnimationRef.current = false;
     setTranslateX(0);
-    controls.set({ x: 0 });
+    controlsRef.current.set({ x: 0 });
     setReelItems(generateReelItems(r));
-  }, [controls, reward]);
+  }, [reward]);
 
   useEffect(() => {
     if (didComputeTargetRef.current) return;
@@ -152,8 +153,8 @@ const SpinWheel = ({
 
     const run = async () => {
       try {
-        controls.set({ x: 0 });
-        await controls.start({
+        controlsRef.current.set({ x: 0 });
+        await controlsRef.current.start({
           x: translateX,
           transition: { duration: 5, ease: 'easeOut' },
         });
@@ -171,15 +172,15 @@ const SpinWheel = ({
     return () => {
       cancelled = true;
     };
-  }, [controls, isSpinning, readyToAnimate, reward, translateX]);
+  }, [isSpinning, readyToAnimate, reward, translateX]);
 
   return (
     <div
-      className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6"
+      className="fixed inset-0 z-[10002] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-6"
       onClick={() => onCloseRef.current?.()}
     >
       <div
-        className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar"
+        className="w-full h-dvh md:h-auto md:max-h-[92dvh] md:max-w-5xl overflow-y-auto custom-scrollbar bg-[#0f111a] md:bg-transparent"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-end mb-3">
@@ -191,7 +192,7 @@ const SpinWheel = ({
             Close
           </button>
         </div>
-        <div className="w-full bg-[#0f111a] border border-white/10 rounded-[2rem] p-4 md:p-6">
+        <div className="w-full bg-[#0f111a] border border-white/10 rounded-none md:rounded-[2rem] p-4 md:p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase tracking-[0.35em] text-gray-500 font-black">
               Opening...
