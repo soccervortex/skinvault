@@ -152,6 +152,9 @@ export default function GiveawaysPage() {
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [nowTick, setNowTick] = useState(0);
 
+  const [spinStatusLoading, setSpinStatusLoading] = useState(false);
+  const [spinStatus, setSpinStatus] = useState<{ canSpin: boolean; nextEligibleAt: string; } | null>(null);
+
   const [entriesToBuy, setEntriesToBuy] = useState<number>(1);
   const [entering, setEntering] = useState(false);
   const [myEntries, setMyEntries] = useState<number>(0);
@@ -373,6 +376,24 @@ export default function GiveawaysPage() {
     }
   };
 
+  const loadDailySpinStatus = async () => {
+    if (!user?.steamId) {
+      setSpinStatus(null);
+      return;
+    }
+    setSpinStatusLoading(true);
+    try {
+      const res = await fetch('/api/spins', { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      setSpinStatus({ canSpin: !!json.canSpin, nextEligibleAt: json.nextEligibleAt });
+    } catch {
+      setSpinStatus(null);
+    } finally {
+      setSpinStatusLoading(false);
+    }
+  };
+
   const loadCredits = async () => {
     if (!user?.steamId) {
       setCreditsBalance(null);
@@ -466,6 +487,7 @@ export default function GiveawaysPage() {
 
   useEffect(() => {
     loadDailyClaimStatus();
+    loadDailySpinStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.steamId]);
 
@@ -589,6 +611,17 @@ export default function GiveawaysPage() {
 
   const canClaim = !!user?.steamId && !!claimStatus?.canClaim;
 
+  const spinRemainingSeconds = useMemo(() => {
+    if (!spinStatus || spinStatus.canSpin) return 0;
+    const nextMs = Date.parse(spinStatus.nextEligibleAt);
+    if (!Number.isFinite(nextMs)) return 0;
+    const nowMsLocal = Date.now() + serverOffsetMs;
+    const remainingMs = nextMs - nowMsLocal;
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }, [spinStatus, serverOffsetMs, nowTick]);
+
+  const canSpin = !!user?.steamId && !!spinStatus?.canSpin;
+
   const enterGiveaway = async () => {
     if (!detail?.id) return;
     if (!user?.steamId) {
@@ -677,6 +710,19 @@ export default function GiveawaysPage() {
                           ? 'Daily Claim'
                           : `Next in ${formatHms(claimRemainingSeconds)}`}
                 </button>
+                <Link
+                  href={canSpin ? '/spins' : '#'}
+                  onClick={(e) => { if (!canSpin) e.preventDefault(); }}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!canSpin ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                >
+                  {spinStatusLoading
+                    ? 'Loading...'
+                    : !user?.steamId
+                      ? 'Daily Spin'
+                      : canSpin
+                        ? 'Daily Spin'
+                        : `Next in ${formatHms(spinRemainingSeconds)}`}
+                </Link>
               </div>
             </div>
 
