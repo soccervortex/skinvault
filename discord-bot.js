@@ -124,6 +124,10 @@ const commands = [
     .setDescription('Get an invite to the official support server.')
     .toJSON(),
   new SlashCommandBuilder()
+    .setName('spins')
+    .setDescription('Use your daily spin to win credits.')
+    .toJSON(),
+  new SlashCommandBuilder()
     .setName('wishlist')
     .setDescription('View your wishlist with current prices')
     .toJSON(),
@@ -929,6 +933,36 @@ client.on('interactionCreate', async (interaction) => {
         }
       } catch (error) {
         await interaction.editReply({ content: '❌ An error occurred while trying to claim your daily reward.' });
+      }
+
+    } else if (commandName === 'spins') {
+      await interaction.deferReply({ ephemeral: true });
+      const steamId = await getSteamIdFromDiscord(user.id);
+      if (!steamId) {
+        return interaction.editReply({ content: '❌ **Not Connected**\n\nYou need to connect your Discord account first on the website.' });
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/spins`, { 
+          method: 'POST',
+          headers: { 'Cookie': `steamId=${steamId}` } 
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          await interaction.editReply({ content: `🎉 You spun the wheel and won **${data.reward}** credits! Your new balance is **${data.newBalance.toLocaleString()}** credits.` });
+        } else {
+          if (data.error === 'Already spun today') {
+            const statusRes = await fetch(`${API_BASE_URL}/api/spins`, { headers: { 'Cookie': `steamId=${steamId}` } });
+            const statusData = await statusRes.json();
+            const nextEligibleDate = new Date(statusData.nextEligibleAt);
+            await interaction.editReply({ content: `⌛ You have already used your spin for today. You can spin again <t:${Math.floor(nextEligibleDate.getTime() / 1000)}:R>.` });
+          } else {
+            await interaction.editReply({ content: `❌ Failed to use your spin: ${data.error}` });
+          }
+        }
+      } catch (error) {
+        await interaction.editReply({ content: '❌ An error occurred while trying to use your spin.' });
       }
 
     } else if (commandName === 'giveaways') {
