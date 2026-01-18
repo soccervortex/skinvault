@@ -826,26 +826,10 @@ export default function GiveawaysPage() {
                     {spinWheelOpen ? 'Opening...' : 'Open Case'}
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {spinWheelOpen && (
-            <div
-              className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6"
-              onClick={() => setSpinWheelOpen(false)}
-            >
-              <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-end mb-3">
-                  <button
-                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest"
-                    onClick={() => setSpinWheelOpen(false)}
-                    type="button"
-                  >
-                    Close
-                  </button>
-                </div>
-                <SpinWheel onSpinComplete={handleSpinComplete} />
+                {spinWheelOpen && (
+                  <SpinWheel onSpinComplete={handleSpinComplete} onClose={() => setSpinWheelOpen(false)} />
+                )}
               </div>
             </div>
           )}

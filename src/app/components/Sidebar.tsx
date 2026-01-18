@@ -481,9 +481,14 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </Link>
 
               {isOwner(user?.steamId) && (
-                <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
-                  <Shield size={16} /> Admin Panel
-                </Link>
+                <div className="space-y-2">
+                  <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+                    <Shield size={16} /> Admin Panel
+                  </Link>
+                  <Link href="/admin/spins" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin/spins' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}>
+                    <Coins size={16} /> Spins
+                  </Link>
+                </div>
               )}
             </div>
 
