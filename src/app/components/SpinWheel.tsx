@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 
 const REWARD_TIERS = [
   { reward: 10, label: 'Consumer Grade', color: '#b0c3d9' },
@@ -55,10 +55,11 @@ const SpinWheel = ({
   const [finalReward, setFinalReward] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState<number>(0);
   const [readyToAnimate, setReadyToAnimate] = useState(false);
-  const [animationStarted, setAnimationStarted] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const targetRef = useRef<HTMLDivElement | null>(null);
   const didComputeTargetRef = useRef(false);
+  const didStartAnimationRef = useRef(false);
+  const controls = useAnimationControls();
 
   const targetIndex = 45;
 
@@ -67,10 +68,11 @@ const SpinWheel = ({
     const startSpin = async () => {
       setIsSpinning(true);
       setReadyToAnimate(false);
-      setAnimationStarted(false);
       didComputeTargetRef.current = false;
+      didStartAnimationRef.current = false;
       setTranslateX(0);
       setReelItems(generateRandomReelItems());
+      controls.set({ x: 0 });
       try {
         const response = await fetch('/api/spins', { method: 'POST' });
         const data = await response.json();
@@ -93,7 +95,7 @@ const SpinWheel = ({
       }
     };
     startSpin();
-  }, [onSpinComplete]);
+  }, [controls, onSpinComplete]);
 
   useEffect(() => {
     if (didComputeTargetRef.current) return;
@@ -101,35 +103,73 @@ const SpinWheel = ({
     if (reelItems.length === 0) return;
     if (finalReward === null) return;
 
-    // Wait a frame to ensure layout is fully calculated (fonts, responsive widths, etc.)
-    const raf = requestAnimationFrame(() => {
+    let cancelled = false;
+
+    const compute = async () => {
+      try {
+        const fontsReady = (document as any).fonts?.ready;
+        if (fontsReady) await fontsReady;
+      } catch {
+      }
+
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      if (cancelled) return;
       if (didComputeTargetRef.current) return;
       if (!containerRef.current || !targetRef.current) return;
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const targetRect = targetRef.current.getBoundingClientRect();
 
-      // Compute the winning card's center relative to the container's left edge.
-      const targetCenter = (targetRect.left - containerRect.left) + targetRect.width / 2;
-      const containerCenter = containerRect.width / 2;
+      const container = containerRef.current;
+      const target = targetRef.current;
+
+      const containerCenter = container.clientWidth / 2;
+      const targetCenter = target.offsetLeft + target.offsetWidth / 2;
       const delta = targetCenter - containerCenter;
+      const nextTranslate = -delta;
 
-      // Move reel left by delta so the target center aligns with container center.
-      setTranslateX(-delta);
+      setTranslateX(nextTranslate);
       setReadyToAnimate(true);
       didComputeTargetRef.current = true;
-    });
+    };
 
-    return () => cancelAnimationFrame(raf);
+    void compute();
+
+    return () => {
+      cancelled = true;
+    };
   }, [reelItems.length, finalReward]);
 
-  const handleAnimationComplete = () => {
-    // Framer-motion can fire onAnimationComplete for the initial (non-animated) render.
-    // Only treat completion as a real spin once the measured animation actually started.
-    if (!readyToAnimate || !animationStarted) return;
-    if (finalReward !== null) {
-      onSpinComplete(finalReward);
-    }
-  };
+  useEffect(() => {
+    if (!readyToAnimate) return;
+    if (finalReward === null) return;
+    if (didStartAnimationRef.current) return;
+    if (!isSpinning) return;
+
+    let cancelled = false;
+    didStartAnimationRef.current = true;
+
+    const run = async () => {
+      try {
+        controls.set({ x: 0 });
+        await controls.start({
+          x: translateX,
+          transition: { duration: 5, ease: 'easeOut' },
+        });
+        if (cancelled) return;
+        onSpinComplete(finalReward);
+      } catch (e) {
+        if (cancelled) return;
+        console.error(e);
+        onSpinComplete(0);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [controls, finalReward, isSpinning, onSpinComplete, readyToAnimate, translateX]);
 
   return (
     <div
@@ -162,12 +202,7 @@ const SpinWheel = ({
                 <motion.div
                   className="flex h-full items-center gap-2"
                   initial={{ x: 0 }}
-                  animate={{ x: readyToAnimate ? translateX : 0 }}
-                  transition={readyToAnimate ? { duration: 5, ease: 'easeOut' } : { duration: 0 }}
-                  onAnimationStart={() => {
-                    if (readyToAnimate) setAnimationStarted(true);
-                  }}
-                  onAnimationComplete={handleAnimationComplete}
+                  animate={controls}
                 >
                   {reelItems.map((tier, i) => (
                     <div
