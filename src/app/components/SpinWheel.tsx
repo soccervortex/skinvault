@@ -61,13 +61,23 @@ const SpinWheel = ({
   const didComputeTargetRef = useRef(false);
   const didStartAnimationRef = useRef(false);
   const controls = useAnimationControls();
+  const onSpinCompleteRef = useRef(onSpinComplete);
+  const onCloseRef = useRef(onClose);
 
   const targetIndex = 45;
 
   useEffect(() => {
+    onSpinCompleteRef.current = onSpinComplete;
+  }, [onSpinComplete]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
     const r = Number(reward);
     if (!Number.isFinite(r)) {
-      onSpinComplete(0);
+      onSpinCompleteRef.current(0);
       return;
     }
 
@@ -78,11 +88,10 @@ const SpinWheel = ({
     setTranslateX(0);
     controls.set({ x: 0 });
     setReelItems(generateReelItems(r));
-  }, [controls, onSpinComplete, reward]);
+  }, [controls, reward]);
 
   useEffect(() => {
     if (didComputeTargetRef.current) return;
-    if (!containerRef.current || !targetRef.current) return;
     if (reelItems.length === 0) return;
 
     let cancelled = false;
@@ -94,24 +103,30 @@ const SpinWheel = ({
       } catch {
       }
 
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      for (let i = 0; i < 30; i++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-      if (cancelled) return;
-      if (didComputeTargetRef.current) return;
-      if (!containerRef.current || !targetRef.current) return;
+        if (cancelled) return;
+        if (didComputeTargetRef.current) return;
 
-      const container = containerRef.current;
-      const target = targetRef.current;
+        const container = containerRef.current;
+        const target = targetRef.current;
+        if (!container || !target) continue;
 
-      const containerCenter = container.clientWidth / 2;
-      const targetCenter = target.offsetLeft + target.offsetWidth / 2;
-      const delta = targetCenter - containerCenter;
-      const nextTranslate = -delta;
+        const containerWidth = container.clientWidth;
+        const targetWidth = target.offsetWidth;
+        if (!(containerWidth > 0) || !(targetWidth > 0)) continue;
 
-      setTranslateX(nextTranslate);
-      setReadyToAnimate(true);
-      didComputeTargetRef.current = true;
+        const containerCenter = containerWidth / 2;
+        const targetCenter = target.offsetLeft + targetWidth / 2;
+        const delta = targetCenter - containerCenter;
+        const nextTranslate = -delta;
+
+        setTranslateX(nextTranslate);
+        setReadyToAnimate(true);
+        didComputeTargetRef.current = true;
+        return;
+      }
     };
 
     void compute();
@@ -119,7 +134,7 @@ const SpinWheel = ({
     return () => {
       cancelled = true;
     };
-  }, [reelItems.length]);
+  }, [reelItems]);
 
   useEffect(() => {
     if (!readyToAnimate) return;
@@ -131,7 +146,7 @@ const SpinWheel = ({
 
     const r = Number(reward);
     if (!Number.isFinite(r)) {
-      onSpinComplete(0);
+      onSpinCompleteRef.current(0);
       return;
     }
 
@@ -143,11 +158,11 @@ const SpinWheel = ({
           transition: { duration: 5, ease: 'easeOut' },
         });
         if (cancelled) return;
-        onSpinComplete(r);
+        onSpinCompleteRef.current(r);
       } catch (e) {
         if (cancelled) return;
         console.error(e);
-        onSpinComplete(0);
+        onSpinCompleteRef.current(0);
       }
     };
 
@@ -156,12 +171,12 @@ const SpinWheel = ({
     return () => {
       cancelled = true;
     };
-  }, [controls, isSpinning, onSpinComplete, readyToAnimate, reward, translateX]);
+  }, [controls, isSpinning, readyToAnimate, reward, translateX]);
 
   return (
     <div
       className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6"
-      onClick={() => onClose?.()}
+      onClick={() => onCloseRef.current?.()}
     >
       <div
         className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar"
@@ -170,7 +185,7 @@ const SpinWheel = ({
         <div className="flex justify-end mb-3">
           <button
             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest"
-            onClick={() => onClose?.()}
+            onClick={() => onCloseRef.current?.()}
             type="button"
           >
             Close
