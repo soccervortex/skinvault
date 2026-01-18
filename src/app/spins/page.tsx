@@ -5,6 +5,14 @@ import { useSession } from 'next-auth/react';
 import SpinWheel from '@/app/components/SpinWheel';
 import { useToast } from '@/app/components/Toast';
 
+function formatTimeLeft(endTime: string) {
+  const totalSeconds = Math.floor((new Date(endTime).getTime() - Date.now()) / 1000);
+  if (totalSeconds <= 0) return 'now';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
 export default function SpinPage() {
   const { data: session } = useSession();
   const [canSpin, setCanSpin] = useState(false);
