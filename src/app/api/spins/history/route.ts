@@ -50,6 +50,27 @@ export async function GET(req: NextRequest) {
 
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    const summaryAgg = await historyCol
+      .aggregate([
+        { $match: { steamId, createdAt: { $gte: cutoff } } },
+        {
+          $group: {
+            _id: null,
+            totalSpins: { $sum: 1 },
+            totalCredits: { $sum: '$reward' },
+            bestReward: { $max: '$reward' },
+          },
+        },
+      ] as any)
+      .toArray();
+
+    const summaryRow: any = summaryAgg?.[0] || null;
+    const summary = {
+      totalSpins: Number(summaryRow?.totalSpins || 0),
+      totalCredits: Number(summaryRow?.totalCredits || 0),
+      bestReward: Number(summaryRow?.bestReward || 0),
+    };
+
     const rows = await historyCol
       .find({ steamId, createdAt: { $gte: cutoff } } as any)
       .sort({ createdAt: -1 })
@@ -63,18 +84,13 @@ export async function GET(req: NextRequest) {
       role: String(r?.role || 'user'),
     }));
 
-    const rewards = items.map((i) => Number(i.reward || 0)).filter((n) => Number.isFinite(n));
-    const totalSpins = rewards.length;
-    const totalCredits = rewards.reduce((sum, n) => sum + n, 0);
-    const bestReward = rewards.length ? Math.max(...rewards) : 0;
-
     return NextResponse.json(
       {
         ok: true,
         steamId,
         days,
         limit,
-        summary: { totalSpins, totalCredits, bestReward },
+        summary,
         items,
       },
       { status: 200 }

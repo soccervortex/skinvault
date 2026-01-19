@@ -205,6 +205,8 @@ export default function GiveawaysPage() {
   const [spinHistorySummary, setSpinHistorySummary] = useState<SpinHistorySummary | null>(null);
   const [spinHistory, setSpinHistory] = useState<SpinHistoryItem[]>([]);
 
+  const spinHistoryRequestSeqRef = useRef(0);
+
   const autoSpinTimerRef = useRef<number | null>(null);
 
   const canSpin = !!user?.steamId && !!spinStatus?.canSpin;
@@ -466,6 +468,7 @@ export default function GiveawaysPage() {
   }, [user?.steamId]);
 
   const loadSpinHistory = useCallback(async () => {
+    const seq = ++spinHistoryRequestSeqRef.current;
     if (!user?.steamId) {
       setSpinHistory([]);
       setSpinHistorySummary(null);
@@ -477,12 +480,15 @@ export default function GiveawaysPage() {
       const res = await fetch('/api/spins/history?days=30&limit=15', { cache: 'no-store' });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(String(json?.error || 'Failed'));
+      if (seq !== spinHistoryRequestSeqRef.current) return;
       setSpinHistory(Array.isArray(json?.items) ? (json.items as SpinHistoryItem[]) : []);
       setSpinHistorySummary(json?.summary ? (json.summary as SpinHistorySummary) : null);
     } catch {
+      if (seq !== spinHistoryRequestSeqRef.current) return;
       setSpinHistory([]);
       setSpinHistorySummary(null);
     } finally {
+      if (seq !== spinHistoryRequestSeqRef.current) return;
       setSpinHistoryLoading(false);
     }
   }, [user?.steamId]);
@@ -625,6 +631,9 @@ export default function GiveawaysPage() {
       if (!res.ok) throw new Error(String(json?.error || 'Failed to spin'));
       const reward = Number(json?.reward);
       if (!Number.isFinite(reward)) throw new Error('Invalid reward');
+
+      // Invalidate any in-flight history fetch (important for Auto/Turbo back-to-back spins)
+      spinHistoryRequestSeqRef.current += 1;
 
       const optimisticCreatedAt = new Date().toISOString();
       const optimisticRole = String(json?.role || spinStatus?.role || 'user');
@@ -1036,7 +1045,7 @@ export default function GiveawaysPage() {
 
           {spinModalOpen && (
             <div
-              className="fixed inset-0 z-[10000] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
+              className="fixed inset-0 z-[10002] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => {
                 setSpinModalOpen(false);
                 setSpinWheelOpen(false);
@@ -1062,7 +1071,7 @@ export default function GiveawaysPage() {
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5 bg-[#0f111a]">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {SPIN_TIERS.map((t) => (
-                      <div key={t.reward} className="rounded-2xl border border-white/10 bg-black/30 p-4 relative overflow-hidden">
+                      <div key={t.reward} className="rounded-2xl border border-white/10 bg-[#0b0d14] p-4 relative overflow-hidden">
                         <div className="absolute inset-0 opacity-15" style={{ background: `radial-gradient(circle at 30% 20%, ${t.color}, transparent 55%)` }} />
                         <div className="relative">
                           <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: t.color }}>{t.label}</div>
@@ -1129,7 +1138,7 @@ export default function GiveawaysPage() {
 
           {spinResultOpen && (
             <div
-              className="fixed inset-0 z-[10001] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
+              className="fixed inset-0 z-[10003] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => setSpinResultOpen(false)}
             >
               <div
@@ -1149,7 +1158,7 @@ export default function GiveawaysPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5 bg-[#0f111a]">
-                  <div className="rounded-[2rem] border border-white/10 bg-black/30 relative overflow-hidden">
+                  <div className="rounded-[2rem] border border-white/10 bg-[#0b0d14] relative overflow-hidden">
                     <div
                       className="absolute inset-0 opacity-20"
                       style={{ background: `radial-gradient(circle at 30% 20%, ${spinResultTier.color}, transparent 60%)` }}
