@@ -1045,7 +1045,7 @@ export default function GiveawaysPage() {
 
           {spinModalOpen && (
             <div
-              className="fixed inset-0 z-[10002] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
+              className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
               onClick={() => {
                 setSpinModalOpen(false);
                 setSpinWheelOpen(false);
@@ -1138,7 +1138,7 @@ export default function GiveawaysPage() {
 
           {spinResultOpen && (
             <div
-              className="fixed inset-0 z-[10003] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
+              className="fixed inset-0 z-[10001] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
               onClick={() => setSpinResultOpen(false)}
             >
               <div
