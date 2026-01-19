@@ -1,20 +1,88 @@
-Weapon Categorize modal not responsive
+make for the discord bot a command /announcesite this will let me enter the announcement channel or any channel with the select menu and thenn it will let me make their announcement for me automatically so example ouyr newest daily spin feature or if i make more features so we need to be carefull with this cause we are gonna make a automated systems thats looks what on the website new is and if there is a update he will send it in the discord in a nice embed with what there changed and some info about them also tag @everyone there
 
-A Edit button to see your profile how others sees it and a edit preview to see the trade url edit thing as example: no i want it shows how a other user copmes to your profile but if its your own porfile you have a edit button
+Okay i have a few things you need to fix
 
-Where are all the stats it seems like you removed it in the inventory for the user
+1. Ledger history should also include spins
 
-create more and better milestones not only credits be various with some things
+Ledger
+Refresh
+daily_claim
+2026-01-18T17:07:18.866Z
++150
+Rollback
+No Balance
+Copy ID
+{
+  "day": "2026-01-18",
+  "pro": true
+}
 
-no top right timeout or ban button for shwoing publicly if the user acoount got banned for acces or just for credits or something else 
+giveaway_entry
+2026-01-17T00:36:17.343Z
+-25000
+Rollback
+No Balance
+Copy ID
+{
+  "giveawayId": "696983a3288d011346c5053d",
+  "entries": 1,
+  "creditsPerEntry": 25000
+}
 
-Banned users cant buy credits obviously
+admin_adjust
+2026-01-17T00:35:00.332Z
++25000
+Rollback
+No Balance
+Copy ID
+{
+  "adminSteamId": "76561199235618867",
+  "reason": "Sponsor"
+}
 
-credits in the shop not nice aligned look at 500 credits one and the rest of it
+daily_claim
+2026-01-17T00:33:18.319Z
++150
+Rollback
+No Balance
+Copy ID
+{
+  "day": "2026-01-17",
+  "pro": true
+}
 
-pro what you unlock field doesnt say credits
+admin_adjust
+2026-01-17T00:17:14.430Z
++10000
+Rollback
+No Balance
+Copy ID
+{
+  "adminSteamId": "76561199235618867",
+  "reason": "Sponsor"
 
-in the sidebar there is standing giveaway admin but i dont want this in the sidebar cause i already have it in the admin panel
+2. Webpage optimization
 
-claim in affialte doesnt work Updating the path 'balance' would create a conflict at 'balance' api/affiliate/claim:1   Failed to load resource: the server responded with a status of 500 ()
-api/affiliate/claim:1   Failed to load resource: the server responded with a status of 500 ()
+- on the first picture we see the styling for mobile is a bit nehh because of the modal not covering the full page we see a part  of the giveaway page in the bottom this is also on pc also we would like to see the top of the modal and the bottom with opencase its always in the screen make between that a scroll function so you can scroll through the cards 
+
+then for the second image we also see the same in the bottom a part of the giveaways tab we also see that we can see anything of the buttons in the top also we see a big screen with nothing under the animation lets put there your latest rewards so we can see a little stats highest value from a case something like that and make a feature where we can do auto spins so it automatically spins till your cases are finished it will go to the first modal then the case modal then the third modal and then again to the second modal auto include a turbo functions there to speed it a bit up you can control it with keyboard shortcuts and buttons
+
+then for the third image you did better and shows everything but the bottom part has the same thing
+
+look at image 4  and 5 together thats the admin panel but i dont see any spins thing in there also reorder it a bit to a nice ordered admin panel
+
+[{
+	"resource": "/d:/Codes/cs2-website/skin-vault/src/app/components/Sidebar.tsx",
+	"owner": "typescript",
+	"code": "17008",
+	"severity": 8,
+	"message": "JSX element 'div' has no corresponding closing tag.",
+	"source": "ts",
+	"startLineNumber": 420,
+	"startColumn": 14,
+	"endLineNumber": 420,
+	"endColumn": 17,
+	"origin": "extHost1"
+}]
+
+

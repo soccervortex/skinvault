@@ -79,7 +79,7 @@ export default function AdminPage() {
   const [testModeMessage, setTestModeMessage] = useState<string | null>(null);
   const [testModeError, setTestModeError] = useState<string | null>(null);
   const [failedPurchases, setFailedPurchases] = useState<any[]>([]);
-  const [loadingFailedPurchases, setLoadingFailedPurchases] = useState(true);
+  const [, setLoadingFailedPurchases] = useState(true);
   const [fixSteamId, setFixSteamId] = useState("");
   const [userPurchases, setUserPurchases] = useState<any[]>([]);
   const [loadingUserPurchases, setLoadingUserPurchases] = useState(false);
@@ -1076,7 +1076,7 @@ export default function AdminPage() {
               }
             }
           }
-        } catch (e) {
+        } catch {
           // Ignore errors
         }
       } else {
@@ -1971,6 +1971,31 @@ export default function AdminPage() {
 
         <div className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-yellow-500/10 border border-yellow-500/40 shrink-0">
+              <BarChart3 className="text-yellow-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">
+                Spins
+              </p>
+              <h2 className="text-lg md:text-xl lg:text-2xl font-black italic uppercase tracking-tighter">
+                Spin History
+              </h2>
+            </div>
+          </div>
+          <p className="text-[10px] md:text-[11px] text-gray-400 mb-4">
+            View daily spin history and credits distributed.
+          </p>
+          <button
+            onClick={() => router.push('/admin/spins')}
+            className="w-full bg-yellow-600 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-yellow-500 transition-all shadow-xl shadow-yellow-600/20 flex items-center justify-center gap-2"
+          >
+            <BarChart3 size={14} /> View Spins
+          </button>
+        </div>
+
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
               <Wallet className="text-blue-400" size={16} />
             </div>
@@ -2273,7 +2298,7 @@ export default function AdminPage() {
                 const errorData = await resolveRes.json();
                 toast.error(errorData.error || 'Could not resolve Steam username');
               }
-            } catch (error) {
+            } catch {
               toast.error('Failed to resolve Steam username');
             }
           }} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px] mb-6">

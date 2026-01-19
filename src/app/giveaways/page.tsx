@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Link from 'next/link';
+import Image from 'next/image';
 import { HelpCircle, Loader2, Sparkles, Ticket, Wallet, X } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 import SpinWheel from '@/app/components/SpinWheel';
@@ -54,6 +55,19 @@ type DailyClaimStatus = {
   canClaim: boolean;
   nextEligibleAt: string;
   serverNow: string;
+};
+
+type SpinHistoryItem = {
+  reward: number;
+  createdAt: string | null;
+  day: string;
+  role: string;
+};
+
+type SpinHistorySummary = {
+  totalSpins: number;
+  totalCredits: number;
+  bestReward: number;
 };
 
 const SPIN_TIERS = [
@@ -183,6 +197,15 @@ export default function GiveawaysPage() {
   const [spinResultOpen, setSpinResultOpen] = useState(false);
   const [spinResultReward, setSpinResultReward] = useState<number | null>(null);
   const [lastSpinReward, setLastSpinReward] = useState<number | null>(null);
+
+  const [turboEnabled, setTurboEnabled] = useState(false);
+  const [autoSpinEnabled, setAutoSpinEnabled] = useState(false);
+
+  const [spinHistoryLoading, setSpinHistoryLoading] = useState(false);
+  const [spinHistorySummary, setSpinHistorySummary] = useState<SpinHistorySummary | null>(null);
+  const [spinHistory, setSpinHistory] = useState<SpinHistoryItem[]>([]);
+
+  const autoSpinTimerRef = useRef<number | null>(null);
 
   const canSpin = !!user?.steamId && !!spinStatus?.canSpin;
 
@@ -415,7 +438,7 @@ export default function GiveawaysPage() {
     }
   };
 
-  const loadDailySpinStatus = async () => {
+  const loadDailySpinStatus = useCallback(async () => {
     if (!user?.steamId) {
       setSpinStatus(null);
       return;
@@ -438,7 +461,29 @@ export default function GiveawaysPage() {
     } finally {
       setSpinStatusLoading(false);
     }
-  };
+  }, [user?.steamId]);
+
+  const loadSpinHistory = useCallback(async () => {
+    if (!user?.steamId) {
+      setSpinHistory([]);
+      setSpinHistorySummary(null);
+      return;
+    }
+
+    setSpinHistoryLoading(true);
+    try {
+      const res = await fetch('/api/spins/history?days=30&limit=15', { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed'));
+      setSpinHistory(Array.isArray(json?.items) ? (json.items as SpinHistoryItem[]) : []);
+      setSpinHistorySummary(json?.summary ? (json.summary as SpinHistorySummary) : null);
+    } catch {
+      setSpinHistory([]);
+      setSpinHistorySummary(null);
+    } finally {
+      setSpinHistoryLoading(false);
+    }
+  }, [user?.steamId]);
 
   const loadCredits = async () => {
     if (!user?.steamId) {
@@ -542,6 +587,7 @@ export default function GiveawaysPage() {
       toast.error('Sign in with Steam first');
       return;
     }
+    void loadSpinHistory();
     setLastSpinReward(null);
     setSpinResultOpen(false);
     setSpinResultReward(null);
@@ -560,9 +606,10 @@ export default function GiveawaysPage() {
     }
     void loadCredits();
     void loadDailySpinStatus();
+    void loadSpinHistory();
   };
 
-  const startSpin = async () => {
+  const startSpin = useCallback(async () => {
     if (!user?.steamId) {
       toast.error('Sign in with Steam first');
       return;
@@ -585,15 +632,19 @@ export default function GiveawaysPage() {
     } finally {
       setSpinOpening(false);
     }
-  };
+  }, [user?.steamId, canSpin, spinWheelOpen, spinOpening, toast, loadDailySpinStatus]);
 
-  const closeAllSpinModals = () => {
+  const closeAllSpinModals = useCallback(() => {
+    if (autoSpinTimerRef.current) {
+      window.clearTimeout(autoSpinTimerRef.current);
+      autoSpinTimerRef.current = null;
+    }
     setSpinWheelOpen(false);
     setSpinWheelReward(null);
     setSpinResultOpen(false);
     setSpinResultReward(null);
     setSpinModalOpen(false);
-  };
+  }, []);
 
   useEffect(() => {
     spinModalOpenRef.current = spinModalOpen;
@@ -624,10 +675,33 @@ export default function GiveawaysPage() {
   }, [closeAllSpinModals]);
 
   useEffect(() => {
+    if (autoSpinTimerRef.current) {
+      window.clearTimeout(autoSpinTimerRef.current);
+      autoSpinTimerRef.current = null;
+    }
+
+    if (!autoSpinEnabled) return;
+    if (!spinResultOpenRef.current) return;
+    if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
+
+    autoSpinTimerRef.current = window.setTimeout(() => {
+      autoSpinTimerRef.current = null;
+      if (!autoSpinEnabled) return;
+      if (!spinResultOpenRef.current) return;
+      if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
+      setSpinResultOpen(false);
+      void startSpinRef.current?.();
+    }, turboEnabled ? 350 : 900);
+  }, [autoSpinEnabled, turboEnabled]);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const isSpace = e.code === 'Space' || e.key === ' ';
       const isEsc = e.code === 'Escape' || e.key === 'Escape';
-      if (!isSpace && !isEsc) return;
+      const key = String(e.key || '').toLowerCase();
+      const isToggleAuto = key === 'a';
+      const isToggleTurbo = key === 't';
+      if (!isSpace && !isEsc && !isToggleAuto && !isToggleTurbo) return;
 
       const target = e.target as HTMLElement | null;
       const tag = String(target?.tagName || '').toLowerCase();
@@ -636,6 +710,13 @@ export default function GiveawaysPage() {
 
       const anySpinOverlayOpen =
         !!spinModalOpenRef.current || !!spinWheelOpenRef.current || !!spinResultOpenRef.current;
+
+      if (anySpinOverlayOpen && (isToggleAuto || isToggleTurbo)) {
+        e.preventDefault();
+        if (isToggleAuto) setAutoSpinEnabled((v) => !v);
+        if (isToggleTurbo) setTurboEnabled((v) => !v);
+        return;
+      }
 
       if (isEsc && anySpinOverlayOpen) {
         e.preventDefault();
@@ -676,7 +757,9 @@ export default function GiveawaysPage() {
 
   useEffect(() => {
     if (!user?.steamId) return;
-    if (!claimStatus || claimStatus.canClaim) return;
+    const can = !!claimStatus?.canClaim;
+    const next = String(claimStatus?.nextEligibleAt || '');
+    if (can || !next) return;
     const id = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [user?.steamId, claimStatus?.canClaim, claimStatus?.nextEligibleAt]);
@@ -787,7 +870,7 @@ export default function GiveawaysPage() {
     if (!claimStatus || claimStatus.canClaim) return 0;
     const nextMs = Date.parse(claimStatus.nextEligibleAt);
     if (!Number.isFinite(nextMs)) return 0;
-    const nowMsLocal = Date.now() + serverOffsetMs;
+    const nowMsLocal = Number(nowTick || 0) + serverOffsetMs;
     const remainingMs = nextMs - nowMsLocal;
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, [claimStatus, serverOffsetMs, nowTick]);
@@ -798,7 +881,7 @@ export default function GiveawaysPage() {
     if (!spinStatus || spinStatus.canSpin) return 0;
     const nextMs = Date.parse(spinStatus.nextEligibleAt);
     if (!Number.isFinite(nextMs)) return 0;
-    const nowMsLocal = Date.now() + serverOffsetMs;
+    const nowMsLocal = Number(nowTick || 0) + serverOffsetMs;
     const remainingMs = nextMs - nowMsLocal;
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, [spinStatus, serverOffsetMs, nowTick]);
@@ -926,61 +1009,87 @@ export default function GiveawaysPage() {
 
           {spinModalOpen && (
             <div
-              className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
+              className="fixed inset-0 z-[10000] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => {
                 setSpinModalOpen(false);
                 setSpinWheelOpen(false);
               }}
             >
               <div
-                className="w-full h-dvh md:h-auto md:max-h-[88dvh] md:max-w-4xl bg-[#0f111a] border border-white/10 rounded-none md:rounded-[2rem] p-5 md:p-8 overflow-y-auto custom-scrollbar"
+                className="w-full h-full max-w-5xl max-h-[calc(100dvh-2rem)] md:max-h-[calc(100dvh-4rem)] bg-[#0f111a] border border-white/10 rounded-[2rem] overflow-hidden flex flex-col shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
-                    <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">Open Your Reward</div>
-                    <div className="text-[11px] text-gray-400 mt-2">Once every 24h (UTC). Odds are shown below.</div>
-                  </div>
-                  <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }} aria-label="Close">
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {SPIN_TIERS.map((t) => (
-                    <div key={t.reward} className="rounded-2xl border border-white/10 bg-black/30 p-4 relative overflow-hidden">
-                      <div className="absolute inset-0 opacity-15" style={{ background: `radial-gradient(circle at 30% 20%, ${t.color}, transparent 55%)` }} />
-                      <div className="relative">
-                        <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: t.color }}>{t.label}</div>
-                        <div className="mt-2 text-2xl font-black italic tracking-tighter">{t.reward} <span className="text-[12px] text-gray-400">CREDITS</span></div>
-                        <div className="mt-1 text-[9px] text-gray-500 font-black uppercase tracking-widest">Odds: {t.odds}</div>
-                      </div>
+                <div className="shrink-0 border-b border-white/10 px-5 md:px-8 py-5 bg-[#0f111a]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
+                      <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">Open Your Reward</div>
+                      <div className="text-[11px] text-gray-400 mt-2">Once every 24h (UTC). Odds are shown below.</div>
                     </div>
-                  ))}
+                    <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => { setSpinModalOpen(false); setSpinWheelOpen(false); }} aria-label="Close">
+                      <X size={18} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between gap-4 flex-wrap">
-                  <div className="text-[11px] text-gray-400">
-                    {canSpin ? 'Spin available now.' : `Next spin in ${formatHms(spinRemainingSeconds)}.`}
-                    {lastSpinReward !== null && lastSpinReward > 0 && (
-                      <span className="ml-2 text-emerald-300 font-black uppercase tracking-widest text-[10px]">Last win: {lastSpinReward} credits</span>
-                    )}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {SPIN_TIERS.map((t) => (
+                      <div key={t.reward} className="rounded-2xl border border-white/10 bg-black/30 p-4 relative overflow-hidden">
+                        <div className="absolute inset-0 opacity-15" style={{ background: `radial-gradient(circle at 30% 20%, ${t.color}, transparent 55%)` }} />
+                        <div className="relative">
+                          <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: t.color }}>{t.label}</div>
+                          <div className="mt-2 text-2xl font-black italic tracking-tighter">{t.reward} <span className="text-[12px] text-gray-400">CREDITS</span></div>
+                          <div className="mt-1 text-[9px] text-gray-500 font-black uppercase tracking-widest">Odds: {t.odds}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={startSpin}
-                    disabled={!canSpin || spinWheelOpen || spinOpening}
-                    className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen || spinOpening ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
-                  >
-                    {spinOpening || spinWheelOpen ? 'Opening...' : 'Open Case'}
-                  </button>
+                </div>
+
+                <div className="shrink-0 border-t border-white/10 px-5 md:px-8 py-5 bg-[#0f111a]">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="text-[11px] text-gray-400">
+                      {canSpin ? 'Spin available now.' : `Next spin in ${formatHms(spinRemainingSeconds)}.`}
+                      {lastSpinReward !== null && lastSpinReward > 0 && (
+                        <span className="ml-2 text-emerald-300 font-black uppercase tracking-widest text-[10px]">Last win: {lastSpinReward} credits</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setAutoSpinEnabled((v) => !v)}
+                        className={`px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${autoSpinEnabled ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                      >
+                        Auto (A)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTurboEnabled((v) => !v)}
+                        className={`px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${turboEnabled ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                      >
+                        Turbo (T)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={startSpin}
+                        disabled={!canSpin || spinWheelOpen || spinOpening}
+                        className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen || spinOpening ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                      >
+                        {spinOpening || spinWheelOpen ? 'Opening...' : 'Open Case'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {spinWheelOpen && spinWheelReward !== null && (
                   <SpinWheel
                     reward={spinWheelReward}
                     onSpinComplete={handleSpinComplete}
+                    durationSeconds={turboEnabled ? 1.6 : 5}
+                    historyItems={spinHistory}
+                    historySummary={spinHistorySummary}
+                    historyLoading={spinHistoryLoading}
                     onClose={() => {
                       setSpinWheelOpen(false);
                       setSpinWheelReward(null);
@@ -993,79 +1102,85 @@ export default function GiveawaysPage() {
 
           {spinResultOpen && (
             <div
-              className="fixed inset-0 z-[10001] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
+              className="fixed inset-0 z-[10001] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => setSpinResultOpen(false)}
             >
               <div
-                className="w-full h-dvh md:h-auto md:max-h-[90dvh] md:max-w-xl bg-[#0f111a] border border-white/10 rounded-none md:rounded-[2rem] p-5 md:p-6 overflow-y-auto custom-scrollbar"
+                className="w-full h-full max-w-4xl max-h-[calc(100dvh-2rem)] md:max-h-[calc(100dvh-4rem)] bg-[#0f111a] border border-white/10 rounded-[2rem] overflow-hidden flex flex-col shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
-                    <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">You opened</div>
-                  </div>
-                  <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => setSpinResultOpen(false)} aria-label="Close">
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="mt-6 rounded-[2rem] border border-white/10 bg-black/30 relative overflow-hidden">
-                  <div
-                    className="absolute inset-0 opacity-20"
-                    style={{ background: `radial-gradient(circle at 30% 20%, ${spinResultTier.color}, transparent 60%)` }}
-                  />
-                  <div className="relative p-6">
-                    <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: spinResultTier.color }}>
-                      {spinResultTier.label}
+                <div className="shrink-0 border-b border-white/10 px-5 md:px-8 py-5 bg-[#0f111a]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Daily Spin</div>
+                      <div className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">You opened</div>
                     </div>
-                    <div className="mt-2 flex items-end gap-3 flex-wrap">
-                      <div className="text-5xl md:text-6xl font-black italic tracking-tighter text-white">
-                        {spinResultReward ?? 0}
-                      </div>
-                      <div className="pb-2 text-[12px] md:text-[13px] text-gray-300 font-black uppercase tracking-widest">
-                        CREDITS
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center gap-3 flex-wrap">
-                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
-                        <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Odds</div>
-                        <div className="text-[10px] text-white font-black uppercase tracking-widest">{spinResultTier.odds}</div>
-                      </div>
-                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
-                        <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Shortcut</div>
-                        <div className="text-[10px] text-white font-black uppercase tracking-widest">Space</div>
-                      </div>
-                    </div>
-                    <div className="mt-4 text-[11px] text-gray-400">
-                      {spinStatus?.dailyLimit === null
-                        ? 'Unlimited spins available.'
-                        : typeof spinStatus?.remainingSpins === 'number'
-                          ? `Spins left today: ${spinStatus.remainingSpins}`
-                          : (!canSpin ? `Next spin in ${formatHms(spinRemainingSeconds)}.` : 'Spin available now.')}
-                    </div>
+                    <button className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" onClick={() => setSpinResultOpen(false)} aria-label="Close">
+                      <X size={18} />
+                    </button>
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-end gap-3 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setSpinResultOpen(false)}
-                    className="px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
-                  >
-                    Go back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSpinResultOpen(false);
-                      await startSpin();
-                    }}
-                    disabled={!canSpin || spinWheelOpen || spinOpening}
-                    className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen || spinOpening ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
-                  >
-                    {canSpin ? 'Open case again' : `Next in ${formatHms(spinRemainingSeconds)}`}
-                  </button>
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5">
+                  <div className="rounded-[2rem] border border-white/10 bg-black/30 relative overflow-hidden">
+                    <div
+                      className="absolute inset-0 opacity-20"
+                      style={{ background: `radial-gradient(circle at 30% 20%, ${spinResultTier.color}, transparent 60%)` }}
+                    />
+                    <div className="relative p-6">
+                      <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: spinResultTier.color }}>
+                        {spinResultTier.label}
+                      </div>
+                      <div className="mt-2 flex items-end gap-3 flex-wrap">
+                        <div className="text-5xl md:text-6xl font-black italic tracking-tighter text-white">
+                          {spinResultReward ?? 0}
+                        </div>
+                        <div className="pb-2 text-[12px] md:text-[13px] text-gray-300 font-black uppercase tracking-widest">
+                          CREDITS
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3 flex-wrap">
+                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
+                          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Odds</div>
+                          <div className="text-[10px] text-white font-black uppercase tracking-widest">{spinResultTier.odds}</div>
+                        </div>
+                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
+                          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Shortcut</div>
+                          <div className="text-[10px] text-white font-black uppercase tracking-widest">Space</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-[11px] text-gray-400">
+                        {spinStatus?.dailyLimit === null
+                          ? 'Unlimited spins available.'
+                          : typeof spinStatus?.remainingSpins === 'number'
+                            ? `Spins left today: ${spinStatus.remainingSpins}`
+                            : (!canSpin ? `Next spin in ${formatHms(spinRemainingSeconds)}.` : 'Spin available now.')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0 border-t border-white/10 px-5 md:px-8 py-5 bg-[#0f111a]">
+                  <div className="flex items-center justify-end gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setSpinResultOpen(false)}
+                      className="px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
+                    >
+                      Go back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setSpinResultOpen(false);
+                        await startSpin();
+                      }}
+                      disabled={!canSpin || spinWheelOpen || spinOpening}
+                      className={`px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${!canSpin || spinWheelOpen || spinOpening ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500 text-white'}`}
+                    >
+                      {canSpin ? 'Open case again' : `Next in ${formatHms(spinRemainingSeconds)}`}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1178,10 +1293,12 @@ export default function GiveawaysPage() {
                               <div className="aspect-square bg-black/20 rounded-[1.25rem] md:rounded-[1.75rem] flex items-center justify-center p-2.5 md:p-3 mb-3 relative overflow-hidden">
                                 <div className="absolute inset-0 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity" style={{ backgroundColor: rarityColor }} />
                                 {img ? (
-                                  <img
+                                  <Image
                                     src={img}
                                     alt={g.prize || info?.name || 'Prize'}
-                                    className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
+                                    fill
+                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 240px"
+                                    className="object-contain relative z-10 group-hover:scale-110 transition-transform duration-500"
                                     style={{ transform: 'translateZ(0)' }}
                                   />
                                 ) : (
@@ -1240,7 +1357,13 @@ export default function GiveawaysPage() {
                                 <div className="aspect-square bg-black/20 rounded-[1.25rem] md:rounded-[1.75rem] flex items-center justify-center p-2.5 md:p-3 mb-3 relative overflow-hidden">
                                   <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
                                   {img ? (
-                                    <img src={img} alt={g.prize || info?.name || 'Prize'} className="w-full h-full object-contain relative z-10" />
+                                    <Image
+                                      src={img}
+                                      alt={g.prize || info?.name || 'Prize'}
+                                      fill
+                                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 240px"
+                                      className="object-contain relative z-10"
+                                    />
                                   ) : (
                                     <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 relative z-10" />
                                   )}
@@ -1286,7 +1409,13 @@ export default function GiveawaysPage() {
                                 <div className="aspect-square bg-black/20 rounded-[1.25rem] md:rounded-[1.75rem] flex items-center justify-center p-2.5 md:p-3 mb-3 relative overflow-hidden">
                                   <div className="absolute inset-0 blur-3xl opacity-10" style={{ backgroundColor: rarityColor }} />
                                   {img ? (
-                                    <img src={img} alt={g.prize || info?.name || 'Prize'} className="w-full h-full object-contain relative z-10" />
+                                    <Image
+                                      src={img}
+                                      alt={g.prize || info?.name || 'Prize'}
+                                      fill
+                                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 240px"
+                                      className="object-contain relative z-10"
+                                    />
                                   ) : (
                                     <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 relative z-10" />
                                   )}
@@ -1349,9 +1478,15 @@ export default function GiveawaysPage() {
                         style={{ background: `linear-gradient(135deg, ${hexToRgba(detailRarityColor, 0.20)} 0%, rgba(0,0,0,0.25) 65%)` }}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-[1.5rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                          <div className="w-16 h-16 rounded-[1.5rem] bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 relative">
                             {detailPrizeImage ? (
-                              <img src={detailPrizeImage} alt={detail.prize || 'Prize'} className="w-full h-full object-contain" />
+                              <Image
+                                src={detailPrizeImage}
+                                alt={detail.prize || 'Prize'}
+                                fill
+                                sizes="64px"
+                                className="object-contain"
+                              />
                             ) : (
                               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">No image</div>
                             )}

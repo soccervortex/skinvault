@@ -30,6 +30,14 @@ type UserCreditsDoc = {
   updatedAt: Date;
 };
 
+ type CreditsLedgerDoc = {
+   steamId: string;
+   delta: number;
+   type: string;
+   createdAt: Date;
+   meta?: any;
+ };
+
 function getSteamIdFromRequestOrBot(req: NextRequest): string | null {
   const sessionSteamId = getSteamIdFromRequest(req);
   if (sessionSteamId) return sessionSteamId;
@@ -167,6 +175,7 @@ export async function POST(req: NextRequest) {
   const spinsCol = db.collection<DailySpinDoc>('daily_spins');
   const creditsCol = db.collection<UserCreditsDoc>('user_credits');
   const historyCol = db.collection<SpinHistoryDoc>('spin_history');
+  const ledgerCol = db.collection<CreditsLedgerDoc>('credits_ledger');
   const { role, dailyLimit } = await getRoleAndLimit(steamId);
   const now = new Date();
   const today = dayKeyUtc(now);
@@ -212,7 +221,7 @@ export async function POST(req: NextRequest) {
 
   const reward = getWeightedReward();
 
-  const updatedDoc = await creditsCol.findOneAndUpdate(
+  const updated = await creditsCol.findOneAndUpdate(
     { _id: steamId },
     {
       $inc: { balance: reward },
@@ -221,6 +230,17 @@ export async function POST(req: NextRequest) {
     },
     { upsert: true, returnDocument: 'after' }
   );
+
+  const updatedDoc = (updated as any)?.value ?? null;
+  const newBalance = Number(updatedDoc?.balance || 0);
+
+  await ledgerCol.insertOne({
+    steamId,
+    delta: reward,
+    type: 'spin',
+    createdAt: now,
+    meta: { day: today, role },
+  });
 
   try {
     await historyCol.insertOne({ steamId, reward, createdAt: now, day: today, role });
@@ -232,7 +252,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     reward,
-    newBalance: updatedDoc?.balance || 0,
+    newBalance,
     role,
     dailyLimit,
   });

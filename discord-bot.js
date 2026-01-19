@@ -1,4 +1,19 @@
-const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder, SlashCommandBuilder, ActivityType, PresenceUpdateStatus } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  EmbedBuilder,
+  SlashCommandBuilder,
+  ActivityType,
+  PresenceUpdateStatus,
+  ActionRowBuilder,
+  ChannelSelectMenuBuilder,
+  ChannelType,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} = require('discord.js');
 require('dotenv').config();
 
 // Helper: timestamped logs
@@ -12,6 +27,135 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const API_BASE_URL = process.env.API_BASE_URL || 'https://www.skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 const GUILD_ID = process.env.DISCORD_GUILD_ID || '1453751539792347304'; // SkinVaults Community server
+
+const ANNOUNCE_SITE_EVERYONE = process.env.ANNOUNCE_SITE_EVERYONE !== 'false';
+
+const AUTO_ANNOUNCE_ENABLED = process.env.AUTO_SITE_ANNOUNCE_ENABLED === 'true';
+const AUTO_ANNOUNCE_CHANNEL_ID = process.env.AUTO_SITE_ANNOUNCE_CHANNEL_ID || '';
+const AUTO_ANNOUNCE_INTERVAL_MS = Math.max(
+  30_000,
+  Math.min(6 * 60 * 60 * 1000, Number(process.env.AUTO_SITE_ANNOUNCE_INTERVAL_MS || 120_000))
+);
+
+const ANNOUNCE_SITE_CHANNEL_SELECT_ID = 'announcesite_select_channel';
+const ANNOUNCE_SITE_MODAL_ID = 'announcesite_modal';
+const ANNOUNCE_SITE_MODAL_TITLE_ID = 'announcesite_title';
+const ANNOUNCE_SITE_MODAL_DESC_ID = 'announcesite_desc';
+const ANNOUNCE_SITE_MODAL_LINK_ID = 'announcesite_link';
+
+// In-memory drafts (cleared on restart)
+const announceSiteDrafts = new Map();
+
+let autoAnnounceRunning = false;
+let autoAnnounceTimer = null;
+
+async function fetchUnpostedFeatureAnnouncements(limit = 3) {
+  if (!API_TOKEN) return [];
+  const res = await fetch(`${API_BASE_URL}/api/discord/bot/feature-announcements?limit=${encodeURIComponent(String(limit))}`, {
+    headers: { Authorization: `Bearer ${API_TOKEN}` },
+  });
+  if (!res.ok) return [];
+  const json = await res.json().catch(() => null);
+  const items = Array.isArray(json?.announcements) ? json.announcements : [];
+  return items;
+}
+
+async function markFeatureAnnouncementPosted(id, postId) {
+  if (!API_TOKEN) return false;
+  const res = await fetch(`${API_BASE_URL}/api/discord/bot/feature-announcements`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${API_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id, postId }),
+  });
+  return res.ok;
+}
+
+function buildAnnouncementEmbed(a) {
+  const title = String(a?.title || 'Website Update').trim();
+  const description = String(a?.description || '').trim();
+  const link = a?.link ? String(a.link).trim() : '';
+
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(description || 'New update on the website.')
+    .setColor(0x5865F2)
+    .setTimestamp();
+
+  if (link) {
+    embed.setURL(link);
+  }
+
+  embed.setFooter({ text: 'SkinVaults • Website Update' });
+  return embed;
+}
+
+async function runAutoAnnounceOnce() {
+  if (!AUTO_ANNOUNCE_ENABLED) return;
+  if (!AUTO_ANNOUNCE_CHANNEL_ID) return;
+  if (!client?.isReady?.() && !client?.user) return;
+  if (autoAnnounceRunning) return;
+
+  autoAnnounceRunning = true;
+  try {
+    const channel = await client.channels.fetch(AUTO_ANNOUNCE_CHANNEL_ID).catch(() => null);
+    if (!channel || !channel.isTextBased()) return;
+
+    const announcements = await fetchUnpostedFeatureAnnouncements(3);
+    if (!announcements.length) return;
+
+    for (const a of announcements) {
+      const id = String(a?.id || '').trim();
+      if (!id) continue;
+
+      const embed = buildAnnouncementEmbed(a);
+
+      try {
+        const msg = await channel.send({
+          content: ANNOUNCE_SITE_EVERYONE ? '@everyone' : undefined,
+          embeds: [embed],
+          allowedMentions: ANNOUNCE_SITE_EVERYONE ? { parse: ['everyone'] } : { parse: [] },
+        });
+
+        await markFeatureAnnouncementPosted(id, String(msg?.id || ''));
+        await new Promise((r) => setTimeout(r, 1200));
+      } catch (e) {
+        console.error('[auto-announce] Failed to post announcement:', e);
+        break;
+      }
+    }
+  } finally {
+    autoAnnounceRunning = false;
+  }
+}
+
+function startAutoAnnouncer() {
+  if (!AUTO_ANNOUNCE_ENABLED) {
+    log('ℹ️ Auto site announcements are disabled (AUTO_SITE_ANNOUNCE_ENABLED!=true).');
+    return;
+  }
+  if (!AUTO_ANNOUNCE_CHANNEL_ID) {
+    log('⚠️ Auto site announcements enabled, but AUTO_SITE_ANNOUNCE_CHANNEL_ID is not set.');
+    return;
+  }
+  if (!API_TOKEN) {
+    log('⚠️ Auto site announcements enabled, but DISCORD_BOT_API_TOKEN is not set.');
+    return;
+  }
+
+  log(`📰 Auto announcer enabled. Channel=${AUTO_ANNOUNCE_CHANNEL_ID} intervalMs=${AUTO_ANNOUNCE_INTERVAL_MS}`);
+
+  if (autoAnnounceTimer) clearInterval(autoAnnounceTimer);
+  autoAnnounceTimer = setInterval(() => {
+    runAutoAnnounceOnce().catch(() => {});
+  }, AUTO_ANNOUNCE_INTERVAL_MS);
+
+  setTimeout(() => {
+    runAutoAnnounceOnce().catch(() => {});
+  }, 5000);
+}
 
 // Owner Steam IDs (from owner-ids.ts)
 const OWNER_STEAM_IDS = [
@@ -126,6 +270,11 @@ const commands = [
   new SlashCommandBuilder()
     .setName('spins')
     .setDescription('Use your daily spin to win credits.')
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName('announcesite')
+    .setDescription('Post a website update announcement to a selected channel.')
+    .setDefaultMemberPermissions(0)
     .toJSON(),
   new SlashCommandBuilder()
     .setName('wishlist')
@@ -800,17 +949,137 @@ client.on('interactionCreate', async (interaction) => {
   } else if (interaction.isAutocomplete()) {
     log(`📥 Received autocomplete for: ${interaction.commandName}`);
     return;
+  } else if (interaction.isChannelSelectMenu()) {
+    log(`📥 Received channel select: ${interaction.customId} from user ${interaction.user.id} (${interaction.user.username})`);
+  } else if (interaction.isModalSubmit()) {
+    log(`📥 Received modal submit: ${interaction.customId} from user ${interaction.user.id} (${interaction.user.username})`);
   } else {
-    // Log other interaction types
-    log(`📥 Received interaction type: ${interaction.type}`);
+    // ignore other interaction types
     return;
   }
 
-  if (!interaction.isChatInputCommand()) return;
-
   const { commandName, user } = interaction;
 
+  const isServerOwner = interaction.user.id === interaction.guild?.ownerId;
+  const steamIdForPerms = await getSteamIdFromDiscord(interaction.user.id);
+  const isBotOwner = OWNER_STEAM_IDS.includes(steamIdForPerms);
+  const canAnnounceSite = isServerOwner || isBotOwner;
+
   try {
+    if (interaction.isChannelSelectMenu() && interaction.customId === ANNOUNCE_SITE_CHANNEL_SELECT_ID) {
+      if (!canAnnounceSite) {
+        return interaction.reply({ content: '❌ You do not have permission to use this action.', ephemeral: true });
+      }
+
+      const guildId = interaction.guildId;
+      if (!guildId) {
+        return interaction.reply({ content: '❌ This action can only be used in a server.', ephemeral: true });
+      }
+
+      const selectedChannelId = Array.isArray(interaction.values) && interaction.values.length ? interaction.values[0] : null;
+      if (!selectedChannelId) {
+        return interaction.reply({ content: '❌ No channel selected.', ephemeral: true });
+      }
+
+      const draftKey = `${interaction.user.id}:${guildId}`;
+      announceSiteDrafts.set(draftKey, { channelId: selectedChannelId, guildId, createdAt: Date.now() });
+
+      const modal = new ModalBuilder()
+        .setCustomId(ANNOUNCE_SITE_MODAL_ID)
+        .setTitle('Website announcement');
+
+      const titleInput = new TextInputBuilder()
+        .setCustomId(ANNOUNCE_SITE_MODAL_TITLE_ID)
+        .setLabel('Title')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(120)
+        .setPlaceholder('Daily Spin is live!');
+
+      const descInput = new TextInputBuilder()
+        .setCustomId(ANNOUNCE_SITE_MODAL_DESC_ID)
+        .setLabel('What changed?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(1800)
+        .setPlaceholder('- Added Daily Spin\n- Fixed ledger history\n- Mobile UI improvements');
+
+      const linkInput = new TextInputBuilder()
+        .setCustomId(ANNOUNCE_SITE_MODAL_LINK_ID)
+        .setLabel('Link (optional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(300)
+        .setPlaceholder('https://www.skinvaults.online/giveaways');
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(titleInput),
+        new ActionRowBuilder().addComponents(descInput),
+        new ActionRowBuilder().addComponents(linkInput)
+      );
+
+      return interaction.showModal(modal);
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId === ANNOUNCE_SITE_MODAL_ID) {
+      if (!canAnnounceSite) {
+        return interaction.reply({ content: '❌ You do not have permission to use this action.', ephemeral: true });
+      }
+
+      const guildId = interaction.guildId;
+      if (!guildId) {
+        return interaction.reply({ content: '❌ This action can only be used in a server.', ephemeral: true });
+      }
+
+      const draftKey = `${interaction.user.id}:${guildId}`;
+      const draft = announceSiteDrafts.get(draftKey);
+      if (!draft?.channelId) {
+        return interaction.reply({ content: '❌ No channel selected. Run /announcesite again.', ephemeral: true });
+      }
+
+      const title = String(interaction.fields.getTextInputValue(ANNOUNCE_SITE_MODAL_TITLE_ID) || '').trim();
+      const description = String(interaction.fields.getTextInputValue(ANNOUNCE_SITE_MODAL_DESC_ID) || '').trim();
+      const linkRaw = String(interaction.fields.getTextInputValue(ANNOUNCE_SITE_MODAL_LINK_ID) || '').trim();
+
+      const link = linkRaw && !/^https?:\/\//i.test(linkRaw) ? `${API_BASE_URL.replace(/\/$/, '')}/${linkRaw.replace(/^\//, '')}` : linkRaw;
+
+      if (!title || !description) {
+        return interaction.reply({ content: '❌ Title and description are required.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      const channel = await client.channels.fetch(draft.channelId).catch(() => null);
+      if (!channel || !channel.isTextBased()) {
+        return interaction.editReply({ content: '❌ The selected channel is not a text channel or could not be accessed.' });
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(description)
+        .setColor(0x5865F2)
+        .setTimestamp();
+
+      if (link) {
+        embed.setURL(link);
+      }
+
+      embed.setFooter({ text: 'SkinVaults • Website Update' });
+
+      try {
+        await channel.send({
+          content: ANNOUNCE_SITE_EVERYONE ? '@everyone' : undefined,
+          embeds: [embed],
+          allowedMentions: ANNOUNCE_SITE_EVERYONE ? { parse: ['everyone'] } : { parse: [] },
+        });
+      } catch (e) {
+        return interaction.editReply({ content: `❌ Failed to send announcement: ${e?.message || 'Unknown error'}` });
+      }
+
+      announceSiteDrafts.delete(draftKey);
+      return interaction.editReply({ content: `✅ Announcement sent to <#${draft.channelId}>.` });
+    }
+
     if (['ban', 'timeout', 'banadmin', 'timeoutadmin'].includes(commandName)) {
       await interaction.deferReply({ ephemeral: true });
 
@@ -884,6 +1153,28 @@ client.on('interactionCreate', async (interaction) => {
         console.error(`Failed to execute ${commandName}:`, error);
         await interaction.editReply({ content: `❌ Failed to moderate user: ${error.message}` });
       }
+
+    } else if (commandName === 'announcesite') {
+      if (!interaction.guildId) {
+        return interaction.reply({ content: '❌ This command can only be used in a server.', ephemeral: true });
+      }
+
+      if (!canAnnounceSite) {
+        return interaction.reply({ content: '❌ This command can only be used by the server owner or bot owners.', ephemeral: true });
+      }
+
+      const row = new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder()
+          .setCustomId(ANNOUNCE_SITE_CHANNEL_SELECT_ID)
+          .setPlaceholder('Select an announcement channel')
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      );
+
+      return interaction.reply({
+        content: 'Select the channel where the bot should post the announcement.',
+        components: [row],
+        ephemeral: true,
+      });
 
     } else if (commandName === 'support') {
       const supportGuildId = process.env.DISCORD_GUILD_ID;
@@ -3031,6 +3322,9 @@ client.once('clientReady', async () => {
   // Process any queued messages immediately
   log('🔄 Checking for queued messages...');
   processQueuedMessages();
+
+  // Start safe auto announcer (if enabled)
+  startAutoAnnouncer();
 
   log('🤖 Bot is ready and processing messages!');
   log('⏰ Bot will check for queued messages every 5 seconds...');

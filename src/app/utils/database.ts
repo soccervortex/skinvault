@@ -13,14 +13,20 @@
  */
 
 import { kv } from '@vercel/kv';
-import { MongoClient, Db, Collection } from 'mongodb';
-import { getMongoClient, getDatabase as getSharedDatabase, hasMongoConfig } from './mongodb-client';
+import { Db, Collection } from 'mongodb';
+import { getDatabase as getSharedDatabase, hasMongoConfig } from './mongodb-client';
 
 // Database status
 // If KV isn't configured, default to MongoDB to avoid unnecessary KV calls.
+const FORCE_MONGODB =
+  process.env.FORCE_MONGODB === 'true' ||
+  process.env.DATABASE_PRIMARY === 'mongodb';
+
 let dbStatus: 'kv' | 'mongodb' | 'fallback' =
-  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN ? 'kv' : 'mongodb';
+  !FORCE_MONGODB && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN ? 'kv' : 'mongodb';
 let previousKVAvailable: boolean | null = null; // Track KV availability to detect recovery
+
+let lastKVRateLimitWarnAt = 0;
 
 // Cache to reduce KV reads (simple in-memory cache)
 export const readCache: Map<string, { value: any; timestamp: number }> = new Map();
@@ -45,8 +51,16 @@ async function initMongoDB(): Promise<Db | null> {
   }
 }
 
+void _backupToMongoDB;
+void _syncAllFromMongoDBToKV;
+
 // Check if KV is available and working
 async function isKVAvailable(): Promise<boolean> {
+  if (FORCE_MONGODB) {
+    previousKVAvailable = false;
+    return false;
+  }
+
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
     previousKVAvailable = false;
     return false;
@@ -90,7 +104,11 @@ async function isKVAvailable(): Promise<boolean> {
         errorString.includes('quota exceeded') ||
         error?.status === 429 ||
         error?.statusCode === 429) {
-      console.warn('[Database] ⚠️ KV rate limit hit, switching to MongoDB');
+      const now = Date.now();
+      if (now - lastKVRateLimitWarnAt > 60_000) {
+        lastKVRateLimitWarnAt = now;
+        console.warn('[Database] ⚠️ KV rate limit hit, switching to MongoDB');
+      }
       dbStatus = 'mongodb';
       return false;
     }
@@ -193,7 +211,7 @@ async function mongoDelete(key: string): Promise<boolean> {
 }
 
 // Backup KV data to MongoDB (no longer needed - dbSet handles this)
-async function backupToMongoDB(key: string, value: any): Promise<void> {
+async function _backupToMongoDB(): Promise<void> {
   // This function is kept for backwards compatibility but dbSet already handles backups
   // No-op since dbSet always writes to both KV and MongoDB
 }
@@ -212,7 +230,7 @@ async function syncFromMongoDBToKV(key: string): Promise<void> {
 }
 
 // Sync all MongoDB data back to KV (when KV recovers)
-async function syncAllFromMongoDBToKV(): Promise<void> {
+async function _syncAllFromMongoDBToKV(): Promise<void> {
   if (!await isKVAvailable()) {
     return; // KV not available yet
   }
@@ -586,7 +604,7 @@ export async function closeDbConnections(): Promise<void> {
   try {
     const { closeConnection } = await import('@/app/utils/mongodb-client');
     await closeConnection();
-  } catch (error) {
+  } catch {
     // Ignore errors - connection pool manages itself
   }
 }
