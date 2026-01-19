@@ -1644,7 +1644,7 @@ export default function GiveawaysPage() {
 
       {tradeUrlModalOpen && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-[#08090d]"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-[#08090d] min-h-screen"
           role="dialog"
           aria-modal="true"
           aria-labelledby="trade-url-modal-title"
