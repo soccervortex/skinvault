@@ -626,6 +626,23 @@ export default function GiveawaysPage() {
       const reward = Number(json?.reward);
       if (!Number.isFinite(reward)) throw new Error('Invalid reward');
 
+      const optimisticCreatedAt = new Date().toISOString();
+      const optimisticRole = String(json?.role || spinStatus?.role || 'user');
+      setSpinHistory((prev) => {
+        const next = [{ reward, createdAt: optimisticCreatedAt, day: '', role: optimisticRole }, ...(prev || [])];
+        return next.slice(0, 15);
+      });
+      setSpinHistorySummary((prev) => {
+        if (!prev) {
+          return { totalSpins: 1, totalCredits: reward, bestReward: reward };
+        }
+        return {
+          totalSpins: Number(prev.totalSpins || 0) + 1,
+          totalCredits: Number(prev.totalCredits || 0) + reward,
+          bestReward: Math.max(Number(prev.bestReward || 0), reward),
+        };
+      });
+
       setSpinWheelReward(reward);
       setSpinWheelOpen(true);
     } catch (e: any) {
@@ -634,7 +651,7 @@ export default function GiveawaysPage() {
     } finally {
       setSpinOpening(false);
     }
-  }, [user?.steamId, canSpin, spinWheelOpen, spinOpening, toast, loadDailySpinStatus]);
+  }, [user?.steamId, canSpin, spinWheelOpen, spinOpening, toast, loadDailySpinStatus, spinStatus?.role]);
 
   const closeAllSpinModals = useCallback(() => {
     if (autoSpinTimerRef.current) {
@@ -1618,15 +1635,12 @@ export default function GiveawaysPage() {
 
       {tradeUrlModalOpen && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-[#08090d]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="trade-url-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setTradeUrlModalOpen(false);
-              setTradeUrlModalClaimId(null);
-            }
+          onClick={() => {
+            setTradeUrlModalOpen(false);
           }}
         >
           <div

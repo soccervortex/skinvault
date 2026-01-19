@@ -189,7 +189,7 @@ const SpinWheel = ({
 
   return (
     <div
-      className="fixed inset-0 z-[10002] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-4 md:p-8"
+      className="fixed inset-0 z-[10002] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
       onClick={() => onCloseRef.current?.()}
     >
       <div

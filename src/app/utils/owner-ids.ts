@@ -11,7 +11,9 @@ export const OWNER_STEAM_IDS = [
  * Check if a Steam ID is an owner
  */
 export function isOwner(steamId: string | null | undefined): boolean {
-  if (!steamId) return false;
-  return OWNER_STEAM_IDS.includes(steamId as any);
+  if (steamId == null) return false;
+  const normalized = String(steamId).trim();
+  if (!normalized) return false;
+  return OWNER_STEAM_IDS.includes(normalized as any);
 }
 
