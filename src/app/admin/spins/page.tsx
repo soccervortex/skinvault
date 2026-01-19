@@ -28,6 +28,7 @@ export default function AdminSpinsPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<SpinHistoryRow[]>([]);
   const [summary, setSummary] = useState<SpinHistorySummary | null>(null);
+  const [allTimeSummary, setAllTimeSummary] = useState<SpinHistorySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filterSteamId, setFilterSteamId] = useState('');
 
@@ -54,9 +55,11 @@ export default function AdminSpinsPage() {
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setItems(Array.isArray(json?.items) ? json.items : []);
       setSummary(json?.summary || null);
+      setAllTimeSummary(json?.allTimeSummary || null);
     } catch (e: any) {
       setItems([]);
       setSummary(null);
+      setAllTimeSummary(null);
       setError(e?.message || 'Failed to load');
     } finally {
       setLoading(false);
@@ -80,6 +83,12 @@ export default function AdminSpinsPage() {
     const totalCredits = Number(summary?.totalCredits) || filtered.reduce((sum, r) => sum + (Number(r.reward) || 0), 0);
     return { totalSpins, totalCredits };
   }, [filtered]);
+
+  const allTimeTotals = useMemo(() => {
+    const totalSpins = Number(allTimeSummary?.totalSpins) || 0;
+    const totalCredits = Number(allTimeSummary?.totalCredits) || 0;
+    return { totalSpins, totalCredits };
+  }, [allTimeSummary]);
 
   if (!user) {
     return (
@@ -136,14 +145,22 @@ export default function AdminSpinsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5">
-                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Total Spins</div>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Total Spins (30d)</div>
                 <div className="text-2xl font-black italic tracking-tighter mt-1">{Number(totals.totalSpins).toLocaleString('en-US')}</div>
               </div>
               <div className="bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5">
-                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Credits Distributed</div>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Credits Distributed (30d)</div>
                 <div className="text-2xl font-black italic tracking-tighter mt-1">{Number(totals.totalCredits).toLocaleString('en-US')}</div>
+              </div>
+              <div className="bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Total Spins (All-Time)</div>
+                <div className="text-2xl font-black italic tracking-tighter mt-1">{Number(allTimeTotals.totalSpins).toLocaleString('en-US')}</div>
+              </div>
+              <div className="bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Credits Distributed (All-Time)</div>
+                <div className="text-2xl font-black italic tracking-tighter mt-1">{Number(allTimeTotals.totalCredits).toLocaleString('en-US')}</div>
               </div>
             </div>
 

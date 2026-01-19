@@ -68,6 +68,26 @@ export async function GET(request: Request) {
       bestReward: Number(summaryRow?.bestReward || 0),
     };
 
+    const allTimeAgg = await historyCol
+      .aggregate([
+        {
+          $group: {
+            _id: null,
+            totalSpins: { $sum: 1 },
+            totalCredits: { $sum: '$reward' },
+            bestReward: { $max: '$reward' },
+          },
+        },
+      ] as any)
+      .toArray();
+
+    const allTimeRow: any = allTimeAgg?.[0] || null;
+    const allTimeSummary: SpinHistorySummary = {
+      totalSpins: Number(allTimeRow?.totalSpins || 0),
+      totalCredits: Number(allTimeRow?.totalCredits || 0),
+      bestReward: Number(allTimeRow?.bestReward || 0),
+    };
+
     const rows = await historyCol
       .find({ createdAt: { $gte: cutoff } })
       .sort({ createdAt: -1 })
@@ -82,7 +102,7 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json(
-      { success: true, days, limit, count: items.length, summary, items },
+      { success: true, days, limit, count: items.length, summary, allTimeSummary, items },
       { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   } catch (error: any) {
