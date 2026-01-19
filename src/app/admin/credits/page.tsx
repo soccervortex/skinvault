@@ -34,6 +34,7 @@ export default function AdminCreditsPage() {
 
   const [loadingLedger, setLoadingLedger] = useState(false);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [openLedgerMeta, setOpenLedgerMeta] = useState<Record<string, boolean>>({});
 
   const [granting, setGranting] = useState(false);
   const [grantAmount, setGrantAmount] = useState('100');
@@ -316,6 +317,10 @@ export default function AdminCreditsPage() {
     }
   };
 
+  const toggleLedgerMeta = (key: string) => {
+    setOpenLedgerMeta((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   if (!user) {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
@@ -550,7 +555,7 @@ export default function AdminCreditsPage() {
             ) : (
               <div className="space-y-2">
                 {ledger.map((e, idx) => (
-                  <div key={`${e.id || e.createdAt || 'x'}_${idx}`} className="bg-black/40 border border-white/5 rounded-xl p-3">
+                  <div key={`${e.id || e.createdAt || 'x'}_${idx}`} className="bg-black/40 border border-white/5 rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-[10px] font-black uppercase tracking-widest">{e.type || 'entry'}</div>
@@ -558,6 +563,15 @@ export default function AdminCreditsPage() {
                       </div>
                       <div className={`text-[12px] font-black ${e.delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{e.delta >= 0 ? `+${e.delta}` : `${e.delta}`}</div>
                     </div>
+
+                    <div className="mt-2 text-[10px] text-gray-500 break-words">
+                      {e.meta?.reason ? `Reason: ${String(e.meta.reason)}` : null}
+                      {e.meta?.day ? (e.meta?.reason ? ' • ' : '') : null}
+                      {e.meta?.day ? `Day: ${String(e.meta.day)}` : null}
+                      {e.meta?.role ? (e.meta?.day || e.meta?.reason ? ' • ' : '') : null}
+                      {e.meta?.role ? `Role: ${String(e.meta.role)}` : null}
+                    </div>
+
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => rollbackEntry(e, true)}
@@ -573,6 +587,12 @@ export default function AdminCreditsPage() {
                       >
                         No Balance
                       </button>
+                      <button
+                        onClick={() => toggleLedgerMeta(`${e.id || e.createdAt || 'x'}_${idx}`)}
+                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10"
+                      >
+                        Details
+                      </button>
                       {e.id ? (
                         <button
                           onClick={() => copy(String(e.id))}
@@ -582,16 +602,20 @@ export default function AdminCreditsPage() {
                         </button>
                       ) : null}
                     </div>
-                    {e.meta ? (
-                      <div className="mt-2 flex items-center justify-between gap-3">
+
+                    {openLedgerMeta[`${e.id || e.createdAt || 'x'}_${idx}`] && e.meta ? (
+                      <div className="mt-3 bg-black/30 border border-white/10 rounded-xl p-3">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Meta</div>
+                          <button
+                            onClick={() => copy(JSON.stringify(e.meta))}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10"
+                            aria-label="Copy meta"
+                          >
+                            <Copy size={14} className="text-gray-300" />
+                          </button>
+                        </div>
                         <pre className="text-[9px] text-gray-500 overflow-x-auto max-w-full">{JSON.stringify(e.meta, null, 2)}</pre>
-                        <button
-                          onClick={() => copy(JSON.stringify(e.meta))}
-                          className="p-2 rounded-lg bg-white/5 hover:bg-white/10"
-                          aria-label="Copy meta"
-                        >
-                          <Copy size={14} className="text-gray-300" />
-                        </button>
                       </div>
                     ) : null}
                   </div>

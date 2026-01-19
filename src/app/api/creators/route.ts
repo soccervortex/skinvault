@@ -41,10 +41,14 @@ export async function readCreators(): Promise<CreatorProfile[]> {
 export async function GET() {
   try {
     const creators = await readCreators();
-    return NextResponse.json({ creators });
+    const res = NextResponse.json({ creators });
+    res.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    return res;
   } catch (error) {
     console.error('Failed to get creators:', error);
-    return NextResponse.json({ creators: CREATORS });
+    const res = NextResponse.json({ creators: CREATORS }, { status: 200 });
+    res.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    return res;
   }
 }
 

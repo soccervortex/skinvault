@@ -855,7 +855,13 @@ export async function GET(
 
   const respond = (payload: any) => {
     const res = NextResponse.json(payload);
-    res.headers.set('Cache-Control', 'no-store');
+    // For standard page loads we want Vercel Edge caching to reduce latency.
+    // For realtime/refresh requests we must bypass caching.
+    if (realtime || refresh) {
+      res.headers.set('Cache-Control', 'no-store');
+    } else {
+      res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+    }
     return res;
   };
 

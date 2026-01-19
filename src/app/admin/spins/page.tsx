@@ -79,10 +79,17 @@ export default function AdminSpinsPage() {
   }, [items, filterSteamId]);
 
   const totals = useMemo(() => {
+    const hasFilter = String(filterSteamId || '').trim().length > 0;
+    if (hasFilter) {
+      const totalSpins = filtered.length;
+      const totalCredits = filtered.reduce((sum, r) => sum + (Number(r.reward) || 0), 0);
+      return { totalSpins, totalCredits };
+    }
+
     const totalSpins = Number(summary?.totalSpins) || filtered.length;
     const totalCredits = Number(summary?.totalCredits) || filtered.reduce((sum, r) => sum + (Number(r.reward) || 0), 0);
     return { totalSpins, totalCredits };
-  }, [filtered]);
+  }, [filtered, filterSteamId, summary]);
 
   const allTimeTotals = useMemo(() => {
     const totalSpins = Number(allTimeSummary?.totalSpins) || 0;
@@ -179,7 +186,7 @@ export default function AdminSpinsPage() {
                 <div className="p-8 text-gray-500 text-[11px]">No spins found.</div>
               ) : (
                 <div className="divide-y divide-white/5">
-                  {filtered.slice(0, 500).map((r, idx) => {
+                  {filtered.slice(0, 2000).map((r, idx) => {
                     const ts = r.createdAt ? new Date(r.createdAt) : null;
                     const timeLabel = ts && !isNaN(ts.getTime()) ? ts.toLocaleString() : '—';
                     const invHref = r.steamId ? `/inventory/${encodeURIComponent(r.steamId)}` : '#';

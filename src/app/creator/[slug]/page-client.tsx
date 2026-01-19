@@ -283,7 +283,7 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
     const run = async () => {
       setError(null);
       try {
-        const res = await fetch(`/api/creator/${encodeURIComponent(slug)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/creator/${encodeURIComponent(slug)}`);
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error || 'Failed to load');
         if (!cancelled) setData(json);

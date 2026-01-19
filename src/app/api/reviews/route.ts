@@ -61,13 +61,15 @@ export async function GET() {
     }
 
     if (!reviewsData || reviewsData.length === 0) {
-      return NextResponse.json({
+      const res = NextResponse.json({
         reviews: [],
         sources: REVIEW_SOURCES,
         aggregateRating: 0,
         totalReviews: 0,
         ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
       });
+      res.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+      return res;
     }
 
     // Transform Supabase data to match our Review interface
@@ -107,13 +109,15 @@ export async function GET() {
 
     console.log(`Reviews API: Found ${totalCount} reviews from Supabase, Aggregate: ${aggregateRating.toFixed(2)}`);
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       reviews: reviews,
       sources: REVIEW_SOURCES,
       aggregateRating: aggregateRating,
       totalReviews: totalCount,
       ratingBreakdown: ratingBreakdown,
     });
+    res.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    return res;
   } catch (error) {
     console.error('Reviews API error:', error);
     return NextResponse.json(
@@ -125,7 +129,7 @@ export async function GET() {
         ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
         error: 'Failed to fetch reviews' 
       },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   }
 }

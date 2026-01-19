@@ -61,10 +61,10 @@ export default function CreatorsIndexClient() {
 
   const canManage = isOwner(adminSteamId);
 
-  const fetchCreators = async () => {
+  const fetchCreators = async (fresh?: boolean) => {
     setError(null);
     try {
-      const res = await fetch('/api/creators', { cache: 'no-store' });
+      const res = await fetch('/api/creators', fresh ? { cache: 'no-store' } : undefined);
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed');
       setCreators(Array.isArray(data?.creators) ? data.creators : []);
@@ -75,7 +75,7 @@ export default function CreatorsIndexClient() {
   };
 
   useEffect(() => {
-    fetchCreators();
+    fetchCreators(false);
   }, []);
 
   const handleCreate = async () => {
@@ -111,7 +111,7 @@ export default function CreatorsIndexClient() {
         youtubeChannelId: '',
         twitchLogin: '',
       });
-      await fetchCreators();
+      await fetchCreators(true);
     } catch (e: any) {
       setError(e?.message || 'Failed to create');
     } finally {
@@ -133,7 +133,7 @@ export default function CreatorsIndexClient() {
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to delete');
-      await fetchCreators();
+      await fetchCreators(true);
     } catch (e: any) {
       setError(e?.message || 'Failed to delete');
     } finally {
