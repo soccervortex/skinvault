@@ -214,6 +214,8 @@ export default function GiveawaysPage() {
   const spinResultOpenRef = useRef(spinResultOpen);
   const spinOpeningRef = useRef(spinOpening);
   const canSpinRef = useRef(canSpin);
+  const autoSpinEnabledRef = useRef(autoSpinEnabled);
+  const turboEnabledRef = useRef(turboEnabled);
   const startSpinRef = useRef<null | (() => Promise<void>)>(null);
   const closeAllSpinModalsRef = useRef<null | (() => void)>(null);
 
@@ -667,6 +669,14 @@ export default function GiveawaysPage() {
   }, [canSpin]);
 
   useEffect(() => {
+    autoSpinEnabledRef.current = autoSpinEnabled;
+  }, [autoSpinEnabled]);
+
+  useEffect(() => {
+    turboEnabledRef.current = turboEnabled;
+  }, [turboEnabled]);
+
+  useEffect(() => {
     startSpinRef.current = startSpin;
   }, [startSpin]);
 
@@ -681,18 +691,18 @@ export default function GiveawaysPage() {
     }
 
     if (!autoSpinEnabled) return;
-    if (!spinResultOpen) return;
+    if (!spinModalOpenRef.current && !spinResultOpenRef.current) return;
     if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
 
     autoSpinTimerRef.current = window.setTimeout(() => {
       autoSpinTimerRef.current = null;
-      if (!autoSpinEnabled) return;
-      if (!spinResultOpenRef.current) return;
+      if (!autoSpinEnabledRef.current) return;
+      if (!spinModalOpenRef.current && !spinResultOpenRef.current) return;
       if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
-      setSpinResultOpen(false);
+      if (spinResultOpenRef.current) setSpinResultOpen(false);
       void startSpinRef.current?.();
-    }, turboEnabled ? 350 : 900);
-  }, [autoSpinEnabled, turboEnabled, spinResultOpen]);
+    }, turboEnabledRef.current ? 350 : 900);
+  }, [autoSpinEnabled, turboEnabled, spinModalOpen, spinResultOpen, canSpin, spinWheelOpen, spinOpening]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1009,7 +1019,7 @@ export default function GiveawaysPage() {
 
           {spinModalOpen && (
             <div
-              className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
+              className="fixed inset-0 z-[10000] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => {
                 setSpinModalOpen(false);
                 setSpinWheelOpen(false);
@@ -1102,7 +1112,7 @@ export default function GiveawaysPage() {
 
           {spinResultOpen && (
             <div
-              className="fixed inset-0 z-[10001] bg-black/80 backdrop-blur-sm flex items-center justify-center overscroll-contain p-0 md:p-4"
+              className="fixed inset-0 z-[10001] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => setSpinResultOpen(false)}
             >
               <div
