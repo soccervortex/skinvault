@@ -584,7 +584,7 @@ async function checkProStatus(steamId) {
       return new Date(data.proUntil) > new Date();
     }
     return false;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -625,7 +625,7 @@ async function getDiscordUserIdFromUsername(username, client) {
           return data.discordId;
         }
       }
-    } catch (error) {
+    } catch {
       // Fall back to Discord server search
     }
 
@@ -644,7 +644,7 @@ async function getDiscordUserIdFromUsername(username, client) {
           if (member) {
             return member.user.id;
           }
-        } catch (error) {
+        } catch {
           continue;
         }
       }
@@ -664,6 +664,8 @@ async function getPlayerInventory(player) {
   const data = await response.json();
   return data.assets || [];
 }
+
+void getPlayerInventory;
 
 // Retrieve Steam profile info
 async function getSteamProfile(steamId) {
@@ -743,7 +745,7 @@ async function resolveSteamUsername(username) {
           return steamId64;
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore
     }
 
@@ -915,7 +917,7 @@ async function searchItem(query) {
             id: found.id,
           };
         }
-      } catch (error) {
+      } catch {
         // Continue to next dataset
         continue;
       }
@@ -1232,7 +1234,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0x5865F2)
           .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
-      } catch (error) {
+      } catch {
         await interaction.editReply({ content: '❌ Could not retrieve your credits balance.' });
       }
 
@@ -1274,7 +1276,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.editReply({ content: `❌ Failed to claim daily reward: ${data.error}` });
           }
         }
-      } catch (error) {
+      } catch {
         await interaction.editReply({ content: '❌ An error occurred while trying to claim your daily reward.' });
       }
 
@@ -1318,7 +1320,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.editReply({ content: `❌ Failed to use your spin: ${data.error}` });
           }
         }
-      } catch (error) {
+      } catch {
         await interaction.editReply({ content: '❌ An error occurred while trying to use your spin.' });
       }
 
@@ -1343,7 +1345,7 @@ client.on('interactionCreate', async (interaction) => {
           });
         }
         await interaction.editReply({ embeds: [embed] });
-      } catch (error) {
+      } catch {
         await interaction.editReply({ content: '❌ Could not retrieve active giveaways.' });
       }
 
@@ -1463,7 +1465,6 @@ client.on('interactionCreate', async (interaction) => {
 
       const fields = alerts.slice(0, 10).map((alert, index) => {
         const condition = alert.condition === 'below' ? '≤' : '≥';
-        const currency = alert.currency === '1' ? 'USD' : 'EUR';
         const symbol = alert.currency === '1' ? '$' : '€';
         const status = alert.triggered ? '✅ Triggered' : '⏳ Active';
         const price = prices[index];
@@ -1491,7 +1492,7 @@ client.on('interactionCreate', async (interaction) => {
               embed.setThumbnail(itemData.image);
             }
           }
-        } catch (error) {
+        } catch {
           // Ignore errors getting image
         }
       }
@@ -1536,7 +1537,7 @@ client.on('interactionCreate', async (interaction) => {
               itemImage = itemInfo.image;
             }
           }
-        } catch (error) {
+        } catch {
           // Ignore
         }
 
@@ -1574,7 +1575,7 @@ client.on('interactionCreate', async (interaction) => {
               embed.setThumbnail(itemData.image);
             }
           }
-        } catch (error) {
+        } catch {
           // Ignore errors getting image
         }
       }
@@ -1603,7 +1604,6 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const invResponse = await fetch(`${API_BASE_URL}/api/steam/inventory?steamId=${encodeURIComponent(steamId)}&currency=${currency}&isPro=false`);
         if (!invResponse.ok) {
-          const errorText = await invResponse.text().catch(() => 'Unknown error');
           let errorMessage = 'Could not fetch your inventory.';
 
           if (invResponse.status === 403 || invResponse.status === 401) {
@@ -2003,7 +2003,7 @@ client.on('interactionCreate', async (interaction) => {
                 searchMethod = 'Discord username (database)';
               }
             }
-          } catch (error) {
+          } catch {
             // Continue to fallback
           }
 
@@ -2052,7 +2052,7 @@ client.on('interactionCreate', async (interaction) => {
               });
               return;
             }
-          } catch (error) {
+          } catch {
             await interaction.editReply({
               content: '❌ **Error**\n\nFailed to lookup Discord ID. Please try again later.',
             });
@@ -2097,7 +2097,7 @@ client.on('interactionCreate', async (interaction) => {
               stats = statsObj;
             }
           }
-        } catch (error) {
+        } catch {
           // Stats are optional
         }
 
@@ -2459,7 +2459,7 @@ client.on('interactionCreate', async (interaction) => {
               }
             }
           }
-        } catch (error) {
+        } catch {
           // Ignore errors checking promo codes
         }
 
@@ -3186,11 +3186,13 @@ async function fetchRoleSyncQueue() {
 
     const data = await response.json();
     return data.queue || [];
-  } catch (error) {
+  } catch {
     // Endpoint might not exist, that's okay
     return [];
   }
 }
+
+void fetchRoleSyncQueue;
 
 // Process role sync queue
 async function processRoleSyncQueue() {
@@ -3210,7 +3212,6 @@ async function processRoleSyncQueue() {
     // This is simpler and ensures roles stay in sync
 
     // Only sync every 5 minutes to avoid rate limits
-    const lastSyncKey = 'last_role_sync';
     const lastSync = client.lastRoleSync || 0;
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
@@ -3226,7 +3227,7 @@ async function processRoleSyncQueue() {
     let synced = 0;
     let errors = 0;
 
-    for (const [id, member] of members) {
+    for (const [, member] of members) {
       try {
         await assignRoles(member);
         synced++;
@@ -3293,7 +3294,7 @@ client.once('clientReady', async () => {
         let synced = 0;
         let errors = 0;
 
-        for (const [id, member] of members) {
+        for (const [, member] of members) {
           try {
             await assignRoles(member);
             synced++;
