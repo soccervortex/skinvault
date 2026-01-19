@@ -681,7 +681,7 @@ export default function GiveawaysPage() {
     }
 
     if (!autoSpinEnabled) return;
-    if (!spinResultOpenRef.current) return;
+    if (!spinResultOpen) return;
     if (!canSpinRef.current || spinWheelOpenRef.current || spinOpeningRef.current) return;
 
     autoSpinTimerRef.current = window.setTimeout(() => {
@@ -692,7 +692,7 @@ export default function GiveawaysPage() {
       setSpinResultOpen(false);
       void startSpinRef.current?.();
     }, turboEnabled ? 350 : 900);
-  }, [autoSpinEnabled, turboEnabled]);
+  }, [autoSpinEnabled, turboEnabled, spinResultOpen]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1009,7 +1009,7 @@ export default function GiveawaysPage() {
 
           {spinModalOpen && (
             <div
-              className="fixed inset-0 z-[10000] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
+              className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => {
                 setSpinModalOpen(false);
                 setSpinWheelOpen(false);
@@ -1032,7 +1032,7 @@ export default function GiveawaysPage() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5 bg-[#0f111a]">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {SPIN_TIERS.map((t) => (
                       <div key={t.reward} className="rounded-2xl border border-white/10 bg-black/30 p-4 relative overflow-hidden">
@@ -1102,7 +1102,7 @@ export default function GiveawaysPage() {
 
           {spinResultOpen && (
             <div
-              className="fixed inset-0 z-[10001] bg-[#08090d] flex items-center justify-center overscroll-contain p-4 md:p-8"
+              className="fixed inset-0 z-[10001] bg-black/70 backdrop-blur-sm flex items-center justify-center overscroll-contain p-4 md:p-8"
               onClick={() => setSpinResultOpen(false)}
             >
               <div
@@ -1121,7 +1121,7 @@ export default function GiveawaysPage() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5 bg-[#0f111a]">
                   <div className="rounded-[2rem] border border-white/10 bg-black/30 relative overflow-hidden">
                     <div
                       className="absolute inset-0 opacity-20"
