@@ -14,6 +14,12 @@ type SpinHistoryRow = {
   role: string;
 };
 
+type SpinHistorySummary = {
+  totalSpins: number;
+  totalCredits: number;
+  bestReward: number;
+};
+
 export default function AdminSpinsPage() {
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
@@ -21,6 +27,7 @@ export default function AdminSpinsPage() {
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<SpinHistoryRow[]>([]);
+  const [summary, setSummary] = useState<SpinHistorySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filterSteamId, setFilterSteamId] = useState('');
 
@@ -37,7 +44,7 @@ export default function AdminSpinsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/spins/history?days=7&limit=2000', {
+      const res = await fetch('/api/admin/spins/history?days=30&limit=2000', {
         cache: 'no-store',
         headers: {
           'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
@@ -46,8 +53,10 @@ export default function AdminSpinsPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setItems(Array.isArray(json?.items) ? json.items : []);
+      setSummary(json?.summary || null);
     } catch (e: any) {
       setItems([]);
+      setSummary(null);
       setError(e?.message || 'Failed to load');
     } finally {
       setLoading(false);
@@ -67,8 +76,8 @@ export default function AdminSpinsPage() {
   }, [items, filterSteamId]);
 
   const totals = useMemo(() => {
-    const totalSpins = filtered.length;
-    const totalCredits = filtered.reduce((sum, r) => sum + (Number(r.reward) || 0), 0);
+    const totalSpins = Number(summary?.totalSpins) || filtered.length;
+    const totalCredits = Number(summary?.totalCredits) || filtered.reduce((sum, r) => sum + (Number(r.reward) || 0), 0);
     return { totalSpins, totalCredits };
   }, [filtered]);
 
@@ -107,7 +116,7 @@ export default function AdminSpinsPage() {
                 </div>
                 <div>
                   <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Credits</p>
-                  <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Spin History (7 Days)</h1>
+                  <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">Spin History (30 Days)</h1>
                 </div>
               </div>
 
@@ -130,11 +139,11 @@ export default function AdminSpinsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Total Spins</div>
-                <div className="text-2xl font-black italic tracking-tighter mt-1">{totals.totalSpins}</div>
+                <div className="text-2xl font-black italic tracking-tighter mt-1">{Number(totals.totalSpins).toLocaleString('en-US')}</div>
               </div>
               <div className="bg-[#11141d] border border-white/5 rounded-[1.5rem] p-5">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Credits Distributed</div>
-                <div className="text-2xl font-black italic tracking-tighter mt-1">{totals.totalCredits.toLocaleString()}</div>
+                <div className="text-2xl font-black italic tracking-tighter mt-1">{Number(totals.totalCredits).toLocaleString('en-US')}</div>
               </div>
             </div>
 
@@ -181,7 +190,7 @@ export default function AdminSpinsPage() {
 
                         <div className="shrink-0 text-right">
                           <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Won</div>
-                          <div className="text-xl font-black italic tracking-tighter text-emerald-300">{Number(r.reward || 0).toLocaleString()} CR</div>
+                          <div className="text-xl font-black italic tracking-tighter text-emerald-300">{Number(r.reward || 0).toLocaleString('en-US')} CR</div>
                         </div>
                       </div>
                     );
