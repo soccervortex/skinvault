@@ -19,6 +19,7 @@ type GiveawaySummary = {
   id: string;
   title: string;
   prize: string;
+  claimMode?: 'bot' | 'manual';
   prizeItem?: PrizeItem;
   startAt: string | null;
   endAt: string | null;
@@ -87,11 +88,28 @@ type MyClaimRow = {
   giveawayId: string;
   title: string;
   prize: string;
+  claimMode?: 'bot' | 'manual';
   prizeItem?: PrizeItem;
   entries: number;
   claimStatus: string;
   claimDeadlineAt: string | null;
 };
+
+function formatWinnerClaimStatus(raw: string | null | undefined): string {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return 'PENDING';
+  if (s === 'pending_trade') return 'QUEUED';
+  if (s === 'manual_pending') return 'PENDING';
+  if (s === 'manual_contacted') return 'CONTACTED';
+  if (s === 'manual_awaiting_user') return 'AWAITING USER';
+  if (s === 'manual_sent') return 'SENT';
+  return s.toUpperCase();
+}
+
+function isManualQueueStatus(raw: string | null | undefined): boolean {
+  const s = String(raw || '').trim().toLowerCase();
+  return s === 'manual_pending' || s === 'manual_contacted' || s === 'manual_awaiting_user' || s === 'manual_sent';
+}
 
 function formatHms(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -240,6 +258,12 @@ export default function GiveawaysPage() {
   const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
   const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
 
+  const [manualClaimModalOpen, setManualClaimModalOpen] = useState(false);
+  const [manualClaimGiveawayId, setManualClaimGiveawayId] = useState<string | null>(null);
+  const [manualDiscordUsername, setManualDiscordUsername] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualClaimSending, setManualClaimSending] = useState(false);
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -268,6 +292,58 @@ export default function GiveawaysPage() {
       .finally(() => {
         setTradeUrlLoading(false);
       });
+  };
+
+  const openManualClaimModal = (giveawayId: string | null) => {
+    setManualClaimGiveawayId(giveawayId);
+    setManualDiscordUsername('');
+    setManualEmail('');
+    setManualClaimModalOpen(true);
+  };
+
+  const submitManualClaim = async () => {
+    const id = String(manualClaimGiveawayId || '').trim();
+    if (!id) return;
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return;
+    }
+    if (!String(manualDiscordUsername || '').trim()) {
+      toast.error('Discord username is required');
+      return;
+    }
+
+    setManualClaimSending(true);
+    try {
+      const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}/manual-claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steamId: String(user?.steamId || ''),
+          discordUsername: String(manualDiscordUsername || '').trim(),
+          email: String(manualEmail || '').trim(),
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Claim submitted');
+      setManualClaimModalOpen(false);
+      const gid = manualClaimGiveawayId;
+      setManualClaimGiveawayId(null);
+      if (gid) {
+        await loadMyWinner(gid);
+      }
+      await loadGiveaways();
+      await loadMyClaims();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to submit claim');
+      const gid = manualClaimGiveawayId;
+      if (gid) {
+        await loadMyWinner(gid);
+      }
+    } finally {
+      setManualClaimSending(false);
+    }
   };
 
   const scrollToDetail = () => {
@@ -785,6 +861,10 @@ export default function GiveawaysPage() {
 
   const claimPrize = async () => {
     if (!detail?.id) return;
+    if (String((detail as any)?.claimMode || 'bot') === 'manual') {
+      openManualClaimModal(detail.id);
+      return;
+    }
     if (!user?.steamId) {
       toast.error('Sign in with Steam first');
       return;
@@ -818,6 +898,11 @@ export default function GiveawaysPage() {
   const claimPrizeById = async (giveawayId: string) => {
     const id = String(giveawayId || '').trim();
     if (!id) return;
+    const mode = myClaims.find((c) => String(c.giveawayId || '') === id)?.claimMode;
+    if (String(mode || 'bot') === 'manual') {
+      openManualClaimModal(id);
+      return;
+    }
     if (!user?.steamId) {
       toast.error('Sign in with Steam first');
       return;
@@ -1234,6 +1319,11 @@ export default function GiveawaysPage() {
                             Claim queued
                           </div>
                         )}
+                        {isManualQueueStatus(c.claimStatus) && (
+                          <div className="mt-1 text-[9px] text-blue-300 font-black uppercase tracking-widest">
+                            Manual claim submitted
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1247,7 +1337,11 @@ export default function GiveawaysPage() {
                           disabled={claimingPrize || String(c.claimStatus || '') !== 'pending'}
                           className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize || String(c.claimStatus || '') !== 'pending' ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                         >
-                          {String(c.claimStatus || '') === 'pending_trade' ? 'Queued' : 'Claim'}
+                          {String(c.claimStatus || '') === 'pending_trade'
+                            ? 'Queued'
+                            : isManualQueueStatus(c.claimStatus)
+                              ? 'Submitted'
+                              : (String(c.claimMode || 'bot') === 'manual' ? 'Submit' : 'Claim')}
                         </button>
                       </div>
                     </div>
@@ -1564,7 +1658,7 @@ export default function GiveawaysPage() {
                               </div>
                             ) : myWinner?.isWinner ? (
                               <div className="mt-2 text-[11px] text-gray-300">
-                                Status: <span className="text-white font-black">{String(myWinner.claimStatus || 'pending').toUpperCase()}</span>
+                                Status: <span className="text-white font-black">{formatWinnerClaimStatus(myWinner.claimStatus)}</span>
                                 {myWinner.claimDeadlineAt ? (
                                   <span className="text-gray-500"> • Deadline: {formatShortDate(myWinner.claimDeadlineAt)} {formatShortTime(myWinner.claimDeadlineAt)}</span>
                                 ) : null}
@@ -1580,7 +1674,7 @@ export default function GiveawaysPage() {
                               disabled={claimingPrize}
                               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${claimingPrize ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
                             >
-                              {claimingPrize ? 'Queueing...' : 'Claim Prize'}
+                              {claimingPrize ? 'Submitting...' : (String((detail as any)?.claimMode || 'bot') === 'manual' ? 'Submit Claim' : 'Claim Prize')}
                             </button>
                           ) : null}
                         </div>
@@ -1702,6 +1796,93 @@ export default function GiveawaysPage() {
                 className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tradeUrlSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
               >
                 {tradeUrlSaving ? 'Saving...' : 'Save & Claim'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manualClaimModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-[#08090d] min-h-screen"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="manual-claim-modal-title"
+          onClick={() => {
+            setManualClaimModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-[#11141d] border border-white/10 p-6 md:p-8 rounded-[2rem] w-full max-w-lg shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setManualClaimModalOpen(false);
+                setManualClaimGiveawayId(null);
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+              aria-label="Close manual claim modal"
+            >
+              <X size={20} />
+            </button>
+
+            <h2 id="manual-claim-modal-title" className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+              Manual Claim
+            </h2>
+
+            <div className="mt-3 bg-amber-500/10 border border-amber-500/20 rounded-[1.5rem] px-5 py-4 text-[11px] text-gray-300">
+              Make sure your Discord profile/DMs allow messages from server members. If your privacy settings are too strict, staff may not be able to contact you.
+            </div>
+
+            <div className="mt-4">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Steam ID</div>
+              <input
+                value={String(user?.steamId || '')}
+                readOnly
+                className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black text-gray-300"
+              />
+            </div>
+
+            <div className="mt-4">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Discord Username</div>
+              <input
+                value={manualDiscordUsername}
+                onChange={(e) => setManualDiscordUsername(e.target.value)}
+                placeholder="Your Discord username"
+                className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black"
+                disabled={manualClaimSending}
+              />
+            </div>
+
+            <div className="mt-4">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Email (optional)</div>
+              <input
+                value={manualEmail}
+                onChange={(e) => setManualEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black"
+                disabled={manualClaimSending}
+              />
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setManualClaimModalOpen(false);
+                  setManualClaimGiveawayId(null);
+                }}
+                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
+                disabled={manualClaimSending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitManualClaim}
+                disabled={manualClaimSending}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${manualClaimSending ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+              >
+                {manualClaimSending ? 'Sending...' : 'Send'}
               </button>
             </div>
           </div>

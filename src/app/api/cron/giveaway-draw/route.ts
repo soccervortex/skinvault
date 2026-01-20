@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
           endAt: { $lte: now },
           drawnAt: { $exists: false },
         } as any,
-        { projection: { _id: 1, endAt: 1, winnerCount: 1 } } as any
+        { projection: { _id: 1, endAt: 1, winnerCount: 1, claimMode: 1 } } as any
       )
       .sort({ endAt: 1 })
       .limit(limit)
@@ -123,6 +123,7 @@ export async function GET(req: NextRequest) {
       }
 
       try {
+        const claimMode = String(g?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot';
         const existing = await winnersCol.findOne({ _id: id } as any, { projection: { winners: 1 } } as any);
         if (existing?.winners) {
           skippedAlreadyDrawnCount++;
@@ -150,21 +151,23 @@ export async function GET(req: NextRequest) {
           const idx = pool.findIndex((p) => p.steamId === one.steamId);
           if (idx >= 0) pool.splice(idx, 1);
 
-          const settings: any = await settingsCol.findOne({ _id: one.steamId } as any, { projection: { tradeUrl: 1 } } as any);
-          const tradeUrl = String(settings?.tradeUrl || '').trim();
-          if (!isValidTradeUrl(tradeUrl)) {
-            try {
-              await createUserNotification(
-                db,
-                one.steamId,
-                'giveaway_missing_trade_url',
-                'Trade URL Required',
-                'You were selected as a giveaway winner, but you do not have a valid Steam trade URL set. Add your trade URL to claim prizes.',
-                { giveawayId: id }
-              );
-            } catch {
+          if (claimMode !== 'manual') {
+            const settings: any = await settingsCol.findOne({ _id: one.steamId } as any, { projection: { tradeUrl: 1 } } as any);
+            const tradeUrl = String(settings?.tradeUrl || '').trim();
+            if (!isValidTradeUrl(tradeUrl)) {
+              try {
+                await createUserNotification(
+                  db,
+                  one.steamId,
+                  'giveaway_missing_trade_url',
+                  'Trade URL Required',
+                  'You were selected as a giveaway winner, but you do not have a valid Steam trade URL set. Add your trade URL to claim prizes.',
+                  { giveawayId: id }
+                );
+              } catch {
+              }
+              continue;
             }
-            continue;
           }
 
           winners.push({

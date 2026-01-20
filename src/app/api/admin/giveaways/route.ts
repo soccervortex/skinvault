@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
       title: String(g.title || ''),
       description: String(g.description || ''),
       prize: String(g.prize || ''),
+      claimMode: String(g.claimMode || 'bot') === 'manual' ? 'manual' : 'bot',
       prizeItem: g.prizeItem
         ? {
             id: String(g.prizeItem?.id || ''),
@@ -67,6 +68,8 @@ export async function POST(req: NextRequest) {
     const endAt = safeDate(body?.endAt);
     const creditsPerEntry = Math.max(1, Math.floor(Number(body?.creditsPerEntry || 10)));
     const winnerCount = Math.max(1, Math.floor(Number(body?.winnerCount || 1)));
+    const claimModeRaw = String(body?.claimMode || 'bot').trim().toLowerCase();
+    const claimMode = claimModeRaw === 'manual' ? 'manual' : 'bot';
 
     if (!title) return NextResponse.json({ error: 'Missing title' }, { status: 400 });
     if (!startAt || !endAt || startAt >= endAt) return NextResponse.json({ error: 'Invalid dates' }, { status: 400 });
@@ -79,6 +82,7 @@ export async function POST(req: NextRequest) {
       title,
       description,
       prize,
+      claimMode,
       prizeItem: prizeItem && (prizeItem.id || prizeItem.name || prizeItem.market_hash_name || prizeItem.image)
         ? {
             id: prizeItem.id,

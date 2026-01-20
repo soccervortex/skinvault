@@ -38,6 +38,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (body?.title !== undefined) update.title = String(body.title || '').trim();
     if (body?.description !== undefined) update.description = String(body.description || '').trim();
 
+    if (body?.claimMode !== undefined) {
+      const raw = String(body.claimMode || '').trim().toLowerCase();
+      update.claimMode = raw === 'manual' ? 'manual' : 'bot';
+    }
+
     if (body?.prizeItem !== undefined) {
       const raw = body?.prizeItem;
       if (!raw) {

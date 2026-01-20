@@ -25,10 +25,28 @@ function log(message) {
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const API_BASE_URL = process.env.API_BASE_URL || 'https://www.skinvaults.online';
+const WEBSITE_BASE_URL = process.env.WEBSITE_BASE_URL || process.env.SITE_BASE_URL || 'https://www.skinvaults.online';
 const API_TOKEN = process.env.DISCORD_BOT_API_TOKEN || '';
 const GUILD_ID = process.env.DISCORD_GUILD_ID || '1453751539792347304'; // SkinVaults Community server
 
 const ANNOUNCE_SITE_EVERYONE = process.env.ANNOUNCE_SITE_EVERYONE !== 'false';
+
+function normalizeAnnouncementLink(raw) {
+  const input = String(raw || '').trim();
+  if (!input) return '';
+
+  if (/^https?:\/\//i.test(input)) return input;
+
+  if (/^\/\//.test(input)) return `https:${input}`;
+
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/|\?|#|$)/i.test(input)) {
+    return `https://${input}`;
+  }
+
+  const base = String(WEBSITE_BASE_URL || '').trim().replace(/\/$/, '');
+  if (!base) return '';
+  return `${base}/${input.replace(/^\//, '')}`;
+}
 
 const AUTO_ANNOUNCE_ENABLED = process.env.AUTO_SITE_ANNOUNCE_ENABLED === 'true';
 const AUTO_ANNOUNCE_CHANNEL_ID = process.env.AUTO_SITE_ANNOUNCE_CHANNEL_ID || '';
@@ -76,17 +94,15 @@ async function markFeatureAnnouncementPosted(id, postId) {
 function buildAnnouncementEmbed(a) {
   const title = String(a?.title || 'Website Update').trim();
   const description = String(a?.description || '').trim();
-  const link = a?.link ? String(a.link).trim() : '';
+  const link = normalizeAnnouncementLink(a?.link);
+  const descBase = description || 'New update on the website.';
+  const desc = link ? `${descBase}\n\n🔗 ${link}` : descBase;
 
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(description || 'New update on the website.')
+    .setDescription(desc)
     .setColor(0x5865F2)
     .setTimestamp();
-
-  if (link) {
-    embed.setURL(link);
-  }
 
   embed.setFooter({ text: 'SkinVaults • Website Update' });
   return embed;
@@ -1043,7 +1059,8 @@ client.on('interactionCreate', async (interaction) => {
       const description = String(interaction.fields.getTextInputValue(ANNOUNCE_SITE_MODAL_DESC_ID) || '').trim();
       const linkRaw = String(interaction.fields.getTextInputValue(ANNOUNCE_SITE_MODAL_LINK_ID) || '').trim();
 
-      const link = linkRaw && !/^https?:\/\//i.test(linkRaw) ? `${API_BASE_URL.replace(/\/$/, '')}/${linkRaw.replace(/^\//, '')}` : linkRaw;
+      const link = normalizeAnnouncementLink(linkRaw);
+      const descriptionWithLink = link ? `${description}\n\n🔗 ${link}` : description;
 
       if (!title || !description) {
         return interaction.reply({ content: '❌ Title and description are required.', ephemeral: true });
@@ -1058,13 +1075,9 @@ client.on('interactionCreate', async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(description)
+        .setDescription(descriptionWithLink)
         .setColor(0x5865F2)
         .setTimestamp();
-
-      if (link) {
-        embed.setURL(link);
-      }
 
       embed.setFooter({ text: 'SkinVaults • Website Update' });
 
@@ -1303,7 +1316,38 @@ client.on('interactionCreate', async (interaction) => {
         const data = await response.json();
 
         if (response.ok) {
-          await interaction.editReply({ content: `🎉 You spun the wheel and won **${data.reward}** credits! Your new balance is **${data.newBalance.toLocaleString()}** credits.` });
+          const reward = Number(data?.reward);
+          const apiBalance = Number(data?.newBalance);
+
+          let balance = Number.isFinite(apiBalance) ? apiBalance : NaN;
+          try {
+            const balRes = await fetch(`${API_BASE_URL}/api/credits/balance?steamId=${encodeURIComponent(steamId)}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${API_TOKEN}`,
+                }
+              }
+            );
+            const balData = await balRes.json().catch(() => null);
+            const b = Number(balData?.balance);
+            if (balRes.ok && Number.isFinite(b)) {
+              balance = b;
+            }
+          } catch {
+            // ignore; fall back to apiBalance
+          }
+
+          if (!Number.isFinite(balance)) {
+            balance = 0;
+          }
+
+          if (Number.isFinite(apiBalance) && Number.isFinite(balance) && apiBalance !== balance) {
+            log(`⚠️ spins balance mismatch for ${steamId}: spins.newBalance=${apiBalance} credits/balance=${balance}`);
+          }
+
+          const rewardText = Number.isFinite(reward) ? reward.toLocaleString() : String(data?.reward || 0);
+          const balanceText = Number.isFinite(balance) ? balance.toLocaleString() : '0';
+          await interaction.editReply({ content: `🎉 You spun the wheel and won **${rewardText}** credits! Your new balance is **${balanceText}** credits.` });
         } else {
           if (data.error === 'Already spun today') {
             const statusRes = await fetch(`${API_BASE_URL}/api/spins?steamId=${encodeURIComponent(steamId)}`,

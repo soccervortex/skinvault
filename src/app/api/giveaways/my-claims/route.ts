@@ -11,6 +11,7 @@ type GiveawayDoc = {
   title?: string;
   prize?: string;
   prizeItem?: { id?: string; name?: string; market_hash_name?: string; marketHashName?: string; image?: string | null };
+  claimMode?: string;
   archivedAt?: Date;
 };
 
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
           winners: {
             $elemMatch: {
               steamId,
-              claimStatus: 'pending',
+              claimStatus: { $in: ['pending', 'pending_trade', 'manual_pending', 'manual_contacted', 'manual_awaiting_user', 'manual_sent'] },
               claimDeadlineAt: { $gt: now },
             },
           },
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
     const giveaways = giveawayIds.length
       ? await giveawaysCol
           .find({ _id: { $in: giveawayIds }, archivedAt: { $exists: false } } as any, {
-            projection: { _id: 1, title: 1, prize: 1, prizeItem: 1, archivedAt: 1 },
+            projection: { _id: 1, title: 1, prize: 1, prizeItem: 1, claimMode: 1, archivedAt: 1 },
           })
           .toArray()
       : [];
@@ -150,12 +151,13 @@ export async function GET(req: NextRequest) {
           giveawayId: id,
           title: String(g?.title || ''),
           prize: String(g?.prize || ''),
+          claimMode: String((g as any)?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot',
           prizeItem: g?.prizeItem
             ? {
                 id: String(g.prizeItem?.id || ''),
                 name: String(g.prizeItem?.name || ''),
                 market_hash_name: String(g.prizeItem?.market_hash_name || g.prizeItem?.marketHashName || ''),
-                image: g.prizeItem?.image ? String(g.prizeItem.image) : null,
+                image: g?.prizeItem?.image ? String(g.prizeItem.image) : null,
               }
             : null,
           entries: Number(mine.entries || 0),

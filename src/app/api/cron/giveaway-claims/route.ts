@@ -25,6 +25,10 @@ function isValidTradeUrl(raw: string): boolean {
 
 type EntryRow = { steamId: string; entries: number };
 
+function isOpenClaimStatus(st: string): boolean {
+  return st === 'pending' || st === 'pending_trade' || st === 'manual_pending' || st === 'manual_contacted' || st === 'manual_awaiting_user' || st === 'manual_sent';
+}
+
 function pickOneWeighted(pool: EntryRow[]): EntryRow | null {
   const normalized = pool
     .map((e) => ({ steamId: String(e.steamId || ''), entries: Math.max(0, Math.floor(Number(e.entries || 0))) }))
@@ -69,7 +73,7 @@ export async function GET(req: NextRequest) {
     const reminderCutoff = new Date(now.getTime() + reminderWindowMinutes * 60 * 1000);
 
     const docs: any[] = await winnersCol
-      .find({ winners: { $elemMatch: { claimStatus: 'pending', claimDeadlineAt: { $lte: reminderCutoff } } } } as any)
+      .find({ winners: { $elemMatch: { claimStatus: { $in: ['pending', 'manual_pending', 'manual_contacted', 'manual_awaiting_user', 'manual_sent'] }, claimDeadlineAt: { $lte: reminderCutoff } } } } as any)
       .sort({ pickedAt: 1 })
       .limit(limit)
       .toArray();
@@ -97,7 +101,7 @@ export async function GET(req: NextRequest) {
         const deadlineMs = w?.claimDeadlineAt ? new Date(w.claimDeadlineAt).getTime() : NaN;
 
         if (
-          st === 'pending' &&
+          (st === 'pending' || st === 'manual_pending' || st === 'manual_contacted' || st === 'manual_awaiting_user' || st === 'manual_sent') &&
           Number.isFinite(deadlineMs) &&
           deadlineMs > now.getTime() &&
           deadlineMs <= reminderCutoff.getTime() &&
@@ -123,7 +127,7 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        if (st === 'pending' && Number.isFinite(deadlineMs) && deadlineMs <= now.getTime()) {
+        if (isOpenClaimStatus(st) && Number.isFinite(deadlineMs) && deadlineMs <= now.getTime()) {
           const forfeitedSteamId = String(w?.steamId || '').trim();
           w.claimStatus = 'forfeited';
           w.forfeitedAt = now;
@@ -234,7 +238,7 @@ export async function GET(req: NextRequest) {
 
       const anyActive = winners.some((w) => {
         const st = String(w?.claimStatus || '');
-        return st === 'pending' || st === 'pending_trade';
+        return isOpenClaimStatus(st);
       });
       if (!anyActive) {
         let oid: ObjectId | null = null;

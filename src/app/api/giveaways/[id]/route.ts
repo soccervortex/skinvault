@@ -35,6 +35,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
           title: String(doc.title || ''),
           description: String(doc.description || ''),
           prize: String(doc.prize || ''),
+          claimMode: String((doc as any)?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot',
           prizeItem: doc.prizeItem
             ? {
                 id: String(doc.prizeItem?.id || ''),

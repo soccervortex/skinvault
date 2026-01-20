@@ -232,7 +232,24 @@ export async function POST(req: NextRequest) {
   );
 
   const updatedDoc = (updated as any)?.value ?? null;
-  const newBalance = Number(updatedDoc?.balance || 0);
+  let newBalance = Number(updatedDoc?.balance);
+  if (!Number.isFinite(newBalance)) {
+    try {
+      const reread = await creditsCol.findOne({ _id: steamId } as any, { projection: { balance: 1 } } as any);
+      newBalance = Number((reread as any)?.balance);
+    } catch {
+      newBalance = NaN;
+    }
+  }
+  if (!Number.isFinite(newBalance)) {
+    console.warn('[spins] newBalance missing after update', {
+      steamId,
+      reward,
+      gotValue: !!updatedDoc,
+      balanceType: typeof (updatedDoc as any)?.balance,
+    });
+    newBalance = 0;
+  }
 
   await ledgerCol.insertOne({
     steamId,

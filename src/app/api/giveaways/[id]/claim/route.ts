@@ -56,6 +56,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const assetAppId = Math.max(1, Math.floor(Number(process.env.STEAM_APP_ID || 730)));
     const assetContextId = String(process.env.STEAM_CONTEXT_ID || '2').trim() || '2';
 
+    const giveawayModeDoc: any = await giveawaysCol.findOne({ _id: giveawayId } as any, { projection: { claimMode: 1 } } as any);
+    const claimMode = String(giveawayModeDoc?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot';
+    if (claimMode === 'manual') {
+      return NextResponse.json({ error: 'This giveaway requires manual claim submission.' }, { status: 400 });
+    }
+
     const settings: any = await settingsCol.findOne({ _id: steamId } as any, { projection: { tradeUrl: 1 } });
     const tradeUrl = String(settings?.tradeUrl || '').trim();
     if (!isValidTradeUrl(tradeUrl)) {

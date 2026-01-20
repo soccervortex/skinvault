@@ -11,6 +11,7 @@ type GiveawayAdminRow = {
   title: string;
   description?: string;
   prize: string;
+  claimMode: 'bot' | 'manual';
   prizeItem?: { id: string; name: string; market_hash_name: string; image: string | null } | null;
   startAt: string | null;
   endAt: string | null;
@@ -73,6 +74,21 @@ type GiveawayClaimRow = {
   completedAt: string | null;
 };
 
+type ManualClaimRow = {
+  id: string;
+  giveawayId: string;
+  steamId: string;
+  discordUsername: string;
+  discordId: string | null;
+  discordProfileUrl: string | null;
+  email: string | null;
+  status: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  webhookSentAt: string | null;
+  lastWebhookError: string | null;
+};
+
 function toLocalInputValue(d: Date): string {
   const dt = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return dt.toISOString().slice(0, 16);
@@ -116,6 +132,7 @@ export default function AdminGiveawaysPage() {
   const [creditsPerEntry, setCreditsPerEntry] = useState(10);
   const [suggestedCreditsPerEntry, setSuggestedCreditsPerEntry] = useState<number | null>(null);
   const [winnerCount, setWinnerCount] = useState(1);
+  const [claimMode, setClaimMode] = useState<'bot' | 'manual'>('bot');
 
   const applyPreset = (preset: 'day' | 'week' | 'month' | 'year') => {
     const start = new Date();
@@ -126,6 +143,45 @@ export default function AdminGiveawaysPage() {
     if (preset === 'year') end.setFullYear(end.getFullYear() + 1);
     setStartAt(toLocalInputValue(start));
     setEndAt(toLocalInputValue(end));
+  };
+
+  const loadManualClaims = async (id: string) => {
+    setManualClaimsLoading(true);
+    setSelectedId(id);
+    setSelectedPanel('manualClaims');
+    setManualClaims([]);
+    setWinners([]);
+    setEntrants([]);
+    setStockRows([]);
+    setClaims([]);
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}/manual-claims`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to load manual claims');
+      setManualClaims(Array.isArray(json?.claims) ? json.claims : []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load manual claims');
+      setManualClaims([]);
+    } finally {
+      setManualClaimsLoading(false);
+    }
+  };
+
+  const setManualClaimStatus = async (giveawayId: string, claimId: string, status: string) => {
+    if (!giveawayId || !claimId) return;
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(giveawayId)}/manual-claims`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId, status }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to update manual claim');
+      toast.success('Updated');
+      await loadManualClaims(giveawayId);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update manual claim');
+    }
   };
 
   const loadStock = async (id: string) => {
@@ -221,7 +277,7 @@ export default function AdminGiveawaysPage() {
   };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedPanel, setSelectedPanel] = useState<'winners' | 'entrants' | 'stock' | 'claims' | null>(null);
+  const [selectedPanel, setSelectedPanel] = useState<'winners' | 'entrants' | 'stock' | 'claims' | 'manualClaims' | null>(null);
   const [winnersLoading, setWinnersLoading] = useState(false);
   const [winners, setWinners] = useState<
     Array<{
@@ -244,6 +300,9 @@ export default function AdminGiveawaysPage() {
 
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claims, setClaims] = useState<GiveawayClaimRow[]>([]);
+
+  const [manualClaimsLoading, setManualClaimsLoading] = useState(false);
+  const [manualClaims, setManualClaims] = useState<ManualClaimRow[]>([]);
 
   useEffect(() => {
     try {
@@ -364,6 +423,7 @@ export default function AdminGiveawaysPage() {
         endAt: new Date(endAt).toISOString(),
         creditsPerEntry,
         winnerCount,
+        claimMode,
       };
 
       if (editingId) {
@@ -396,6 +456,7 @@ export default function AdminGiveawaysPage() {
       setEndAt('');
       setCreditsPerEntry(10);
       setWinnerCount(1);
+      setClaimMode('bot');
       await load();
     } catch (e: any) {
       toast.error(e?.message || (editingId ? 'Failed to update' : 'Failed to create'));
@@ -429,6 +490,7 @@ export default function AdminGiveawaysPage() {
     setCreditsPerEntry(Number(g.creditsPerEntry || 10));
     setSuggestedCreditsPerEntry(null);
     setWinnerCount(Number(g.winnerCount || 1));
+    setClaimMode(String((g as any)?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot');
   };
 
   const cancelEdit = () => {
@@ -443,6 +505,24 @@ export default function AdminGiveawaysPage() {
     setCreditsPerEntry(10);
     setSuggestedCreditsPerEntry(null);
     setWinnerCount(1);
+    setClaimMode('bot');
+  };
+
+  const setGiveawayClaimMode = async (id: string, mode: 'bot' | 'manual') => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/admin/giveaways/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimMode: mode }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Updated claim mode');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update claim mode');
+    }
   };
 
   const deleteGiveaway = async (id: string) => {
@@ -620,6 +700,10 @@ export default function AdminGiveawaysPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black" />
+              <select value={claimMode} onChange={(e) => setClaimMode(e.target.value === 'manual' ? 'manual' : 'bot')} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 md:py-3 text-[11px] font-black">
+                <option value="bot">Claim Mode: Bot</option>
+                <option value="manual">Claim Mode: Manual</option>
+              </select>
               <input
                 value={prizeSearch}
                 onChange={(e) => setPrizeSearch(e.target.value)}
@@ -726,6 +810,12 @@ export default function AdminGiveawaysPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
                         <button
+                          onClick={() => setGiveawayClaimMode(g.id, String((g as any)?.claimMode || 'bot') === 'manual' ? 'bot' : 'manual')}
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
+                        >
+                          {String((g as any)?.claimMode || 'bot') === 'manual' ? 'Manual' : 'Bot'}
+                        </button>
+                        <button
                           onClick={() => beginEdit(g)}
                           disabled={!!g.drawnAt}
                           className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${g.drawnAt ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
@@ -760,6 +850,13 @@ export default function AdminGiveawaysPage() {
                           {(claimsLoading && selectedId === g.id) ? 'Loading...' : 'Claims'}
                         </button>
                         <button
+                          onClick={() => loadManualClaims(g.id)}
+                          disabled={manualClaimsLoading && selectedId === g.id}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(manualClaimsLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                        >
+                          {(manualClaimsLoading && selectedId === g.id) ? 'Loading...' : 'Manual Claims'}
+                        </button>
+                        <button
                           onClick={() => loadWinners(g.id, !g.drawnAt)}
                           disabled={winnersLoading && selectedId === g.id}
                           className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(winnersLoading && selectedId === g.id) ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
@@ -791,6 +888,10 @@ export default function AdminGiveawaysPage() {
 
                     {selectedId === g.id && selectedPanel === 'claims' && claimsLoading && (
                       <div className="mt-4 text-gray-500 text-[11px]">Loading claims...</div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'manualClaims' && manualClaimsLoading && (
+                      <div className="mt-4 text-gray-500 text-[11px]">Loading manual claims...</div>
                     )}
 
                     {selectedId === g.id && selectedPanel === 'winners' && !winnersLoading && (
@@ -964,6 +1065,59 @@ export default function AdminGiveawaysPage() {
                                       <Copy size={14} className="text-gray-300" />
                                     </button>
                                   ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedId === g.id && selectedPanel === 'manualClaims' && !manualClaimsLoading && (
+                      <div className="mt-4 bg-[#11141d] border border-white/5 rounded-[1.5rem] p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Manual Claims</div>
+                          <button
+                            onClick={() => loadManualClaims(g.id)}
+                            className="text-[10px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-300"
+                          >
+                            Refresh
+                          </button>
+                        </div>
+
+                        {manualClaims.length === 0 ? (
+                          <div className="text-gray-500 text-[11px]">No manual claims for this giveaway.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {manualClaims.map((c) => (
+                              <div key={c.id} className="bg-black/40 border border-white/5 rounded-xl p-3">
+                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] font-black uppercase tracking-widest">{c.steamId}</div>
+                                    <div className="text-[9px] text-gray-500">Status: {String(c.status || '').toUpperCase()}</div>
+                                    <div className="text-[9px] text-gray-500 break-all">Discord: {c.discordUsername}{c.discordId ? ` (${c.discordId})` : ''}</div>
+                                    {c.discordProfileUrl ? (
+                                      <a href={c.discordProfileUrl} target="_blank" rel="noreferrer" className="text-[9px] text-blue-400 break-all">
+                                        {c.discordProfileUrl}
+                                      </a>
+                                    ) : null}
+                                    {c.email ? <div className="text-[9px] text-gray-500 break-all">Email: {c.email}</div> : null}
+                                    {c.lastWebhookError ? <div className="text-[9px] text-red-400 break-all">{c.lastWebhookError}</div> : null}
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {(['pending', 'contacted', 'awaiting_user', 'sent', 'completed', 'rejected'] as const).map((st) => (
+                                      <button
+                                        key={st}
+                                        onClick={() => setManualClaimStatus(g.id, c.id, st)}
+                                        className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${String(c.status || '') === st ? 'bg-emerald-600 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+                                      >
+                                        {st.replace('_', ' ')}
+                                      </button>
+                                    ))}
+                                    <button onClick={() => copy(c.steamId)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10" aria-label="Copy steam id">
+                                      <Copy size={14} className="text-gray-300" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ))}
