@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { kv } from '@vercel/kv';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { dbGet } from '@/app/utils/database';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 export const runtime = 'nodejs';
@@ -21,16 +21,20 @@ async function resolveDiscordIdByUsername(username: string): Promise<string | nu
   const query = normalizeUsername(username);
   if (!query) return null;
 
-  const connections = (await kv.get<Record<string, any>>('discord_connections')) || {};
-  for (const [, connection] of Object.entries(connections)) {
-    if (!connection?.discordUsername) continue;
-    if (connection.expiresAt && Date.now() > connection.expiresAt) continue;
+  try {
+    const connections = (await dbGet<Record<string, any>>('discord_connections')) || {};
+    for (const [, connection] of Object.entries(connections)) {
+      if (!connection?.discordUsername) continue;
+      if (connection.expiresAt && Date.now() > connection.expiresAt) continue;
 
-    const stored = normalizeUsername(String(connection.discordUsername));
-    if (stored === query || stored.includes(query) || query.includes(stored)) {
-      const did = String(connection.discordId || '').trim();
-      return did || null;
+      const stored = normalizeUsername(String(connection.discordUsername));
+      if (stored === query || stored.includes(query) || query.includes(stored)) {
+        const did = String(connection.discordId || '').trim();
+        return did || null;
+      }
     }
+  } catch {
+    return null;
   }
 
   return null;

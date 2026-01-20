@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { dbGet } from '@/app/utils/database';
 
 // Find Discord connection by username (searches through all connections)
 export async function GET(request: Request) {
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     }
 
     const discordConnectionsKey = 'discord_connections';
-    const connections = await kv.get<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = (await dbGet<Record<string, any>>(discordConnectionsKey)) || {};
     
     // Normalize search query (remove discriminator if present, lowercase, trim)
     const normalizedQuery = username.split('#')[0].toLowerCase().trim().replace(/\s+/g, '');
