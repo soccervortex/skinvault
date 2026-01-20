@@ -21,6 +21,9 @@ User-agent: yahoo-blogs/v3.9
 Disallow: /admin
 Disallow: /api/
 Disallow: /payment/
+Disallow: /chat
+Disallow: /notifications
+Disallow: /fix-purchase
 
 # Explicitly Allow AI/LLM Crawlers
 User-agent: GPTBot
@@ -37,26 +40,18 @@ Allow: /
 # General Rules for All Other Bots
 User-agent: *
 Allow: /
-Allow: /inventory
-Allow: /wishlist
-Allow: /pro
-Allow: /compare
-Allow: /item/
-Allow: /shop
-Allow: /contact
-Allow: /faq
-Allow: /privacy
-Allow: /terms
-Allow: /reviews
 Disallow: /admin
 Disallow: /api/
 Disallow: /payment/
+Disallow: /chat
+Disallow: /notifications
+Disallow: /fix-purchase
 
 # Crawl delay to prevent server overload
 Crawl-delay: 1
 
 # Sitemap and AI Documentation
-Sitemap: https://skinvaults.online/sitemap.xml
+Sitemap: https://www.skinvaults.online/sitemap.xml
 # AI crawlers should read this file for site understanding
 # Reference: https://llmstxt.org/
 # Location: https://skinvaults.online/llms.txt

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbGet, dbSet, dbDelete } from '@/app/utils/database';
 import { submitItemToIndexNow } from '@/app/utils/indexnow';
+import { submitItemToGoogleIndexing } from '@/app/utils/google-indexing';
 
 // Get all custom items
 export async function GET(request: Request) {
@@ -95,6 +96,15 @@ export async function POST(request: Request) {
       console.error('Failed to submit item to IndexNow:', error);
       // Don't throw - IndexNow is non-critical
     });
+
+    // Submit to Google Indexing API (if configured)
+    // Fire and forget - don't block the response if Google indexing fails
+    const googleEnabled = String(process.env.GOOGLE_INDEXING_ENABLED || '').toLowerCase() === 'true';
+    if (googleEnabled) {
+      submitItemToGoogleIndexing(id).catch((error) => {
+        console.error('Failed to submit item to Google Indexing:', error);
+      });
+    }
 
     return NextResponse.json({ success: true, item: customItem });
   } catch (error) {

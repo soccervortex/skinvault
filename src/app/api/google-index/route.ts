@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { submitUrlsToGoogleIndexing } from '@/app/utils/google-indexing';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online';
-const GOOGLE_INDEXING_API_URL = 'https://indexing.googleapis.com/v3/urlNotifications:publish';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
+
+function isAuthorized(request: NextRequest): boolean {
+  const secret = String(process.env.GOOGLE_INDEXING_SECRET || '').trim();
+  if (!secret) return false;
+  const auth = request.headers.get('authorization') || '';
+  return auth === `Bearer ${secret}`;
+}
 
 /**
  * POST /api/google-index
@@ -14,8 +21,12 @@ const GOOGLE_INDEXING_API_URL = 'https://indexing.googleapis.com/v3/urlNotificat
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!isAuthorized(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
-    const { urls } = body;
+    const { urls, type } = body as { urls?: string[]; type?: 'URL_UPDATED' | 'URL_DELETED' };
 
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
@@ -42,22 +53,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Note: Google Indexing API requires OAuth 2.0 authentication
-    // This endpoint provides the structure, but you need to:
-    // 1. Set up Google Cloud Project
-    // 2. Enable Indexing API
-    // 3. Create Service Account
-    // 4. Add service account email to Google Search Console
-    // 5. Get OAuth token
-    
+    const result = await submitUrlsToGoogleIndexing({ urls: validUrls, type: type || 'URL_UPDATED' });
+
     return NextResponse.json({
-      success: true,
-      message: 'Google Indexing API requires OAuth setup. Use Google Search Console for manual submission.',
-      urls: validUrls,
-      instructions: {
-        manual: 'Go to https://search.google.com/search-console and use "URL Inspection" tool to request indexing',
-        api: 'Set up Google Cloud Project and OAuth 2.0 credentials to use this API endpoint',
-      },
+      success: result.enabled && result.failed === 0,
+      enabled: result.enabled,
+      submitted: result.submitted,
+      failed: result.failed,
+      results: result.results,
+      note: result.enabled
+        ? undefined
+        : 'Google indexing is disabled. Set GOOGLE_INDEXING_ENABLED=true and required service account env vars.',
     });
   } catch (error) {
     console.error('Google indexing error:', error);
@@ -90,7 +96,7 @@ export async function GET() {
         note: 'Submit your sitemap in Google Search Console under "Sitemaps" section',
       },
       api: {
-        note: 'To use the API endpoint, set up Google Cloud Project with Indexing API enabled',
+        note: 'This endpoint supports Google Indexing API via a service account (JWT). Set env vars and call POST with Authorization Bearer secret.',
         documentation: 'https://developers.google.com/search/apis/indexing-api/v3/using-api',
       },
     },

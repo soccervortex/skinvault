@@ -3,9 +3,19 @@ import { MetadataRoute } from 'next';
 export default function robots(): MetadataRoute.Robots {
   // Get base URL from environment variable or use default
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://skinvaults.online');
+                 (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.skinvaults.online');
 
-  const commonDisallows = ['/admin', '/api/', '/payment/', '/chat', '/cgi-bin/', '/_next/static/', '/_next/image', '/_next/private/'];
+  // Don't block Next.js assets (/_next/*) or public static files; crawlers often need them to render pages.
+  // Focus on keeping private/app-only routes out of the index.
+  const commonDisallows = [
+    '/admin',
+    '/api/',
+    '/payment/',
+    '/chat',
+    '/notifications',
+    '/fix-purchase',
+    '/cgi-bin/',
+  ];
 
   return {
     rules: [
@@ -31,10 +41,7 @@ export default function robots(): MetadataRoute.Robots {
       // 3. General rules for all other bots (*)
       {
         userAgent: '*',
-        allow: [
-          '/', '/inventory', '/wishlist', '/pro', '/compare', 
-          '/item/', '/shop', '/contact', '/faq', '/privacy', '/terms', '/reviews'
-        ],
+        allow: '/',
         disallow: commonDisallows,
         crawlDelay: 1,
       },
