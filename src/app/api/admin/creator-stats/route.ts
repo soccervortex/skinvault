@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { getAllProUsers } from '@/app/utils/pro-storage';
 import { dbGet } from '@/app/utils/database';
 import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
+import { isOwner } from '@/app/utils/owner-ids';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { CREATORS, type CreatorProfile } from '@/data/creators';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -410,13 +413,17 @@ async function computeWindow(
   return result;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const adminKey = request.headers.get(ADMIN_HEADER);
     const expected = process.env.ADMIN_PRO_TOKEN;
     if (expected && adminKey !== expected) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const requesterSteamId = getSteamIdFromRequest(request);
+    if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isOwner(requesterSteamId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');

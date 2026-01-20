@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -153,7 +153,7 @@ export default function AffiliateStatsAdminPage() {
     window.history.replaceState(null, '', next);
   }, [userLoaded, userIsOwner, rangeDays, metric]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -180,14 +180,13 @@ export default function AffiliateStatsAdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [rangeDays]);
 
   useEffect(() => {
     if (!userLoaded) return;
     if (!userIsOwner) return;
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLoaded, userIsOwner, rangeDays]);
+  }, [userLoaded, userIsOwner, load]);
 
   const series = useMemo(() => {
     const rows = Array.isArray(data?.series?.data) ? (data!.series!.data as SeriesPoint[]) : [];
@@ -376,7 +375,11 @@ export default function AffiliateStatsAdminPage() {
                         <tbody>
                           {leaderboard.map((r) => (
                             <tr key={r.steamId} className="border-t border-white/5">
-                              <td className="py-3 pr-4 text-[11px] font-black text-gray-300">{r.steamId}</td>
+                              <td className="py-3 pr-4 text-[11px] font-black text-gray-300">
+                                <Link href={`/admin/affiliate-stats/${encodeURIComponent(r.steamId)}`} className="hover:text-white">
+                                  {r.steamId}
+                                </Link>
+                              </td>
                               <td className="py-3 pr-4 text-[11px] font-black">{r.referrals}</td>
                               <td className="py-3 pr-4 text-[11px] font-black">{r.claims}</td>
                               <td className="py-3 pr-4 text-[11px] font-black">{r.creditsGranted}</td>

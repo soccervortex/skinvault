@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { isOwner } from '@/app/utils/owner-ids';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -322,13 +325,17 @@ async function computeTotals(db: any) {
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const adminKey = request.headers.get(ADMIN_HEADER);
     const expected = process.env.ADMIN_PRO_TOKEN;
     if (expected && adminKey !== expected) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const requesterSteamId = getSteamIdFromRequest(request);
+    if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isOwner(requesterSteamId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 400 });
