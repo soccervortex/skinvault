@@ -15,6 +15,15 @@ type DailySpinDoc = {
   count?: number;
 };
 
+type BonusSpinDoc = {
+  _id: string; // composite key: steamId_day
+  steamId: string;
+  day: string;
+  createdAt: Date;
+  updatedAt?: Date;
+  count?: number;
+};
+
 type SpinHistoryDoc = {
   steamId: string;
   reward: number;
@@ -118,7 +127,7 @@ function usedCountFromDoc(doc: DailySpinDoc | null): number {
 }
 
 function retentionCutoff(now: Date): Date {
-  return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 }
 
 // --- API Handlers ---
@@ -132,6 +141,7 @@ export async function GET(req: NextRequest) {
 
   const db = await getDatabase();
   const spinsCol = db.collection<DailySpinDoc>('daily_spins');
+  const bonusCol = db.collection<BonusSpinDoc>('bonus_spins');
   const { role, dailyLimit } = await getRoleAndLimit(steamId);
   const now = new Date();
   const today = dayKeyUtc(now);
@@ -150,7 +160,10 @@ export async function GET(req: NextRequest) {
 
   const doc = await spinsCol.findOne({ _id: spinKey });
   const usedSpins = usedCountFromDoc(doc);
-  const remainingSpins = Math.max(0, dailyLimit - usedSpins);
+  const bonusDoc = await bonusCol.findOne({ _id: spinKey } as any);
+  const bonusCount = Number((bonusDoc as any)?.count);
+  const bonusSpins = Number.isFinite(bonusCount) ? Math.max(0, Math.floor(bonusCount)) : 0;
+  const remainingSpins = Math.max(0, dailyLimit + bonusSpins - usedSpins);
   const canSpin = remainingSpins > 0;
 
   return NextResponse.json({
@@ -173,6 +186,7 @@ export async function POST(req: NextRequest) {
 
   const db = await getDatabase();
   const spinsCol = db.collection<DailySpinDoc>('daily_spins');
+  const bonusCol = db.collection<BonusSpinDoc>('bonus_spins');
   const creditsCol = db.collection<UserCreditsDoc>('user_credits');
   const historyCol = db.collection<SpinHistoryDoc>('spin_history');
   const ledgerCol = db.collection<CreditsLedgerDoc>('credits_ledger');
@@ -182,12 +196,16 @@ export async function POST(req: NextRequest) {
   const spinKey = `${steamId}_${today}`;
 
   if (dailyLimit !== null) {
+    const bonusDoc = await bonusCol.findOne({ _id: spinKey } as any);
+    const bonusCount = Number((bonusDoc as any)?.count);
+    const bonusSpins = Number.isFinite(bonusCount) ? Math.max(0, Math.floor(bonusCount)) : 0;
+
     const existing = await spinsCol.findOne({ _id: spinKey });
     const used = usedCountFromDoc(existing);
-    if (used >= dailyLimit) {
+    if (used >= dailyLimit + bonusSpins) {
       return NextResponse.json({
         error: 'Spin limit reached',
-        dailyLimit,
+        dailyLimit: dailyLimit + bonusSpins,
         usedSpins: used,
         remainingSpins: 0,
         nextEligibleAt: nextMidnightUtc(now).toISOString(),
