@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     const receiptPatch = await getReceiptPatch(stripe, session);
 
     // Check if payment was successful
-    if (session.payment_status !== 'paid') {
+    if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
       return NextResponse.json({ 
         error: 'Payment not completed',
         paymentStatus: session.payment_status 

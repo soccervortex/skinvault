@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { sanitizeEmail } from '@/app/utils/sanitize';
+import { isOwner } from '@/app/utils/owner-ids';
+import { getOwnerFreeCouponId } from '@/app/utils/stripe-owner-discount';
+import type { NextRequest } from 'next/server';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -33,7 +37,7 @@ const PRICES: Record<string, { amount: number; months: number }> = {
   '6months': { amount: 4499, months: 6 }, // €44.99 in cents
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripeInstance();
     const { plan, steamId, promoCode, email } = await request.json();
@@ -79,6 +83,15 @@ export async function POST(request: Request) {
       // Ignore
     }
 
+    const sessionSteamId = getSteamIdFromRequest(request as any as NextRequest);
+    const ownerDiscountEligible = isOwner(steamId) && sessionSteamId === steamId;
+    let ownerDiscountApplied = false;
+    let ownerCouponId: string | null = null;
+    if (ownerDiscountEligible) {
+      ownerCouponId = await getOwnerFreeCouponId(stripe, testMode);
+      if (ownerCouponId) ownerDiscountApplied = true;
+    }
+
     // Set expiration to 30 minutes from now (minimum allowed by Stripe is 30 minutes)
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60); // 30 minutes in seconds
 
@@ -106,9 +119,12 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
+      payment_method_collection: 'if_required',
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
+      allow_promotion_codes: true,
+      discounts: ownerDiscountApplied && ownerCouponId ? [{ coupon: ownerCouponId }] : undefined,
       payment_intent_data: {
         receipt_email: customerEmail,
         metadata: {
@@ -118,7 +134,8 @@ export async function POST(request: Request) {
           plan,
           promoCode: promoCode || '',
           originalAmount: priceInfo.amount.toString(),
-          discountAmount: discountAmount.toString(),
+          discountAmount: ownerDiscountApplied ? priceInfo.amount.toString() : discountAmount.toString(),
+          ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
           testMode: testMode ? 'true' : 'false',
         },
       },
@@ -132,7 +149,8 @@ export async function POST(request: Request) {
         plan,
         promoCode: promoCode || '',
         originalAmount: priceInfo.amount.toString(),
-        discountAmount: discountAmount.toString(),
+        discountAmount: ownerDiscountApplied ? priceInfo.amount.toString() : discountAmount.toString(),
+        ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
         testMode: testMode ? 'true' : 'false',
       },
     });

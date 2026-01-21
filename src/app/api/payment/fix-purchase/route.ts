@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const stripe = await getStripeInstance();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-    if (session.payment_status !== 'paid') {
+    if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
       return NextResponse.json({ 
         error: 'Payment not completed',
         paymentStatus: session.payment_status 

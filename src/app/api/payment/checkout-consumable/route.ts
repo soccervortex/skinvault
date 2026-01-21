@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { sanitizeEmail } from '@/app/utils/sanitize';
+import { isOwner } from '@/app/utils/owner-ids';
+import { getOwnerFreeCouponId } from '@/app/utils/stripe-owner-discount';
+import type { NextRequest } from 'next/server';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -36,7 +40,7 @@ const CONSUMABLE_PRICES: Record<string, number> = {
   'cache_boost': 199, // €1.99 - Longer price cache duration for free users
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripeInstance();
     const { type, quantity, steamId, email } = await request.json();
@@ -105,6 +109,15 @@ export async function POST(request: Request) {
       ? `[TEST MODE] ${consumableDescriptions[type] || `Add ${quantity} ${consumableNames[type]}${quantity > 1 ? 's' : ''} to your account`}. Permanent and never expires.`
       : `${consumableDescriptions[type] || `Add ${quantity} ${consumableNames[type]}${quantity > 1 ? 's' : ''} to your account`}. Permanent and never expires.`;
 
+    const sessionSteamId = getSteamIdFromRequest(request);
+    const owner = isOwner(steamId) && sessionSteamId === steamId;
+    let ownerDiscountApplied = false;
+    let ownerCouponId: string | null = null;
+    if (owner) {
+      ownerCouponId = await getOwnerFreeCouponId(stripe, testMode);
+      if (ownerCouponId) ownerDiscountApplied = true;
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -121,9 +134,12 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
+      payment_method_collection: 'if_required',
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
+      allow_promotion_codes: true,
+      discounts: ownerDiscountApplied && ownerCouponId ? [{ coupon: ownerCouponId }] : undefined,
       payment_intent_data: {
         receipt_email: customerEmail,
         metadata: {
@@ -133,6 +149,7 @@ export async function POST(request: Request) {
           quantity: quantity.toString(),
           unitPrice: unitPrice.toString(),
           totalAmount: totalAmount.toString(),
+          ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
           testMode: testMode ? 'true' : 'false',
         },
       },

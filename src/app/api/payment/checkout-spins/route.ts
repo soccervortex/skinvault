@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { sanitizeEmail } from '@/app/utils/sanitize';
+import { isOwner } from '@/app/utils/owner-ids';
+import { getOwnerFreeCouponId } from '@/app/utils/stripe-owner-discount';
+import type { NextRequest } from 'next/server';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 async function getStripeInstance(): Promise<Stripe> {
   let testMode = false;
@@ -37,7 +41,7 @@ const SPIN_PACKS: Record<string, SpinPack> = {
   whale: { spins: 300, amount: 4999, label: 'Whale Pack' },
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripeInstance();
     const { pack, steamId, email } = await request.json();
@@ -79,6 +83,15 @@ export async function POST(request: Request) {
       ? `[TEST MODE] Add ${info.spins} bonus spins to your SkinVaults account.`
       : `Add ${info.spins} bonus spins to your SkinVaults account.`;
 
+    const sessionSteamId = getSteamIdFromRequest(request);
+    const owner = isOwner(steamId) && sessionSteamId === steamId;
+    let ownerDiscountApplied = false;
+    let ownerCouponId: string | null = null;
+    if (owner) {
+      ownerCouponId = await getOwnerFreeCouponId(stripe, testMode);
+      if (ownerCouponId) ownerDiscountApplied = true;
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -95,9 +108,12 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
+      payment_method_collection: 'if_required',
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
+      allow_promotion_codes: true,
+      discounts: ownerDiscountApplied && ownerCouponId ? [{ coupon: ownerCouponId }] : undefined,
       payment_intent_data: {
         receipt_email: customerEmail,
         metadata: {
@@ -105,6 +121,7 @@ export async function POST(request: Request) {
           type: 'spins',
           pack: packId,
           spins: info.spins.toString(),
+          ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
           testMode: testMode ? 'true' : 'false',
         },
       },
