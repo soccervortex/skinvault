@@ -152,8 +152,15 @@ export default function SpinPage() {
     setShowSpinner(false);
     setSpinReward(null);
     setCanSpin(false);
-    // Refetch eligibility to get the next eligible time
-    fetch('/api/spins').then(res => res.json()).then(data => setNextEligibleAt(data.nextEligibleAt));
+    // Refetch eligibility to get the next eligible time (and allow bonus spins)
+    fetch('/api/spins', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        setCanSpin(!!data?.canSpin);
+        setNextEligibleAt(data?.nextEligibleAt || null);
+      })
+      .catch(() => {
+      });
     fetch('/api/spins/history?days=30&limit=15', { cache: 'no-store' })
       .then(res => res.json())
       .then((j) => {
