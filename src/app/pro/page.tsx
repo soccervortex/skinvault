@@ -11,6 +11,7 @@ export default function ProInfoPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [freeMonthEligible, setFreeMonthEligible] = useState(false);
   const [claimingFreeMonth, setClaimingFreeMonth] = useState(false);
+  const [checkoutEmail, setCheckoutEmail] = useState('');
   const toast = useToast();
 
   useEffect(() => {
@@ -24,6 +25,12 @@ export default function ProInfoPage() {
       const stored = window.localStorage.getItem('steam_user');
       const parsedUser = stored ? JSON.parse(stored) : null;
       setUser(parsedUser);
+
+      try {
+        const storedEmail = window.localStorage.getItem('sv_checkout_email');
+        if (storedEmail) setCheckoutEmail(String(storedEmail));
+      } catch {
+      }
       
       // Check if eligible for free month (only if not Pro)
       const userIsPro = parsedUser?.proUntil && new Date(parsedUser.proUntil) > new Date();
@@ -43,6 +50,14 @@ export default function ProInfoPage() {
       setUser(null);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('sv_checkout_email', String(checkoutEmail || '').trim());
+    } catch {
+    }
+  }, [checkoutEmail]);
 
   const isPro = user?.proUntil && new Date(user.proUntil) > new Date();
 
@@ -93,6 +108,13 @@ export default function ProInfoPage() {
       return;
     }
 
+    const email = String(checkoutEmail || '').trim();
+    if (!email) {
+      toast.error('Please enter your email to receive your receipt.');
+      setLoading(null);
+      return;
+    }
+
     setLoading(plan);
     try {
       // Check if user has claimed any theme gift with promo code reward
@@ -117,7 +139,7 @@ export default function ProInfoPage() {
       const res = await fetch('/api/payment/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, steamId: user.steamId, promoCode }),
+        body: JSON.stringify({ plan, steamId: user.steamId, promoCode, email }),
       });
 
       const data = await res.json();
@@ -342,9 +364,26 @@ export default function ProInfoPage() {
                 </button>
               </div>
             </div>
-            <p className="text-[8px] md:text-[9px] text-gray-500 text-center mt-3 md:mt-4">
-              Secure payment via Stripe. No card details stored on our servers.
-            </p>
+            <p className="text-[10px] md:text-[11px] text-gray-400">
+          Grant or extend <span className="text-emerald-400 font-bold">Pro</span>{" "}
+          for any SteamID64. Pro automatically becomes inactive when the expiry
+          date passes.
+        </p>
+
+        <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5">
+          <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+            Receipt email
+          </p>
+          <input
+            value={checkoutEmail}
+            onChange={(e) => setCheckoutEmail(e.target.value)}
+            placeholder="you@email.com"
+            className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
+          />
+          <p className="mt-2 text-[10px] text-gray-400">
+            We’ll send your receipt/invoice to this email after payment.
+          </p>
+        </div>
           </div>
         )}
 

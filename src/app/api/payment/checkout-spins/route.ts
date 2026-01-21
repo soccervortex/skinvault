@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { sanitizeEmail } from '@/app/utils/sanitize';
 
 async function getStripeInstance(): Promise<Stripe> {
   let testMode = false;
@@ -39,7 +40,12 @@ const SPIN_PACKS: Record<string, SpinPack> = {
 export async function POST(request: Request) {
   try {
     const stripe = await getStripeInstance();
-    const { pack, steamId } = await request.json();
+    const { pack, steamId, email } = await request.json();
+
+    const customerEmail = sanitizeEmail(String(email || ''));
+    if (!customerEmail) {
+      return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });
+    }
 
     if (!pack || !SPIN_PACKS[String(pack)]) {
       return NextResponse.json({ error: 'Invalid spins pack' }, { status: 400 });
@@ -90,7 +96,18 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       customer_creation: 'always',
+      customer_email: customerEmail,
       invoice_creation: { enabled: true },
+      payment_intent_data: {
+        receipt_email: customerEmail,
+        metadata: {
+          steamId,
+          type: 'spins',
+          pack: packId,
+          spins: info.spins.toString(),
+          testMode: testMode ? 'true' : 'false',
+        },
+      },
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&type=spins&pack=${encodeURIComponent(packId)}&spins=${info.spins}`,
       cancel_url: `${origin}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: expiresAt,

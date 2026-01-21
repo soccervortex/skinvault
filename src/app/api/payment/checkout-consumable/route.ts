@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { sanitizeEmail } from '@/app/utils/sanitize';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -38,7 +39,12 @@ const CONSUMABLE_PRICES: Record<string, number> = {
 export async function POST(request: Request) {
   try {
     const stripe = await getStripeInstance();
-    const { type, quantity, steamId } = await request.json();
+    const { type, quantity, steamId, email } = await request.json();
+
+    const customerEmail = sanitizeEmail(String(email || ''));
+    if (!customerEmail) {
+      return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });
+    }
 
     if (!type || !CONSUMABLE_PRICES[type]) {
       return NextResponse.json({ error: 'Invalid consumable type' }, { status: 400 });
@@ -116,7 +122,20 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       customer_creation: 'always',
+      customer_email: customerEmail,
       invoice_creation: { enabled: true },
+      payment_intent_data: {
+        receipt_email: customerEmail,
+        metadata: {
+          steamId,
+          type: 'consumable',
+          consumableType: type,
+          quantity: quantity.toString(),
+          unitPrice: unitPrice.toString(),
+          totalAmount: totalAmount.toString(),
+          testMode: testMode ? 'true' : 'false',
+        },
+      },
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&type=consumable&consumableType=${type}&quantity=${quantity}`,
       cancel_url: `${origin}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: expiresAt,

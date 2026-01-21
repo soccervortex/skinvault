@@ -6,7 +6,7 @@ const ADMIN_HEADER = 'x-admin-key';
 
 async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<string, any>) {
   const purchasesKey = 'purchase_history';
-  const purchases = (await dbGet<Array<any>>(purchasesKey)) || [];
+  const purchases = (await dbGet<Array<any>>(purchasesKey, false)) || [];
   let updated = false;
   const next = purchases.map((p) => {
     if (!p || updated) return p;
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     try {
       const purchasesKey = 'purchase_history';
-      let purchases = await dbGet<Array<any>>(purchasesKey) || [];
+      let purchases = await dbGet<Array<any>>(purchasesKey, false) || [];
 
       if (!includeHidden) {
         purchases = purchases.filter((p) => p && p.hidden !== true);
@@ -59,7 +59,9 @@ export async function GET(request: Request) {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
 
-      return NextResponse.json({ purchases: sortedPurchases });
+      const res = NextResponse.json({ purchases: sortedPurchases });
+      res.headers.set('cache-control', 'no-store');
+      return res;
     } catch (error) {
       console.error('Failed to get purchases:', error);
       return NextResponse.json({ error: 'Failed to get purchases' }, { status: 500 });

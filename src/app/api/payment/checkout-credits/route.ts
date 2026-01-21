@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
+import { sanitizeEmail } from '@/app/utils/sanitize';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -44,7 +45,12 @@ const CREDIT_PACKS: Record<string, CreditPack> = {
 export async function POST(request: Request) {
   try {
     const stripe = await getStripeInstance();
-    const { pack, steamId } = await request.json();
+    const { pack, steamId, email } = await request.json();
+
+    const customerEmail = sanitizeEmail(String(email || ''));
+    if (!customerEmail) {
+      return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });
+    }
 
     if (!pack || !CREDIT_PACKS[String(pack)]) {
       return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
@@ -110,7 +116,18 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       customer_creation: 'always',
+      customer_email: customerEmail,
       invoice_creation: { enabled: true },
+      payment_intent_data: {
+        receipt_email: customerEmail,
+        metadata: {
+          steamId,
+          type: 'credits',
+          pack: packId,
+          credits: info.credits.toString(),
+          testMode: testMode ? 'true' : 'false',
+        },
+      },
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&type=credits&pack=${encodeURIComponent(packId)}&credits=${info.credits}`,
       cancel_url: `${origin}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: expiresAt,

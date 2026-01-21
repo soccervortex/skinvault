@@ -363,6 +363,7 @@ export default function AdminPage() {
       try {
         // Load ALL purchases (no steamId filter for admin view)
         const res = await fetch(`/api/admin/purchases`, {
+          cache: 'no-store',
           headers: {
             "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
           },
@@ -406,6 +407,7 @@ export default function AdminPage() {
       try {
         // Load ALL failed purchases (no steamId filter for admin view)
         const res = await fetch(`/api/admin/failed-purchases`, {
+          cache: 'no-store',
           headers: {
             "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
           },
@@ -1574,6 +1576,7 @@ export default function AdminPage() {
                     <th className="py-2 pr-2">Amount</th>
                     <th className="py-2 pr-2">Status</th>
                     <th className="py-2 pr-2">Details</th>
+                    <th className="py-2 pr-2">Receipt</th>
                     <th className="py-2 pr-2">Action</th>
                   </tr>
                 </thead>
@@ -1587,7 +1590,13 @@ export default function AdminPage() {
                         {purchase.steamId}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
-                        {purchase.type === 'pro' ? '👑 Pro' : (purchase.type === 'credits' ? '💳 Credits' : '🎁 Consumable')}
+                        {purchase.type === 'pro'
+                          ? '👑 Pro'
+                          : (purchase.type === 'credits'
+                            ? '💳 Credits'
+                            : (purchase.type === 'spins'
+                              ? '🎡 Spins'
+                              : '🎁 Consumable'))}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.currency === "eur" ? "€" : "$"}
@@ -1640,10 +1649,40 @@ export default function AdminPage() {
                             return 'Credits purchase';
                           }
 
+                          if (t === 'spins') {
+                            const spins = Math.max(0, Math.floor(Number((purchase as any).spins || 0)));
+                            const pack = String(purchase.pack || '').trim();
+                            if (spins > 0 && pack) return `${spins.toLocaleString('en-US')} spins (${pack})`;
+                            if (spins > 0) return `${spins.toLocaleString('en-US')} spins`;
+                            if (pack) return `Spins pack (${pack})`;
+                            return 'Spins purchase';
+                          }
+
                           const quantityRaw = Number(purchase.quantity);
                           const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? Math.floor(quantityRaw) : 1;
                           const item = String(purchase.consumableType || (purchase as any).itemType || 'item');
                           return `${quantity}x ${item}`;
+                        })()}
+                      </td>
+                      <td className="py-2 pr-2">
+                        {(() => {
+                          const href = String(
+                            (purchase as any)?.receiptUrl ||
+                              (purchase as any)?.invoiceUrl ||
+                              (purchase as any)?.invoicePdf ||
+                              ''
+                          ).trim();
+                          if (!href) return null;
+                          return (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-400 hover:text-blue-300 font-black uppercase tracking-widest text-[9px]"
+                            >
+                              Download
+                            </a>
+                          );
                         })()}
                       </td>
                       <td className="py-2 pr-2">

@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const targetSteamId = searchParams.get('steamId'); // Optional filter
 
     const failedKey = 'failed_purchases';
-    let failed = await dbGet<Array<any>>(failedKey) || [];
+    let failed = await dbGet<Array<any>>(failedKey, false) || [];
     
     // Filter by target Steam ID if provided
     if (targetSteamId) {
@@ -29,7 +29,9 @@ export async function GET(request: Request) {
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    return NextResponse.json({ failedPurchases: sorted });
+    const res = NextResponse.json({ failedPurchases: sorted });
+    res.headers.set('cache-control', 'no-store');
+    return res;
   } catch (error) {
     console.error('Failed to get failed purchases:', error);
     return NextResponse.json({ error: 'Failed to get failed purchases' }, { status: 500 });

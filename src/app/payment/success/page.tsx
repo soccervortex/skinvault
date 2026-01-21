@@ -95,6 +95,8 @@ function PaymentSuccessContent() {
               credits: fulfillData.credits,
               spins: fulfillData.spins,
               pack: fulfillData.pack,
+              receiptUrl: fulfillData.receiptUrl,
+              customerEmail: fulfillData.customerEmail,
               invoiceId: fulfillData.invoiceId,
               invoiceUrl: fulfillData.invoiceUrl,
               invoicePdf: fulfillData.invoicePdf,
@@ -249,7 +251,7 @@ function PaymentSuccessContent() {
             Go to My Vault
           </Link>
           {(() => {
-            const href = String(purchaseDetails?.invoiceUrl || purchaseDetails?.invoicePdf || '').trim();
+            const href = String(purchaseDetails?.receiptUrl || purchaseDetails?.invoiceUrl || purchaseDetails?.invoicePdf || '').trim();
             if (!href) return null;
             return (
               <a
@@ -258,7 +260,7 @@ function PaymentSuccessContent() {
                 rel="noreferrer"
                 className="bg-black/40 border border-white/10 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:border-white/20 transition-all"
               >
-                Download Invoice
+                Download Receipt
               </a>
             );
           })()}

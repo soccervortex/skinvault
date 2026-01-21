@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import { sanitizeEmail } from '@/app/utils/sanitize';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -12,7 +13,6 @@ async function getStripeInstance(): Promise<Stripe> {
   } catch (error) {
     // If database fails, use production keys
   }
-
   const secretKey = testMode 
     ? (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY)
     : process.env.STRIPE_SECRET_KEY;
@@ -24,6 +24,44 @@ async function getStripeInstance(): Promise<Stripe> {
   return new Stripe(secretKey, {
     apiVersion: '2025-12-15.clover',
   });
+}
+
+async function getReceiptPatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const out: Record<string, any> = {};
+
+    const sessionEmail = sanitizeEmail(String((session as any)?.customer_details?.email || (session as any)?.customer_email || ''));
+    if (sessionEmail) out.customerEmail = sessionEmail;
+
+    const piId = (session.payment_intent as string) || '';
+    if (!piId) return out;
+
+    const pi = await stripe.paymentIntents.retrieve(piId, { expand: ['latest_charge'] });
+
+    const receiptEmail = sanitizeEmail(String((pi as any)?.receipt_email || ''));
+    if (!out.customerEmail && receiptEmail) out.customerEmail = receiptEmail;
+
+    const latestCharge = (pi as any)?.latest_charge;
+    let charge: Stripe.Charge | null = null;
+    if (typeof latestCharge === 'string' && latestCharge) {
+      charge = await stripe.charges.retrieve(latestCharge);
+    } else if (latestCharge && typeof latestCharge === 'object') {
+      charge = latestCharge as Stripe.Charge;
+    }
+
+    const receiptUrl = String((charge as any)?.receipt_url || '').trim();
+    if (receiptUrl) out.receiptUrl = receiptUrl;
+
+    const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
+    if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
+
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<string, any>) {
@@ -82,6 +120,7 @@ export async function POST(request: Request) {
     // Retrieve the session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     const invoicePatch = await getInvoicePatch(stripe, session);
+    const receiptPatch = await getReceiptPatch(stripe, session);
 
     // Check if payment was successful
     if (session.payment_status !== 'paid') {
@@ -148,6 +187,13 @@ export async function POST(request: Request) {
           } catch {
           }
         }
+
+        if (purchase && Object.keys(receiptPatch).length > 0 && !purchase?.receiptUrl) {
+          try {
+            await updatePurchaseDiscordStatus(session.id, receiptPatch);
+          } catch {
+          }
+        }
         return NextResponse.json({ 
           fulfilled: true,
           message: 'Reward already granted',
@@ -160,6 +206,12 @@ export async function POST(request: Request) {
       if (Object.keys(invoicePatch).length > 0 && !purchase?.invoiceId) {
         try {
           await updatePurchaseDiscordStatus(session.id, invoicePatch);
+        } catch {
+        }
+      }
+      if (Object.keys(receiptPatch).length > 0 && !purchase?.receiptUrl) {
+        try {
+          await updatePurchaseDiscordStatus(session.id, receiptPatch);
         } catch {
         }
       }
@@ -279,6 +331,7 @@ export async function POST(request: Request) {
         discordNotified: false,
         discordNotifyAttempts: 0,
         ...invoicePatch,
+        ...receiptPatch,
       };
 
       const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
@@ -313,6 +366,7 @@ export async function POST(request: Request) {
         credits,
         pack,
         ...invoicePatch,
+        ...receiptPatch,
         message: `Granted ${credits} credits to ${steamId}`,
       });
     }
@@ -412,6 +466,7 @@ export async function POST(request: Request) {
         spins,
         pack,
         ...invoicePatch,
+        ...receiptPatch,
         message: `Granted ${spins} spins to ${steamId}`,
       });
     }
@@ -492,6 +547,7 @@ export async function POST(request: Request) {
         months,
         proUntil,
         ...invoicePatch,
+        ...receiptPatch,
         message: `Granted ${months} months Pro to ${steamId}`
       });
     }
@@ -551,6 +607,7 @@ export async function POST(request: Request) {
           discordNotified: false,
           discordNotifyAttempts: 0,
           ...invoicePatch,
+          ...receiptPatch,
         };
 
         const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
@@ -610,6 +667,7 @@ export async function POST(request: Request) {
           consumableType,
           quantity,
           ...invoicePatch,
+          ...receiptPatch,
           message: `Granted ${quantity} ${consumableType} to ${steamId}`
         });
       }
@@ -667,6 +725,8 @@ export async function GET(request: Request) {
         timestamp: purchase.timestamp,
         amount: purchase.amount,
         currency: purchase.currency,
+        receiptUrl: (purchase as any).receiptUrl || null,
+        customerEmail: (purchase as any).customerEmail || null,
         invoiceId: (purchase as any).invoiceId || null,
         invoiceUrl: (purchase as any).invoiceUrl || null,
         invoicePdf: (purchase as any).invoicePdf || null,

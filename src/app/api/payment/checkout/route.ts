@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { sanitizeEmail } from '@/app/utils/sanitize';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -35,7 +36,12 @@ const PRICES: Record<string, { amount: number; months: number }> = {
 export async function POST(request: Request) {
   try {
     const stripe = await getStripeInstance();
-    const { plan, steamId, promoCode } = await request.json();
+    const { plan, steamId, promoCode, email } = await request.json();
+
+    const customerEmail = sanitizeEmail(String(email || ''));
+    if (!customerEmail) {
+      return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });
+    }
 
     if (!plan || !PRICES[plan]) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
@@ -101,12 +107,27 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       customer_creation: 'always',
+      customer_email: customerEmail,
       invoice_creation: { enabled: true },
-      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&months=${priceInfo.months}`,
+      payment_intent_data: {
+        receipt_email: customerEmail,
+        metadata: {
+          steamId,
+          type: 'pro',
+          months: priceInfo.months.toString(),
+          plan,
+          promoCode: promoCode || '',
+          originalAmount: priceInfo.amount.toString(),
+          discountAmount: discountAmount.toString(),
+          testMode: testMode ? 'true' : 'false',
+        },
+      },
+      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&type=pro&months=${priceInfo.months}`,
       cancel_url: `${origin}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: expiresAt,
       metadata: {
         steamId,
+        type: 'pro',
         months: priceInfo.months.toString(),
         plan,
         promoCode: promoCode || '',
