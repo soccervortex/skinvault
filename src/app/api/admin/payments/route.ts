@@ -18,6 +18,7 @@ type PaymentRow = {
   currency: string;
   customerEmail: string | null;
   receiptUrl: string | null;
+  receiptNumber: string | null;
   invoiceUrl: string | null;
   invoicePdf: string | null;
   invoiceNumber: string | null;
@@ -51,6 +52,7 @@ function normalizePaid(p: any): PaymentRow {
     currency: String(p?.currency || 'eur'),
     customerEmail: p?.customerEmail ? sanitizeEmail(String(p.customerEmail)) : null,
     receiptUrl: p?.receiptUrl ? String(p.receiptUrl) : null,
+    receiptNumber: p?.receiptNumber ? String(p.receiptNumber) : null,
     invoiceUrl: p?.invoiceUrl ? String(p.invoiceUrl) : null,
     invoicePdf: p?.invoicePdf ? String(p.invoicePdf) : null,
     invoiceNumber: p?.invoiceNumber ? String(p.invoiceNumber) : null,
@@ -82,6 +84,7 @@ function normalizeFailed(f: any): PaymentRow {
     currency: String(f?.currency || 'eur'),
     customerEmail: f?.customerEmail ? sanitizeEmail(String(f.customerEmail)) : null,
     receiptUrl: f?.receiptUrl ? String(f.receiptUrl) : null,
+    receiptNumber: f?.receiptNumber ? String(f.receiptNumber) : null,
     invoiceUrl: f?.invoiceUrl ? String(f.invoiceUrl) : null,
     invoicePdf: f?.invoicePdf ? String(f.invoicePdf) : null,
     invoiceNumber: f?.invoiceNumber ? String(f.invoiceNumber) : null,
@@ -141,6 +144,9 @@ async function getReceiptPatch(
     const receiptUrl = String((charge as any)?.receipt_url || '').trim();
     if (receiptUrl) out.receiptUrl = receiptUrl;
 
+    const receiptNumber = String((charge as any)?.receipt_number || '').trim();
+    if (receiptNumber) out.receiptNumber = receiptNumber;
+
     const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
     if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
 
@@ -171,6 +177,9 @@ async function getReceiptPatchFromPaymentIntent(
 
     const receiptUrl = String((charge as any)?.receipt_url || '').trim();
     if (receiptUrl) out.receiptUrl = receiptUrl;
+
+    const receiptNumber = String((charge as any)?.receipt_number || '').trim();
+    if (receiptNumber) out.receiptNumber = receiptNumber;
 
     const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
     if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;

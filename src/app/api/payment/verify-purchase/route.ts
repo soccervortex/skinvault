@@ -55,6 +55,9 @@ async function getReceiptPatch(
     const receiptUrl = String((charge as any)?.receipt_url || '').trim();
     if (receiptUrl) out.receiptUrl = receiptUrl;
 
+    const receiptNumber = String((charge as any)?.receipt_number || '').trim();
+    if (receiptNumber) out.receiptNumber = receiptNumber;
+
     const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
     if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
 

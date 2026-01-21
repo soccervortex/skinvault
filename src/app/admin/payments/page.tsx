@@ -20,6 +20,7 @@ type PaymentRow = {
   currency: string;
   customerEmail: string | null;
   receiptUrl: string | null;
+  receiptNumber: string | null;
   invoiceUrl: string | null;
   invoicePdf: string | null;
   invoiceNumber: string | null;
@@ -391,7 +392,7 @@ export default function AdminPaymentsPage() {
                               <span className="text-gray-600">-</span>
                             )}
                           </td>
-                          <td className="py-2 pr-3 font-mono">{p.invoiceNumber || '-'}</td>
+                          <td className="py-2 pr-3 font-mono">{p.invoiceNumber || p.receiptNumber || '-'}</td>
                           <td className="py-2 pr-3">
                             <div className="flex items-center gap-2">
                               <button
