@@ -14,6 +14,18 @@ function dayKeyUtc(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function getDailyResetOffsetMinutes(): number {
+  const raw = Number(process.env.DAILY_RESET_TZ_OFFSET_MINUTES || 0);
+  if (!Number.isFinite(raw)) return 0;
+  const n = Math.trunc(raw);
+  return Math.max(-14 * 60, Math.min(14 * 60, n));
+}
+
+function dayKeyWithOffset(now: Date, offsetMinutes: number): string {
+  const shifted = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+  return dayKeyUtc(shifted);
+}
+
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
@@ -44,7 +56,8 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
-    const day = dayKeyUtc(now);
+    const resetOffsetMinutes = getDailyResetOffsetMinutes();
+    const day = dayKeyWithOffset(now, resetOffsetMinutes);
     const key = `${steamId}_${day}`;
 
     const db = await getDatabase();

@@ -216,6 +216,14 @@ export default function SpinPage() {
           onClose={() => {
             setShowSpinner(false);
             setSpinReward(null);
+            fetch('/api/spins', { cache: 'no-store' })
+              .then(res => res.json())
+              .then(data => {
+                setCanSpin(!!data?.canSpin);
+                setNextEligibleAt(data?.nextEligibleAt || null);
+              })
+              .catch(() => {
+              });
           }}
         />
       )}

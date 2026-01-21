@@ -102,6 +102,24 @@ function nextMidnightUtc(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0));
 }
 
+function getDailyResetOffsetMinutes(): number {
+  const raw = Number(process.env.DAILY_RESET_TZ_OFFSET_MINUTES || 0);
+  if (!Number.isFinite(raw)) return 0;
+  const n = Math.trunc(raw);
+  return Math.max(-14 * 60, Math.min(14 * 60, n));
+}
+
+function dayKeyWithOffset(now: Date, offsetMinutes: number): string {
+  const shifted = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+  return dayKeyUtc(shifted);
+}
+
+function nextResetWithOffset(now: Date, offsetMinutes: number): Date {
+  const shifted = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+  const nextShiftedMidnight = nextMidnightUtc(shifted);
+  return new Date(nextShiftedMidnight.getTime() - offsetMinutes * 60 * 1000);
+}
+
 function getCreatorDailyLimit(): number {
   const raw = Number(process.env.CREATOR_SPINS_PER_DAY || 25);
   if (!Number.isFinite(raw)) return 25;
@@ -144,7 +162,8 @@ export async function GET(req: NextRequest) {
   const bonusCol = db.collection<BonusSpinDoc>('bonus_spins');
   const { role, dailyLimit } = await getRoleAndLimit(steamId);
   const now = new Date();
-  const today = dayKeyUtc(now);
+  const resetOffsetMinutes = getDailyResetOffsetMinutes();
+  const today = dayKeyWithOffset(now, resetOffsetMinutes);
   const spinKey = `${steamId}_${today}`;
 
   if (dailyLimit === null) {
@@ -165,6 +184,7 @@ export async function GET(req: NextRequest) {
   const bonusSpins = Number.isFinite(bonusCount) ? Math.max(0, Math.floor(bonusCount)) : 0;
   const remainingSpins = Math.max(0, dailyLimit + bonusSpins - usedSpins);
   const canSpin = remainingSpins > 0;
+  const nextResetAt = nextResetWithOffset(now, resetOffsetMinutes);
 
   return NextResponse.json({
     canSpin,
@@ -172,7 +192,7 @@ export async function GET(req: NextRequest) {
     dailyLimit,
     usedSpins,
     remainingSpins,
-    nextEligibleAt: canSpin ? now.toISOString() : nextMidnightUtc(now).toISOString(),
+    nextEligibleAt: canSpin ? now.toISOString() : nextResetAt.toISOString(),
   });
 }
 
@@ -192,7 +212,8 @@ export async function POST(req: NextRequest) {
   const ledgerCol = db.collection<CreditsLedgerDoc>('credits_ledger');
   const { role, dailyLimit } = await getRoleAndLimit(steamId);
   const now = new Date();
-  const today = dayKeyUtc(now);
+  const resetOffsetMinutes = getDailyResetOffsetMinutes();
+  const today = dayKeyWithOffset(now, resetOffsetMinutes);
   const spinKey = `${steamId}_${today}`;
 
   if (dailyLimit !== null) {
@@ -203,12 +224,13 @@ export async function POST(req: NextRequest) {
     const existing = await spinsCol.findOne({ _id: spinKey });
     const used = usedCountFromDoc(existing);
     if (used >= dailyLimit + bonusSpins) {
+      const nextResetAt = nextResetWithOffset(now, resetOffsetMinutes);
       return NextResponse.json({
         error: 'Spin limit reached',
         dailyLimit: dailyLimit + bonusSpins,
         usedSpins: used,
         remainingSpins: 0,
-        nextEligibleAt: nextMidnightUtc(now).toISOString(),
+        nextEligibleAt: nextResetAt.toISOString(),
       }, { status: 400 });
     }
 
