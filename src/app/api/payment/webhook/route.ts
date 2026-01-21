@@ -7,7 +7,6 @@ import { sendInngestEvent } from '@/app/lib/inngest';
 import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
-import { sendEmail } from '@/app/utils/email';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 
 async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<string, any>) {
@@ -22,35 +21,6 @@ async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<stri
   });
   if (updated) {
     await dbSet(purchasesKey, next.slice(-1000));
-  }
-}
-
-async function sendPaymentProblemEmailSafe(args: {
-  to: string;
-  subject: string;
-  title: string;
-  body: string;
-  ctaLabel: string;
-  ctaUrl: string;
-}) {
-  try {
-    const to = sanitizeEmail(args.to);
-    if (!to) return;
-    const html = `
-      <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b0d12; padding:24px">
-        <div style="max-width:560px; margin:0 auto; background:#11141d; border:1px solid rgba(255,255,255,0.08); border-radius:20px; padding:24px; color:#fff">
-          <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#9ca3af; font-weight:800">Skinvaults</div>
-          <h1 style="margin:10px 0 0; font-size:22px; letter-spacing:-0.02em">${args.title}</h1>
-          <p style="margin:12px 0 0; color:#cbd5e1; font-size:14px; line-height:1.5">${args.body}</p>
-          <div style="margin-top:18px">
-            <a href="${args.ctaUrl}" target="_blank" rel="noreferrer" style="display:inline-block; background:#2563eb; color:#fff; text-decoration:none; font-weight:900; letter-spacing:0.12em; text-transform:uppercase; font-size:12px; padding:12px 16px; border-radius:14px">${args.ctaLabel}</a>
-          </div>
-          <p style="margin:18px 0 0; color:#64748b; font-size:12px">If you think you were charged, please contact support.</p>
-        </div>
-      </div>
-    `;
-    await sendEmail({ to, subject: args.subject, html });
-  } catch {
   }
 }
 
@@ -89,35 +59,6 @@ async function getReceiptPatch(
     return out;
   } catch {
     return {};
-  }
-}
-
-async function sendPurchaseEmailSafe(args: {
-  to: string;
-  subject: string;
-  title: string;
-  body: string;
-  ctaLabel: string;
-  ctaUrl: string;
-}) {
-  try {
-    const to = sanitizeEmail(args.to);
-    if (!to) return;
-    const html = `
-      <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b0d12; padding:24px">
-        <div style="max-width:560px; margin:0 auto; background:#11141d; border:1px solid rgba(255,255,255,0.08); border-radius:20px; padding:24px; color:#fff">
-          <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#9ca3af; font-weight:800">Skinvaults</div>
-          <h1 style="margin:10px 0 0; font-size:22px; letter-spacing:-0.02em">${args.title}</h1>
-          <p style="margin:12px 0 0; color:#cbd5e1; font-size:14px; line-height:1.5">${args.body}</p>
-          <div style="margin-top:18px">
-            <a href="${args.ctaUrl}" target="_blank" rel="noreferrer" style="display:inline-block; background:#2563eb; color:#fff; text-decoration:none; font-weight:900; letter-spacing:0.12em; text-transform:uppercase; font-size:12px; padding:12px 16px; border-radius:14px">${args.ctaLabel}</a>
-          </div>
-          <p style="margin:18px 0 0; color:#64748b; font-size:12px">If you didn’t make this purchase, please contact support.</p>
-        </div>
-      </div>
-    `;
-    await sendEmail({ to, subject: args.subject, html });
-  } catch {
   }
 }
 
@@ -228,9 +169,6 @@ export async function POST(request: Request) {
     const invoicePatch = await getInvoicePatch(stripe, session);
     const receiptPatch = await getReceiptPatch(stripe, session);
 
-    const downloadUrl = String(receiptPatch?.receiptUrl || invoicePatch?.invoiceUrl || invoicePatch?.invoicePdf || '').trim();
-    const customerEmail = sanitizeEmail(String(receiptPatch?.customerEmail || ''));
-
     // Handle spins purchase
     if (steamId && type === 'spins') {
       const spins = Number(session.metadata?.spins || 0);
@@ -340,17 +278,6 @@ export async function POST(request: Request) {
               { pack, spins, sessionId: session.id }
             );
           } catch {
-          }
-
-          if (customerEmail && downloadUrl) {
-            void sendPurchaseEmailSafe({
-              to: customerEmail,
-              subject: 'Your SkinVaults receipt',
-              title: 'Payment successful',
-              body: 'Thanks for your purchase. You can view and download your receipt using the button below.',
-              ctaLabel: 'View receipt',
-              ctaUrl: downloadUrl,
-            });
           }
 
           console.log(`✅ Granted ${spins} bonus spins to ${steamId}`);
@@ -522,17 +449,6 @@ export async function POST(request: Request) {
           } catch {
           }
 
-          if (customerEmail && downloadUrl) {
-            void sendPurchaseEmailSafe({
-              to: customerEmail,
-              subject: 'Your SkinVaults receipt',
-              title: 'Payment successful',
-              body: 'Thanks for your purchase. You can view and download your receipt using the button below.',
-              ctaLabel: 'View receipt',
-              ctaUrl: downloadUrl,
-            });
-          }
-
           console.log(`✅ Granted ${credits} credits to ${steamId}`);
         } catch (error) {
           console.error('❌ Failed to grant credits:', error);
@@ -673,17 +589,6 @@ export async function POST(request: Request) {
           } catch {
           }
 
-          if (customerEmail && downloadUrl) {
-            void sendPurchaseEmailSafe({
-              to: customerEmail,
-              subject: 'Your SkinVaults receipt',
-              title: 'Payment successful',
-              body: 'Thanks for your purchase. You can view and download your receipt using the button below.',
-              ctaLabel: 'View receipt',
-              ctaUrl: downloadUrl,
-            });
-          }
-          
           // Trigger Discord role sync if user has Discord connected
           try {
             const { dbGet } = await import('@/app/utils/database');
@@ -851,17 +756,6 @@ export async function POST(request: Request) {
               );
             } catch {
             }
-
-            if (customerEmail && downloadUrl) {
-              void sendPurchaseEmailSafe({
-                to: customerEmail,
-                subject: 'Your SkinVaults receipt',
-                title: 'Payment successful',
-                body: 'Thanks for your purchase. You can view and download your receipt using the button below.',
-                ctaLabel: 'View receipt',
-                ctaUrl: downloadUrl,
-              });
-            }
           } catch (error) {
             console.error('Failed to record purchase history:', error);
             // Still continue - rewards were granted
@@ -920,20 +814,6 @@ export async function POST(request: Request) {
     } catch {
     }
 
-    const baseUrl = String(process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online');
-    const ctaUrl = type === 'pro' ? `${baseUrl}/pro` : `${baseUrl}/shop`;
-
-    if (customerEmail) {
-      void sendPaymentProblemEmailSafe({
-        to: customerEmail,
-        subject: 'Payment expired',
-        title: 'Your checkout expired',
-        body: 'Your payment was not completed in time, so the checkout expired. You can try again using the button below.',
-        ctaLabel: 'Try again',
-        ctaUrl,
-      });
-    }
-
     return NextResponse.json({ received: true });
   }
 
@@ -962,20 +842,6 @@ export async function POST(request: Request) {
       });
       await dbSet(failedKey, failed.slice(-200));
     } catch {
-    }
-
-    const baseUrl = String(process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online');
-    const ctaUrl = type === 'pro' ? `${baseUrl}/pro` : `${baseUrl}/shop`;
-
-    if (customerEmail) {
-      void sendPaymentProblemEmailSafe({
-        to: customerEmail,
-        subject: 'Payment failed',
-        title: 'Payment failed',
-        body: 'Your payment could not be completed. Please try again or use a different payment method.',
-        ctaLabel: 'Try again',
-        ctaUrl,
-      });
     }
 
     return NextResponse.json({ received: true });

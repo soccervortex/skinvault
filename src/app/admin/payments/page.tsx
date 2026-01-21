@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
-import { ArrowLeft, ExternalLink, Loader2, Mail, Search } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Eye, EyeOff, Loader2, Pencil, RefreshCw, Save, Search, X } from 'lucide-react';
 
 type PaymentStatus = 'paid' | 'payment_failed' | 'expired' | 'unfulfilled' | 'unknown';
 
@@ -26,7 +26,8 @@ type PaymentRow = {
   sessionId: string | null;
   paymentIntentId: string | null;
   error: string | null;
-  emailResentAt: string | null;
+  hidden: boolean;
+  hiddenAt: string | null;
 };
 
 export default function AdminPaymentsPage() {
@@ -43,7 +44,16 @@ export default function AdminPaymentsPage() {
   const [steamId, setSteamId] = useState<string>('');
   const [q, setQ] = useState<string>('');
 
-  const [resendBusyId, setResendBusyId] = useState<string | null>(null);
+  const [includeHidden, setIncludeHidden] = useState(false);
+
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<PaymentRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editCustomerEmail, setEditCustomerEmail] = useState('');
+  const [editReceiptUrl, setEditReceiptUrl] = useState('');
+  const [editInvoiceUrl, setEditInvoiceUrl] = useState('');
+  const [editInvoicePdf, setEditInvoicePdf] = useState('');
+  const [editInvoiceNumber, setEditInvoiceNumber] = useState('');
 
   useEffect(() => {
     try {
@@ -65,6 +75,7 @@ export default function AdminPaymentsPage() {
       if (type) qs.set('type', type);
       if (steamId) qs.set('steamId', steamId);
       if (q) qs.set('q', q);
+      if (includeHidden) qs.set('includeHidden', '1');
 
       const res = await fetch(`/api/admin/payments?${qs.toString()}`, {
         cache: 'no-store',
@@ -103,8 +114,8 @@ export default function AdminPaymentsPage() {
     return Array.from(s.values()).sort();
   }, [payments]);
 
-  const resendEmail = async (id: string) => {
-    setResendBusyId(id);
+  const setHidden = async (id: string, hidden: boolean) => {
+    setBusyId(id);
     try {
       const res = await fetch('/api/admin/payments', {
         method: 'POST',
@@ -112,16 +123,78 @@ export default function AdminPaymentsPage() {
           'Content-Type': 'application/json',
           'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
-        body: JSON.stringify({ action: 'resend_email', id }),
+        body: JSON.stringify({ action: 'set_hidden', id, hidden }),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(String(json?.error || 'Failed to resend email'));
-      toast.success('Email sent');
+      if (!res.ok) throw new Error(String(json?.error || 'Failed'));
       await load();
     } catch (e: any) {
-      toast.error(String(e?.message || 'Failed to resend email'));
+      toast.error(String(e?.message || 'Failed'));
     } finally {
-      setResendBusyId(null);
+      setBusyId(null);
+    }
+  };
+
+  const refreshFromStripe = async (id: string) => {
+    setBusyId(id);
+    try {
+      const res = await fetch('/api/admin/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ action: 'refresh_stripe', id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed'));
+      toast.success(json?.updated ? 'Refreshed from Stripe' : 'No new Stripe data');
+      await load();
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Failed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const openEdit = (p: PaymentRow) => {
+    setEditing(p);
+    setEditCustomerEmail(String(p.customerEmail || ''));
+    setEditReceiptUrl(String(p.receiptUrl || ''));
+    setEditInvoiceUrl(String(p.invoiceUrl || ''));
+    setEditInvoicePdf(String(p.invoicePdf || ''));
+    setEditInvoiceNumber(String(p.invoiceNumber || ''));
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch('/api/admin/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({
+          action: 'update_fields',
+          id: editing.id,
+          customerEmail: editCustomerEmail,
+          receiptUrl: editReceiptUrl,
+          invoiceUrl: editInvoiceUrl,
+          invoicePdf: editInvoicePdf,
+          invoiceNumber: editInvoiceNumber,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed'));
+      toast.success('Saved');
+      setEditing(null);
+      await load();
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Failed'));
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -227,24 +300,41 @@ export default function AdminPaymentsPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                onClick={() => load()}
-                className="bg-blue-600/20 border border-blue-500/40 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-blue-300 hover:bg-blue-600/30"
-              >
-                Apply
-              </button>
-              <button
-                onClick={() => {
-                  setStatus('all');
-                  setType('');
-                  setSteamId('');
-                  setQ('');
-                }}
-                className="bg-black/40 border border-white/10 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-gray-300 hover:border-white/20"
-              >
-                Reset
-              </button>
+            <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIncludeHidden((v) => !v)}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] border transition-all ${
+                    includeHidden
+                      ? 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30'
+                      : 'bg-black/40 border-white/10 text-gray-300 hover:border-white/20'
+                  }`}
+                >
+                  {includeHidden ? <Eye size={12} /> : <EyeOff size={12} />}
+                  {includeHidden ? 'Including hidden' : 'Hide hidden'}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => load()}
+                  className="bg-blue-600/20 border border-blue-500/40 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-blue-300 hover:bg-blue-600/30"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => {
+                    setStatus('all');
+                    setType('');
+                    setSteamId('');
+                    setQ('');
+                    setIncludeHidden(false);
+                  }}
+                  className="bg-black/40 border border-white/10 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-gray-300 hover:border-white/20"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 
@@ -270,14 +360,15 @@ export default function AdminPaymentsPage() {
                       <th className="py-2 pr-3">Email</th>
                       <th className="py-2 pr-3">Receipt</th>
                       <th className="py-2 pr-3">Invoice #</th>
-                      <th className="py-2 pr-3">Resend</th>
+                      <th className="py-2 pr-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {payments.slice(0, 500).map((p) => {
                       const href = hrefFor(p);
+                      const rowHidden = p.hidden === true;
                       return (
-                        <tr key={p.id} className="border-b border-white/5 last:border-b-0">
+                        <tr key={p.id} className={`border-b border-white/5 last:border-b-0 ${rowHidden ? 'opacity-60' : ''}`}>
                           <td className="py-2 pr-3 text-[9px] whitespace-nowrap">{new Date(p.timestamp).toLocaleString()}</td>
                           <td className="py-2 pr-3">{renderStatus(p)}</td>
                           <td className="py-2 pr-3">{p.type || '-'}</td>
@@ -302,20 +393,39 @@ export default function AdminPaymentsPage() {
                           </td>
                           <td className="py-2 pr-3 font-mono">{p.invoiceNumber || '-'}</td>
                           <td className="py-2 pr-3">
-                            <button
-                              disabled={!p.customerEmail || resendBusyId === p.id}
-                              onClick={() => resendEmail(p.id)}
-                              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] border transition-all ${
-                                !p.customerEmail
-                                  ? 'bg-black/20 border-white/5 text-gray-600'
-                                  : resendBusyId === p.id
-                                  ? 'bg-black/30 border-white/10 text-gray-400'
-                                  : 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30'
-                              }`}
-                            >
-                              {resendBusyId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail size={12} />}
-                              Resend
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                disabled={busyId === p.id}
+                                onClick={() => refreshFromStripe(p.id)}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] border transition-all ${
+                                  busyId === p.id
+                                    ? 'bg-black/30 border-white/10 text-gray-400'
+                                    : 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30'
+                                }`}
+                              >
+                                {busyId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw size={12} />}
+                                Refresh
+                              </button>
+                              <button
+                                disabled={busyId === p.id}
+                                onClick={() => openEdit(p)}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] border bg-black/40 border-white/10 text-gray-200 hover:border-white/20 transition-all"
+                              >
+                                <Pencil size={12} /> Edit
+                              </button>
+                              <button
+                                disabled={busyId === p.id}
+                                onClick={() => setHidden(p.id, !rowHidden)}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] border transition-all ${
+                                  rowHidden
+                                    ? 'bg-emerald-600/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/25'
+                                    : 'bg-red-600/15 border-red-500/30 text-red-300 hover:bg-red-600/25'
+                                }`}
+                              >
+                                {rowHidden ? <Eye size={12} /> : <EyeOff size={12} />}
+                                {rowHidden ? 'Unhide' : 'Hide'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -331,6 +441,96 @@ export default function AdminPaymentsPage() {
           </div>
         </div>
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-[#11141d] border border-white/10 rounded-3xl p-5 md:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.4em] text-gray-500 font-black">Edit Payment</p>
+                <div className="mt-1 text-[10px] text-gray-400 font-mono break-all">{editing.id}</div>
+              </div>
+              <button
+                onClick={() => setEditing(null)}
+                className="text-gray-500 hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Customer Email</p>
+                <input
+                  value={editCustomerEmail}
+                  onChange={(e) => setEditCustomerEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Receipt URL (preferred)</p>
+                <input
+                  value={editReceiptUrl}
+                  onChange={(e) => setEditReceiptUrl(e.target.value)}
+                  placeholder="https://pay.stripe.com/receipts/..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-blue-300 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Invoice URL</p>
+                  <input
+                    value={editInvoiceUrl}
+                    onChange={(e) => setEditInvoiceUrl(e.target.value)}
+                    placeholder="https://invoice.stripe.com/i/..."
+                    className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Invoice PDF</p>
+                  <input
+                    value={editInvoicePdf}
+                    onChange={(e) => setEditInvoicePdf(e.target.value)}
+                    placeholder="https://.../invoice.pdf"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Invoice Number</p>
+                <input
+                  value={editInvoiceNumber}
+                  onChange={(e) => setEditInvoiceNumber(e.target.value)}
+                  placeholder="INV-..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                disabled={editSaving}
+                onClick={() => setEditing(null)}
+                className="bg-black/40 border border-white/10 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-gray-300 hover:border-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={editSaving}
+                onClick={saveEdit}
+                className="bg-blue-600/20 border border-blue-500/40 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-blue-300 hover:bg-blue-600/30 inline-flex items-center gap-2"
+              >
+                {editSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save size={12} />}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

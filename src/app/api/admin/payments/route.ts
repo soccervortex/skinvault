@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { sendEmail } from '@/app/utils/email';
 import { sanitizeEmail } from '@/app/utils/sanitize';
+import Stripe from 'stripe';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -24,7 +24,8 @@ type PaymentRow = {
   sessionId: string | null;
   paymentIntentId: string | null;
   error: string | null;
-  emailResentAt: string | null;
+  hidden: boolean;
+  hiddenAt: string | null;
 };
 
 function asIso(ts: any): string {
@@ -56,7 +57,8 @@ function normalizePaid(p: any): PaymentRow {
     sessionId,
     paymentIntentId: p?.paymentIntentId ? String(p.paymentIntentId) : null,
     error: p?.error ? String(p.error) : null,
-    emailResentAt: p?.emailResentAt ? asIso(p.emailResentAt) : null,
+    hidden: p?.hidden === true,
+    hiddenAt: p?.hiddenAt ? asIso(p.hiddenAt) : null,
   };
 }
 
@@ -86,8 +88,124 @@ function normalizeFailed(f: any): PaymentRow {
     sessionId,
     paymentIntentId,
     error: f?.error ? String(f.error) : null,
-    emailResentAt: f?.emailResentAt ? asIso(f.emailResentAt) : null,
+    hidden: f?.hidden === true,
+    hiddenAt: f?.hiddenAt ? asIso(f.hiddenAt) : null,
   };
+}
+
+function parseBool(value: any): boolean {
+  const v = String(value ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+function getStripeSecretKeyFromRecord(record: any): string | null {
+  const recordTest = parseBool(record?.testMode);
+  if (recordTest) {
+    return process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY || null;
+  }
+  return process.env.STRIPE_SECRET_KEY || null;
+}
+
+function createStripe(secretKey: string): Stripe {
+  return new Stripe(secretKey, {
+    apiVersion: '2025-12-15.clover',
+  });
+}
+
+async function getReceiptPatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const out: Record<string, any> = {};
+
+    const sessionEmail = sanitizeEmail(String((session as any)?.customer_details?.email || (session as any)?.customer_email || ''));
+    if (sessionEmail) out.customerEmail = sessionEmail;
+
+    const piId = (session.payment_intent as string) || '';
+    if (!piId) return out;
+
+    const pi = await stripe.paymentIntents.retrieve(piId, { expand: ['latest_charge'] });
+
+    const receiptEmail = sanitizeEmail(String((pi as any)?.receipt_email || ''));
+    if (!out.customerEmail && receiptEmail) out.customerEmail = receiptEmail;
+
+    const latestCharge = (pi as any)?.latest_charge;
+    let charge: Stripe.Charge | null = null;
+    if (typeof latestCharge === 'string' && latestCharge) {
+      charge = await stripe.charges.retrieve(latestCharge);
+    } else if (latestCharge && typeof latestCharge === 'object') {
+      charge = latestCharge as Stripe.Charge;
+    }
+
+    const receiptUrl = String((charge as any)?.receipt_url || '').trim();
+    if (receiptUrl) out.receiptUrl = receiptUrl;
+
+    const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
+    if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
+
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+async function getReceiptPatchFromPaymentIntent(
+  stripe: Stripe,
+  paymentIntentId: string
+): Promise<Record<string, any>> {
+  try {
+    const out: Record<string, any> = {};
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
+
+    const receiptEmail = sanitizeEmail(String((pi as any)?.receipt_email || ''));
+    if (receiptEmail) out.customerEmail = receiptEmail;
+
+    const latestCharge = (pi as any)?.latest_charge;
+    let charge: Stripe.Charge | null = null;
+    if (typeof latestCharge === 'string' && latestCharge) {
+      charge = await stripe.charges.retrieve(latestCharge);
+    } else if (latestCharge && typeof latestCharge === 'object') {
+      charge = latestCharge as Stripe.Charge;
+    }
+
+    const receiptUrl = String((charge as any)?.receipt_url || '').trim();
+    if (receiptUrl) out.receiptUrl = receiptUrl;
+
+    const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
+    if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
+
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+async function getInvoicePatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const refreshed = await stripe.checkout.sessions.retrieve(String(session.id), {
+      expand: ['invoice'],
+    });
+
+    let invoiceId: string | null = null;
+    const rawInvoice = (refreshed as any)?.invoice;
+    if (typeof rawInvoice === 'string') invoiceId = rawInvoice;
+    else if (rawInvoice && typeof rawInvoice.id === 'string') invoiceId = rawInvoice.id;
+
+    if (!invoiceId) return {};
+
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    const patch: Record<string, any> = { invoiceId: invoice.id };
+    if (invoice.hosted_invoice_url) patch.invoiceUrl = invoice.hosted_invoice_url;
+    if (invoice.invoice_pdf) patch.invoicePdf = invoice.invoice_pdf;
+    if (invoice.number) patch.invoiceNumber = invoice.number;
+    return patch;
+  } catch {
+    return {};
+  }
 }
 
 async function patchPurchase(sessionId: string, patch: Record<string, any>) {
@@ -167,6 +285,7 @@ export async function GET(request: Request) {
     const filterType = String(url.searchParams.get('type') || '').trim();
     const filterStatus = String(url.searchParams.get('status') || '').trim();
     const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+    const includeHidden = parseBool(url.searchParams.get('includeHidden'));
 
     const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
     const failed = (await dbGet<Array<any>>('failed_purchases', false)) || [];
@@ -174,6 +293,10 @@ export async function GET(request: Request) {
     let rows: PaymentRow[] = [];
     rows = rows.concat(purchases.filter(Boolean).map(normalizePaid));
     rows = rows.concat(failed.filter(Boolean).map(normalizeFailed));
+
+    if (!includeHidden) {
+      rows = rows.filter((r) => r.hidden !== true);
+    }
 
     if (filterSteamId) {
       rows = rows.filter((r) => String(r.steamId || '').trim() === filterSteamId);
@@ -236,86 +359,118 @@ export async function POST(request: Request) {
     const action = String(body?.action || '').trim();
     const id = String(body?.id || '').trim();
 
-    if (action !== 'resend_email') {
-      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-    }
-
     if (!id || !id.includes(':')) {
       return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     }
 
     const [kind, rawId] = id.split(':', 2);
-    const baseUrl = String(process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online');
 
-    if (kind === 'paid') {
-      const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
-      const purchase = purchases.find((p) => String(p?.sessionId || '').trim() === rawId);
-      if (!purchase) return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
-
-      const to = sanitizeEmail(String(purchase?.customerEmail || ''));
-      if (!to) return NextResponse.json({ error: 'Missing customer email' }, { status: 400 });
-
-      const href = String(purchase?.receiptUrl || purchase?.invoiceUrl || purchase?.invoicePdf || '').trim();
-      const ctaUrl = href || (purchase?.type === 'pro' ? `${baseUrl}/pro` : `${baseUrl}/shop`);
-
-      const result = await sendResendEmail({
-        to,
-        subject: 'Your receipt',
-        title: 'Receipt resend',
-        body: 'Here is a fresh copy of your receipt / invoice link.',
-        ctaLabel: href ? 'Open receipt' : 'Open shop',
-        ctaUrl,
-      });
-
-      if (!result.ok) {
-        return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
-      }
-
+    if (action === 'set_hidden') {
+      const hidden = body?.hidden === true;
       const ts = new Date().toISOString();
-      await patchPurchase(rawId, { emailResentAt: ts });
+      const patch = hidden ? { hidden: true, hiddenAt: ts } : { hidden: false, hiddenAt: null };
 
-      return NextResponse.json({ ok: true });
+      if (kind === 'paid') {
+        await patchPurchase(rawId, patch);
+        return NextResponse.json({ ok: true });
+      }
+      if (kind === 'failed') {
+        await patchFailed(rawId, patch);
+        return NextResponse.json({ ok: true });
+      }
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     }
 
-    if (kind === 'failed') {
+    if (action === 'update_fields') {
+      const nextPatch: Record<string, any> = {};
+      if ('customerEmail' in body) {
+        const em = sanitizeEmail(String(body?.customerEmail || ''));
+        nextPatch.customerEmail = em || null;
+      }
+      if ('receiptUrl' in body) {
+        nextPatch.receiptUrl = String(body?.receiptUrl || '').trim() || null;
+      }
+      if ('invoiceUrl' in body) {
+        nextPatch.invoiceUrl = String(body?.invoiceUrl || '').trim() || null;
+      }
+      if ('invoicePdf' in body) {
+        nextPatch.invoicePdf = String(body?.invoicePdf || '').trim() || null;
+      }
+      if ('invoiceNumber' in body) {
+        nextPatch.invoiceNumber = String(body?.invoiceNumber || '').trim() || null;
+      }
+
+      if (Object.keys(nextPatch).length === 0) {
+        return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+      }
+
+      if (kind === 'paid') {
+        await patchPurchase(rawId, nextPatch);
+        return NextResponse.json({ ok: true });
+      }
+      if (kind === 'failed') {
+        await patchFailed(rawId, nextPatch);
+        return NextResponse.json({ ok: true });
+      }
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    }
+
+    if (action === 'refresh_stripe') {
+      const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
       const failed = (await dbGet<Array<any>>('failed_purchases', false)) || [];
-      const record = failed.find((p) => {
-        const key = String(p?.sessionId || p?.paymentIntentId || p?._id || p?.id || '').trim();
-        return key === rawId;
-      });
+
+      let record: any = null;
+      if (kind === 'paid') {
+        record = purchases.find((p) => String(p?.sessionId || '').trim() === rawId);
+      } else if (kind === 'failed') {
+        record = failed.find((p) => {
+          const key = String(p?.sessionId || p?.paymentIntentId || p?._id || p?.id || '').trim();
+          return key === rawId;
+        });
+      }
+
       if (!record) return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
 
-      const to = sanitizeEmail(String(record?.customerEmail || ''));
-      if (!to) return NextResponse.json({ error: 'Missing customer email' }, { status: 400 });
+      const secretKey = getStripeSecretKeyFromRecord(record);
+      if (!secretKey) return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+      const stripe = createStripe(secretKey);
 
-      const status = String(record?.status || '').trim();
-      const ctaUrl = record?.type === 'pro' ? `${baseUrl}/pro` : `${baseUrl}/shop`;
-
-      const result = await sendResendEmail({
-        to,
-        subject: status === 'expired' ? 'Payment expired' : 'Payment failed',
-        title: status === 'expired' ? 'Your checkout expired' : 'Payment failed',
-        body:
-          status === 'expired'
-            ? 'Your payment was not completed in time, so the checkout expired. You can try again using the button below.'
-            : 'Your payment could not be completed. Please try again or use a different payment method.',
-        ctaLabel: 'Try again',
-        ctaUrl,
-      });
-
-      if (!result.ok) {
-        return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
+      let patch: Record<string, any> = {};
+      if (kind === 'paid') {
+        const sessionId = String(record?.sessionId || rawId).trim();
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const invoicePatch = await getInvoicePatch(stripe, session);
+        const receiptPatch = await getReceiptPatch(stripe, session);
+        patch = { ...invoicePatch, ...receiptPatch };
+      } else {
+        const sessionId = String(record?.sessionId || '').trim();
+        const paymentIntentId = String(record?.paymentIntentId || '').trim();
+        if (sessionId) {
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          const invoicePatch = await getInvoicePatch(stripe, session);
+          const receiptPatch = await getReceiptPatch(stripe, session);
+          patch = { ...invoicePatch, ...receiptPatch };
+        } else if (paymentIntentId) {
+          patch = await getReceiptPatchFromPaymentIntent(stripe, paymentIntentId);
+        }
       }
 
-      const ts = new Date().toISOString();
-      await patchFailed(rawId, { emailResentAt: ts });
+      if (Object.keys(patch).length === 0) {
+        return NextResponse.json({ ok: true, updated: false });
+      }
 
-      return NextResponse.json({ ok: true });
+      if (kind === 'paid') {
+        await patchPurchase(rawId, patch);
+      } else {
+        await patchFailed(rawId, patch);
+      }
+
+      return NextResponse.json({ ok: true, updated: true });
     }
 
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   } catch (error: any) {
-    console.error('Failed to resend email:', error);
+    console.error('Failed to update payment:', error);
     return NextResponse.json({ error: error?.message || 'Failed' }, { status: 500 });
   }
 }
