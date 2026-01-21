@@ -239,38 +239,6 @@ async function patchFailed(id: string, patch: Record<string, any>) {
   }
 }
 
-async function sendResendEmail(args: {
-  to: string;
-  subject: string;
-  title: string;
-  body: string;
-  ctaLabel: string;
-  ctaUrl: string;
-}) {
-  const to = sanitizeEmail(args.to);
-  if (!to) return { ok: false, error: 'Invalid email' };
-
-  const html = `
-    <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b0d12; padding:24px">
-      <div style="max-width:560px; margin:0 auto; background:#11141d; border:1px solid rgba(255,255,255,0.08); border-radius:20px; padding:24px; color:#fff">
-        <div style="font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#9ca3af; font-weight:800">Skinvaults</div>
-        <h1 style="margin:10px 0 0; font-size:22px; letter-spacing:-0.02em">${args.title}</h1>
-        <p style="margin:12px 0 0; color:#cbd5e1; font-size:14px; line-height:1.5">${args.body}</p>
-        <div style="margin-top:18px">
-          <a href="${args.ctaUrl}" target="_blank" rel="noreferrer" style="display:inline-block; background:#2563eb; color:#fff; text-decoration:none; font-weight:900; letter-spacing:0.12em; text-transform:uppercase; font-size:12px; padding:12px 16px; border-radius:14px">${args.ctaLabel}</a>
-        </div>
-        <p style="margin:18px 0 0; color:#64748b; font-size:12px">If you didn’t request this, please contact support.</p>
-      </div>
-    </div>
-  `;
-
-  return await sendEmail({
-    to,
-    subject: args.subject,
-    html,
-  });
-}
-
 export async function GET(request: Request) {
   const adminKey = request.headers.get(ADMIN_HEADER);
   const expected = process.env.ADMIN_PRO_TOKEN;
