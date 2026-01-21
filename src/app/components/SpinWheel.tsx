@@ -89,6 +89,15 @@ const SpinWheel = ({
   }, [onClose]);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  useEffect(() => {
     const r = Number(reward);
     if (!Number.isFinite(r)) {
       onSpinCompleteRef.current(0);

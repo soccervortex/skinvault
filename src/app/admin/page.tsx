@@ -1595,7 +1595,14 @@ export default function AdminPage() {
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.fulfilled !== false ? (
-                          <span className="text-emerald-400">✅ Fulfilled</span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-emerald-400">✅ Fulfilled</span>
+                            {purchase.discordNotified === true ? (
+                              <span className="text-emerald-400">🔔 Discord</span>
+                            ) : (
+                              <span className="text-amber-400">🔕 Discord pending</span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-red-400">❌ Failed</span>
                         )}
@@ -1624,6 +1631,50 @@ export default function AdminPage() {
                         })()}
                       </td>
                       <td className="py-2 pr-2">
+                        {purchase.fulfilled !== false && purchase.discordNotified !== true && String((purchase as any).sessionId || '').trim() && (
+                          <button
+                            onClick={async () => {
+                              const sid = String((purchase as any).sessionId || '').trim();
+                              if (!sid) {
+                                setError('Missing session id for this purchase.');
+                                return;
+                              }
+                              if (!confirm('Retry Discord notification for this purchase?')) return;
+                              try {
+                                const res = await fetch('/api/admin/purchases', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+                                  },
+                                  body: JSON.stringify({ action: 'retry_discord', sessionId: sid }),
+                                });
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok) {
+                                  setError(data?.error || 'Failed to retry Discord notification.');
+                                  return;
+                                }
+                                setPurchases((prev) =>
+                                  prev.map((p: any) => {
+                                    if (String(p?.sessionId || '').trim() !== sid) return p;
+                                    return {
+                                      ...p,
+                                      discordNotified: true,
+                                      discordNotifiedAt: new Date().toISOString(),
+                                      discordNotifyError: null,
+                                    };
+                                  })
+                                );
+                              } catch (e: any) {
+                                setError(e?.message || 'Failed to retry Discord notification.');
+                              }
+                            }}
+                            className="p-1 text-amber-400 hover:text-amber-300"
+                            title="Retry Discord notification"
+                          >
+                            <Bell size={12} />
+                          </button>
+                        )}
                         <button
                           onClick={async () => {
                             const sid = String((purchase as any).sessionId || '').trim();

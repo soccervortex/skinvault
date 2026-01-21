@@ -43,6 +43,35 @@ function getWebhookUrl(category: WebhookCategory): string | null {
   return process.env.DISCORD_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
 }
 
+async function postDiscordWebhook(webhookUrl: string, embeds: DiscordEmbed[], strict: boolean): Promise<void> {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), 10_000) : null;
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds }),
+      signal: controller?.signal,
+    });
+
+    if (!res.ok) {
+      let text = '';
+      try {
+        text = await res.text();
+      } catch {
+      }
+      const msg = `Discord webhook failed (${res.status} ${res.statusText})${text ? `: ${text.slice(0, 500)}` : ''}`;
+      if (strict) throw new Error(msg);
+      console.error(msg);
+    }
+  } catch (error) {
+    if (strict) throw error;
+    console.error(`Failed to send Discord webhook:`, error);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 interface DiscordEmbed {
   title?: string;
   description?: string;
@@ -75,16 +104,20 @@ export async function sendDiscordWebhook(
       console.warn(`No webhook URL configured for category: ${category}`);
       return;
     }
-    
-    await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ embeds }),
-    });
+
+    await postDiscordWebhook(webhookUrl, embeds, false);
   } catch (error) {
     console.error(`Failed to send Discord webhook for ${category}:`, error);
     // Don't throw - webhook failures shouldn't break the main flow
   }
+}
+
+export async function sendDiscordWebhookStrict(embeds: DiscordEmbed[], category: WebhookCategory): Promise<void> {
+  const webhookUrl = getWebhookUrl(category);
+  if (!webhookUrl) {
+    throw new Error(`No webhook URL configured for category: ${category}`);
+  }
+  await postDiscordWebhook(webhookUrl, embeds, true);
 }
 
 /**
@@ -248,6 +281,152 @@ export async function notifyProPurchase(steamId: string, months: number, amount:
   // Send to both 'pro' and 'purchases' channels
   await sendDiscordWebhook([embed], 'pro');
   await sendDiscordWebhook([embed], 'purchases');
+}
+
+export async function notifyConsumablePurchaseStrict(steamId: string, consumableType: string, quantity: number, amount: number, currency: string, sessionId: string): Promise<void> {
+  const typeEmoji: Record<string, string> = {
+    discord_access: '🎁',
+    wishlist_slot: '📝',
+    price_tracker: '📊',
+  };
+
+  const emoji = typeEmoji[consumableType] || '🎁';
+  const typeName = consumableType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+  const embed: DiscordEmbed = {
+    title: `${emoji} Consumable Purchase`,
+    description: 'A user has purchased a consumable item!',
+    color: 0x0099ff,
+    fields: [
+      {
+        name: 'Steam ID',
+        value: `\`${steamId}\``,
+        inline: true,
+      },
+      {
+        name: 'Type',
+        value: typeName,
+        inline: true,
+      },
+      {
+        name: 'Quantity',
+        value: `${quantity}`,
+        inline: true,
+      },
+      {
+        name: 'Amount',
+        value: `${amount.toFixed(2)} ${currency.toUpperCase()}`,
+        inline: true,
+      },
+      {
+        name: 'Session ID',
+        value: `\`${sessionId}\``,
+        inline: false,
+      },
+      {
+        name: 'Timestamp',
+        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+        inline: false,
+      },
+    ],
+    footer: {
+      text: 'SkinVaults Notification System',
+    },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhookStrict([embed], 'purchases');
+}
+
+export async function notifyCreditsPurchaseStrict(steamId: string, credits: number, pack: string, amount: number, currency: string, sessionId: string): Promise<void> {
+  const packLabel = String(pack || '').trim();
+  const details = packLabel ? `${credits.toLocaleString('en-US')} credits (${packLabel})` : `${credits.toLocaleString('en-US')} credits`;
+
+  const embed: DiscordEmbed = {
+    title: '💳 Credits Purchase',
+    description: 'A user has purchased credits!',
+    color: 0x00ff00,
+    fields: [
+      {
+        name: 'Steam ID',
+        value: `\`${steamId}\``,
+        inline: true,
+      },
+      {
+        name: 'Credits',
+        value: details,
+        inline: true,
+      },
+      {
+        name: 'Amount',
+        value: `${amount.toFixed(2)} ${currency.toUpperCase()}`,
+        inline: true,
+      },
+      {
+        name: 'Session ID',
+        value: `\`${sessionId}\``,
+        inline: false,
+      },
+      {
+        name: 'Timestamp',
+        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+        inline: false,
+      },
+    ],
+    footer: {
+      text: 'SkinVaults Notification System',
+    },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhookStrict([embed], 'purchases');
+}
+
+export async function notifyProPurchaseStrict(steamId: string, months: number, amount: number, currency: string, proUntil: string, sessionId: string): Promise<void> {
+  const embed: DiscordEmbed = {
+    title: '💰 Pro Purchase',
+    description: 'A user has purchased Pro subscription!',
+    color: 0x00ff00,
+    fields: [
+      {
+        name: 'Steam ID',
+        value: `\`${steamId}\``,
+        inline: true,
+      },
+      {
+        name: 'Months',
+        value: `${months} month${months !== 1 ? 's' : ''}`,
+        inline: true,
+      },
+      {
+        name: 'Amount',
+        value: `${amount.toFixed(2)} ${currency.toUpperCase()}`,
+        inline: true,
+      },
+      {
+        name: 'Expires',
+        value: `<t:${Math.floor(new Date(proUntil).getTime() / 1000)}:F>`,
+        inline: true,
+      },
+      {
+        name: 'Session ID',
+        value: `\`${sessionId}\``,
+        inline: false,
+      },
+      {
+        name: 'Timestamp',
+        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+        inline: false,
+      },
+    ],
+    footer: {
+      text: 'SkinVaults Notification System',
+    },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhookStrict([embed], 'pro');
+  await sendDiscordWebhookStrict([embed], 'purchases');
 }
 
 /**

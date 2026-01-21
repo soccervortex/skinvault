@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Loader2, ArrowLeft, Ban, Clock, Crown, Search, User, Shield, Trash2, MessageSquare } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
@@ -299,13 +300,13 @@ export default function UserManagementPage() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-6">
-          <button
-            onClick={() => router.push('/admin')}
-            className="flex items-center gap-2 text-gray-500 hover:text-white transition-colors mb-4"
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white mb-4 transition-colors"
           >
-            <ArrowLeft size={16} />
-            Back to Admin Panel
-          </button>
+            <ArrowLeft size={14} />
+            Back to Admin
+          </Link>
 
           {loading ? (
             <div className="flex items-center justify-center py-20">

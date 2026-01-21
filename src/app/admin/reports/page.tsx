@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { Loader2, Flag, Search, Eye, CheckCircle, XCircle, MessageSquare, Users, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Flag, Search, Eye, CheckCircle, XCircle, MessageSquare, Users, Save } from 'lucide-react';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
 
@@ -153,6 +154,14 @@ export default function ReportsPage() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-6">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white mb-4 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Back to Admin
+          </Link>
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-black uppercase tracking-tighter">Chat Reports</h1>

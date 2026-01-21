@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
-import { Copy, Loader2, Shield, Wallet } from 'lucide-react';
+import { ArrowLeft, Copy, Loader2, Shield, Wallet } from 'lucide-react';
 
 type LedgerEntry = {
   id?: string;
@@ -344,6 +345,14 @@ export default function AdminCreditsPage() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-24">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white mb-6 md:mb-8 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Back to Admin
+          </Link>
+
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
             <div className="flex items-start justify-between gap-6 flex-wrap">
               <div>

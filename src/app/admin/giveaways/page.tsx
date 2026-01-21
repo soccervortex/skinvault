@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
-import { Loader2, Shield, Trophy, Users, Gift, Copy } from 'lucide-react';
+import { ArrowLeft, Loader2, Shield, Trophy, Users, Gift, Copy } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 type GiveawayAdminRow = {
@@ -668,6 +669,14 @@ export default function AdminGiveawaysPage() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-24">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white mb-6 md:mb-8 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Back to Admin
+          </Link>
+
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
               <div>

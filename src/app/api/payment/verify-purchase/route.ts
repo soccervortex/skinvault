@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { notifyProPurchase, notifyConsumablePurchase } from '@/app/utils/discord-webhook';
+import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict } from '@/app/utils/discord-webhook';
 import { createUserNotification } from '@/app/utils/user-notifications';
 
 // Helper to get Stripe instance (checks for test mode)
@@ -24,6 +24,21 @@ async function getStripeInstance(): Promise<Stripe> {
   return new Stripe(secretKey, {
     apiVersion: '2025-12-15.clover',
   });
+}
+
+async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<string, any>) {
+  const purchasesKey = 'purchase_history';
+  const purchases = (await dbGet<Array<any>>(purchasesKey)) || [];
+  let updated = false;
+  const next = purchases.map((p) => {
+    if (!p || updated) return p;
+    if (String(p.sessionId || '').trim() !== String(sessionId || '').trim()) return p;
+    updated = true;
+    return { ...p, ...patch };
+  });
+  if (updated) {
+    await dbSet(purchasesKey, next.slice(-1000));
+  }
 }
 
 // Verify and fulfill a purchase if it wasn't already fulfilled
@@ -64,6 +79,7 @@ export async function POST(request: Request) {
     // Check if reward was actually granted (not just if purchase exists)
     const type = session.metadata?.type;
     const consumableType = session.metadata?.consumableType;
+    const months = Number(session.metadata?.months || 0);
     
     if (type === 'consumable' && consumableType) {
       const rewardsKey = 'user_rewards';
@@ -74,6 +90,29 @@ export async function POST(request: Request) {
       );
       
       if (rewardGranted) {
+        if (purchase && purchase?.discordNotified !== true) {
+          const quantityRaw = Number(session.metadata?.quantity || purchase?.quantity || 0);
+          const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? Math.floor(quantityRaw) : 1;
+          const amount = session.amount_total ? (session.amount_total / 100) : 0;
+          const currency = session.currency || 'eur';
+          const nextAttempts = Math.max(0, Math.floor(Number(purchase?.discordNotifyAttempts || 0))) + 1;
+          try {
+            await updatePurchaseDiscordStatus(session.id, {
+              discordNotifyAttempts: nextAttempts,
+              discordNotifyLastAttemptAt: new Date().toISOString(),
+            });
+            await notifyConsumablePurchaseStrict(steamId, consumableType, quantity, amount, currency, session.id);
+            await updatePurchaseDiscordStatus(session.id, {
+              discordNotified: true,
+              discordNotifiedAt: new Date().toISOString(),
+              discordNotifyError: null,
+            });
+          } catch (error: any) {
+            await updatePurchaseDiscordStatus(session.id, {
+              discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+            });
+          }
+        }
         return NextResponse.json({ 
           fulfilled: true,
           message: 'Reward already granted',
@@ -83,16 +122,47 @@ export async function POST(request: Request) {
       }
       // Continue to grant reward even if purchase exists in history
     } else if (purchase) {
-      // For Pro subscriptions, if purchase exists, it's fulfilled
-      return NextResponse.json({ 
+      if (purchase?.discordNotified !== true) {
+        const amount = session.amount_total ? (session.amount_total / 100) : 0;
+        const currency = session.currency || 'eur';
+        const nextAttempts = Math.max(0, Math.floor(Number(purchase?.discordNotifyAttempts || 0))) + 1;
+        try {
+          await updatePurchaseDiscordStatus(session.id, {
+            discordNotifyAttempts: nextAttempts,
+            discordNotifyLastAttemptAt: new Date().toISOString(),
+          });
+
+          const t = String(type || '').trim();
+          if (t === 'credits') {
+            const credits = Number(session.metadata?.credits || purchase?.credits || 0);
+            const pack = String(session.metadata?.pack || purchase?.pack || '');
+            await notifyCreditsPurchaseStrict(steamId, credits, pack, amount, currency, session.id);
+          } else {
+            const proUntil = String(session.metadata?.proUntil || purchase?.proUntil || '');
+            await notifyProPurchaseStrict(steamId, months, amount, currency, proUntil, session.id);
+          }
+
+          await updatePurchaseDiscordStatus(session.id, {
+            discordNotified: true,
+            discordNotifiedAt: new Date().toISOString(),
+            discordNotifyError: null,
+          });
+        } catch (error: any) {
+          await updatePurchaseDiscordStatus(session.id, {
+            discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+          });
+        }
+      }
+
+      // For Pro subscriptions / credits, if purchase exists, it's fulfilled
+      return NextResponse.json({
         fulfilled: true,
         message: 'Purchase already fulfilled',
-        sessionId 
+        sessionId,
       });
     }
 
     // Fulfill the purchase
-    const months = Number(session.metadata?.months || 0);
 
     // Handle credits purchase
     if (type === 'credits') {
@@ -143,20 +213,53 @@ export async function POST(request: Request) {
       } catch {
       }
 
-      existingPurchases.push({
+      const amount = session.amount_total ? (session.amount_total / 100) : 0;
+      const currency = session.currency || 'eur';
+      const nowIso = new Date().toISOString();
+      const record = {
         steamId,
         type: 'credits',
         credits,
         pack,
-        amount: session.amount_total ? (session.amount_total / 100) : 0,
-        currency: session.currency || 'eur',
+        amount,
+        currency,
         sessionId: session.id,
-        timestamp: new Date().toISOString(),
-        verifiedAt: new Date().toISOString(),
+        timestamp: nowIso,
+        verifiedAt: nowIso,
         verifiedBy: 'manual_verification',
-      });
+        fulfilled: true,
+        fulfilledAt: nowIso,
+        paymentIntentId: (session.payment_intent as string) || null,
+        customerId: (session.customer as string) || null,
+        discordNotified: false,
+        discordNotifyAttempts: 0,
+      };
+
+      const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
+      if (existingIdx >= 0) {
+        existingPurchases[existingIdx] = { ...existingPurchases[existingIdx], ...record };
+      } else {
+        existingPurchases.push(record);
+      }
 
       await dbSet(purchasesKey, existingPurchases.slice(-1000));
+
+      try {
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotifyAttempts: 1,
+          discordNotifyLastAttemptAt: new Date().toISOString(),
+        });
+        await notifyCreditsPurchaseStrict(steamId, credits, pack, amount, currency, session.id);
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotified: true,
+          discordNotifiedAt: new Date().toISOString(),
+          discordNotifyError: null,
+        });
+      } catch (error: any) {
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+        });
+      }
 
       return NextResponse.json({
         fulfilled: true,
@@ -172,28 +275,53 @@ export async function POST(request: Request) {
       const { grantPro } = await import('@/app/utils/pro-storage');
       const proUntil = await grantPro(steamId, months);
       
-      // Record purchase
-      existingPurchases.push({
+      const amount = session.amount_total ? (session.amount_total / 100) : 0;
+      const currency = session.currency || 'eur';
+      const nowIso = new Date().toISOString();
+      const record = {
         steamId,
         type: 'pro',
         months,
-        amount: session.amount_total ? (session.amount_total / 100) : 0,
-        currency: session.currency || 'eur',
+        amount,
+        currency,
         sessionId: session.id,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso,
         proUntil,
-        verifiedAt: new Date().toISOString(),
+        verifiedAt: nowIso,
         verifiedBy: 'manual_verification',
-      });
+        fulfilled: true,
+        fulfilledAt: nowIso,
+        paymentIntentId: (session.payment_intent as string) || null,
+        customerId: (session.customer as string) || null,
+        discordNotified: false,
+        discordNotifyAttempts: 0,
+      };
+
+      const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
+      if (existingIdx >= 0) {
+        existingPurchases[existingIdx] = { ...existingPurchases[existingIdx], ...record };
+      } else {
+        existingPurchases.push(record);
+      }
       
       await dbSet(purchasesKey, existingPurchases.slice(-1000));
-      
-      // Send Discord notification for manually verified Pro purchase
-      const amount = session.amount_total ? (session.amount_total / 100) : 0;
-      const currency = session.currency || 'eur';
-      notifyProPurchase(steamId, months, amount, currency, proUntil, session.id).catch(error => {
-        console.error('Failed to send Pro purchase notification:', error);
-      });
+
+      try {
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotifyAttempts: 1,
+          discordNotifyLastAttemptAt: new Date().toISOString(),
+        });
+        await notifyProPurchaseStrict(steamId, months, amount, currency, proUntil, session.id);
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotified: true,
+          discordNotifiedAt: new Date().toISOString(),
+          discordNotifyError: null,
+        });
+      } catch (error: any) {
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+        });
+      }
 
       try {
         const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
@@ -254,28 +382,53 @@ export async function POST(request: Request) {
           console.log(`ℹ️ Rewards already granted for session ${sessionId}`);
         }
 
-        // Record purchase
-        existingPurchases.push({
+        const amount = session.amount_total ? (session.amount_total / 100) : 0;
+        const currency = session.currency || 'eur';
+        const nowIso = new Date().toISOString();
+        const record = {
           steamId,
           type: 'consumable',
           consumableType,
           quantity,
-          amount: session.amount_total ? (session.amount_total / 100) : 0,
-          currency: session.currency || 'eur',
+          amount,
+          currency,
           sessionId: session.id,
-          timestamp: new Date().toISOString(),
-          verifiedAt: new Date().toISOString(),
+          timestamp: nowIso,
+          verifiedAt: nowIso,
           verifiedBy: 'manual_verification',
-        });
+          fulfilled: true,
+          fulfilledAt: nowIso,
+          paymentIntentId: (session.payment_intent as string) || null,
+          customerId: (session.customer as string) || null,
+          discordNotified: false,
+          discordNotifyAttempts: 0,
+        };
+
+        const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
+        if (existingIdx >= 0) {
+          existingPurchases[existingIdx] = { ...existingPurchases[existingIdx], ...record };
+        } else {
+          existingPurchases.push(record);
+        }
         
         await dbSet(purchasesKey, existingPurchases.slice(-1000));
 
-        // Send Discord notification for manually verified consumable purchase
-        const amount = session.amount_total ? (session.amount_total / 100) : 0;
-        const currency = session.currency || 'eur';
-        notifyConsumablePurchase(steamId, consumableType, quantity, amount, currency, session.id).catch(error => {
-          console.error('Failed to send consumable purchase notification:', error);
-        });
+        try {
+          await updatePurchaseDiscordStatus(session.id, {
+            discordNotifyAttempts: 1,
+            discordNotifyLastAttemptAt: new Date().toISOString(),
+          });
+          await notifyConsumablePurchaseStrict(steamId, consumableType, quantity, amount, currency, session.id);
+          await updatePurchaseDiscordStatus(session.id, {
+            discordNotified: true,
+            discordNotifiedAt: new Date().toISOString(),
+            discordNotifyError: null,
+          });
+        } catch (error: any) {
+          await updatePurchaseDiscordStatus(session.id, {
+            discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+          });
+        }
 
         try {
           const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
