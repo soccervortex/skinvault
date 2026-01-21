@@ -202,13 +202,13 @@ export default function ShopPage() {
               <ShoppingCart className="text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black mb-1">Consumables</p>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black mb-1">Store</p>
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">Shop</h1>
             </div>
           </div>
 
           <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed mb-6 md:mb-8">
-            Purchase consumables to enhance your free account. Perfect if you only need specific features without a full Pro subscription.
+            Purchase credits, spins, and consumables to enhance your account. Perfect if you only need specific features without a full Pro subscription.
           </p>
 
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4">

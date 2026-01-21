@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
-import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import { getWearFloatRange, getWearNameFromSkin } from '@/app/utils/skin-utils';
@@ -98,8 +98,10 @@ function CompareContent() {
 
   // Hydrate wishlist / user / Pro status once
   useEffect(() => {
+    let cancelled = false;
     try {
       if (typeof window === "undefined") return;
+
       // Test localStorage accessibility first
       const testKey = '__localStorage_test__';
       window.localStorage.setItem(testKey, 'test');
@@ -110,6 +112,17 @@ function CompareContent() {
       setUser(parsedUser);
       const steamId = parsedUser?.steamId || null;
       setWishlist(loadWishlist(steamId));
+
+        if (steamId) {
+          fetchWishlistFromServer()
+            .then((server) => {
+              if (cancelled) return;
+              if (!server.ok) return;
+              setWishlist(server.wishlist);
+              saveWishlist(server.wishlist, steamId);
+            })
+            .catch(() => {});
+        }
       
         // Check Pro status from API to ensure accuracy
         if (steamId) {
@@ -131,6 +144,9 @@ function CompareContent() {
       setWishlist([]);
       setIsPro(false);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch prices for both items when items or currency change
@@ -275,8 +291,8 @@ function CompareContent() {
                 />
                 <div className="relative z-10 space-y-4 md:space-y-6">
                   <button
-                    onClick={() => {
-                      const result = toggleWishlistEntry(
+                    onClick={async () => {
+                      const result = await toggleWishlistEntryServer(
                         {
                           key: wishlistKey,
                           name: skin.name,

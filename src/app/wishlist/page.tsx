@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import HelpTooltip from '@/app/components/HelpTooltip';
-import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync, getWishlistBatchSize, getWishlistBatchSizeSync, preloadRewards, clearRewardsCache } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
@@ -89,6 +89,7 @@ export default function WishlistPage() {
 
   // hydrate wishlist + currency + Pro status
   useEffect(() => {
+    let cancelled = false;
     try {
       if (typeof window !== 'undefined') {
         // Test localStorage accessibility first
@@ -101,6 +102,17 @@ export default function WishlistPage() {
         setUser(parsedUser);
         const steamId = parsedUser?.steamId || null;
         setItems(loadWishlist(steamId));
+
+        if (steamId) {
+          fetchWishlistFromServer()
+            .then((server) => {
+              if (cancelled) return;
+              if (!server.ok) return;
+              setItems(server.wishlist);
+              saveWishlist(server.wishlist, steamId);
+            })
+            .catch(() => {});
+        }
         
         // Load rewards to update limit (force refresh cache)
         if (steamId) {
@@ -140,6 +152,9 @@ export default function WishlistPage() {
       setIsPro(false);
     }
     setLoading(false);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // fetch prices for wishlist entries (Pro users get faster batch processing)
@@ -327,11 +342,11 @@ export default function WishlistPage() {
                     >
                       <div className="bg-[#11141d] p-7 rounded-[2.5rem] border border-white/5 flex flex-col group-hover:border-rose-500/40 transition-all group-hover:-translate-y-2 relative overflow-hidden shadow-xl">
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             const steamId = user?.steamId || null;
-                            const result = toggleWishlistEntry(entry, steamId, isPro);
+                            const result = await toggleWishlistEntryServer(entry, steamId, isPro);
                             if (result.success) {
                               setItems(result.newList);
                             } else if (result.reason === 'limit_reached') {

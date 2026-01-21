@@ -31,24 +31,50 @@ export function loadWishlist(steamId?: string | null): WishlistEntry[] {
   }
 }
 
+export type FetchWishlistResult = {
+  ok: boolean;
+  wishlist: WishlistEntry[];
+  status?: number;
+};
+
+export async function fetchWishlistFromServer(): Promise<FetchWishlistResult> {
+  try {
+    const res = await fetch('/api/wishlist', { cache: 'no-store' });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { ok: false, wishlist: [], status: res.status };
+    }
+    const arr = Array.isArray(json?.wishlist) ? (json.wishlist as any[]) : [];
+    return {
+      ok: true,
+      wishlist: arr.filter((e) => e && typeof e.key === 'string') as WishlistEntry[],
+      status: res.status,
+    };
+  } catch {
+    return { ok: false, wishlist: [] };
+  }
+}
+
 export function saveWishlist(entries: WishlistEntry[], steamId?: string | null) {
   if (typeof window === 'undefined') return;
   try {
     const key = getStorageKeyForUser(steamId);
     window.localStorage.setItem(key, JSON.stringify(entries));
-    
-    // Also sync to KV for Discord bot access
-    if (steamId) {
-      fetch('/api/wishlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steamId, wishlist: entries }),
-      }).catch(() => {
-        // Silently fail - this is just for bot sync
-      });
-    }
   } catch {
     // ignore quota / privacy errors
+  }
+}
+
+export async function saveWishlistToServer(entries: WishlistEntry[]): Promise<boolean> {
+  try {
+    const res = await fetch('/api/wishlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wishlist: entries }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -93,6 +119,45 @@ export function toggleWishlistEntry(
   }
   
   const next = [...current, entry];
+  saveWishlist(next, steamId);
+  return { success: true, newList: next };
+}
+
+export async function toggleWishlistEntryServer(
+  entry: WishlistEntry,
+  steamId?: string | null,
+  isProUser: boolean = false
+): Promise<ToggleWishlistResult> {
+  if (!steamId) {
+    return { success: false, newList: loadWishlist(null), reason: 'not_logged_in' };
+  }
+
+  const fetchResult = await fetchWishlistFromServer();
+  if (!fetchResult.ok) {
+    return { success: false, newList: loadWishlist(steamId), reason: 'not_logged_in' };
+  }
+
+  const current = fetchResult.wishlist;
+  const idx = current.findIndex((e) => e.key === entry.key);
+
+  // If removing, always allow
+  if (idx >= 0) {
+    const next = [...current.slice(0, idx), ...current.slice(idx + 1)];
+    await saveWishlistToServer(next);
+    saveWishlist(next, steamId);
+    return { success: true, newList: next };
+  }
+
+  const currentCount = current.length;
+  const limit = isProUser ? Infinity : getWishlistLimitSync(isProUser, steamId);
+  const canAdd = currentCount < limit;
+  if (!canAdd) {
+    saveWishlist(current, steamId);
+    return { success: false, newList: current, reason: 'limit_reached', limit, currentCount };
+  }
+
+  const next = [...current, entry];
+  await saveWishlistToServer(next);
   saveWishlist(next, steamId);
   return { success: true, newList: next };
 }

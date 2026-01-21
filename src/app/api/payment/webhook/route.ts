@@ -23,6 +23,33 @@ async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<stri
   }
 }
 
+async function getInvoicePatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const refreshed = await stripe.checkout.sessions.retrieve(String(session.id), {
+      expand: ['invoice'],
+    });
+
+    let invoiceId: string | null = null;
+    const rawInvoice = (refreshed as any)?.invoice;
+    if (typeof rawInvoice === 'string') invoiceId = rawInvoice;
+    else if (rawInvoice && typeof rawInvoice.id === 'string') invoiceId = rawInvoice.id;
+
+    if (!invoiceId) return {};
+
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    const patch: Record<string, any> = { invoiceId: invoice.id };
+    if (invoice.hosted_invoice_url) patch.invoiceUrl = invoice.hosted_invoice_url;
+    if (invoice.invoice_pdf) patch.invoicePdf = invoice.invoice_pdf;
+    if (invoice.number) patch.invoiceNumber = invoice.number;
+    return patch;
+  } catch {
+    return {};
+  }
+}
+
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
   // Check if test mode is enabled (use database abstraction)
@@ -100,6 +127,8 @@ export async function POST(request: Request) {
     const months = Number(session.metadata?.months || 0);
     const type = session.metadata?.type;
 
+    const invoicePatch = await getInvoicePatch(stripe, session);
+
     // Handle spins purchase
     if (steamId && type === 'spins') {
       const spins = Number(session.metadata?.spins || 0);
@@ -114,6 +143,16 @@ export async function POST(request: Request) {
 
           if (alreadyFulfilled) {
             console.log(`⚠️ Purchase ${session.id} already fulfilled, skipping`);
+            if (
+              existingPurchase &&
+              Object.keys(invoicePatch).length > 0 &&
+              !existingPurchase?.invoiceId
+            ) {
+              try {
+                await updatePurchaseDiscordStatus(session.id, invoicePatch);
+              } catch {
+              }
+            }
             return NextResponse.json({ received: true, message: 'Already fulfilled' });
           }
 
@@ -150,6 +189,7 @@ export async function POST(request: Request) {
               customerId: (session.customer as string) || null,
               discordNotified: false,
               discordNotifyAttempts: 0,
+              ...invoicePatch,
             });
 
             await dbSet(purchasesKey, existingPurchases.slice(-1000));
@@ -227,6 +267,17 @@ export async function POST(request: Request) {
           if (alreadyFulfilled) {
             console.log(`⚠️ Purchase ${session.id} already fulfilled, skipping`);
 
+            if (
+              existingPurchase &&
+              Object.keys(invoicePatch).length > 0 &&
+              !existingPurchase?.invoiceId
+            ) {
+              try {
+                await updatePurchaseDiscordStatus(session.id, invoicePatch);
+              } catch {
+              }
+            }
+
             if (existingPurchase?.discordNotified !== true) {
               try {
                 const amount = session.amount_total ? (session.amount_total / 100) : 0;
@@ -295,6 +346,7 @@ export async function POST(request: Request) {
               customerId: session.customer as string || null,
               discordNotified: false,
               discordNotifyAttempts: 0,
+              ...invoicePatch,
             });
 
             await dbSet(purchasesKey, existingPurchases.slice(-1000));
@@ -367,6 +419,12 @@ export async function POST(request: Request) {
         
         if (alreadyFulfilled) {
           console.log(`⚠️ Purchase ${session.id} already fulfilled, skipping`);
+          if (Object.keys(invoicePatch).length > 0) {
+            try {
+              await updatePurchaseDiscordStatus(session.id, invoicePatch);
+            } catch {
+            }
+          }
           return NextResponse.json({ received: true, message: 'Already fulfilled' });
         }
 
@@ -420,6 +478,7 @@ export async function POST(request: Request) {
             customerId: session.customer as string || null,
             discordNotified: false,
             discordNotifyAttempts: 0,
+            ...invoicePatch,
           });
           
           // Keep only last 1000 purchases
@@ -523,6 +582,12 @@ export async function POST(request: Request) {
           
           if (alreadyFulfilled) {
             console.log(`⚠️ Purchase ${session.id} already fulfilled, skipping`);
+            if (Object.keys(invoicePatch).length > 0) {
+              try {
+                await updatePurchaseDiscordStatus(session.id, invoicePatch);
+              } catch {
+              }
+            }
             return NextResponse.json({ received: true, message: 'Already fulfilled' });
           }
 
@@ -564,6 +629,7 @@ export async function POST(request: Request) {
               customerId: session.customer as string || null,
               discordNotified: false,
               discordNotifyAttempts: 0,
+              ...invoicePatch,
             });
             
             // Keep only last 1000 purchases

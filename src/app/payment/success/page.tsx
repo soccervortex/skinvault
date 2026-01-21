@@ -95,6 +95,10 @@ function PaymentSuccessContent() {
               credits: fulfillData.credits,
               spins: fulfillData.spins,
               pack: fulfillData.pack,
+              invoiceId: fulfillData.invoiceId,
+              invoiceUrl: fulfillData.invoiceUrl,
+              invoicePdf: fulfillData.invoicePdf,
+              invoiceNumber: fulfillData.invoiceNumber,
             });
           } else {
             throw new Error(fulfillData.error || 'Fulfillment failed');
@@ -244,6 +248,20 @@ function PaymentSuccessContent() {
           >
             Go to My Vault
           </Link>
+          {(() => {
+            const href = String(purchaseDetails?.invoiceUrl || purchaseDetails?.invoicePdf || '').trim();
+            if (!href) return null;
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-black/40 border border-white/10 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:border-white/20 transition-all"
+              >
+                Download Invoice
+              </a>
+            );
+          })()}
           {purchaseType === 'pro' ? (
             <Link
               href="/pro"

@@ -19,7 +19,7 @@ const SurpriseMeModal = dynamic(() => import('@/app/components/SurpriseMeModal')
   ssr: false,
 });
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
-import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
+import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 
@@ -154,6 +154,8 @@ export default function GlobalSkinSearch() {
   const [showSurpriseModal, setShowSurpriseModal] = useState(false);
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
 
+  const wishlistHydrateSteamIdRef = useRef<string | null>(null);
+
   // VEILIGE SYNC VOOR LOCALSTORAGE
   useEffect(() => {
     const updateStates = () => {
@@ -193,8 +195,20 @@ export default function GlobalSkinSearch() {
         setUser(parsedUser);
         
         if (parsedUser?.steamId) {
-          setWishlist(loadWishlist(parsedUser.steamId));
-          checkProStatus(parsedUser.steamId).then(setIsPro);
+          const sid = String(parsedUser.steamId);
+          setWishlist(loadWishlist(sid));
+          checkProStatus(sid).then(setIsPro);
+
+          if (wishlistHydrateSteamIdRef.current !== sid) {
+            wishlistHydrateSteamIdRef.current = sid;
+            fetchWishlistFromServer()
+              .then((server) => {
+                if (!server.ok) return;
+                setWishlist(server.wishlist);
+                saveWishlist(server.wishlist, sid);
+              })
+              .catch(() => {});
+          }
         }
         
         // Load currency
@@ -726,25 +740,28 @@ export default function GlobalSkinSearch() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              const isWishlisted = wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id);
-                              const result = toggleWishlistEntry(
-                                {
-                                  key: item.id,
-                                  name: item.name,
-                                  image: item.image,
-                                  market_hash_name: item.market_hash_name,
-                                  rarityName: item.rarity?.name,
-                                  rarityColor: item.rarity?.color,
-                                  weaponName: item.weapon?.name,
-                                },
-                                user.steamId,
-                                isPro,
-                              );
-                              if (result.success) {
-                                setWishlist(result.newList);
-                              } else if (result.reason === 'limit_reached') {
-                                setShowUpgradeModal(true);
-                              }
+                              void (async () => {
+                                const sid = String(user?.steamId || '').trim();
+                                if (!sid) return;
+                                const result = await toggleWishlistEntryServer(
+                                  {
+                                    key: item.id,
+                                    name: item.name,
+                                    image: item.image,
+                                    market_hash_name: item.market_hash_name,
+                                    rarityName: item.rarity?.name,
+                                    rarityColor: item.rarity?.color,
+                                    weaponName: item.weapon?.name,
+                                  },
+                                  sid,
+                                  isPro,
+                                );
+                                if (result.success) {
+                                  setWishlist(result.newList);
+                                } else if (result.reason === 'limit_reached') {
+                                  setShowUpgradeModal(true);
+                                }
+                              })();
                             }}
                             className={`p-2 md:p-2.5 rounded-lg md:rounded-xl border bg-black/60 backdrop-blur-md transition-all flex items-center justify-center ${
                               wishlist.some(w => w.market_hash_name === item.market_hash_name || w.key === item.id)

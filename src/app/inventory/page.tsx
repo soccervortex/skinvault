@@ -27,7 +27,7 @@ import ShareButton from '@/app/components/ShareButton';
 import { copyToClipboard } from '@/app/utils/clipboard';
 import { useToast } from '@/app/components/Toast';
 import { isBanned } from '@/app/utils/ban-check';
-import { loadWishlist, toggleWishlistEntry } from '@/app/utils/wishlist';
+import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer } from '@/app/utils/wishlist';
 import { getRankForValue } from '@/app/utils/rank-tiers';
 import { isOwner } from '@/app/utils/owner-ids';
 
@@ -295,6 +295,7 @@ function InventoryContent() {
   const toast = useToast();
 
   useEffect(() => {
+    let cancelled = false;
     const onUserUpdated = () => {
       try {
         const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -303,7 +304,14 @@ function InventoryContent() {
 
         if (sid && /^\d{17}$/.test(sid)) {
           setLoggedInUser(parsed);
-          setWishlist(loadWishlist(sid));
+          fetchWishlistFromServer()
+            .then((server) => {
+              if (cancelled) return;
+              if (!server.ok) return;
+              setWishlist(server.wishlist);
+              saveWishlist(server.wishlist, sid);
+            })
+            .catch(() => {});
           checkProStatus(sid).then(setLoggedInUserPro).catch(() => setLoggedInUserPro(false));
           return;
         }
@@ -320,7 +328,10 @@ function InventoryContent() {
 
     onUserUpdated();
     window.addEventListener('userUpdated', onUserUpdated);
-    return () => window.removeEventListener('userUpdated', onUserUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('userUpdated', onUserUpdated);
+    };
   }, []);
 
   const cacheKey = useMemo(() => `sv_price_cache_${currency.code}`, [currency.code]);
@@ -1194,7 +1205,7 @@ function InventoryContent() {
           return;
         }
       }
-      
+
       // Fetch Pro status of the VIEWED profile (only used for displaying badges, not gating features)
       let proInfo: any = { proUntil: null };
       try {
@@ -1901,7 +1912,7 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="grid grid-cols-2 gap-2 w-full mt-3 md:mt-4 md:flex md:items-center md:gap-3 md:flex-wrap">
+                    <div className="grid grid-cols-2 gap-2 w-full md:flex md:items-center md:gap-3 md:flex-wrap">
                       <button
                         onClick={() => setViewAsOthers(true)}
                         className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
@@ -2480,21 +2491,24 @@ function InventoryContent() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                const result = toggleWishlistEntry(
-                                  {
-                                    key: wishlistKey,
-                                    name: getItemDisplayName(item),
-                                    image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
-                                    market_hash_name: itemKey,
-                                  },
-                                  loggedInUser.steamId,
-                                  loggedInUserPro,
-                                );
-                                if (result.success) {
-                                  setWishlist(result.newList);
-                                } else if (result.reason === 'limit_reached') {
-                                  setShowUpgradeModal(true);
-                                }
+                                void (async () => {
+                                  const sid = String(loggedInUser?.steamId || '').trim();
+                                  const result = await toggleWishlistEntryServer(
+                                    {
+                                      key: wishlistKey,
+                                      name: getItemDisplayName(item),
+                                      image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}`,
+                                      market_hash_name: itemKey,
+                                    },
+                                    sid,
+                                    loggedInUserPro,
+                                  );
+                                  if (result.success) {
+                                    setWishlist(result.newList);
+                                  } else if (result.reason === 'limit_reached') {
+                                    setShowUpgradeModal(true);
+                                  }
+                                })();
                               }}
                               className={`p-2 rounded-lg border border-white/10 bg-black/60 transition-all ${
                                 isWishlisted 

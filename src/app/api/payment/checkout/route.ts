@@ -100,6 +100,8 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
+      customer_creation: 'always',
+      invoice_creation: { enabled: true },
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&steamId=${steamId}&months=${priceInfo.months}`,
       cancel_url: `${origin}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: expiresAt,

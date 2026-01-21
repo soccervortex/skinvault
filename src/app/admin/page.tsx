@@ -1821,7 +1821,13 @@ export default function AdminPage() {
                         {new Date(purchase.timestamp).toLocaleString()}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
-                        {purchase.type === "pro" ? "👑 Pro" : "🎁 Consumable"}
+                        {purchase.type === 'pro'
+                          ? '👑 Pro'
+                          : (purchase.type === 'credits'
+                            ? '💳 Credits'
+                            : (purchase.type === 'spins'
+                              ? '🎰 Spins'
+                              : '🎁 Consumable'))}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.currency === "eur" ? "€" : "$"}
@@ -1829,32 +1835,99 @@ export default function AdminPage() {
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
                         {purchase.fulfilled !== false ? (
-                          <span className="text-emerald-400">✅ Fulfilled</span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-emerald-400">✅ Fulfilled</span>
+                            {purchase.discordNotified === true ? (
+                              <span className="text-emerald-400">🔔 Discord</span>
+                            ) : (
+                              <span className="text-amber-400">🔕 Discord pending</span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-red-400">❌ Failed</span>
                         )}
                       </td>
                       <td className="py-2 pr-2 text-[9px]">
-                        {purchase.type === "pro"
-                          ? `${purchase.months} month${purchase.months > 1 ? "s" : ""}`
-                          : `${purchase.quantity}x ${purchase.consumableType || "item"}`}
+                        {(() => {
+                          const t = String(purchase.type || '').trim();
+                          if (t === 'pro') {
+                            const months = Math.max(0, Math.floor(Number(purchase.months || 0)));
+                            return months > 0 ? `${months} month${months > 1 ? 's' : ''}` : '—';
+                          }
+                          if (t === 'credits') {
+                            const credits = Math.max(0, Math.floor(Number(purchase.credits || 0)));
+                            const pack = String(purchase.pack || '').trim();
+                            if (credits > 0 && pack) return `${credits.toLocaleString('en-US')} credits (${pack})`;
+                            if (credits > 0) return `${credits.toLocaleString('en-US')} credits`;
+                            if (pack) return `Credits pack (${pack})`;
+                            return 'Credits purchase';
+                          }
+                          if (t === 'spins') {
+                            const spins = Math.max(0, Math.floor(Number((purchase as any).spins || 0)));
+                            const pack = String(purchase.pack || '').trim();
+                            if (spins > 0 && pack) return `${spins.toLocaleString('en-US')} spins (${pack})`;
+                            if (spins > 0) return `${spins.toLocaleString('en-US')} spins`;
+                            if (pack) return `Spins pack (${pack})`;
+                            return 'Spins purchase';
+                          }
+                          const quantityRaw = Number(purchase.quantity);
+                          const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? Math.floor(quantityRaw) : 1;
+                          const item = String(purchase.consumableType || (purchase as any).itemType || 'item');
+                          return `${quantity}x ${item}`;
+                        })()}
                       </td>
                       <td className="py-2 pr-2">
-                        <button
-                          onClick={() => handleFixPurchase(purchase.sessionId, purchase.steamId)}
-                          disabled={fixingPurchase}
-                          className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-2 py-1 rounded text-[8px] font-black uppercase transition-all disabled:opacity-60 flex items-center gap-1"
-                        >
-                          {fixingPurchase ? (
-                            <>
-                              <Loader2 className="w-2 h-2 animate-spin" /> Fixing...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 size={10} /> Fix
-                            </>
+                        <div className="flex items-center gap-2">
+                          {purchase.fulfilled === false && (
+                            <button
+                              onClick={() => handleFixPurchase(purchase.sessionId, purchase.steamId)}
+                              disabled={fixingPurchase}
+                              className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-2 py-1 rounded text-[8px] font-black uppercase transition-all disabled:opacity-60 flex items-center gap-1"
+                            >
+                              {fixingPurchase ? (
+                                <>
+                                  <Loader2 className="w-2 h-2 animate-spin" /> Fixing...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={10} /> Fix
+                                </>
+                              )}
+                            </button>
                           )}
-                        </button>
+                          <button
+                            onClick={async () => {
+                              const sid = String(purchase?.sessionId || '').trim();
+                              if (!sid) {
+                                setFixError('Missing session id for this purchase.');
+                                return;
+                              }
+                              if (!confirm('Hide this purchase from the list?')) return;
+                              try {
+                                const res = await fetch('/api/admin/purchases', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+                                  },
+                                  body: JSON.stringify({ action: 'hide', sessionId: sid }),
+                                });
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok) {
+                                  setFixError(data?.error || 'Failed to hide purchase.');
+                                  return;
+                                }
+                                setUserPurchases((prev: any[]) => prev.filter((p: any) => String(p?.sessionId || '').trim() !== sid));
+                              } catch (e: any) {
+                                setFixError(e?.message || 'Failed to hide purchase.');
+                              }
+                            }}
+                            className="p-1 text-red-400 hover:text-red-300"
+                            title="Hide from list"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

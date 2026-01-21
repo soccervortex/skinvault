@@ -41,6 +41,33 @@ async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<stri
   }
 }
 
+async function getInvoicePatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const refreshed = await stripe.checkout.sessions.retrieve(String(session.id), {
+      expand: ['invoice'],
+    });
+
+    let invoiceId: string | null = null;
+    const rawInvoice = (refreshed as any)?.invoice;
+    if (typeof rawInvoice === 'string') invoiceId = rawInvoice;
+    else if (rawInvoice && typeof rawInvoice.id === 'string') invoiceId = rawInvoice.id;
+
+    if (!invoiceId) return {};
+
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    const patch: Record<string, any> = { invoiceId: invoice.id };
+    if (invoice.hosted_invoice_url) patch.invoiceUrl = invoice.hosted_invoice_url;
+    if (invoice.invoice_pdf) patch.invoicePdf = invoice.invoice_pdf;
+    if (invoice.number) patch.invoiceNumber = invoice.number;
+    return patch;
+  } catch {
+    return {};
+  }
+}
+
 // Verify and fulfill a purchase if it wasn't already fulfilled
 export async function POST(request: Request) {
   try {
@@ -54,6 +81,7 @@ export async function POST(request: Request) {
     
     // Retrieve the session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const invoicePatch = await getInvoicePatch(stripe, session);
 
     // Check if payment was successful
     if (session.payment_status !== 'paid') {
@@ -113,6 +141,13 @@ export async function POST(request: Request) {
             });
           }
         }
+
+        if (purchase && Object.keys(invoicePatch).length > 0 && !purchase?.invoiceId) {
+          try {
+            await updatePurchaseDiscordStatus(session.id, invoicePatch);
+          } catch {
+          }
+        }
         return NextResponse.json({ 
           fulfilled: true,
           message: 'Reward already granted',
@@ -122,6 +157,12 @@ export async function POST(request: Request) {
       }
       // Continue to grant reward even if purchase exists in history
     } else if (purchase) {
+      if (Object.keys(invoicePatch).length > 0 && !purchase?.invoiceId) {
+        try {
+          await updatePurchaseDiscordStatus(session.id, invoicePatch);
+        } catch {
+        }
+      }
       if (purchase?.discordNotified !== true) {
         const amount = session.amount_total ? (session.amount_total / 100) : 0;
         const currency = session.currency || 'eur';
@@ -237,6 +278,7 @@ export async function POST(request: Request) {
         customerId: (session.customer as string) || null,
         discordNotified: false,
         discordNotifyAttempts: 0,
+        ...invoicePatch,
       };
 
       const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
@@ -270,6 +312,7 @@ export async function POST(request: Request) {
         type: 'credits',
         credits,
         pack,
+        ...invoicePatch,
         message: `Granted ${credits} credits to ${steamId}`,
       });
     }
@@ -334,6 +377,7 @@ export async function POST(request: Request) {
         customerId: (session.customer as string) || null,
         discordNotified: false,
         discordNotifyAttempts: 0,
+        ...invoicePatch,
       };
 
       const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
@@ -367,6 +411,7 @@ export async function POST(request: Request) {
         type: 'spins',
         spins,
         pack,
+        ...invoicePatch,
         message: `Granted ${spins} spins to ${steamId}`,
       });
     }
@@ -396,6 +441,7 @@ export async function POST(request: Request) {
         customerId: (session.customer as string) || null,
         discordNotified: false,
         discordNotifyAttempts: 0,
+        ...invoicePatch,
       };
 
       const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
@@ -445,6 +491,7 @@ export async function POST(request: Request) {
         type: 'pro',
         months,
         proUntil,
+        ...invoicePatch,
         message: `Granted ${months} months Pro to ${steamId}`
       });
     }
@@ -503,6 +550,7 @@ export async function POST(request: Request) {
           customerId: (session.customer as string) || null,
           discordNotified: false,
           discordNotifyAttempts: 0,
+          ...invoicePatch,
         };
 
         const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
@@ -561,6 +609,7 @@ export async function POST(request: Request) {
           type: 'consumable',
           consumableType,
           quantity,
+          ...invoicePatch,
           message: `Granted ${quantity} ${consumableType} to ${steamId}`
         });
       }
@@ -618,6 +667,10 @@ export async function GET(request: Request) {
         timestamp: purchase.timestamp,
         amount: purchase.amount,
         currency: purchase.currency,
+        invoiceId: (purchase as any).invoiceId || null,
+        invoiceUrl: (purchase as any).invoiceUrl || null,
+        invoicePdf: (purchase as any).invoicePdf || null,
+        invoiceNumber: (purchase as any).invoiceNumber || null,
         ...(purchase.type === 'pro' && { months: purchase.months, proUntil: purchase.proUntil }),
         ...(purchase.type === 'consumable' && { consumableType: purchase.consumableType, quantity: purchase.quantity }),
         ...(purchase.type === 'credits' && { credits: purchase.credits, pack: purchase.pack }),

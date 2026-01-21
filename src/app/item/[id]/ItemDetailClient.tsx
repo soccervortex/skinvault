@@ -18,7 +18,7 @@ const CompareModal = dynamic(() => import('@/app/components/CompareModal'), {
 });
 import ShareButton from '@/app/components/ShareButton';
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
-import { loadWishlist, toggleWishlistEntry, WishlistEntry } from '@/app/utils/wishlist';
+import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 
@@ -106,6 +106,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
   // Hydrate dataset + price caches + wishlist once on mount
   useEffect(() => {
+    let cancelled = false;
     try {
       if (typeof window !== 'undefined') {
         // Test localStorage accessibility first
@@ -130,6 +131,17 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         setUser(parsedUser);
         const steamId = parsedUser?.steamId || null;
         setWishlist(loadWishlist(steamId));
+
+        if (steamId) {
+          fetchWishlistFromServer()
+            .then((server) => {
+              if (cancelled) return;
+              if (!server.ok) return;
+              setWishlist(server.wishlist);
+              saveWishlist(server.wishlist, steamId);
+            })
+            .catch(() => {});
+        }
         
         // Check Pro status from API to ensure accuracy
         if (steamId) {
@@ -144,6 +156,9 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
       setUser(null);
       setWishlist([]);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persistDatasetCache = () => {
@@ -1012,24 +1027,26 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {/* Wishlist Button (Mobile) */}
                 <button
                   onClick={() => {
-                    const result = toggleWishlistEntry(
-                      {
-                        key: wishlistKey,
-                        name: item.name,
-                        image: item.image,
-                        market_hash_name: (item as any).market_hash_name,
-                        rarityName: item.rarity?.name,
-                        rarityColor: item.rarity?.color,
-                        weaponName: item.weapon?.name,
-                      },
-                      steamId,
-                      isPro,
-                    );
-                    if (result.success) {
-                      setWishlist(result.newList);
-                    } else if (result.reason === 'limit_reached') {
-                      setShowUpgradeModal(true);
-                    }
+                    void (async () => {
+                      const result = await toggleWishlistEntryServer(
+                        {
+                          key: wishlistKey,
+                          name: item.name,
+                          image: item.image,
+                          market_hash_name: (item as any).market_hash_name,
+                          rarityName: item.rarity?.name,
+                          rarityColor: item.rarity?.color,
+                          weaponName: item.weapon?.name,
+                        },
+                        steamId,
+                        isPro,
+                      );
+                      if (result.success) {
+                        setWishlist(result.newList);
+                      } else if (result.reason === 'limit_reached') {
+                        setShowUpgradeModal(true);
+                      }
+                    })();
                   }}
                   className="inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-xl border border-white/10 bg-black/40 hover:bg-white/5 transition-all"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -1094,24 +1111,26 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 {/* Wishlist Button */}
                 <button
                   onClick={() => {
-                    const result = toggleWishlistEntry(
-                      {
-                        key: wishlistKey,
-                        name: item.name,
-                        image: item.image,
-                        market_hash_name: (item as any).market_hash_name,
-                        rarityName: item.rarity?.name,
-                        rarityColor: item.rarity?.color,
-                        weaponName: item.weapon?.name,
-                      },
-                      steamId,
-                      isPro,
-                    );
-                    if (result.success) {
-                      setWishlist(result.newList);
-                    } else if (result.reason === 'limit_reached') {
-                      setShowUpgradeModal(true);
-                    }
+                    void (async () => {
+                      const result = await toggleWishlistEntryServer(
+                        {
+                          key: wishlistKey,
+                          name: item.name,
+                          image: item.image,
+                          market_hash_name: (item as any).market_hash_name,
+                          rarityName: item.rarity?.name,
+                          rarityColor: item.rarity?.color,
+                          weaponName: item.weapon?.name,
+                        },
+                        steamId,
+                        isPro,
+                      );
+                      if (result.success) {
+                        setWishlist(result.newList);
+                      } else if (result.reason === 'limit_reached') {
+                        setShowUpgradeModal(true);
+                      }
+                    })();
                   }}
                   className="hidden md:inline-flex items-center justify-center p-2.5 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all shrink-0 min-h-[40px]"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}

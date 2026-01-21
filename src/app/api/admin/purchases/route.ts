@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       const purchasesKey = 'purchase_history';
       let purchases = await dbGet<Array<any>>(purchasesKey) || [];
 
-      if (!includeHidden && !targetSteamId) {
+      if (!includeHidden) {
         purchases = purchases.filter((p) => p && p.hidden !== true);
       }
       
@@ -120,6 +120,10 @@ export async function POST(request: Request) {
           const credits = Math.max(0, Math.floor(Number(purchase?.credits || 0)));
           const pack = String(purchase?.pack || '');
           await notifyCreditsPurchaseStrict(steamId, credits, pack, amount, currency, sessionId);
+        } else if (type === 'spins') {
+          const spins = Math.max(0, Math.floor(Number((purchase as any)?.spins || 0)));
+          const pack = String(purchase?.pack || '');
+          await notifySpinsPurchaseStrict(steamId, spins, pack, amount, currency, sessionId);
         } else {
           const consumableType = String(purchase?.consumableType || '');
           const quantity = Math.max(1, Math.floor(Number(purchase?.quantity || 1)));
