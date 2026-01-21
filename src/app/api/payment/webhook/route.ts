@@ -4,7 +4,7 @@ import { grantPro } from '@/app/utils/pro-storage';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { captureError, captureMessage } from '@/app/lib/error-handler';
 import { sendInngestEvent } from '@/app/lib/inngest';
-import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
 
@@ -100,6 +100,118 @@ export async function POST(request: Request) {
     const months = Number(session.metadata?.months || 0);
     const type = session.metadata?.type;
 
+    // Handle spins purchase
+    if (steamId && type === 'spins') {
+      const spins = Number(session.metadata?.spins || 0);
+      const pack = String(session.metadata?.pack || '');
+
+      if (spins > 0) {
+        try {
+          const purchasesKey = 'purchase_history';
+          const existingPurchases = (await dbGet<Array<any>>(purchasesKey)) || [];
+          const existingPurchase = existingPurchases.find((p) => p?.sessionId === session.id);
+          const alreadyFulfilled = !!existingPurchase;
+
+          if (alreadyFulfilled) {
+            console.log(`⚠️ Purchase ${session.id} already fulfilled, skipping`);
+            return NextResponse.json({ received: true, message: 'Already fulfilled' });
+          }
+
+          const db = await getDatabase();
+          const bonusCol = db.collection('bonus_spins');
+          const now = new Date();
+
+          await bonusCol.updateOne(
+            { _id: steamId } as any,
+            {
+              $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+              $inc: { count: spins },
+              $set: { updatedAt: now },
+            } as any,
+            { upsert: true }
+          );
+
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+
+          try {
+            existingPurchases.push({
+              steamId,
+              type: 'spins',
+              spins,
+              pack,
+              amount,
+              currency,
+              sessionId: session.id,
+              timestamp: new Date().toISOString(),
+              fulfilled: true,
+              fulfilledAt: new Date().toISOString(),
+              paymentIntentId: (session.payment_intent as string) || null,
+              customerId: (session.customer as string) || null,
+              discordNotified: false,
+              discordNotifyAttempts: 0,
+            });
+
+            await dbSet(purchasesKey, existingPurchases.slice(-1000));
+            console.log(`✅ Purchase ${session.id} recorded in history`);
+          } catch (error) {
+            console.error('Failed to record purchase history:', error);
+          }
+
+          try {
+            await updatePurchaseDiscordStatus(session.id, {
+              discordNotifyAttempts: 1,
+              discordNotifyLastAttemptAt: new Date().toISOString(),
+            });
+            await notifySpinsPurchaseStrict(steamId, spins, pack, amount, currency, session.id);
+            await updatePurchaseDiscordStatus(session.id, {
+              discordNotified: true,
+              discordNotifiedAt: new Date().toISOString(),
+              discordNotifyError: null,
+            });
+          } catch (error: any) {
+            console.error('Failed to send spins purchase notification:', error);
+            await updatePurchaseDiscordStatus(session.id, {
+              discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+            });
+          }
+
+          try {
+            await createUserNotification(
+              db,
+              steamId,
+              'purchase_spins',
+              'Spins Purchased',
+              `Your purchase was successful. ${spins.toLocaleString('en-US')} bonus spins were added to your account.`,
+              { pack, spins, sessionId: session.id }
+            );
+          } catch {
+          }
+
+          console.log(`✅ Granted ${spins} bonus spins to ${steamId}`);
+        } catch (error) {
+          console.error('❌ Failed to grant bonus spins:', error);
+          try {
+            const failedKey = 'failed_purchases';
+            const failed = (await dbGet<Array<any>>(failedKey)) || [];
+            failed.push({
+              sessionId: session.id,
+              steamId,
+              type: 'spins',
+              spins,
+              pack: String(session.metadata?.pack || ''),
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: new Date().toISOString(),
+              amount: session.amount_total ? session.amount_total / 100 : 0,
+            });
+            await dbSet(failedKey, failed.slice(-100));
+          } catch (err) {
+            console.error('Failed to record failed purchase:', err);
+          }
+        }
+      }
+    }
+
     // Handle credits purchase
     if (steamId && type === 'credits') {
       const credits = Number(session.metadata?.credits || 0);
@@ -131,6 +243,7 @@ export async function POST(request: Request) {
                   discordNotifyError: null,
                 });
               } catch (error: any) {
+                console.error('Failed to send credits purchase notification (retry):', error);
                 await updatePurchaseDiscordStatus(session.id, {
                   discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
                 });
@@ -202,6 +315,7 @@ export async function POST(request: Request) {
               discordNotifyError: null,
             });
           } catch (error: any) {
+            console.error('Failed to send credits purchase notification:', error);
             await updatePurchaseDiscordStatus(session.id, {
               discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
             });
@@ -469,6 +583,7 @@ export async function POST(request: Request) {
                 discordNotifyError: null,
               });
             } catch (error: any) {
+              console.error('Failed to send consumable purchase notification:', error);
               await updatePurchaseDiscordStatus(session.id, {
                 discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
               });

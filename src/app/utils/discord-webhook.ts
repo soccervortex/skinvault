@@ -382,6 +382,50 @@ export async function notifyCreditsPurchaseStrict(steamId: string, credits: numb
   await sendDiscordWebhookStrict([embed], 'purchases');
 }
 
+export async function notifySpinsPurchaseStrict(steamId: string, spins: number, pack: string, amount: number, currency: string, sessionId: string): Promise<void> {
+  const packLabel = String(pack || '').trim();
+  const details = packLabel ? `${spins.toLocaleString('en-US')} spins (${packLabel})` : `${spins.toLocaleString('en-US')} spins`;
+
+  const embed: DiscordEmbed = {
+    title: '🎡 Spins Purchase',
+    description: 'A user has purchased spins!',
+    color: 0x00ff00,
+    fields: [
+      {
+        name: 'Steam ID',
+        value: `\`${steamId}\``,
+        inline: true,
+      },
+      {
+        name: 'Spins',
+        value: details,
+        inline: true,
+      },
+      {
+        name: 'Amount',
+        value: `${amount.toFixed(2)} ${currency.toUpperCase()}`,
+        inline: true,
+      },
+      {
+        name: 'Session ID',
+        value: `\`${sessionId}\``,
+        inline: false,
+      },
+      {
+        name: 'Timestamp',
+        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+        inline: false,
+      },
+    ],
+    footer: {
+      text: 'SkinVaults Notification System',
+    },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhookStrict([embed], 'purchases');
+}
+
 export async function notifyProPurchaseStrict(steamId: string, months: number, amount: number, currency: string, proUntil: string, sessionId: string): Promise<void> {
   const embed: DiscordEmbed = {
     title: '💰 Pro Purchase',

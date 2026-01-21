@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { createUserNotification } from '@/app/utils/user-notifications';
 
 // Helper to get Stripe instance (checks for test mode)
@@ -137,6 +137,10 @@ export async function POST(request: Request) {
             const credits = Number(session.metadata?.credits || purchase?.credits || 0);
             const pack = String(session.metadata?.pack || purchase?.pack || '');
             await notifyCreditsPurchaseStrict(steamId, credits, pack, amount, currency, session.id);
+          } else if (t === 'spins') {
+            const spins = Number(session.metadata?.spins || purchase?.spins || 0);
+            const pack = String(session.metadata?.pack || purchase?.pack || '');
+            await notifySpinsPurchaseStrict(steamId, spins, pack, amount, currency, session.id);
           } else {
             const proUntil = String(session.metadata?.proUntil || purchase?.proUntil || '');
             await notifyProPurchaseStrict(steamId, months, amount, currency, proUntil, session.id);
@@ -267,6 +271,103 @@ export async function POST(request: Request) {
         credits,
         pack,
         message: `Granted ${credits} credits to ${steamId}`,
+      });
+    }
+
+    // Handle spins purchase
+    if (type === 'spins') {
+      const spins = Number(session.metadata?.spins || 0);
+      const pack = String(session.metadata?.pack || '');
+
+      if (spins <= 0) {
+        return NextResponse.json({ error: 'Invalid spins amount' }, { status: 400 });
+      }
+
+      const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
+      if (!hasMongoConfig()) {
+        return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+      }
+
+      const db = await getDatabase();
+      const bonusCol = db.collection('bonus_spins');
+      const now = new Date();
+
+      await bonusCol.updateOne(
+        { _id: steamId } as any,
+        {
+          $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+          $inc: { count: spins },
+          $set: { updatedAt: now },
+        } as any,
+        { upsert: true }
+      );
+
+      try {
+        await createUserNotification(
+          db,
+          steamId,
+          'purchase_spins',
+          'Spins Purchased',
+          `Your purchase was verified and fulfilled. ${spins.toLocaleString('en-US')} bonus spins were added to your account.`,
+          { pack, spins, sessionId: session.id, verifiedBy: 'manual_verification' }
+        );
+      } catch {
+      }
+
+      const amount = session.amount_total ? (session.amount_total / 100) : 0;
+      const currency = session.currency || 'eur';
+      const nowIso = new Date().toISOString();
+      const record = {
+        steamId,
+        type: 'spins',
+        spins,
+        pack,
+        amount,
+        currency,
+        sessionId: session.id,
+        timestamp: nowIso,
+        verifiedAt: nowIso,
+        verifiedBy: 'manual_verification',
+        fulfilled: true,
+        fulfilledAt: nowIso,
+        paymentIntentId: (session.payment_intent as string) || null,
+        customerId: (session.customer as string) || null,
+        discordNotified: false,
+        discordNotifyAttempts: 0,
+      };
+
+      const existingIdx = existingPurchases.findIndex((p) => String(p?.sessionId || '').trim() === String(session.id || '').trim());
+      if (existingIdx >= 0) {
+        existingPurchases[existingIdx] = { ...existingPurchases[existingIdx], ...record };
+      } else {
+        existingPurchases.push(record);
+      }
+
+      await dbSet(purchasesKey, existingPurchases.slice(-1000));
+
+      try {
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotifyAttempts: 1,
+          discordNotifyLastAttemptAt: new Date().toISOString(),
+        });
+        await notifySpinsPurchaseStrict(steamId, spins, pack, amount, currency, session.id);
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotified: true,
+          discordNotifiedAt: new Date().toISOString(),
+          discordNotifyError: null,
+        });
+      } catch (error: any) {
+        await updatePurchaseDiscordStatus(session.id, {
+          discordNotifyError: error?.message || 'Failed to send Discord purchase notification',
+        });
+      }
+
+      return NextResponse.json({
+        fulfilled: true,
+        type: 'spins',
+        spins,
+        pack,
+        message: `Granted ${spins} spins to ${steamId}`,
       });
     }
 
@@ -520,6 +621,7 @@ export async function GET(request: Request) {
         ...(purchase.type === 'pro' && { months: purchase.months, proUntil: purchase.proUntil }),
         ...(purchase.type === 'consumable' && { consumableType: purchase.consumableType, quantity: purchase.quantity }),
         ...(purchase.type === 'credits' && { credits: purchase.credits, pack: purchase.pack }),
+        ...(purchase.type === 'spins' && { spins: purchase.spins, pack: purchase.pack }),
       }
     });
 

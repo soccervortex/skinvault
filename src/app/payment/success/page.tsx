@@ -10,7 +10,7 @@ function PaymentSuccessContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | 'credits' | null>(null);
+  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | 'credits' | 'spins' | null>(null);
   const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
 
   useEffect(() => {
@@ -22,6 +22,7 @@ function PaymentSuccessContent() {
     const quantity = searchParams.get('quantity');
     const credits = searchParams.get('credits');
     const pack = searchParams.get('pack');
+    const spins = searchParams.get('spins');
 
     if (!sessionId || !steamId || !type) {
       setError('Missing payment information');
@@ -48,7 +49,13 @@ function PaymentSuccessContent() {
       return;
     }
 
-    setPurchaseType(type as 'pro' | 'consumable' | 'credits');
+    if (type === 'spins' && (!spins || !pack)) {
+      setError('Missing payment information (spins details)');
+      setLoading(false);
+      return;
+    }
+
+    setPurchaseType(type as 'pro' | 'consumable' | 'credits' | 'spins');
 
     // Give webhook a moment to process, then verify and refresh user data
     const verifyAndRefresh = async (retries = 5) => {
@@ -86,6 +93,7 @@ function PaymentSuccessContent() {
               months: fulfillData.months,
               proUntil: fulfillData.proUntil,
               credits: fulfillData.credits,
+              spins: fulfillData.spins,
               pack: fulfillData.pack,
             });
           } else {
@@ -144,6 +152,13 @@ function PaymentSuccessContent() {
                 // Ignore errors
               }
             }
+          }
+        } else if (type === 'spins') {
+          // For spins purchases, refresh spin eligibility/balance
+          try {
+            await fetch('/api/spins', { cache: 'no-store' });
+          } catch (e) {
+            // Ignore errors
           }
         }
 
@@ -214,6 +229,10 @@ function PaymentSuccessContent() {
               ? purchaseDetails?.credits
                 ? `Your ${purchaseDetails.credits} credits have been added to your account.`
                 : 'Your purchase has been processed successfully. Your credits will appear shortly.'
+              : purchaseType === 'spins'
+                ? purchaseDetails?.spins
+                  ? `Your ${purchaseDetails.spins} spins have been added to your account.`
+                  : 'Your purchase has been processed successfully. Your spins will appear shortly.'
               : purchaseDetails?.consumableType
                 ? `Your ${purchaseDetails.consumableType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}${purchaseDetails.quantity > 1 ? ` (x${purchaseDetails.quantity})` : ''} has been added to your account.`
                 : 'Your purchase has been processed successfully. Your consumable has been added to your account.'}

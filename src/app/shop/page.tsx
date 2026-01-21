@@ -57,6 +57,46 @@ export default function ShopPage() {
     }
   };
 
+  const handleSpinsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale') => {
+    if (!user?.steamId) {
+      toast.error('You must be signed in with Steam to purchase. Please sign in first.');
+      setTimeout(() => window.location.href = '/inventory', 2000);
+      return;
+    }
+
+    setLoading(`spins_${pack}`);
+    try {
+      const res = await fetch('/api/payment/checkout-spins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pack, steamId: user.steamId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          toast.error('You must be signed in with Steam to purchase. Please sign in first.');
+          setTimeout(() => window.location.href = '/inventory', 2000);
+        } else {
+          toast.error(data.error || 'Failed to create checkout session');
+        }
+        setLoading(null);
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error('Failed to redirect to checkout');
+        setLoading(null);
+      }
+    } catch (error) {
+      toast.error('Failed to process purchase. Please try again.');
+      setLoading(null);
+    }
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -161,6 +201,143 @@ export default function ShopPage() {
             <div className="p-2 md:p-3 rounded-xl md:rounded-2xl bg-blue-600/20 border border-blue-500/40 shrink-0">
               <ShoppingCart className="text-blue-400" size={20} />
             </div>
+
+          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-yellow-600/20 border border-yellow-500/40">
+                <Package className="w-5 h-5 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Spins</p>
+                <p className="text-xl md:text-2xl font-black text-white">Buy Spins</p>
+              </div>
+            </div>
+            <p className="text-[10px] md:text-[11px] text-gray-300 leading-relaxed">
+              Spins are added as bonus spins and can be used after your daily spin limit.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4 items-stretch">
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
+                  <p className="text-lg font-black">5 Spins</p>
+                  <p className="text-[10px] text-gray-400">€1.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleSpinsCheckout('starter')}
+                  disabled={loading === 'spins_starter' || !user?.steamId}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-yellow-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'spins_starter' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Value</p>
+                  <p className="text-lg font-black">15 Spins</p>
+                  <p className="text-[10px] text-gray-400">€4.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleSpinsCheckout('value')}
+                  disabled={loading === 'spins_value' || !user?.steamId}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-yellow-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'spins_value' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Mega</p>
+                  <p className="text-lg font-black">40 Spins</p>
+                  <p className="text-[10px] text-gray-400">€9.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleSpinsCheckout('mega')}
+                  disabled={loading === 'spins_mega' || !user?.steamId}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-yellow-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'spins_mega' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Giant</p>
+                  <p className="text-lg font-black">100 Spins</p>
+                  <p className="text-[10px] text-gray-400">€19.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleSpinsCheckout('giant')}
+                  disabled={loading === 'spins_giant' || !user?.steamId}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-yellow-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'spins_giant' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Whale</p>
+                  <p className="text-lg font-black">300 Spins</p>
+                  <p className="text-[10px] text-gray-400">€49.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleSpinsCheckout('whale')}
+                  disabled={loading === 'spins_whale' || !user?.steamId}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-yellow-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'spins_whale' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
             <div>
               <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black mb-1">Consumables</p>
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">Shop</h1>

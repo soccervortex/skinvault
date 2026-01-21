@@ -1602,6 +1602,22 @@ export default function AdminPage() {
                             ) : (
                               <span className="text-amber-400">🔕 Discord pending</span>
                             )}
+                            {purchase.discordNotified !== true && (Number(purchase.discordNotifyAttempts) > 0 || (purchase as any).discordNotifyError) && (
+                              <div className="text-[8px] text-gray-500">
+                                <div>
+                                  Attempts: {Math.max(0, Math.floor(Number(purchase.discordNotifyAttempts || 0)))}
+                                </div>
+                                {!!String((purchase as any).discordNotifyError || '').trim() && (
+                                  <div
+                                    className="text-red-400/80"
+                                    title={String((purchase as any).discordNotifyError || '')}
+                                  >
+                                    {String((purchase as any).discordNotifyError || '').slice(0, 80)}
+                                    {String((purchase as any).discordNotifyError || '').length > 80 ? '…' : ''}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-red-400">❌ Failed</span>
