@@ -221,6 +221,7 @@ export default function GiveawaysPage() {
 
   const [spinHistoryLoading, setSpinHistoryLoading] = useState(false);
   const [spinHistorySummary, setSpinHistorySummary] = useState<SpinHistorySummary | null>(null);
+  const [spinHistoryAllTimeSummary, setSpinHistoryAllTimeSummary] = useState<SpinHistorySummary | null>(null);
   const [spinHistory, setSpinHistory] = useState<SpinHistoryItem[]>([]);
 
   const spinHistoryRequestSeqRef = useRef(0);
@@ -548,6 +549,7 @@ export default function GiveawaysPage() {
     if (!user?.steamId) {
       setSpinHistory([]);
       setSpinHistorySummary(null);
+      setSpinHistoryAllTimeSummary(null);
       return;
     }
 
@@ -559,10 +561,12 @@ export default function GiveawaysPage() {
       if (seq !== spinHistoryRequestSeqRef.current) return;
       setSpinHistory(Array.isArray(json?.items) ? (json.items as SpinHistoryItem[]) : []);
       setSpinHistorySummary(json?.summary ? (json.summary as SpinHistorySummary) : null);
+      setSpinHistoryAllTimeSummary(json?.allTimeSummary ? (json.allTimeSummary as SpinHistorySummary) : null);
     } catch {
       if (seq !== spinHistoryRequestSeqRef.current) return;
       setSpinHistory([]);
       setSpinHistorySummary(null);
+      setSpinHistoryAllTimeSummary(null);
     } finally {
       if (seq !== spinHistoryRequestSeqRef.current) return;
       setSpinHistoryLoading(false);
@@ -1137,6 +1141,56 @@ export default function GiveawaysPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 py-5 bg-[#0f111a]">
+                  {(spinHistorySummary || spinHistoryAllTimeSummary || spinHistoryLoading) && (
+                    <div className="mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Best win (30d)</div>
+                          <div className="mt-2 text-2xl font-black italic tracking-tighter text-yellow-300">
+                            {Number(spinHistorySummary?.bestReward || 0).toLocaleString()}
+                            <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                          </div>
+                        </div>
+                        <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Spins (30d)</div>
+                          <div className="mt-2 text-2xl font-black italic tracking-tighter text-white">
+                            {Number(spinHistorySummary?.totalSpins || 0).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits won (30d)</div>
+                          <div className="mt-2 text-2xl font-black italic tracking-tighter text-emerald-300">
+                            {Number(spinHistorySummary?.totalCredits || 0).toLocaleString()}
+                            <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                          </div>
+                        </div>
+                      </div>
+                      {spinHistoryAllTimeSummary && (
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Best win (all time)</div>
+                            <div className="mt-2 text-2xl font-black italic tracking-tighter text-yellow-300">
+                              {Number(spinHistoryAllTimeSummary?.bestReward || 0).toLocaleString()}
+                              <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                            </div>
+                          </div>
+                          <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Spins (all time)</div>
+                            <div className="mt-2 text-2xl font-black italic tracking-tighter text-white">
+                              {Number(spinHistoryAllTimeSummary?.totalSpins || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits won (all time)</div>
+                            <div className="mt-2 text-2xl font-black italic tracking-tighter text-emerald-300">
+                              {Number(spinHistoryAllTimeSummary?.totalCredits || 0).toLocaleString()}
+                              <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {SPIN_TIERS.map((t) => (
                       <div key={t.reward} className="rounded-2xl border border-white/10 bg-[#0b0d14] p-4 relative overflow-hidden">
@@ -1193,6 +1247,7 @@ export default function GiveawaysPage() {
                     durationSeconds={turboEnabled ? 1.6 : 5}
                     historyItems={spinHistory}
                     historySummary={spinHistorySummary}
+                    historyAllTimeSummary={spinHistoryAllTimeSummary}
                     historyLoading={spinHistoryLoading}
                     onClose={() => {
                       setSpinWheelOpen(false);

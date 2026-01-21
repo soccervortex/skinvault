@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import SpinWheel from '@/app/components/SpinWheel';
 import { useToast } from '@/app/components/Toast';
 
@@ -21,7 +21,13 @@ export default function SpinPage() {
   const [showSpinner, setShowSpinner] = useState(false);
   const [spinOpening, setSpinOpening] = useState(false);
   const [spinReward, setSpinReward] = useState<number | null>(null);
+  const [spinHistoryLoading, setSpinHistoryLoading] = useState(false);
+  const [spinHistorySummary, setSpinHistorySummary] = useState<any>(null);
+  const [spinHistoryAllTimeSummary, setSpinHistoryAllTimeSummary] = useState<any>(null);
+  const [spinHistory, setSpinHistory] = useState<any[]>([]);
   const toast = useToast();
+
+  const canShowStats = useMemo(() => !!spinHistorySummary || !!spinHistoryAllTimeSummary || spinHistoryLoading, [spinHistoryAllTimeSummary, spinHistoryLoading, spinHistorySummary]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +86,41 @@ export default function SpinPage() {
       });
   }, [steamId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!steamId) {
+      setSpinHistory([]);
+      setSpinHistorySummary(null);
+      setSpinHistoryAllTimeSummary(null);
+      return;
+    }
+
+    setSpinHistoryLoading(true);
+    fetch('/api/spins/history?days=30&limit=15', { cache: 'no-store' })
+      .then((res) => res.json().then((j) => ({ ok: res.ok, j })))
+      .then(({ ok, j }) => {
+        if (cancelled) return;
+        if (!ok) throw new Error(String(j?.error || 'Failed'));
+        setSpinHistory(Array.isArray(j?.items) ? j.items : []);
+        setSpinHistorySummary(j?.summary || null);
+        setSpinHistoryAllTimeSummary(j?.allTimeSummary || null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSpinHistory([]);
+        setSpinHistorySummary(null);
+        setSpinHistoryAllTimeSummary(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSpinHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [steamId]);
+
   const handleSpinClick = async () => {
     if (!canSpin || spinOpening || showSpinner) return;
     setSpinOpening(true);
@@ -113,6 +154,15 @@ export default function SpinPage() {
     setCanSpin(false);
     // Refetch eligibility to get the next eligible time
     fetch('/api/spins').then(res => res.json()).then(data => setNextEligibleAt(data.nextEligibleAt));
+    fetch('/api/spins/history?days=30&limit=15', { cache: 'no-store' })
+      .then(res => res.json())
+      .then((j) => {
+        setSpinHistory(Array.isArray(j?.items) ? j.items : []);
+        setSpinHistorySummary(j?.summary || null);
+        setSpinHistoryAllTimeSummary(j?.allTimeSummary || null);
+      })
+      .catch(() => {
+      });
   };
 
   if (authLoading) {
@@ -152,6 +202,10 @@ export default function SpinPage() {
         <SpinWheel
           reward={spinReward}
           onSpinComplete={onSpinComplete}
+          historyItems={spinHistory}
+          historySummary={spinHistorySummary}
+          historyAllTimeSummary={spinHistoryAllTimeSummary}
+          historyLoading={spinHistoryLoading}
           onClose={() => {
             setShowSpinner(false);
             setSpinReward(null);

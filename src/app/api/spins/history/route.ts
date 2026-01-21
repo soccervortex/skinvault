@@ -9,6 +9,7 @@ type SpinHistoryDoc = {
   createdAt: Date;
   day: string;
   role: 'owner' | 'creator' | 'user';
+  deletedAt?: Date;
 };
 
 function getSteamIdFromRequestOrBot(req: NextRequest): string | null {
@@ -50,9 +51,11 @@ export async function GET(req: NextRequest) {
 
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    const baseMatch: any = { steamId, deletedAt: { $exists: false } };
+
     const summaryAgg = await historyCol
       .aggregate([
-        { $match: { steamId, createdAt: { $gte: cutoff } } },
+        { $match: { ...baseMatch, createdAt: { $gte: cutoff } } },
         {
           $group: {
             _id: null,
@@ -71,8 +74,29 @@ export async function GET(req: NextRequest) {
       bestReward: Number(summaryRow?.bestReward || 0),
     };
 
+    const allTimeAgg = await historyCol
+      .aggregate([
+        { $match: baseMatch },
+        {
+          $group: {
+            _id: null,
+            totalSpins: { $sum: 1 },
+            totalCredits: { $sum: '$reward' },
+            bestReward: { $max: '$reward' },
+          },
+        },
+      ] as any)
+      .toArray();
+
+    const allTimeRow: any = allTimeAgg?.[0] || null;
+    const allTimeSummary = {
+      totalSpins: Number(allTimeRow?.totalSpins || 0),
+      totalCredits: Number(allTimeRow?.totalCredits || 0),
+      bestReward: Number(allTimeRow?.bestReward || 0),
+    };
+
     const rows = await historyCol
-      .find({ steamId, createdAt: { $gte: cutoff } } as any)
+      .find({ ...baseMatch, createdAt: { $gte: cutoff } } as any)
       .sort({ createdAt: -1 })
       .limit(limit)
       .toArray();
@@ -91,6 +115,7 @@ export async function GET(req: NextRequest) {
         days,
         limit,
         summary,
+        allTimeSummary,
         items,
       },
       { status: 200 }

@@ -53,6 +53,7 @@ const SpinWheel = ({
   durationSeconds,
   historyItems,
   historySummary,
+  historyAllTimeSummary,
   historyLoading,
 }: {
   reward: number;
@@ -61,6 +62,7 @@ const SpinWheel = ({
   durationSeconds?: number;
   historyItems?: SpinWheelHistoryItem[];
   historySummary?: SpinWheelHistorySummary | null;
+  historyAllTimeSummary?: SpinWheelHistorySummary | null;
   historyLoading?: boolean;
 }) => {
   const [isSpinning, setIsSpinning] = useState(false);
@@ -250,7 +252,7 @@ const SpinWheel = ({
               </AnimatePresence>
             </div>
 
-            {(historySummary || (historyItems && historyItems.length > 0) || historyLoading) && (
+            {(historySummary || historyAllTimeSummary || (historyItems && historyItems.length > 0) || historyLoading) && (
               <div className="mt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
@@ -274,6 +276,31 @@ const SpinWheel = ({
                     </div>
                   </div>
                 </div>
+
+                {historyAllTimeSummary && (
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Best win (all time)</div>
+                      <div className="mt-2 text-2xl font-black italic tracking-tighter text-yellow-300">
+                        {Number(historyAllTimeSummary?.bestReward || 0).toLocaleString()}
+                        <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                      </div>
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Spins (all time)</div>
+                      <div className="mt-2 text-2xl font-black italic tracking-tighter text-white">
+                        {Number(historyAllTimeSummary?.totalSpins || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits won (all time)</div>
+                      <div className="mt-2 text-2xl font-black italic tracking-tighter text-emerald-300">
+                        {Number(historyAllTimeSummary?.totalCredits || 0).toLocaleString()}
+                        <span className="text-[12px] text-gray-400 ml-1">CR</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 bg-black/30 border border-white/10 rounded-2xl overflow-hidden">
                   <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
