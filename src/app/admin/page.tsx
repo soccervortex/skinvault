@@ -1222,7 +1222,7 @@ export default function AdminPage() {
                 Owner Console
               </p>
               <h1 className="text-xl md:text-2xl lg:text-3xl font-black italic uppercase tracking-tighter">
-                Pro Management
+                Admin Panel
               </h1>
             </div>
           </div>
@@ -1264,6 +1264,237 @@ export default function AdminPage() {
             <p className="text-xl md:text-2xl font-black text-red-400">
               {totals.expired}
             </p>
+          </div>
+        </div>
+
+        <div className="mt-6 md:mt-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+              <Shield className="text-blue-400" size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Quick tools</p>
+              <h2 className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Jump to manager</h2>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            <button
+              onClick={() => router.push('/admin/payments')}
+              className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Wallet className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Payments</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Payments Manager</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/credits')}
+              className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Wallet className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Economy</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Credits Manager</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/giveaways')}
+              className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-purple-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="text-purple-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Giveaways</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Giveaway Manager</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/reports')}
+              className="bg-black/40 border border-orange-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-orange-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Flag className="text-orange-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Moderation</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Chat Reports</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/item-reports')}
+              className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-yellow-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="text-yellow-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Content</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Item Reports</div>
+            </button>
+
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-user-finder')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 text-left hover:border-white/20 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Search className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Users</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">User Finder</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/spins')}
+              className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-yellow-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-yellow-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Spins</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Spin History</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/databases')}
+              className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-emerald-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Database className="text-emerald-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">System</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Database Manager</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/creator-stats')}
+              className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-emerald-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-emerald-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Analytics</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Creator Stats</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/affiliate-stats')}
+              className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Star className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Analytics</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Affiliate Stats</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/x-post')}
+              className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Twitter className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Social</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">X Post Manager</div>
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-payment-settings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Payment settings
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-purchase-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Purchases
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-purchase-fix')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Fix purchase
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-user-bans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Bans
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-timeouts')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Timeouts
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-chat-management')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Chat
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Notifications
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  document.getElementById('admin-theme-management')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+              }}
+              className="bg-black/40 border border-white/10 px-3 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] text-gray-300 hover:border-white/20"
+            >
+              Themes
+            </button>
           </div>
         </div>
 
@@ -1449,7 +1680,7 @@ export default function AdminPage() {
 
         {/* Failed Purchases Section */}
         {failedPurchases.length > 0 && (
-          <div className="mt-8 pt-8 border-t border-white/10">
+          <div id="admin-purchase-monitoring" className="mt-8 pt-8 border-t border-white/10">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 rounded-xl md:rounded-2xl bg-red-500/10 border border-red-500/40 shrink-0">
                 <AlertTriangle className="text-red-400" size={16} />
@@ -1544,7 +1775,7 @@ export default function AdminPage() {
         )}
 
         {/* Purchase History Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-purchase-history" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
               <ShoppingBag className="text-blue-400" size={16} />
@@ -1772,7 +2003,7 @@ export default function AdminPage() {
         </div>
 
         {/* Fix Purchase Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-purchase-fix" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
               <CheckCircle2 className="text-blue-400" size={16} />
@@ -1977,7 +2208,7 @@ export default function AdminPage() {
         </div>
 
         {/* Ban Steam ID Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-user-bans" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-red-500/10 border border-red-500/40 shrink-0">
               <Ban className="text-red-400" size={16} />
@@ -2224,7 +2455,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-notifications" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
               <Bell className="text-blue-400" size={16} />
@@ -2442,7 +2673,7 @@ export default function AdminPage() {
         </div>
 
         {/* User Search Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-user-finder" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
               <Search className="text-blue-400" size={16} />
@@ -2531,7 +2762,7 @@ export default function AdminPage() {
         </div>
 
         {/* Timeout List Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-timeouts" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-amber-500/10 border border-amber-500/40 shrink-0">
               <Clock className="text-amber-400" size={16} />
@@ -2600,7 +2831,7 @@ export default function AdminPage() {
         </div>
 
         {/* Stripe Test Mode Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-payment-settings" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-yellow-500/10 border border-yellow-500/40 shrink-0">
               <Sparkles className="text-yellow-400" size={16} />
@@ -2706,7 +2937,7 @@ export default function AdminPage() {
         </div>
 
         {/* Theme Management Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-theme-management" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-purple-500/10 border border-purple-500/40 shrink-0">
               <Sparkles className="text-purple-400" size={16} />
@@ -2771,7 +3002,7 @@ export default function AdminPage() {
         </div>
 
         {/* Chat Control Section */}
-        <div className="mt-8 pt-8 border-t border-white/10">
+        <div id="admin-chat-management" className="mt-8 pt-8 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
               <MessageSquare className="text-blue-400" size={16} />
