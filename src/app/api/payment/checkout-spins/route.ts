@@ -108,7 +108,6 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      payment_method_collection: 'if_required',
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
