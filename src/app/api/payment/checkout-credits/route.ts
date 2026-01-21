@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
-      allow_promotion_codes: true,
+      allow_promotion_codes: ownerDiscountApplied ? undefined : true,
       discounts: ownerDiscountApplied && ownerCouponId ? [{ coupon: ownerCouponId }] : undefined,
       payment_intent_data: {
         receipt_email: customerEmail,

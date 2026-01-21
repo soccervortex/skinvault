@@ -153,7 +153,6 @@ export default function AdminPaymentsPage() {
               </Link>
               <div>
                 <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Admin</p>
-                <h1 className="text-xl md:text-2xl lg:text-3xl font-black italic uppercase tracking-tighter">Payments Manager</h1>
               </div>
             </div>
 
