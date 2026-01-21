@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import { sanitizeEmail } from '@/app/utils/sanitize';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -24,6 +25,71 @@ async function getStripeInstance(): Promise<Stripe> {
   });
 }
 
+async function getReceiptPatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const out: Record<string, any> = {};
+
+    const sessionEmail = sanitizeEmail(String((session as any)?.customer_details?.email || (session as any)?.customer_email || ''));
+    if (sessionEmail) out.customerEmail = sessionEmail;
+
+    const piId = (session.payment_intent as string) || '';
+    if (!piId) return out;
+
+    const pi = await stripe.paymentIntents.retrieve(piId, { expand: ['latest_charge'] });
+
+    const receiptEmail = sanitizeEmail(String((pi as any)?.receipt_email || ''));
+    if (!out.customerEmail && receiptEmail) out.customerEmail = receiptEmail;
+
+    const latestCharge = (pi as any)?.latest_charge;
+    let charge: Stripe.Charge | null = null;
+    if (typeof latestCharge === 'string' && latestCharge) {
+      charge = await stripe.charges.retrieve(latestCharge);
+    } else if (latestCharge && typeof latestCharge === 'object') {
+      charge = latestCharge as Stripe.Charge;
+    }
+
+    const receiptUrl = String((charge as any)?.receipt_url || '').trim();
+    if (receiptUrl) out.receiptUrl = receiptUrl;
+
+    const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
+    if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
+
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+async function getInvoicePatch(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<Record<string, any>> {
+  try {
+    const refreshed = await stripe.checkout.sessions.retrieve(String(session.id), {
+      expand: ['invoice'],
+    });
+
+    let invoiceId: string | null = null;
+    const rawInvoice = (refreshed as any)?.invoice;
+    if (typeof rawInvoice === 'string') invoiceId = rawInvoice;
+    else if (rawInvoice && typeof rawInvoice.id === 'string') invoiceId = rawInvoice.id;
+
+    if (!invoiceId) return {};
+
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    const patch: Record<string, any> = { invoiceId: invoice.id };
+    if (invoice.hosted_invoice_url) patch.invoiceUrl = invoice.hosted_invoice_url;
+    if (invoice.invoice_pdf) patch.invoicePdf = invoice.invoice_pdf;
+    if (invoice.number) patch.invoiceNumber = invoice.number;
+    return patch;
+  } catch {
+    return {};
+  }
+}
+
 // POST: Manually fulfill a purchase that wasn't fulfilled
 export async function POST(request: Request) {
   try {
@@ -35,6 +101,9 @@ export async function POST(request: Request) {
 
     const stripe = await getStripeInstance();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    const invoicePatch = await getInvoicePatch(stripe, session);
+    const receiptPatch = await getReceiptPatch(stripe, session);
 
     if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
       return NextResponse.json({ 
@@ -100,6 +169,13 @@ export async function POST(request: Request) {
       if (purchase) {
         purchase.fulfilled = true;
         purchase.fulfilledAt = new Date().toISOString();
+
+        for (const [k, v] of Object.entries({ ...invoicePatch, ...receiptPatch })) {
+          if (v == null) continue;
+          if (purchase[k] == null || String(purchase[k] || '').trim() === '') {
+            purchase[k] = v;
+          }
+        }
       } else {
         existingPurchases.push({
           steamId,
@@ -112,6 +188,10 @@ export async function POST(request: Request) {
           timestamp: new Date().toISOString(),
           fulfilled: true,
           fulfilledAt: new Date().toISOString(),
+          paymentIntentId: (session.payment_intent as string) || null,
+          customerId: (session.customer as string) || null,
+          ...invoicePatch,
+          ...receiptPatch,
         });
       }
 
