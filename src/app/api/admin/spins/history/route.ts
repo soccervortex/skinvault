@@ -11,6 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type SpinHistoryRow = {
+  id: string;
   steamId: string;
   reward: number;
   createdAt: string;
@@ -22,6 +23,13 @@ type SpinHistorySummary = {
   totalCredits: number;
   bestReward: number;
 };
+
+function usedCountFromDoc(doc: any): number {
+  if (!doc) return 0;
+  const n = Number(doc?.count);
+  if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  return 1;
+}
 
 function safeInt(v: string | null, def: number, min: number, max: number): number {
   const n = Number(v);
@@ -43,6 +51,42 @@ function dayKeyUtc(d: Date): string {
 
 function startOfDayUtc(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+}
+
+function startOfDayWithTzOffset(now: Date, tzOffsetMinutes: number): Date {
+  // tzOffsetMinutes matches JS Date.getTimezoneOffset(): minutes = UTC - local.
+  // Convert to "local" by shifting, take UTC date parts, then shift back.
+  const localMs = now.getTime() - tzOffsetMinutes * 60 * 1000;
+  const local = new Date(localMs);
+  const startLocalUtcMs = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 0, 0, 0, 0);
+  const startUtcMs = startLocalUtcMs + tzOffsetMinutes * 60 * 1000;
+  return new Date(startUtcMs);
+}
+
+function localDayKeyWithTzOffset(now: Date, tzOffsetMinutes: number): string {
+  const localMs = now.getTime() - tzOffsetMinutes * 60 * 1000;
+  const local = new Date(localMs);
+  const yyyy = local.getUTCFullYear();
+  const mm = String(local.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(local.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function timezoneFromTzOffset(tzOffsetMinutes: number): string {
+  // tzOffsetMinutes is minutes = UTC - local. Mongo timezone wants offset from UTC.
+  const offset = -tzOffsetMinutes;
+  const sign = offset >= 0 ? '+' : '-';
+  const abs = Math.abs(offset);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `${sign}${hh}:${mm}`;
+}
+
+function parseIsoDate(input: string | null): Date | null {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isFinite(d.getTime()) ? d : null;
 }
 
 function getCreatorDailyLimit(): number {
@@ -87,6 +131,8 @@ export async function GET(request: NextRequest) {
     const page = safeInt(url.searchParams.get('page'), 1, 1, 100000);
     const limit = safeInt(url.searchParams.get('limit'), 100, 1, 500);
 
+    const tzOffset = safeInt(url.searchParams.get('tzOffset'), 0, -14 * 60, 14 * 60);
+
     const steamId = sanitizeSteamId(url.searchParams.get('steamId'));
     const qRaw = String(url.searchParams.get('q') || '').trim();
     const q = qRaw ? qRaw.replace(/[^0-9]/g, '') : '';
@@ -100,10 +146,18 @@ export async function GET(request: NextRequest) {
 
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const todayKey = dayKeyUtc(new Date());
-    const todayStart = startOfDayUtc(new Date());
+    const now = new Date();
+    const todayKey = dayKeyUtc(now);
 
-    const matchBase: any = {};
+    const todayStartFromClient = parseIsoDate(url.searchParams.get('todayStart'));
+    const todayEndFromClient = parseIsoDate(url.searchParams.get('todayEnd'));
+
+    const todayStart = todayStartFromClient || startOfDayWithTzOffset(now, tzOffset);
+    const todayEnd = todayEndFromClient && todayEndFromClient.getTime() > todayStart.getTime()
+      ? todayEndFromClient
+      : new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const matchBase: any = { deletedAt: { $exists: false } };
     if (!hasFilter) {
       matchBase.steamId = { $nin: Array.from(OWNER_STEAM_IDS as any) };
     }
@@ -163,7 +217,12 @@ export async function GET(request: NextRequest) {
 
     const todayAgg = await historyCol
       .aggregate([
-        { $match: { ...matchBase, createdAt: { $gte: todayStart } } },
+        {
+          $match: {
+            ...matchBase,
+            createdAt: { $gte: todayStart, $lt: todayEnd },
+          },
+        },
         {
           $group: {
             _id: null,
@@ -186,20 +245,14 @@ export async function GET(request: NextRequest) {
     if (steamId) {
       const roleInfo = await getRoleAndLimit(steamId);
 
-      const usedDoc = await spinsCol.findOne({ _id: `${steamId}_${todayKey}` } as any);
-      const usedSpins = Number((usedDoc as any)?.count);
-      const used = Number.isFinite(usedSpins) ? Math.max(0, Math.floor(usedSpins)) : (usedDoc ? 1 : 0);
-
-      const bonusDoc = await bonusCol.findOne({ _id: `${steamId}_${todayKey}` } as any);
-      const bonusCount = Number((bonusDoc as any)?.count);
-      const bonus = Number.isFinite(bonusCount) ? Math.max(0, Math.floor(bonusCount)) : 0;
-
-      const limitForDay = roleInfo.dailyLimit === null ? null : roleInfo.dailyLimit + bonus;
-      const remainingSpins = limitForDay === null ? null : Math.max(0, limitForDay - used);
-
       const userTodayAgg = await historyCol
         .aggregate([
-          { $match: { steamId, createdAt: { $gte: todayStart } } },
+          {
+            $match: {
+              steamId,
+              createdAt: { $gte: todayStart, $lt: todayEnd },
+            },
+          },
           {
             $group: {
               _id: null,
@@ -217,6 +270,26 @@ export async function GET(request: NextRequest) {
         totalCredits: Number(userTodayRow?.totalCredits || 0),
         bestReward: Number(userTodayRow?.bestReward || 0),
       };
+
+      const localStart = todayStart;
+      const localEnd = new Date(localStart.getTime() + 24 * 60 * 60 * 1000);
+      const startUtcDay = dayKeyUtc(localStart);
+      const endUtcDay = dayKeyUtc(new Date(localEnd.getTime() - 1));
+
+      const spinKeys = startUtcDay === endUtcDay
+        ? [`${steamId}_${startUtcDay}`]
+        : [`${steamId}_${startUtcDay}`, `${steamId}_${endUtcDay}`];
+
+      const [usedDocs, bonusDocs] = await Promise.all([
+        spinsCol.find({ _id: { $in: spinKeys } } as any).toArray(),
+        bonusCol.find({ _id: { $in: spinKeys } } as any).toArray(),
+      ]);
+
+      const usedLocal = (usedDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
+      const bonusLocal = (bonusDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
+
+      const limitForDay = roleInfo.dailyLimit === null ? null : roleInfo.dailyLimit + bonusLocal;
+      const remainingSpins = limitForDay === null ? null : Math.max(0, limitForDay - usedLocal);
 
       const userAllTimeAgg = await historyCol
         .aggregate([
@@ -243,8 +316,8 @@ export async function GET(request: NextRequest) {
         steamId,
         role: roleInfo.role,
         dailyLimit: roleInfo.dailyLimit,
-        bonusSpins: bonus,
-        usedSpins: used,
+        bonusSpins: bonusLocal,
+        usedSpins: usedLocal,
         remainingSpins,
         today: userTodaySummary,
         allTime: userAllTimeSummary,
@@ -263,6 +336,7 @@ export async function GET(request: NextRequest) {
       .toArray();
 
     const items: SpinHistoryRow[] = rows.map((r: any) => ({
+      id: String(r?._id || ''),
       steamId: String(r?.steamId || ''),
       reward: Number(r?.reward || 0),
       createdAt: r?.createdAt ? new Date(r.createdAt).toISOString() : new Date(0).toISOString(),
@@ -276,6 +350,7 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         total,
+        tzOffset,
         q: qRaw || null,
         steamId: steamId || null,
         todaySummary,

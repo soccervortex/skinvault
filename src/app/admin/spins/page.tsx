@@ -8,6 +8,7 @@ import { Copy, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 
 type SpinHistoryRow = {
+  id: string;
   steamId: string;
   reward: number;
   createdAt: string;
@@ -44,6 +45,7 @@ type GrantsResponse = {
   steamId?: string | null;
   q?: string | null;
   items?: Array<{
+    id: string;
     createdAt: string;
     bySteamId: string;
     targetSteamId: string;
@@ -51,6 +53,9 @@ type GrantsResponse = {
     amount: number;
     reason: string | null;
     ip: string | null;
+    rolledBackAt: string | null;
+    rolledBackBy: string | null;
+    rolledBackReason: string | null;
   }>;
   error?: string;
 };
@@ -89,6 +94,8 @@ export default function AdminSpinsPage() {
   const [grantsLimit] = useState(25);
   const [grantsTotal, setGrantsTotal] = useState(0);
   const [grantsFilter, setGrantsFilter] = useState('');
+  const [rollbackBusyId, setRollbackBusyId] = useState<string | null>(null);
+  const [deleteSpinBusyId, setDeleteSpinBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -107,6 +114,13 @@ export default function AdminSpinsPage() {
       qs.set('days', String(days));
       qs.set('page', String(page));
       qs.set('limit', String(limit));
+      qs.set('tzOffset', String(new Date().getTimezoneOffset()));
+
+      const localStart = new Date();
+      localStart.setHours(0, 0, 0, 0);
+      const localEnd = new Date(localStart.getTime() + 24 * 60 * 60 * 1000);
+      qs.set('todayStart', localStart.toISOString());
+      qs.set('todayEnd', localEnd.toISOString());
 
       const trimmed = String(filterSteamId || '').trim();
       if (/^\d{17}$/.test(trimmed)) {
@@ -225,6 +239,59 @@ export default function AdminSpinsPage() {
       setGrantBusy(false);
     }
   }, [canGrant, grantAmount, grantReason, loadGrants, loadHistory, normalizedSteamId, toast]);
+
+  const rollbackGrant = useCallback(async (grantId: string) => {
+    if (!grantId) return;
+    const ok = window.confirm('Rollback this grant? This will remove the bonus spins that were added.');
+    if (!ok) return;
+    const reason = window.prompt('Reason (optional)') || '';
+    setRollbackBusyId(grantId);
+    try {
+      const res = await fetch('/api/admin/spins/grants/rollback', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ grantId, reason: String(reason || '').trim() || undefined }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed to rollback');
+      toast.success('Rolled back');
+      await loadHistory();
+      await loadGrants();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed');
+    } finally {
+      setRollbackBusyId(null);
+    }
+  }, [loadGrants, loadHistory, toast]);
+
+  const deleteSpin = useCallback(async (spinId: string) => {
+    if (!spinId) return;
+    const ok = window.confirm('Delete this spin? This will reverse the credits and remove it from stats.');
+    if (!ok) return;
+    const reason = window.prompt('Reason (optional)') || '';
+    setDeleteSpinBusyId(spinId);
+    try {
+      const res = await fetch('/api/admin/spins/history/delete', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ spinId, reason: String(reason || '').trim() || undefined }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || 'Failed to delete spin');
+      toast.success('Deleted');
+      await loadHistory();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed');
+    } finally {
+      setDeleteSpinBusyId(null);
+    }
+  }, [loadHistory, toast]);
 
   const totals30d = useMemo(() => {
     const totalSpins = Number(summary?.totalSpins) || 0;
@@ -495,6 +562,13 @@ export default function AdminSpinsPage() {
                               <Copy size={14} />
                             </button>
                             <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">{String(r.role || 'user')}</span>
+                            <button
+                              onClick={() => deleteSpin(String(r.id || ''))}
+                              disabled={deleteSpinBusyId === String(r.id || '')}
+                              className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 text-[10px] font-black uppercase tracking-widest text-red-200 disabled:opacity-60"
+                            >
+                              {deleteSpinBusyId === String(r.id || '') ? 'Deleting' : 'Delete'}
+                            </button>
                           </div>
                         </div>
 
@@ -576,6 +650,7 @@ export default function AdminSpinsPage() {
                         <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Day</th>
                         <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Amount</th>
                         <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Reason</th>
+                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -620,6 +695,19 @@ export default function AdminSpinsPage() {
                             <td className="px-5 py-3 text-[11px] font-black text-gray-300 whitespace-nowrap">{g.day}</td>
                             <td className="px-5 py-3 text-[11px] font-black text-emerald-200 whitespace-nowrap">+{Number(g.amount || 0).toLocaleString('en-US')}</td>
                             <td className="px-5 py-3 text-[11px] text-gray-300 max-w-[420px] truncate" title={g.reason || ''}>{g.reason || '—'}</td>
+                            <td className="px-5 py-3 text-[11px]">
+                              {g.rolledBackAt ? (
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Rolled back</span>
+                              ) : (
+                                <button
+                                  onClick={() => rollbackGrant(String(g.id || ''))}
+                                  disabled={rollbackBusyId === String(g.id || '')}
+                                  className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 text-[10px] font-black uppercase tracking-widest text-red-200 disabled:opacity-60"
+                                >
+                                  {rollbackBusyId === String(g.id || '') ? 'Rolling' : 'Rollback'}
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}

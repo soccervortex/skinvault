@@ -21,6 +21,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type GrantRow = {
+  id: string;
   createdAt: string;
   bySteamId: string;
   targetSteamId: string;
@@ -28,6 +29,9 @@ type GrantRow = {
   amount: number;
   reason: string | null;
   ip: string | null;
+  rolledBackAt: string | null;
+  rolledBackBy: string | null;
+  rolledBackReason: string | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -77,6 +81,7 @@ export async function GET(request: NextRequest) {
       .toArray();
 
     const items: GrantRow[] = rows.map((r: any) => ({
+      id: String(r?._id || ''),
       createdAt: r?.createdAt ? new Date(r.createdAt).toISOString() : new Date(0).toISOString(),
       bySteamId: String(r?.bySteamId || ''),
       targetSteamId: String(r?.targetSteamId || ''),
@@ -84,6 +89,9 @@ export async function GET(request: NextRequest) {
       amount: Number(r?.amount || 0),
       reason: r?.reason ? String(r.reason) : null,
       ip: r?.ip ? String(r.ip) : null,
+      rolledBackAt: r?.rolledBackAt ? new Date(r.rolledBackAt).toISOString() : null,
+      rolledBackBy: r?.rolledBackBy ? String(r.rolledBackBy) : null,
+      rolledBackReason: r?.rolledBackReason ? String(r.rolledBackReason) : null,
     }));
 
     return NextResponse.json(
