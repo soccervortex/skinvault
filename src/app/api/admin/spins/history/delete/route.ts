@@ -16,6 +16,37 @@ function usedCountFromDoc(doc: any): number {
   return 1;
 }
 
+function bonusBalanceFromDoc(doc: any): number {
+  if (!doc) return 0;
+  const n = Number(doc?.count);
+  if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  return 0;
+}
+
+async function getOrMigrateBonusBalance(db: any, steamId: string): Promise<number> {
+  const bonusCol = db.collection('bonus_spins');
+  const balanceDoc = await bonusCol.findOne({ _id: steamId } as any);
+  if (balanceDoc) return bonusBalanceFromDoc(balanceDoc);
+
+  const legacyDocs = await bonusCol.find({ steamId, day: { $exists: true } } as any).toArray();
+  const legacyTotal = (legacyDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
+  const now = new Date();
+
+  try {
+    await bonusCol.updateOne(
+      { _id: steamId } as any,
+      {
+        $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+        $set: { count: legacyTotal, updatedAt: now, migratedAt: now } as any,
+      } as any,
+      { upsert: true }
+    );
+  } catch {
+  }
+
+  return legacyTotal;
+}
+
 type SpinHistoryDoc = {
   _id: ObjectId;
   steamId: string;
@@ -23,6 +54,7 @@ type SpinHistoryDoc = {
   createdAt: Date;
   day: string;
   role: string;
+  usedBonus?: boolean;
   deletedAt?: Date;
   deletedBy?: string;
   deletedReason?: string;
@@ -86,6 +118,7 @@ export async function POST(request: NextRequest) {
     const steamId = String((spin as any)?.steamId || '').trim();
     const day = String((spin as any)?.day || '').trim();
     const reward = Math.floor(Number((spin as any)?.reward || 0));
+    const usedBonus = Boolean((spin as any)?.usedBonus);
 
     if (!/^\d{17}$/.test(steamId)) return NextResponse.json({ error: 'Invalid steamId on spin' }, { status: 400 });
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return NextResponse.json({ error: 'Invalid day on spin' }, { status: 400 });
@@ -129,6 +162,17 @@ export async function POST(request: NextRequest) {
       await spinsCol.updateOne(
         { _id: key } as any,
         { $set: { count: next, updatedAt: now } } as any
+      );
+    }
+
+    // 3b) If the deleted spin consumed a bonus spin, refund it to the persistent balance
+    if (usedBonus) {
+      const bonusCol = db.collection('bonus_spins');
+      await getOrMigrateBonusBalance(db as any, steamId);
+      await bonusCol.updateOne(
+        { _id: steamId } as any,
+        { $inc: { count: 1 }, $set: { updatedAt: now, updatedBy: requesterSteamId } } as any,
+        { upsert: true }
       );
     }
 

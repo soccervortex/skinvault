@@ -16,6 +16,37 @@ function usedCountFromDoc(doc: any): number {
   return 1;
 }
 
+function bonusBalanceFromDoc(doc: any): number {
+  if (!doc) return 0;
+  const n = Number(doc?.count);
+  if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  return 0;
+}
+
+async function getOrMigrateBonusBalance(db: any, steamId: string): Promise<number> {
+  const bonusCol = db.collection('bonus_spins');
+  const balanceDoc = await bonusCol.findOne({ _id: steamId } as any);
+  if (balanceDoc) return bonusBalanceFromDoc(balanceDoc);
+
+  const legacyDocs = await bonusCol.find({ steamId, day: { $exists: true } } as any).toArray();
+  const legacyTotal = (legacyDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
+  const now = new Date();
+
+  try {
+    await bonusCol.updateOne(
+      { _id: steamId } as any,
+      {
+        $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+        $set: { count: legacyTotal, updatedAt: now, migratedAt: now } as any,
+      } as any,
+      { upsert: true }
+    );
+  } catch {
+  }
+
+  return legacyTotal;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const adminKey = request.headers.get(ADMIN_HEADER);
@@ -65,16 +96,16 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: 'Invalid amount on grant' }, { status: 400 });
 
     const now = new Date();
-    const key = `${targetSteamId}_${day}`;
 
-    const bonusDoc = await bonusCol.findOne({ _id: key } as any);
-    const current = usedCountFromDoc(bonusDoc);
+    await getOrMigrateBonusBalance(db as any, targetSteamId);
+    const bonusDoc = await bonusCol.findOne({ _id: targetSteamId } as any);
+    const current = bonusBalanceFromDoc(bonusDoc);
     const next = Math.max(0, current - amount);
 
     await bonusCol.updateOne(
-      { _id: key } as any,
+      { _id: targetSteamId } as any,
       {
-        $setOnInsert: { _id: key, steamId: targetSteamId, day, createdAt: now },
+        $setOnInsert: { _id: targetSteamId, steamId: targetSteamId, createdAt: now },
         $set: { count: next, updatedAt: now, updatedBy: requesterSteamId },
       } as any,
       { upsert: true }

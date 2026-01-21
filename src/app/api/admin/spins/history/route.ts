@@ -31,6 +31,37 @@ function usedCountFromDoc(doc: any): number {
   return 1;
 }
 
+function bonusBalanceFromDoc(doc: any): number {
+  if (!doc) return 0;
+  const n = Number(doc?.count);
+  if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  return 0;
+}
+
+async function getOrMigrateBonusBalance(db: any, steamId: string): Promise<number> {
+  const bonusCol = db.collection('bonus_spins');
+  const balanceDoc = await bonusCol.findOne({ _id: steamId } as any);
+  if (balanceDoc) return bonusBalanceFromDoc(balanceDoc);
+
+  const legacyDocs = await bonusCol.find({ steamId, day: { $exists: true } } as any).toArray();
+  const legacyTotal = (legacyDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
+  const now = new Date();
+
+  try {
+    await bonusCol.updateOne(
+      { _id: steamId } as any,
+      {
+        $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+        $set: { count: legacyTotal, updatedAt: now, migratedAt: now } as any,
+      } as any,
+      { upsert: true }
+    );
+  } catch {
+  }
+
+  return legacyTotal;
+}
+
 function safeInt(v: string | null, def: number, min: number, max: number): number {
   const n = Number(v);
   if (!Number.isFinite(n)) return def;
@@ -142,12 +173,10 @@ export async function GET(request: NextRequest) {
     const db = await getDatabase();
     const historyCol = db.collection('spin_history');
     const spinsCol = db.collection('daily_spins');
-    const bonusCol = db.collection('bonus_spins');
 
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     const now = new Date();
-    const todayKey = dayKeyUtc(now);
 
     const todayStartFromClient = parseIsoDate(url.searchParams.get('todayStart'));
     const todayEndFromClient = parseIsoDate(url.searchParams.get('todayEnd'));
@@ -280,16 +309,15 @@ export async function GET(request: NextRequest) {
         ? [`${steamId}_${startUtcDay}`]
         : [`${steamId}_${startUtcDay}`, `${steamId}_${endUtcDay}`];
 
-      const [usedDocs, bonusDocs] = await Promise.all([
+      const [usedDocs, bonusBalance] = await Promise.all([
         spinsCol.find({ _id: { $in: spinKeys } } as any).toArray(),
-        bonusCol.find({ _id: { $in: spinKeys } } as any).toArray(),
+        getOrMigrateBonusBalance(db as any, steamId),
       ]);
 
       const usedLocal = (usedDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
-      const bonusLocal = (bonusDocs || []).reduce((sum: number, d: any) => sum + usedCountFromDoc(d), 0);
+      const bonusLocal = Number(bonusBalance || 0);
 
-      const limitForDay = roleInfo.dailyLimit === null ? null : roleInfo.dailyLimit + bonusLocal;
-      const remainingSpins = limitForDay === null ? null : Math.max(0, limitForDay - usedLocal);
+      const remainingSpins = roleInfo.dailyLimit === null ? null : Math.max(0, roleInfo.dailyLimit - usedLocal) + bonusLocal;
 
       const userAllTimeAgg = await historyCol
         .aggregate([

@@ -467,11 +467,11 @@ export default function AdminSpinsPage() {
                       <div className="text-xl font-black italic tracking-tighter mt-1">{userStats?.dailyLimit == null ? '∞' : Number(userStats.dailyLimit).toLocaleString('en-US')}</div>
                     </div>
                     <div className="bg-black/20 border border-white/5 rounded-[1.25rem] p-4">
-                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Bonus Spins (Today)</div>
+                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Bonus Spins</div>
                       <div className="text-xl font-black italic tracking-tighter mt-1">{Number(userStats?.bonusSpins || 0).toLocaleString('en-US')}</div>
                     </div>
                     <div className="bg-black/20 border border-white/5 rounded-[1.25rem] p-4">
-                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Remaining (Today)</div>
+                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Remaining</div>
                       <div className="text-xl font-black italic tracking-tighter mt-1">{userStats?.remainingSpins == null ? '∞' : Number(userStats.remainingSpins).toLocaleString('en-US')}</div>
                     </div>
                   </div>
