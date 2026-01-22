@@ -57,18 +57,19 @@ function getSteamIdFromRequestOrBot(req: NextRequest): string | null {
 
 // --- Reward Logic ---
 const REWARDS = [
-  { reward: 10, weight: 35 },
-  { reward: 25, weight: 25 },
-  { reward: 50, weight: 18 },
-  { reward: 100, weight: 12 },
-  { reward: 500, weight: 6 },
-  { reward: 1000, weight: 2.5 },
-  { reward: 2000, weight: 1 },
-  { reward: 5000, weight: 0.4 },
-  { reward: 10000, weight: 0.15 },
-  { reward: 30000, weight: 0.05 },
-  { reward: 50000, weight: 0.02 },
-  { reward: 75000, weight: 0.01 }
+  { reward: 10, weight: 19.5 },
+  { reward: 25, weight: 17.5 },
+  { reward: 50, weight: 22 },
+  { reward: 100, weight: 18 },
+  { reward: 500, weight: 12 },
+  { reward: 1000, weight: 6.5 },
+  { reward: 2000, weight: 2.5 },
+  { reward: 5000, weight: 1 },
+  { reward: 10000, weight: 0.5 },
+  { reward: 30000, weight: 0.25 },
+  { reward: 50000, weight: 0.12 },
+  { reward: 75000, weight: 0.08 },
+  { reward: 150000, weight: 0.05 }
 ];
 
 function getWeightedReward() {
