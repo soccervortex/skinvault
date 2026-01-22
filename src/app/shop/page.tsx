@@ -18,7 +18,7 @@ export default function ShopPage() {
   const [checkoutEmail, setCheckoutEmail] = useState('');
   const toast = useToast();
 
-  const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale') => {
+  const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale' | 'titan' | 'legend') => {
     if (!user?.steamId) {
       toast.error('You must be signed in with Steam to purchase. Please sign in first.');
       setTimeout(() => window.location.href = '/inventory', 2000);
@@ -284,7 +284,7 @@ export default function ShopPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 items-stretch">
               <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
@@ -394,6 +394,54 @@ export default function ShopPage() {
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {loading === 'credits_whale' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Titan</p>
+                  <p className="text-lg font-black">50000 Credits</p>
+                  <p className="text-[10px] text-gray-400">€74.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleCreditsCheckout('titan')}
+                  disabled={loading === 'credits_titan' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_titan' ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={12} /> Buy
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Legend</p>
+                  <p className="text-lg font-black">75000 Credits</p>
+                  <p className="text-[10px] text-gray-400">€99.99</p>
+                </div>
+                <button
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => handleCreditsCheckout('legend')}
+                  disabled={loading === 'credits_legend' || !user?.steamId || !!creditsRestriction?.banned || !!creditsRestriction?.timeoutActive}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading === 'credits_legend' ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" /> Processing...
                     </>

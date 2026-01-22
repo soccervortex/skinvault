@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
 import {
   Loader2,
@@ -25,6 +25,7 @@ import {
   MessageSquare,
   Bell,
   Twitter,
+  Tag,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -39,8 +40,9 @@ type ProEntry = {
   daysRemaining: number;
 };
 
-export default function AdminPage() {
+function AdminPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
   const [steamId, setSteamId] = useState("");
@@ -208,17 +210,13 @@ export default function AdminPage() {
   }, [user?.steamId]);
 
   const userIsOwner = isOwner(user?.steamId);
-  const readLegacyMode = () => {
+  const legacyMode = useMemo(() => {
     try {
-      if (typeof window === 'undefined') return false;
-      const sp = new URLSearchParams(window.location.search);
-      return String(sp.get('legacy') || '').trim() === '1';
+      return String(searchParams?.get('legacy') || '').trim() === '1';
     } catch {
       return false;
     }
-  };
-
-  const [legacyMode, setLegacyMode] = useState<boolean>(readLegacyMode);
+  }, [searchParams]);
 
   const formatCurrencyAmount = (amount: number, currency: string) => {
     const cur = String(currency || 'eur').toUpperCase();
@@ -242,34 +240,6 @@ export default function AdminPage() {
       .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
       .join(' / ');
   }, [paidTotalByCurrency]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const sync = () => setLegacyMode(readLegacyMode());
-    sync();
-
-    window.addEventListener('popstate', sync);
-
-    const originalPushState = window.history.pushState;
-    const originalReplaceState = window.history.replaceState;
-
-    window.history.pushState = function (...args: any[]) {
-      originalPushState.apply(window.history, args as any);
-      sync();
-    } as any;
-
-    window.history.replaceState = function (...args: any[]) {
-      originalReplaceState.apply(window.history, args as any);
-      sync();
-    } as any;
-
-    return () => {
-      window.removeEventListener('popstate', sync);
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
-    };
-  }, []);
 
   useEffect(() => {
     if (!userIsOwner) return;
@@ -1313,7 +1283,6 @@ export default function AdminPage() {
 
               <button
                 onClick={() => {
-                  setLegacyMode(true);
                   router.push('/admin?legacy=1');
                 }}
                 className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-300"
@@ -1538,6 +1507,17 @@ export default function AdminPage() {
                 </button>
 
                 <button
+                  onClick={() => router.push('/admin/coupons')}
+                  className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-yellow-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Tag className="text-yellow-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Billing</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Coupons</div>
+                </button>
+
+                <button
                   onClick={() => router.push('/admin/x-post')}
                   className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
                 >
@@ -1608,6 +1588,7 @@ export default function AdminPage() {
         </div>
       </div>
     );
+  }
 
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
@@ -3920,5 +3901,20 @@ export default function AdminPage() {
   );
 }
 
+export default function AdminPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+          <Sidebar />
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="animate-spin text-blue-500" size={32} />
+          </div>
+        </div>
+      }
+    >
+      <AdminPageInner />
+    </Suspense>
+  );
 }
 

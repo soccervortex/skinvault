@@ -4,6 +4,7 @@ import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 import { isOwner } from '@/app/utils/owner-ids';
 import { getOwnerFreeCouponId } from '@/app/utils/stripe-owner-discount';
+import { dbGet } from '@/app/utils/database';
 import type { NextRequest } from 'next/server';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
@@ -44,6 +45,8 @@ const CREDIT_PACKS: Record<string, CreditPack> = {
   mega: { credits: 4000, amount: 999, label: 'Mega Pack' },
   giant: { credits: 10000, amount: 1999, label: 'Giant Pack' },
   whale: { credits: 30000, amount: 4999, label: 'Whale Pack' },
+  titan: { credits: 50000, amount: 7499, label: 'Titan Pack' },
+  legend: { credits: 75000, amount: 9999, label: 'Legend Pack' },
 };
 
 const PAYMENT_METHOD_TYPES = [
@@ -141,12 +144,8 @@ export async function POST(request: NextRequest) {
     // Check if test mode is enabled
     let testMode = false;
     try {
-      const { kv } = await import('@vercel/kv');
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-      }
-    } catch (error) {
-      // Ignore
+      testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
+    } catch {
     }
 
     // Set expiration to 30 minutes from now
