@@ -4,7 +4,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { SPIN_TIERS } from '@/app/lib/spin-tiers';
 
-const REWARD_TIERS = SPIN_TIERS.map((t) => ({ reward: t.reward, label: t.label, color: t.color })) as const;
+const REWARD_TIERS: Array<{ reward: number; label: string; color: string }> = SPIN_TIERS.map((t) => ({
+  reward: t.reward,
+  label: t.label,
+  color: t.color,
+}));
 
 type RewardTier = (typeof REWARD_TIERS)[number];
 

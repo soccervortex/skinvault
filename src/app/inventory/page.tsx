@@ -134,6 +134,17 @@ type InventoryItem = {
   [key: string]: any;
 };
 
+type PublicCoupon = {
+  code: string;
+  name: string | null;
+  kind: 'percent' | 'amount';
+  percentOff: number | null;
+  amountOff: number | null;
+  currency: string | null;
+  startsAt: string | null;
+  expiresAt: string | null;
+};
+
 function hexToRgba(hex: string, alpha: number) {
   try {
     const h = String(hex || '').trim().replace('#', '');
@@ -190,6 +201,21 @@ function isNonMarketable(item: InventoryItem): boolean {
   return item.marketable === 0 || item.marketable === false;
 }
 
+function stripWearFromMarketName(name: string): string {
+  return String(name || '')
+    .replace(/\s*\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getWeaponAndSkinLabels(item: InventoryItem): { weaponName: string; skinName: string } {
+  const mhnRaw = String(item.market_hash_name || item.market_name || item.name || item.display_name || '').trim();
+  const mhn = stripWearFromMarketName(mhnRaw);
+  const weaponName = mhn.includes('|') ? mhn.split('|')[0].trim() : '';
+  const skinName = mhn.includes('|') ? mhn.split('|').slice(1).join('|').trim() : '';
+  return { weaponName: weaponName || '—', skinName: skinName || '' };
+}
+
 function StatCard({ label, icon, val, unit = "", color = "text-white" }: any) {
   const hasValue = (() => {
     if (val === null || val === undefined) return false;
@@ -242,6 +268,7 @@ function InventoryContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
+
   const [websiteProfilePrivate, setWebsiteProfilePrivate] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [itemPrices, setItemPrices] = useState<{ [key: string]: string }>({});
@@ -273,10 +300,14 @@ function InventoryContent() {
   const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
   const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
   const [viewAsOthers, setViewAsOthers] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
   const [isPrime, setIsPrime] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
+
+  const [publicCoupons, setPublicCoupons] = useState<PublicCoupon[]>([]);
+  const [publicCouponsLoading, setPublicCouponsLoading] = useState(false);
 
   const [publicStatusLoading, setPublicStatusLoading] = useState(false);
   const [publicStatus, setPublicStatus] = useState<PublicProfileStatus | null>(null);
@@ -349,6 +380,39 @@ function InventoryContent() {
   );
   const effectiveIsOwner = useMemo(() => viewingOwnProfile && !viewAsOthers, [viewingOwnProfile, viewAsOthers]);
 
+  useEffect(() => {
+    if (viewAsOthers) {
+      setIsEditingProfile(false);
+    }
+  }, [viewAsOthers]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPublicCouponsLoading(true);
+    fetch('/api/coupons/public', { cache: 'no-store' })
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (cancelled) return;
+        if (!ok) {
+          setPublicCoupons([]);
+          return;
+        }
+        const rows = Array.isArray(j?.coupons) ? (j.coupons as PublicCoupon[]) : [];
+        setPublicCoupons(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPublicCoupons([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setPublicCouponsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const notificationsTargetSteamId = useMemo(() => {
     const loggedInSteamId = String(loggedInUser?.steamId || '').trim();
     const viewedSteamId = String(viewedUser?.steamId || '').trim();
@@ -367,7 +431,6 @@ function InventoryContent() {
 
   useEffect(() => {
     let cancelled = false;
-
     const run = async () => {
       const steamId = String(viewedUser?.steamId || '').trim();
       if (!steamId || !/^\d{17}$/.test(steamId)) {
@@ -557,6 +620,7 @@ function InventoryContent() {
         if (!cancelled) setIsPartner(false);
       }
     };
+
     run();
     return () => {
       cancelled = true;
@@ -596,6 +660,7 @@ function InventoryContent() {
         if (!cancelled) setIsPrime(false);
       }
     };
+
     run();
     return () => {
       cancelled = true;
@@ -1146,7 +1211,7 @@ function InventoryContent() {
       // Load wishlist for logged-in user
       setWishlist(loadWishlist(storedLoggedInUser.steamId));
       // Check Pro status from API
-      checkProStatus(storedLoggedInUser.steamId).then(setLoggedInUserPro);
+      checkProStatus(storedLoggedInUser.steamId).then(setLoggedInUserPro).catch(() => setLoggedInUserPro(false));
     } else {
       setLoggedInUser(null);
       setWishlist([]);
@@ -1451,9 +1516,10 @@ function InventoryContent() {
   useEffect(() => {
     if (!viewedUser?.steamId) return;
     try {
-      if (typeof window === 'undefined') return;
-      const origin = window.location.origin;
-      setShareUrl(`${origin}/inventory/${viewedUser.steamId}?currency=${encodeURIComponent(currency.code)}`);
+      if (typeof window !== 'undefined') {
+        const origin = window.location.origin;
+        setShareUrl(`${origin}/inventory/${viewedUser.steamId}?currency=${encodeURIComponent(currency.code)}`);
+      }
     } catch {
       setShareUrl(null);
     }
@@ -1527,7 +1593,6 @@ function InventoryContent() {
           cache: 'no-store',
         });
         const json = await res.json().catch(() => null);
-        if (cancelled) return;
         if (!res.ok) {
           setCs2Overview(null);
           return;
@@ -1914,6 +1979,14 @@ function InventoryContent() {
                   {effectiveIsOwner && (
                     <div className="grid grid-cols-2 gap-2 w-full md:flex md:items-center md:gap-3 md:flex-wrap">
                       <button
+                        onClick={() => setIsEditingProfile((v) => !v)}
+                        className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
+                        title={isEditingProfile ? 'Exit edit mode' : 'Edit your profile'}
+                      >
+                        {isEditingProfile ? 'Editing' : 'Edit profile'}
+                      </button>
+
+                      <button
                         onClick={() => setViewAsOthers(true)}
                         className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                         title="Preview your profile as other users see it"
@@ -1921,7 +1994,6 @@ function InventoryContent() {
                         View as others
                       </button>
 
-                      {/* Refresh Button (visible to all) */}
                       <button
                         onClick={handleForceRefreshInventory}
                         disabled={refreshingInventory}
@@ -1930,8 +2002,7 @@ function InventoryContent() {
                         {refreshingInventory ? 'Refreshing...' : 'Refresh Inventory'}
                       </button>
 
-                      {/* Connect/Disconnect Discord Button (Show if Pro or has Discord access) */}
-                      {(isPro || hasDiscordAccess) && (
+                      {isEditingProfile && (isPro || hasDiscordAccess) && (
                         !discordStatus?.connected ? (
                           <button
                             onClick={() => {
@@ -1962,7 +2033,6 @@ function InventoryContent() {
                                 });
                                 if (res.ok) {
                                   setDiscordStatus({ connected: false });
-                                  // Refresh page to update UI
                                   window.location.reload();
                                 }
                               } catch (error) {
@@ -1976,47 +2046,51 @@ function InventoryContent() {
                           </button>
                         )
                       )}
-                      {/* Manage Trackers Button */}
-                      <button
-                        onClick={() => setShowManageTrackers(true)}
-                        className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
-                      >
-                        <Settings size={12} />
-                        Manage Trackers
-                      </button>
 
-                      <div className="w-full mt-2 bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
-                        <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Trade URL</div>
-                        <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
-                          <input
-                            value={tradeUrlInput}
-                            onChange={(e) => setTradeUrlInput(e.target.value)}
-                            placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
-                            className="w-full md:flex-1 md:min-w-[240px] bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] md:text-[11px] font-black"
-                          />
+                      {isEditingProfile && (
+                        <>
                           <button
-                            onClick={handleSaveTradeUrl}
-                            disabled={tradeUrlSaving}
-                            className={`px-4 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${tradeUrlSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                            onClick={() => setShowManageTrackers(true)}
+                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                           >
-                            {tradeUrlSaving ? 'Saving...' : 'Save'}
+                            <Settings size={12} />
+                            Manage Trackers
                           </button>
-                          {tradeUrl && (
-                            <button
-                              onClick={async () => {
-                                const ok = await copyToClipboard(tradeUrl);
-                                if (ok) toast.success('Trade URL copied');
-                              }}
-                              className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all"
-                            >
-                              Copy
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2 text-[9px] text-gray-500">
-                          This is visible to visitors on your inventory.
-                        </div>
-                      </div>
+
+                          <div className="w-full mt-2 bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
+                            <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Trade URL</div>
+                            <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                              <input
+                                value={tradeUrlInput}
+                                onChange={(e) => setTradeUrlInput(e.target.value)}
+                                placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
+                                className="w-full md:flex-1 md:min-w-[240px] bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] md:text-[11px] font-black"
+                              />
+                              <button
+                                onClick={handleSaveTradeUrl}
+                                disabled={tradeUrlSaving}
+                                className={`px-4 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${tradeUrlSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                              >
+                                {tradeUrlSaving ? 'Saving...' : 'Save'}
+                              </button>
+                              {tradeUrl && (
+                                <button
+                                  onClick={async () => {
+                                    const ok = await copyToClipboard(tradeUrl);
+                                    if (ok) toast.success('Trade URL copied');
+                                  }}
+                                  className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all"
+                                >
+                                  Copy
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-2 text-[9px] text-gray-500">
+                              This is visible to visitors on your inventory.
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                   {viewingOwnProfile && viewAsOthers && (
@@ -2235,7 +2309,7 @@ function InventoryContent() {
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-                <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">CS2 Overview</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">CS2 Overview</div>
                 <div className="text-[9px] md:text-[10px] text-gray-500">Public playtime data (Steam)</div>
               </div>
 
@@ -2368,6 +2442,47 @@ function InventoryContent() {
               </section>
             )}
 
+            {publicCouponsLoading ? (
+              <div className="bg-[#11141d] border border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
+                  <Loader2 className="animate-spin" size={14} />
+                  Loading coupons
+                </div>
+              </div>
+            ) : publicCoupons.length > 0 ? (
+              <div className="bg-[#11141d] border border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Public Coupons</div>
+                <div className="mt-1 text-xl md:text-2xl font-black italic uppercase tracking-tighter">Save money</div>
+                <div className="mt-2 text-[11px] text-gray-400">These codes are safe to share.</div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {publicCoupons.slice(0, 6).map((c) => {
+                    const label = c.kind === 'percent'
+                      ? (Number.isFinite(Number(c.percentOff)) ? `${Number(c.percentOff)}% OFF` : 'DISCOUNT')
+                      : (Number.isFinite(Number(c.amountOff)) ? `${Number(c.amountOff)} OFF` : 'DISCOUNT');
+                    return (
+                      <div key={c.code} className="bg-black/30 border border-white/10 rounded-2xl p-4 md:p-5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">{label}</div>
+                          <div className="mt-1 text-[12px] font-black text-white truncate">{c.name || c.code}</div>
+                          <div className="mt-1 text-[10px] text-gray-500 truncate">Use code: <span className="text-emerald-300 font-black">{c.code}</span></div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const ok = await copyToClipboard(String(c.code));
+                            if (ok) toast.success('Coupon copied');
+                          }}
+                          className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white transition-all"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             <section className="space-y-6 md:space-y-10">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-6">
                 <div className="flex items-center gap-3 md:gap-4">
@@ -2412,6 +2527,12 @@ function InventoryContent() {
                     const itemKey = getMarketKey(item) || getItemDisplayName(item);
                     const isWishlisted = wishlist.some(w => w.market_hash_name === itemKey || w.key === itemKey);
                     const wishlistKey = itemKey;
+
+                    const labels = getWeaponAndSkinLabels(item);
+                    const isStatTrak = /stattrak/i.test(getItemDisplayName(item));
+                    const isSouvenir = /souvenir/i.test(getItemDisplayName(item));
+                    const nonTradable = isNonTradable(item);
+                    const nonMarketable = isNonMarketable(item);
                     
                     return (
                       <div key={idx} className="group relative">
@@ -2430,12 +2551,34 @@ function InventoryContent() {
                             </div>
                             <div className="mt-auto space-y-1.5 md:space-y-2">
                               <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{getItemDisplayName(item)}</p>
+                              {(labels.weaponName !== '—' || labels.skinName) && (
+                                <div className="text-[9px] text-gray-500 truncate">
+                                  {labels.weaponName !== '—' ? <span className="text-gray-400 font-black">{labels.weaponName}</span> : null}
+                                  {labels.skinName ? <span> {labels.weaponName !== '—' ? '•' : ''} {labels.skinName}</span> : null}
+                                </div>
+                              )}
+                              {(isStatTrak || isSouvenir || nonTradable || nonMarketable) && (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {isStatTrak && (
+                                    <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-[8px] font-black uppercase tracking-widest text-orange-300">StatTrak</span>
+                                  )}
+                                  {isSouvenir && (
+                                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[8px] font-black uppercase tracking-widest text-yellow-300">Souvenir</span>
+                                  )}
+                                  {nonTradable && (
+                                    <span className="px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-[8px] font-black uppercase tracking-widest text-red-300">Not tradable</span>
+                                  )}
+                                  {nonMarketable && (
+                                    <span className="px-2 py-0.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-[8px] font-black uppercase tracking-widest text-gray-300">Not marketable</span>
+                                  )}
+                                </div>
+                              )}
                               <div className="min-h-[14px] md:min-h-[16px] flex items-center">
                                 <div className="text-[10px] md:text-[11px] font-black italic">
                                   {getPriceForItem(item, itemPrices) 
                                     ? <span className="text-emerald-500">{getPriceForItem(item, itemPrices)}</span>
                                       : priceScanDone 
-                                        ? ((item.marketable === 0 || item.marketable === false) ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
+                                        ? (nonMarketable ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
                                       : <span className="text-gray-600 animate-pulse">
                                           {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
                                         </span>}
