@@ -291,7 +291,10 @@ export async function POST(request: Request) {
       const autoEnableAtStart = activeRequested && hasStarts && Date.now() < startsMs;
 
       const promoParams: any = {
-        coupon: coupon.id,
+        promotion: {
+          type: 'coupon',
+          coupon: coupon.id,
+        },
         code,
         active: promoActive,
       };
