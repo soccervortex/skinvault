@@ -72,16 +72,18 @@ type SpinHistorySummary = {
 };
 
 const SPIN_TIERS = [
-  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9', odds: '50%' },
-  { reward: 25, label: 'Industrial Grade', color: '#5e98d9', odds: '30%' },
-  { reward: 50, label: 'Mil-Spec', color: '#4b69ff', odds: '15%' },
-  { reward: 100, label: 'Restricted', color: '#8847ff', odds: '4%' },
-  { reward: 500, label: 'Classified', color: '#d32ce6', odds: '0.9%' },
-  { reward: 1000, label: 'Covert', color: '#eb4b4b', odds: '0.08%' },
-  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b', odds: '0.015%' },
-  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b', odds: '0.003%' },
-  { reward: 10000, label: 'Contraband', color: '#ffd700', odds: '0.0007%' },
-  { reward: 30000, label: 'Contraband', color: '#ffd700', odds: '0.0003%' },
+  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9', odds: '35%' },
+  { reward: 25, label: 'Industrial Grade', color: '#5e98d9', odds: '25%' },
+  { reward: 50, label: 'Mil-Spec', color: '#4b69ff', odds: '18%' },
+  { reward: 100, label: 'Restricted', color: '#8847ff', odds: '12%' },
+  { reward: 500, label: 'Classified', color: '#d32ce6', odds: '6%' },
+  { reward: 1000, label: 'Covert', color: '#eb4b4b', odds: '2.5%' },
+  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b', odds: '1%' },
+  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b', odds: '0.4%' },
+  { reward: 10000, label: 'Contraband', color: '#ffd700', odds: '0.15%' },
+  { reward: 30000, label: 'Contraband', color: '#ffd700', odds: '0.05%' },
+  { reward: 50000, label: 'Contraband', color: '#ffd700', odds: '0.02%' },
+  { reward: 75000, label: 'Contraband', color: '#ffd700', odds: '0.01%' },
 ];
 
 type MyClaimRow = {
