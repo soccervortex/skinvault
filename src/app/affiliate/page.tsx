@@ -10,6 +10,7 @@ type Milestone = {
   referralsRequired: number;
   reward:
     | { type: 'credits'; amount: number }
+    | { type: 'spins'; amount: number }
     | { type: 'discord_access' }
     | { type: 'wishlist_slot' }
     | { type: 'price_tracker_slot' }
@@ -21,6 +22,7 @@ type Milestone = {
 
 function getRewardLabel(reward: Milestone['reward']): string {
   if (reward.type === 'credits') return `+${reward.amount} credits`;
+  if (reward.type === 'spins') return `+${reward.amount} spins`;
   if (reward.type === 'discord_access') return 'Discord access';
   if (reward.type === 'wishlist_slot') return '+1 wishlist slot';
   if (reward.type === 'price_tracker_slot') return '+1 price tracker slot';
@@ -38,6 +40,44 @@ export default function AffiliatePage() {
 
   const [referralCount, setReferralCount] = useState<number>(0);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+
+  const orderedMilestones = useMemo(() => {
+    const ms = Array.isArray(milestones) ? milestones.slice() : [];
+    ms.sort((a, b) => {
+      const aClaimed = !!a.claimed;
+      const bClaimed = !!b.claimed;
+      const aClaimable = !!a.claimable;
+      const bClaimable = !!b.claimable;
+
+      if (aClaimable !== bClaimable) return aClaimable ? -1 : 1;
+      if (aClaimed !== bClaimed) return aClaimed ? 1 : -1;
+      return Number(a.referralsRequired || 0) - Number(b.referralsRequired || 0);
+    });
+    return ms;
+  }, [milestones]);
+
+  const nextMilestone = useMemo(() => {
+    const ms = Array.isArray(milestones) ? milestones : [];
+    const unclaimed = ms
+      .filter((m) => !m.claimed)
+      .slice()
+      .sort((a, b) => Number(a.referralsRequired || 0) - Number(b.referralsRequired || 0));
+    return unclaimed[0] || null;
+  }, [milestones]);
+
+  const claimableCount = useMemo(() => {
+    const ms = Array.isArray(milestones) ? milestones : [];
+    return ms.filter((m) => !!m.claimable && !m.claimed).length;
+  }, [milestones]);
+
+  const nextProgress = useMemo(() => {
+    if (!nextMilestone) return { pct: 0, left: 0 };
+    const req = Math.max(1, Number(nextMilestone.referralsRequired || 0));
+    const cur = Math.max(0, Number(referralCount || 0));
+    const pct = Math.max(0, Math.min(100, Math.round((cur / req) * 100)));
+    const left = Math.max(0, req - cur);
+    return { pct, left };
+  }, [nextMilestone, referralCount]);
 
   useEffect(() => {
     try {
@@ -104,6 +144,8 @@ export default function AffiliatePage() {
         const rt = String(json?.reward?.type || '');
         if (rt === 'credits') {
           toast.success(`Claimed ${Number(json?.granted || 0)} credits`);
+        } else if (rt === 'spins') {
+          toast.success(`Claimed ${Number(json?.granted || 0)} spins`);
         } else if (rt === 'discord_access') {
           toast.success('Claimed Discord access');
         } else if (rt === 'wishlist_slot') {
@@ -175,6 +217,48 @@ export default function AffiliatePage() {
           </header>
 
           <section className="bg-[#11141d] p-5 md:p-6 rounded-[2rem] border border-white/5 shadow-xl">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Progress</div>
+                <div className="mt-1 text-xl md:text-2xl font-black italic tracking-tighter">
+                  {claimableCount > 0 ? `${claimableCount} rewards ready to claim` : 'Keep inviting'}
+                </div>
+                {nextMilestone ? (
+                  <div className="mt-2 text-[11px] text-gray-400">
+                    Next: <span className="font-black text-gray-200">{getRewardLabel(nextMilestone.reward)}</span> at{' '}
+                    <span className="font-black text-gray-200">{nextMilestone.referralsRequired}</span> referrals
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[11px] text-gray-400">All milestones claimed.</div>
+                )}
+              </div>
+              {nextMilestone?.claimable ? (
+                <button
+                  onClick={() => claim(nextMilestone.id)}
+                  disabled={claimingId === nextMilestone.id}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    claimingId === nextMilestone.id ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }`}
+                >
+                  {claimingId === nextMilestone.id ? 'Claiming...' : 'Claim next'}
+                </button>
+              ) : null}
+            </div>
+
+            {nextMilestone ? (
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <span>{nextProgress.left} to go</span>
+                  <span>{nextProgress.pct}%</span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-black/40 border border-white/10 overflow-hidden">
+                  <div className="h-full bg-blue-500" style={{ width: `${nextProgress.pct}%` }} />
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="bg-[#11141d] p-5 md:p-6 rounded-[2rem] border border-white/5 shadow-xl">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Milestones</div>
               <button
@@ -195,7 +279,7 @@ export default function AffiliatePage() {
               <div className="text-gray-500 text-[11px]">No milestones available.</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {milestones.map((m) => (
+                {orderedMilestones.map((m) => (
                   <div key={m.id} className="bg-black/40 border border-white/5 rounded-[1.5rem] p-4 md:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>

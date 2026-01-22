@@ -108,6 +108,19 @@ export default function AffiliateStatsAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
 
+  const [transferFrom, setTransferFrom] = useState('');
+  const [transferTo, setTransferTo] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferOk, setTransferOk] = useState<string | null>(null);
+
+  const [optReferrals, setOptReferrals] = useState(true);
+  const [optClaims, setOptClaims] = useState(true);
+  const [optCreditsBalance, setOptCreditsBalance] = useState(false);
+  const [optCreditsLedger, setOptCreditsLedger] = useState(false);
+  const [optBonusSpins, setOptBonusSpins] = useState(false);
+  const [optUserRewards, setOptUserRewards] = useState(false);
+
   const didInitFromUrl = useRef(false);
 
   useEffect(() => {
@@ -290,6 +303,152 @@ export default function AffiliateStatsAdminPage() {
               </div>
             ) : (
               <>
+                <div className="mb-8 bg-[#11141d] border border-white/5 rounded-[2rem] md:rounded-[3rem] p-4 md:p-6 shadow-xl">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">Admin Tools</div>
+                      <div className="mt-1 text-xl md:text-2xl font-black italic uppercase tracking-tighter">Transfer referrals</div>
+                      <div className="mt-2 text-[11px] text-gray-400 max-w-2xl">
+                        Move an affiliate's credited referrals to another SteamID (for fixing wrong attribution). By default it also moves milestone claims.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">From SteamID</div>
+                      <input
+                        value={transferFrom}
+                        onChange={(e) => setTransferFrom(e.target.value)}
+                        placeholder="7656119..."
+                        className="mt-2 w-full px-3 py-2 rounded-xl bg-[#0b0d14] border border-white/10 text-[12px] font-black"
+                      />
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">To SteamID</div>
+                      <input
+                        value={transferTo}
+                        onChange={(e) => setTransferTo(e.target.value)}
+                        placeholder="7656119..."
+                        className="mt-2 w-full px-3 py-2 rounded-xl bg-[#0b0d14] border border-white/10 text-[12px] font-black"
+                      />
+                    </div>
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Action</div>
+                        <div className="mt-2 text-[11px] text-gray-400">Choose what to move, then confirm.</div>
+                      </div>
+                      <button
+                        disabled={transferLoading}
+                        onClick={async () => {
+                          setTransferLoading(true);
+                          setTransferError(null);
+                          setTransferOk(null);
+                          try {
+                            const from = String(transferFrom || '').trim();
+                            const to = String(transferTo || '').trim();
+                            const opts = {
+                              referrals: optReferrals,
+                              claims: optClaims,
+                              creditsBalance: optCreditsBalance,
+                              creditsLedger: optCreditsLedger,
+                              bonusSpins: optBonusSpins,
+                              userRewards: optUserRewards,
+                            };
+
+                            const enabled = Object.entries(opts).filter(([, v]) => !!v).map(([k]) => k);
+                            if (enabled.length === 0) {
+                              throw new Error('Select at least one thing to transfer');
+                            }
+
+                            const ok = window.confirm(
+                              `Transfer from ${from} to ${to}?\n\nThis will move: ${enabled.join(', ')}\n\nThis cannot be automatically undone.`
+                            );
+                            if (!ok) {
+                              setTransferLoading(false);
+                              return;
+                            }
+
+                            const res = await fetch('/api/admin/affiliate-transfer', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+                              },
+                              body: JSON.stringify({
+                                fromSteamId: from,
+                                toSteamId: to,
+                                options: opts,
+                              }),
+                            });
+                            const json = await res.json().catch(() => null);
+                            if (!res.ok) throw new Error(String(json?.error || 'Transfer failed'));
+                            setTransferOk(`Transfer complete. Moved referrals: ${Number(json?.moved?.referrals || 0)}; moved claims: ${Number(json?.moved?.claims || 0)}.`);
+                            await load();
+                          } catch (e: any) {
+                            setTransferError(String(e?.message || 'Transfer failed'));
+                          } finally {
+                            setTransferLoading(false);
+                          }
+                        }}
+                        className={`mt-4 w-full px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                          transferLoading ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 text-white'
+                        }`}
+                      >
+                        {transferLoading ? 'Transferring...' : 'Transfer'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Move</div>
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-gray-300 font-black">
+                        <input type="checkbox" className="accent-amber-500" checked={optReferrals} onChange={(e) => setOptReferrals(e.target.checked)} />
+                        Referrals
+                      </label>
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-gray-300 font-black">
+                        <input type="checkbox" className="accent-amber-500" checked={optClaims} onChange={(e) => setOptClaims(e.target.checked)} />
+                        Milestone claims
+                      </label>
+                    </div>
+
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Optional</div>
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-gray-300 font-black">
+                        <input type="checkbox" className="accent-amber-500" checked={optCreditsBalance} onChange={(e) => setOptCreditsBalance(e.target.checked)} />
+                        Credits balance
+                      </label>
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-gray-300 font-black">
+                        <input type="checkbox" className="accent-amber-500" checked={optBonusSpins} onChange={(e) => setOptBonusSpins(e.target.checked)} />
+                        Bonus spins balance
+                      </label>
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-gray-300 font-black">
+                        <input type="checkbox" className="accent-amber-500" checked={optUserRewards} onChange={(e) => setOptUserRewards(e.target.checked)} />
+                        User rewards (discord/boosts)
+                      </label>
+                    </div>
+
+                    <div className="bg-black/30 border border-white/10 rounded-2xl p-4">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Advanced</div>
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-gray-300 font-black">
+                        <input type="checkbox" className="accent-amber-500" checked={optCreditsLedger} onChange={(e) => setOptCreditsLedger(e.target.checked)} />
+                        Credits ledger history
+                      </label>
+                      <div className="mt-2 text-[11px] text-gray-500">
+                        Ledger transfer is only for data cleanup. It will rewrite history.
+                      </div>
+                    </div>
+                  </div>
+
+                  {transferError ? (
+                    <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-300 text-[11px]">{transferError}</div>
+                  ) : null}
+                  {transferOk ? (
+                    <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-300 text-[11px]">{transferOk}</div>
+                  ) : null}
+                </div>
+
                 {totals ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
                     <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">

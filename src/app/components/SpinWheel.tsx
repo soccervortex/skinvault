@@ -2,21 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
+import { SPIN_TIERS } from '@/app/lib/spin-tiers';
 
-const REWARD_TIERS = [
-  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9' },
-  { reward: 25, label: 'Industrial Grade', color: '#5e98d9' },
-  { reward: 50, label: 'Mil-Spec', color: '#4b69ff' },
-  { reward: 100, label: 'Restricted', color: '#8847ff' },
-  { reward: 500, label: 'Classified', color: '#d32ce6' },
-  { reward: 1000, label: 'Covert', color: '#eb4b4b' },
-  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b' },
-  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b' },
-  { reward: 10000, label: 'Contraband', color: '#ffd700' },
-  { reward: 30000, label: 'Contraband', color: '#ffd700' },
-  { reward: 50000, label: 'Contraband', color: '#ffd700' },
-  { reward: 75000, label: 'Contraband', color: '#ffd700' },
-] as const;
+const REWARD_TIERS = SPIN_TIERS.map((t) => ({ reward: t.reward, label: t.label, color: t.color })) as const;
 
 type RewardTier = (typeof REWARD_TIERS)[number];
 

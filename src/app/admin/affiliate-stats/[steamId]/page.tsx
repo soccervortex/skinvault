@@ -47,6 +47,7 @@ function safeInt(v: string | null, def: number, min: number, max: number): numbe
 function getRewardLabel(reward: any): string {
   const type = String(reward?.type || '').trim();
   if (type === 'credits') return `+${Number(reward?.amount || 0)} credits`;
+  if (type === 'spins') return `+${Number(reward?.amount || 0)} spins`;
   if (type === 'discord_access') return 'Discord access';
   if (type === 'wishlist_slot') return '+1 wishlist slot';
   if (type === 'price_tracker_slot') return '+1 price tracker slot';
