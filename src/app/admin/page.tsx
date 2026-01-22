@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
 import {
   Loader2,
@@ -41,6 +41,7 @@ type ProEntry = {
 
 export default function AdminPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
   const [steamId, setSteamId] = useState("");
@@ -205,6 +206,7 @@ export default function AdminPage() {
   }, [user?.steamId]);
 
   const userIsOwner = isOwner(user?.steamId);
+  const legacyMode = String(searchParams?.get('legacy') || '').trim() === '1';
 
   useEffect(() => {
     if (!userIsOwner) return;
@@ -1201,6 +1203,276 @@ export default function AdminPage() {
     );
   }
 
+  if (!legacyMode) {
+    return (
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
+          <div className="w-full max-w-5xl mx-auto bg-[#11141d] border border-white/10 p-6 md:p-8 lg:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl space-y-6 md:space-y-8">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.back()}
+                  className="hidden md:inline-flex items-center gap-1 text-[9px] md:text-[10px] text-gray-500 hover:text-white uppercase tracking-[0.2em]"
+                >
+                  <ArrowLeft size={12} /> Back
+                </button>
+                <div className="p-2 rounded-xl md:rounded-2xl bg-emerald-500/10 border border-emerald-500/40 shrink-0">
+                  <Shield className="text-emerald-400" size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Owner Console</p>
+                  <h1 className="text-xl md:text-2xl lg:text-3xl font-black italic uppercase tracking-tighter">Admin Panel</h1>
+                </div>
+              </div>
+
+              <button
+                onClick={() => router.push('/admin?legacy=1')}
+                className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-300"
+              >
+                Legacy view
+              </button>
+            </div>
+
+            <div className="mt-2">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+                  <Shield className="text-blue-400" size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Quick tools</p>
+                  <h2 className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Jump to manager</h2>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                <button
+                  onClick={() => router.push('/admin/payments')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Wallet className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Payments</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Payments Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/pro')}
+                  className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-emerald-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="text-emerald-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Pro</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Pro Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/purchases')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Billing</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Purchases</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/fix-purchase')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Billing</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Fix Purchase</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/credits')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Wallet className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Economy</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Credits Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/spins')}
+                  className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-yellow-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="text-yellow-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Spins</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Spin History</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/giveaways')}
+                  className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-purple-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="text-purple-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Giveaways</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Giveaway Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/reports')}
+                  className="bg-black/40 border border-orange-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-orange-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Flag className="text-orange-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Moderation</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Chat Reports</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/moderation')}
+                  className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-red-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Ban className="text-red-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Moderation</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Bans / Timeouts</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/chat')}
+                  className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 text-left hover:border-white/20 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Chat</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Chat Admin</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/user')}
+                  className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 text-left hover:border-white/20 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Search className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Users</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">User Finder</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/notifications')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Bell className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">System</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Notifications</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/themes')}
+                  className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-purple-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="text-purple-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">System</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Themes</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/stripe')}
+                  className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-yellow-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="text-yellow-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Billing</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Stripe Settings</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/x-post')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Twitter className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Social</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">X Post Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/x-posting')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Twitter className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Social</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">X Posting</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/item-reports')}
+                  className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-yellow-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="text-yellow-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Content</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Item Reports</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/databases')}
+                  className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-emerald-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Database className="text-emerald-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">System</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Database Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/creator-stats')}
+                  className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-emerald-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="text-emerald-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Analytics</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Creator Stats</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/affiliate-stats')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Star className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Analytics</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Affiliate Stats</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
       <Sidebar />
@@ -1336,9 +1608,11 @@ export default function AdminPage() {
 
             <button
               onClick={() => {
-                try {
-                  document.getElementById('admin-user-finder')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } catch {
+                const sid = String(searchSteamId || '').trim();
+                if (sid && /^\d{17}$/.test(sid)) {
+                  router.push(`/admin/user?steamId=${encodeURIComponent(sid)}`);
+                } else {
+                  router.push('/admin/user');
                 }
               }}
               className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 text-left hover:border-white/20 transition-all"
@@ -1348,6 +1622,17 @@ export default function AdminPage() {
                 <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Users</div>
               </div>
               <div className="mt-2 text-[12px] font-black uppercase tracking-wider">User Finder</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/chat')}
+              className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 text-left hover:border-white/20 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Chat</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Chat Admin</div>
             </button>
 
             <button

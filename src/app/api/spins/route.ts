@@ -131,14 +131,24 @@ async function getRoleAndLimit(steamId: string): Promise<{ role: 'owner' | 'crea
 
 function usedCountFromDoc(doc: DailySpinDoc | null): number {
   if (!doc) return 0;
-  if (typeof doc.count === 'number' && Number.isFinite(doc.count)) return Math.max(0, Math.floor(doc.count));
-  // Backward compatibility: old schema inserted one doc per day.
+  const raw = (doc as any)?.count;
+  const n = typeof raw === 'number'
+    ? raw
+    : raw && typeof raw === 'object' && typeof (raw as any).toString === 'function'
+      ? Number((raw as any).toString())
+      : Number(raw);
+  if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
   return 1;
 }
 
 function bonusBalanceFromDoc(doc: any): number {
   if (!doc) return 0;
-  const n = Number(doc?.count);
+  const raw = (doc as any)?.count;
+  const n = typeof raw === 'number'
+    ? raw
+    : raw && typeof raw === 'object' && typeof (raw as any).toString === 'function'
+      ? Number((raw as any).toString())
+      : Number(raw);
   if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
   return 0;
 }
@@ -146,7 +156,20 @@ function bonusBalanceFromDoc(doc: any): number {
 async function getOrMigrateBonusBalance(db: any, steamId: string): Promise<number> {
   const bonusCol = db.collection('bonus_spins');
   const balanceDoc = await bonusCol.findOne({ _id: steamId } as any);
-  if (balanceDoc) return bonusBalanceFromDoc(balanceDoc);
+  if (balanceDoc) {
+    const current = bonusBalanceFromDoc(balanceDoc);
+    const raw = (balanceDoc as any)?.count;
+    if (typeof raw !== 'number' && current >= 0) {
+      try {
+        await bonusCol.updateOne(
+          { _id: steamId } as any,
+          { $set: { count: current, updatedAt: new Date() } } as any
+        );
+      } catch {
+      }
+    }
+    return current;
+  }
 
   // Legacy migration: sum per-day bonus docs into a persistent balance.
   const legacyDocs = await bonusCol.find({ steamId, day: { $exists: true } } as any).toArray();
@@ -175,14 +198,37 @@ async function consumeBonusSpin(db: any, steamId: string): Promise<number | null
   // Ensure a balance doc exists (and migrate legacy docs if needed)
   await getOrMigrateBonusBalance(db, steamId);
 
-  const updated = await bonusCol.findOneAndUpdate(
-    { _id: steamId, count: { $gte: 1 } } as any,
-    { $inc: { count: -1 }, $set: { updatedAt: now } } as any,
-    { returnDocument: 'after' }
+  const existing = await bonusCol.findOne({ _id: steamId } as any);
+  const current = bonusBalanceFromDoc(existing);
+  if (current < 1) {
+    const legacyDocs = await bonusCol
+      .find({ steamId, day: { $exists: true } } as any)
+      .sort({ day: -1, updatedAt: -1, createdAt: -1 } as any)
+      .limit(1)
+      .toArray();
+
+    const legacy = legacyDocs?.[0] || null;
+    const legacyCurrent = usedCountFromDoc(legacy as any);
+    if (!legacy || legacyCurrent < 1) return null;
+
+    const next = Math.max(0, legacyCurrent - 1);
+    await bonusCol.updateOne(
+      { _id: (legacy as any)?._id } as any,
+      { $set: { count: next, updatedAt: now } } as any
+    );
+    return next;
+  }
+
+  await bonusCol.updateOne(
+    { _id: steamId } as any,
+    {
+      $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+      $set: { count: current - 1, updatedAt: now } as any,
+    } as any,
+    { upsert: true }
   );
-  const doc = (updated as any)?.value ?? null;
-  if (!doc) return null;
-  return bonusBalanceFromDoc(doc);
+
+  return current - 1;
 }
 
 function retentionCutoff(now: Date): Date {
