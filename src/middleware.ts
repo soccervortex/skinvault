@@ -64,6 +64,13 @@ function buildRefCookie(req: NextRequest): RefCookie | null {
  }
 
 export function middleware(req: NextRequest) {
+  const host = String(req.headers.get('host') || '').trim().toLowerCase();
+  if (host === 'skinvaults.online') {
+    const url = req.nextUrl.clone();
+    url.hostname = 'www.skinvaults.online';
+    return NextResponse.redirect(url);
+  }
+
   const res = NextResponse.next();
 
   const sidCookie = req.cookies.get('sv_sid')?.value;

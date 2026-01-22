@@ -32,7 +32,8 @@ function getCookieDomain(req: NextRequest): string | undefined {
   const envDomain = String(process.env.COOKIE_DOMAIN || '').trim();
   if (envDomain) return envDomain;
 
-  const host = String(req.headers.get('host') || '').trim().toLowerCase();
+  const hostHeader = String(req.headers.get('host') || '').trim().toLowerCase();
+  const host = hostHeader.split(':')[0];
   if (!host) return undefined;
   if (host.includes('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0')) return undefined;
 

@@ -1332,11 +1332,11 @@ export default function AdminPage() {
                     {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
                   </p>
                 </div>
-                <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                  <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
+                  <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                     Total Pro users
                   </p>
-                  <p className="text-lg md:text-xl font-black">{totals.total}</p>
+                  <p className="text-lg md:text-xl font-black text-purple-400">{totals.total}</p>
                 </div>
                 <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
                   <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
@@ -1651,11 +1651,11 @@ export default function AdminPage() {
               {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
             </p>
           </div>
-          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-            <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+          <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
+            <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Total Pro users
             </p>
-            <p className="text-lg md:text-xl font-black">{totals.total}</p>
+            <p className="text-lg md:text-xl font-black text-purple-400">{totals.total}</p>
           </div>
           <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
             <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
