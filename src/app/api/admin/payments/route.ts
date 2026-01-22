@@ -17,6 +17,9 @@ type PaymentRow = {
   amount: number;
   currency: string;
   customerEmail: string | null;
+  promoCode: string | null;
+  promoCodeId: string | null;
+  couponId: string | null;
   receiptUrl: string | null;
   receiptNumber: string | null;
   invoiceUrl: string | null;
@@ -51,6 +54,9 @@ function normalizePaid(p: any): PaymentRow {
     amount: Number(p?.amount || 0),
     currency: String(p?.currency || 'eur'),
     customerEmail: p?.customerEmail ? sanitizeEmail(String(p.customerEmail)) : null,
+    promoCode: p?.promoCode ? String(p.promoCode) : null,
+    promoCodeId: p?.promoCodeId ? String(p.promoCodeId) : null,
+    couponId: p?.couponId ? String(p.couponId) : null,
     receiptUrl: p?.receiptUrl ? String(p.receiptUrl) : null,
     receiptNumber: p?.receiptNumber ? String(p.receiptNumber) : null,
     invoiceUrl: p?.invoiceUrl ? String(p.invoiceUrl) : null,
@@ -83,6 +89,9 @@ function normalizeFailed(f: any): PaymentRow {
     amount: Number(f?.amount || 0),
     currency: String(f?.currency || 'eur'),
     customerEmail: f?.customerEmail ? sanitizeEmail(String(f.customerEmail)) : null,
+    promoCode: f?.promoCode ? String(f.promoCode) : null,
+    promoCodeId: f?.promoCodeId ? String(f.promoCodeId) : null,
+    couponId: f?.couponId ? String(f.couponId) : null,
     receiptUrl: f?.receiptUrl ? String(f.receiptUrl) : null,
     receiptNumber: f?.receiptNumber ? String(f.receiptNumber) : null,
     invoiceUrl: f?.invoiceUrl ? String(f.invoiceUrl) : null,
@@ -261,6 +270,7 @@ export async function GET(request: Request) {
     const filterSteamId = String(url.searchParams.get('steamId') || '').trim();
     const filterType = String(url.searchParams.get('type') || '').trim();
     const filterStatus = String(url.searchParams.get('status') || '').trim();
+    const filterPromo = String(url.searchParams.get('promo') || '').trim().toLowerCase();
     const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
     const includeHidden = parseBool(url.searchParams.get('includeHidden'));
     const statsOnly = parseBool(url.searchParams.get('statsOnly'));
@@ -278,6 +288,10 @@ export async function GET(request: Request) {
       }
       if (filterType) {
         paidRows = paidRows.filter((p) => String(p?.type || '').trim() === filterType);
+      }
+
+      if (filterPromo) {
+        paidRows = paidRows.filter((p) => String(p?.promoCode || '').trim().toLowerCase() === filterPromo);
       }
 
       let paidCount = 0;
@@ -316,6 +330,10 @@ export async function GET(request: Request) {
       rows = rows.filter((r) => String(r.type || '').trim() === filterType);
     }
 
+    if (filterPromo) {
+      rows = rows.filter((r) => String(r.promoCode || '').trim().toLowerCase() === filterPromo);
+    }
+
     if (filterStatus && filterStatus !== 'all') {
       if (filterStatus === 'paid') {
         rows = rows.filter((r) => r.kind === 'paid' && r.status === 'paid');
@@ -335,6 +353,9 @@ export async function GET(request: Request) {
           r.type || '',
           r.steamId || '',
           r.customerEmail || '',
+          r.promoCode || '',
+          r.promoCodeId || '',
+          r.couponId || '',
           r.sessionId || '',
           r.paymentIntentId || '',
           r.invoiceNumber || '',

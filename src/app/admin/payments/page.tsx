@@ -19,6 +19,9 @@ type PaymentRow = {
   amount: number;
   currency: string;
   customerEmail: string | null;
+  promoCode: string | null;
+  promoCodeId: string | null;
+  couponId: string | null;
   receiptUrl: string | null;
   receiptNumber: string | null;
   invoiceUrl: string | null;
@@ -51,6 +54,7 @@ export default function AdminPaymentsPage() {
   const [status, setStatus] = useState<string>('all');
   const [type, setType] = useState<string>('');
   const [steamId, setSteamId] = useState<string>('');
+  const [promo, setPromo] = useState<string>('');
   const [q, setQ] = useState<string>('');
 
   const [includeHidden, setIncludeHidden] = useState(false);
@@ -83,6 +87,7 @@ export default function AdminPaymentsPage() {
       if (status) qs.set('status', status);
       if (type) qs.set('type', type);
       if (steamId) qs.set('steamId', steamId);
+      if (promo) qs.set('promo', promo);
       if (q) qs.set('q', q);
       if (includeHidden) qs.set('includeHidden', '1');
 
@@ -382,7 +387,7 @@ export default function AdminPaymentsPage() {
           </div>
 
           <div className="mt-6 bg-black/40 border border-white/10 rounded-2xl p-4 md:p-5">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Status</p>
                 <select
@@ -421,6 +426,16 @@ export default function AdminPaymentsPage() {
                   onChange={(e) => setSteamId(e.target.value)}
                   placeholder="7656..."
                   className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-blue-400 outline-none"
+                />
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Promo</p>
+                <input
+                  value={promo}
+                  onChange={(e) => setPromo(e.target.value)}
+                  placeholder="WELCOME20"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-emerald-300 outline-none"
                 />
               </div>
 
@@ -465,6 +480,7 @@ export default function AdminPaymentsPage() {
                     setStatus('all');
                     setType('');
                     setSteamId('');
+                    setPromo('');
                     setQ('');
                     setIncludeHidden(false);
                   }}
@@ -494,6 +510,7 @@ export default function AdminPaymentsPage() {
                       <th className="py-2 pr-3">Status</th>
                       <th className="py-2 pr-3">Type</th>
                       <th className="py-2 pr-3">SteamID</th>
+                      <th className="py-2 pr-3">Promo</th>
                       <th className="py-2 pr-3">Amount</th>
                       <th className="py-2 pr-3">Email</th>
                       <th className="py-2 pr-3">Receipt</th>
@@ -511,6 +528,7 @@ export default function AdminPaymentsPage() {
                           <td className="py-2 pr-3">{renderStatus(p)}</td>
                           <td className="py-2 pr-3">{p.type || '-'}</td>
                           <td className="py-2 pr-3 font-mono break-all">{p.steamId || '-'}</td>
+                          <td className="py-2 pr-3 font-mono">{p.promoCode || '-'}</td>
                           <td className="py-2 pr-3 whitespace-nowrap">
                             {Number(p.amount || 0).toFixed(2)} {String(p.currency || 'eur').toUpperCase()}
                           </td>

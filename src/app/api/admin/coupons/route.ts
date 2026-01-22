@@ -72,6 +72,8 @@ type StoredPromo = {
   autoEnableAtStart: boolean;
   expiresAt: string | null;
   active: boolean;
+  singleUsePerUser?: boolean;
+  creatorSlug?: string | null;
   createdAt: string;
   updatedAt: string;
   testMode: boolean;
@@ -229,6 +231,9 @@ export async function POST(request: Request) {
       const code = normalizeCode(body?.code);
       const name = String(body?.name || '').trim() || null;
 
+      const singleUsePerUser = body?.singleUsePerUser === true;
+      const creatorSlug = String(body?.creatorSlug || '').trim().toLowerCase() || null;
+
       const kind = String(body?.kind || 'percent').trim() === 'amount' ? 'amount' : 'percent';
       const percentOffRaw = body?.percentOff;
       const amountOffRaw = body?.amountOff;
@@ -317,6 +322,8 @@ export async function POST(request: Request) {
         autoEnableAtStart,
         expiresAt,
         active: promoActive,
+        singleUsePerUser,
+        creatorSlug,
         createdAt: nowIso,
         updatedAt: nowIso,
         testMode,
@@ -348,6 +355,79 @@ export async function POST(request: Request) {
       rows[idx] = {
         ...rows[idx],
         active,
+        updatedAt: nowIso,
+      };
+      await saveStored(rows);
+
+      return NextResponse.json({ success: true, promo: rows[idx] });
+    }
+
+    if (action === 'update') {
+      const promoCodeId = String(body?.promoCodeId || '').trim();
+      if (!promoCodeId) {
+        return NextResponse.json({ error: 'promoCodeId is required' }, { status: 400 });
+      }
+
+      const rows = await loadStored();
+      const idx = rows.findIndex((r) => r.promoCodeId === promoCodeId);
+      if (idx < 0) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+
+      const existing = rows[idx];
+      if (existing.deletedAt) {
+        return NextResponse.json({ error: 'Promo code is deleted' }, { status: 400 });
+      }
+
+      const name = typeof body?.name === 'string' ? body.name.trim() || null : existing.name;
+      const maxRedemptionsRaw = body?.maxRedemptions;
+      const maxRedemptions = maxRedemptionsRaw == null || String(maxRedemptionsRaw).trim() === ''
+        ? null
+        : Math.max(1, Math.floor(Number(maxRedemptionsRaw)));
+
+      const expiresAt = asIso(body?.expiresAt);
+      const expiresUnix = toUnixSeconds(expiresAt);
+
+      const activeRequested = body?.active === true;
+      const startsAt = typeof body?.startsAt === 'undefined' ? existing.startsAt : asIso(body?.startsAt);
+      const startsMs = startsAt ? new Date(startsAt).getTime() : null;
+      const hasStarts = typeof startsMs === 'number' && Number.isFinite(startsMs);
+      const shouldBeActive = hasStarts ? Date.now() >= startsMs : true;
+      const promoActive = activeRequested ? shouldBeActive : false;
+      const autoEnableAtStart = body?.autoEnableAtStart === true && activeRequested && hasStarts && Date.now() < startsMs;
+
+      const singleUsePerUser = body?.singleUsePerUser === true;
+      const creatorSlug = String(body?.creatorSlug || '').trim().toLowerCase() || null;
+
+      const promoParams: any = {
+        active: promoActive,
+      };
+      if (expiresUnix) promoParams.expires_at = expiresUnix;
+      else promoParams.expires_at = null;
+      if (Number.isFinite(maxRedemptions as any) && maxRedemptions) promoParams.max_redemptions = maxRedemptions;
+      else promoParams.max_redemptions = null;
+
+      await (stripe.promotionCodes as any).update(promoCodeId, promoParams);
+
+      try {
+        const couponParams: any = {
+          name: name || undefined,
+        };
+        if (expiresUnix) couponParams.redeem_by = expiresUnix;
+        await (stripe.coupons as any).update(existing.couponId, couponParams);
+      } catch {
+      }
+
+      rows[idx] = {
+        ...existing,
+        name,
+        maxRedemptions,
+        startsAt,
+        expiresAt,
+        active: promoActive,
+        autoEnableAtStart,
+        singleUsePerUser,
+        creatorSlug,
         updatedAt: nowIso,
       };
       await saveStored(rows);

@@ -172,6 +172,36 @@ export async function POST(request: Request) {
     const invoicePatch = await getInvoicePatch(stripe, session);
     const receiptPatch = await getReceiptPatch(stripe, session);
 
+    let promoCode: string | null = null;
+    let promoCodeId: string | null = null;
+    let couponId: string | null = null;
+    try {
+      const refreshed = await stripe.checkout.sessions.retrieve(String(session.id), {
+        expand: ['total_details.breakdown.discounts.discount', 'total_details.breakdown.discounts.discount.promotion_code'],
+      } as any);
+      const discounts = (refreshed as any)?.total_details?.breakdown?.discounts;
+      const first = Array.isArray(discounts) ? discounts[0] : null;
+      const discountObj = first?.discount;
+      if (discountObj) {
+        const pc = (discountObj as any)?.promotion_code;
+        if (typeof pc === 'string') promoCodeId = pc;
+        else if (pc && typeof pc === 'object') {
+          promoCodeId = typeof (pc as any)?.id === 'string' ? (pc as any).id : promoCodeId;
+          promoCode = typeof (pc as any)?.code === 'string' ? (pc as any).code : promoCode;
+        }
+        const coupon = (discountObj as any)?.coupon;
+        if (typeof coupon === 'string') couponId = coupon;
+        else if (coupon && typeof coupon === 'object') couponId = typeof (coupon as any)?.id === 'string' ? (coupon as any).id : couponId;
+      }
+    } catch {
+    }
+    const metaPromo = String((session.metadata as any)?.promoCode || '').trim();
+    const metaPromoId = String((session.metadata as any)?.promoCodeId || '').trim();
+    const metaCouponId = String((session.metadata as any)?.couponId || '').trim();
+    if (!promoCode && metaPromo) promoCode = metaPromo;
+    if (!promoCodeId && metaPromoId) promoCodeId = metaPromoId;
+    if (!couponId && metaCouponId) couponId = metaCouponId;
+
     // Handle spins purchase
     if (steamId && type === 'spins') {
       const spins = Number(session.metadata?.spins || 0);
@@ -233,6 +263,9 @@ export async function POST(request: Request) {
               type: 'spins',
               spins,
               pack,
+              promoCode,
+              promoCodeId,
+              couponId,
               amount,
               currency,
               sessionId: session.id,
@@ -402,6 +435,9 @@ export async function POST(request: Request) {
               type: 'credits',
               credits,
               pack,
+              promoCode,
+              promoCodeId,
+              couponId,
               amount,
               currency,
               sessionId: session.id,
@@ -541,6 +577,9 @@ export async function POST(request: Request) {
             steamId,
             type: 'pro',
             months,
+            promoCode,
+            promoCodeId,
+            couponId,
             amount,
             currency,
             sessionId: session.id,
@@ -701,6 +740,9 @@ export async function POST(request: Request) {
               type: 'consumable',
               consumableType,
               quantity,
+              promoCode,
+              promoCodeId,
+              couponId,
               amount,
               currency,
               sessionId: session.id,

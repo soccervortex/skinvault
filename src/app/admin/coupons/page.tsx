@@ -11,9 +11,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   Loader2,
+  Pencil,
+  Save,
   Shield,
   Tag,
   Trash2,
+  X,
 } from 'lucide-react';
 
 type PromoRow = {
@@ -29,6 +32,8 @@ type PromoRow = {
   startsAt: string | null;
   expiresAt: string | null;
   active: boolean;
+  singleUsePerUser?: boolean;
+  creatorSlug?: string | null;
   createdAt: string;
   updatedAt: string;
   testMode: boolean;
@@ -94,6 +99,73 @@ export default function AdminCouponsPage() {
   const [expiresAt, setExpiresAt] = useState('');
   const [active, setActive] = useState(true);
   const [autoEnableAtStart, setAutoEnableAtStart] = useState(true);
+  const [singleUsePerUser, setSingleUsePerUser] = useState(false);
+  const [creatorSlug, setCreatorSlug] = useState('');
+
+  const [editing, setEditing] = useState<PromoRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editMaxRedemptions, setEditMaxRedemptions] = useState('');
+  const [editStartsAt, setEditStartsAt] = useState('');
+  const [editExpiresAt, setEditExpiresAt] = useState('');
+  const [editActive, setEditActive] = useState(true);
+  const [editAutoEnableAtStart, setEditAutoEnableAtStart] = useState(true);
+  const [editSingleUsePerUser, setEditSingleUsePerUser] = useState(false);
+  const [editCreatorSlug, setEditCreatorSlug] = useState('');
+
+  const openEdit = (r: PromoRow) => {
+    setEditing(r);
+    setEditName(String(r.name || ''));
+    setEditMaxRedemptions(r.maxRedemptions == null ? '' : String(r.maxRedemptions));
+    setEditStartsAt(r.startsAt ? String(r.startsAt).slice(0, 16) : '');
+    setEditExpiresAt(r.expiresAt ? String(r.expiresAt).slice(0, 16) : '');
+    setEditActive(!!r.active);
+    setEditAutoEnableAtStart((r as any)?.autoEnableAtStart !== false);
+    setEditSingleUsePerUser(r.singleUsePerUser === true);
+    setEditCreatorSlug(String(r.creatorSlug || ''));
+  };
+
+  const saveEdit = async () => {
+    if (!userIsOwner) return;
+    if (!editing) return;
+    setEditSaving(true);
+    try {
+      const payload: any = {
+        action: 'update',
+        steamId: user?.steamId,
+        promoCodeId: editing.promoCodeId,
+        name: editName,
+        maxRedemptions: editMaxRedemptions,
+        startsAt: toIsoOrNull(editStartsAt),
+        expiresAt: toIsoOrNull(editExpiresAt),
+        active: editActive,
+        autoEnableAtStart: editAutoEnableAtStart,
+        singleUsePerUser: editSingleUsePerUser,
+        creatorSlug: editCreatorSlug,
+      };
+
+      const res = await fetch('/api/admin/coupons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(String((json as any)?.error || 'Failed to update'));
+        return;
+      }
+      toast.success('Updated');
+      setEditing(null);
+      await load();
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Request failed'));
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -150,6 +222,8 @@ export default function AdminCouponsPage() {
         steamId: user?.steamId,
         code,
         name,
+        singleUsePerUser,
+        creatorSlug,
         kind,
         percentOff: kind === 'percent' ? percentOff : null,
         amountOff: kind === 'amount' ? amountOff : null,
@@ -184,6 +258,8 @@ export default function AdminCouponsPage() {
       setMaxRedemptions('');
       setStartsAt('');
       setExpiresAt('');
+      setSingleUsePerUser(false);
+      setCreatorSlug('');
       await load();
     } catch (e: any) {
       const msg = String(e?.message || 'Request failed');
@@ -426,6 +502,28 @@ export default function AdminCouponsPage() {
                   Auto-enable when start date is reached (if start date is in the future)
                 </div>
               </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={singleUsePerUser}
+                  onChange={(e) => setSingleUsePerUser(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <div className="text-[10px] text-gray-300">
+                  Single-use per user
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black mb-2">Creator slug (optional)</div>
+                <input
+                  value={creatorSlug}
+                  onChange={(e) => setCreatorSlug(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[12px]"
+                  placeholder="creator-slug"
+                />
+              </div>
             </div>
 
             <div className="mt-6 flex items-center gap-3">
@@ -471,6 +569,8 @@ export default function AdminCouponsPage() {
                     <tr className="text-gray-500 uppercase tracking-widest text-[9px]">
                       <th className="text-left py-2 pr-4">Code</th>
                       <th className="text-left py-2 pr-4">Discount</th>
+                      <th className="text-left py-2 pr-4">Rules</th>
+                      <th className="text-left py-2 pr-4">Creator</th>
                       <th className="text-left py-2 pr-4">Active</th>
                       <th className="text-left py-2 pr-4">Starts</th>
                       <th className="text-left py-2 pr-4">Expires</th>
@@ -499,6 +599,12 @@ export default function AdminCouponsPage() {
                               ? `${Number(r.percentOff || 0)}%`
                               : `${Number(r.amountOff || 0)} ${(r.currency || 'eur').toUpperCase()}`}
                           </td>
+                          <td className="py-3 pr-4 text-gray-300">
+                            {r.singleUsePerUser === true ? '1/user' : '-'}
+                          </td>
+                          <td className="py-3 pr-4 text-gray-300">
+                            {r.creatorSlug ? r.creatorSlug : '-'}
+                          </td>
                           <td className="py-3 pr-4">
                             <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${activeLabel ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-red-500/10 text-red-300 border border-red-500/20'}`}>
                               {activeLabel ? 'Active' : 'Off'}
@@ -509,6 +615,13 @@ export default function AdminCouponsPage() {
                           <td className="py-3 pr-4 text-gray-300">{Number.isFinite(Number(redeemed)) ? String(redeemed) : '-'}</td>
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => openEdit(r)}
+                                disabled={isDeleted}
+                                className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
+                              >
+                                <Pencil size={12} /> Edit
+                              </button>
                               <button
                                 onClick={() => void setPromoActive(r.promoCodeId, !activeLabel)}
                                 disabled={isDeleted}
@@ -539,6 +652,125 @@ export default function AdminCouponsPage() {
           </section>
         </div>
       </main>
+
+      {editing && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-[#11141d] border border-white/10 rounded-3xl p-5 md:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.4em] text-gray-500 font-black">Edit Promo</p>
+                <div className="mt-1 text-[10px] text-gray-400 font-mono break-all">{editing.code}</div>
+              </div>
+              <button
+                onClick={() => setEditing(null)}
+                className="text-gray-500 hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Name</p>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Starts</p>
+                  <input
+                    type="datetime-local"
+                    value={editStartsAt}
+                    onChange={(e) => setEditStartsAt(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Expires</p>
+                  <input
+                    type="datetime-local"
+                    value={editExpiresAt}
+                    onChange={(e) => setEditExpiresAt(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Max redemptions</p>
+                <input
+                  value={editMaxRedemptions}
+                  onChange={(e) => setEditMaxRedemptions(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                  placeholder=""
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={editActive}
+                  onChange={(e) => setEditActive(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <div className="text-[10px] text-gray-300">Active</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={editAutoEnableAtStart}
+                  onChange={(e) => setEditAutoEnableAtStart(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <div className="text-[10px] text-gray-300">Auto-enable at start</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={editSingleUsePerUser}
+                  onChange={(e) => setEditSingleUsePerUser(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <div className="text-[10px] text-gray-300">Single-use per user</div>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Creator slug</p>
+                <input
+                  value={editCreatorSlug}
+                  onChange={(e) => setEditCreatorSlug(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-white outline-none"
+                  placeholder="creator-slug"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                disabled={editSaving}
+                onClick={() => setEditing(null)}
+                className="bg-black/40 border border-white/10 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-gray-300 hover:border-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={editSaving}
+                onClick={() => void saveEdit()}
+                className="bg-blue-600/20 border border-blue-500/40 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-blue-300 hover:bg-blue-600/30 inline-flex items-center gap-2"
+              >
+                {editSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save size={12} />}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
