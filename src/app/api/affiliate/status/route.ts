@@ -15,28 +15,39 @@ type Milestone = {
     | { type: 'cache_boost' };
 };
 
-const MILESTONES: Milestone[] = [
+const BASE_MILESTONES: Milestone[] = [
   { id: 'ref_1', referralsRequired: 1, reward: { type: 'credits', amount: 100 } },
   { id: 'ref_2', referralsRequired: 2, reward: { type: 'wishlist_slot' } },
   { id: 'ref_3', referralsRequired: 3, reward: { type: 'discord_access' } },
   { id: 'ref_4', referralsRequired: 4, reward: { type: 'wishlist_slot' } },
   { id: 'ref_5', referralsRequired: 5, reward: { type: 'credits', amount: 600 } },
   { id: 'ref_6', referralsRequired: 6, reward: { type: 'wishlist_slot' } },
-  { id: 'ref_7', referralsRequired: 7, reward: { type: 'price_scan_boost' } },
-  { id: 'ref_8', referralsRequired: 8, reward: { type: 'wishlist_slot' } },
-  { id: 'ref_9', referralsRequired: 9, reward: { type: 'price_tracker_slot' } },
-  { id: 'ref_10', referralsRequired: 10, reward: { type: 'credits', amount: 1500 } },
-  { id: 'ref_12', referralsRequired: 12, reward: { type: 'wishlist_slot' } },
-  { id: 'ref_15', referralsRequired: 15, reward: { type: 'cache_boost' } },
-  { id: 'ref_18', referralsRequired: 18, reward: { type: 'price_tracker_slot' } },
-  { id: 'ref_20', referralsRequired: 20, reward: { type: 'credits', amount: 3000 } },
-  { id: 'ref_22', referralsRequired: 22, reward: { type: 'wishlist_slot' } },
-  { id: 'ref_25', referralsRequired: 25, reward: { type: 'credits', amount: 5000 } },
-  { id: 'ref_30', referralsRequired: 30, reward: { type: 'wishlist_slot' } },
-  { id: 'ref_35', referralsRequired: 35, reward: { type: 'price_tracker_slot' } },
-  { id: 'ref_40', referralsRequired: 40, reward: { type: 'credits', amount: 8000 } },
-  { id: 'ref_50', referralsRequired: 50, reward: { type: 'credits', amount: 15000 } },
 ];
+
+function parseRefMilestoneId(id: string): number | null {
+  const m = String(id || '').trim().match(/^ref_(\d+)$/);
+  if (!m?.[1]) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
+function buildMilestones(referralCount: number, claimed: Set<string>): Milestone[] {
+  let maxClaimedN = 0;
+  for (const id of claimed.values()) {
+    const n = parseRefMilestoneId(id);
+    if (n && n > maxClaimedN) maxClaimedN = n;
+  }
+
+  const safeReferralCount = Math.max(0, Math.floor(Number(referralCount || 0)));
+  const maxN = Math.min(200, Math.max(10, safeReferralCount + 5, maxClaimedN));
+
+  const out: Milestone[] = [...BASE_MILESTONES];
+  for (let n = 7; n <= maxN; n += 1) {
+    out.push({ id: `ref_${n}`, referralsRequired: n, reward: { type: 'credits', amount: 100 } });
+  }
+  return out;
+}
 
 export const runtime = 'nodejs';
 
@@ -66,7 +77,9 @@ export async function GET(req: NextRequest) {
       if (id) claimed.add(id);
     }
 
-    const milestones = MILESTONES.map((m) => {
+    const source = buildMilestones(referralCount, claimed);
+
+    const milestones = source.map((m) => {
       const isClaimed = claimed.has(m.id);
       const isEligible = referralCount >= m.referralsRequired;
       return {
