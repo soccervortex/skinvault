@@ -57,8 +57,8 @@ function getSteamIdFromRequestOrBot(req: NextRequest): string | null {
 
 // --- Reward Logic ---
 const REWARDS = [
-  { reward: 10, weight: 19.5 },
-  { reward: 25, weight: 17.5 },
+  { reward: 10, weight: 30 },
+  { reward: 25, weight: 25 },
   { reward: 50, weight: 22 },
   { reward: 100, weight: 18 },
   { reward: 500, weight: 12 },

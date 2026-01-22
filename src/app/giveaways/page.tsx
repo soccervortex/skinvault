@@ -72,8 +72,8 @@ type SpinHistorySummary = {
 };
 
 const SPIN_TIERS = [
-  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9', odds: '19.5%' },
-  { reward: 25, label: 'Industrial Grade', color: '#5e98d9', odds: '17.5%' },
+  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9', odds: '30%' },
+  { reward: 25, label: 'Industrial Grade', color: '#5e98d9', odds: '25%' },
   { reward: 50, label: 'Mil-Spec', color: '#4b69ff', odds: '22%' },
   { reward: 100, label: 'Restricted', color: '#8847ff', odds: '18%' },
   { reward: 500, label: 'Classified', color: '#d32ce6', odds: '12%' },
