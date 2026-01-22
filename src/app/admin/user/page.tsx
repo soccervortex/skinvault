@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
 import { useToast } from '@/app/components/Toast';
@@ -10,7 +10,6 @@ import { ArrowLeft, Loader2, Search, Shield, User } from 'lucide-react';
 
 export default function AdminUserSearchPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const toast = useToast();
 
   const [user, setUser] = useState<any>(null);
@@ -29,11 +28,16 @@ export default function AdminUserSearchPage() {
   }, []);
 
   useEffect(() => {
-    const fromQuery = String(searchParams?.get('steamId') || '').trim();
-    if (fromQuery && /^\d{17}$/.test(fromQuery)) {
-      setSteamId(fromQuery);
+    try {
+      if (typeof window === 'undefined') return;
+      const sp = new URLSearchParams(window.location.search);
+      const fromQuery = String(sp.get('steamId') || '').trim();
+      if (fromQuery && /^\d{17}$/.test(fromQuery)) {
+        setSteamId(fromQuery);
+      }
+    } catch {
     }
-  }, [searchParams]);
+  }, []);
 
   const go = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();

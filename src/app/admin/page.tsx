@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
 import {
   Loader2,
@@ -41,7 +41,6 @@ type ProEntry = {
 
 export default function AdminPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
   const [steamId, setSteamId] = useState("");
@@ -206,7 +205,17 @@ export default function AdminPage() {
   }, [user?.steamId]);
 
   const userIsOwner = isOwner(user?.steamId);
-  const legacyMode = String(searchParams?.get('legacy') || '').trim() === '1';
+  const [legacyMode, setLegacyMode] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const sp = new URLSearchParams(window.location.search);
+      setLegacyMode(String(sp.get('legacy') || '').trim() === '1');
+    } catch {
+      setLegacyMode(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!userIsOwner) return;
@@ -1471,7 +1480,6 @@ export default function AdminPage() {
         </div>
       </div>
     );
-  }
 
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
@@ -2553,65 +2561,70 @@ export default function AdminPage() {
             </button>
           </form>
 
-          {banStatus && (
-            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[9px] md:text-[10px] uppercase tracking-[0.3em] text-gray-500">
-                  Status for {banStatus.steamId}
-                </p>
-                <button
-                  onClick={() => {
-                    setBanStatus(null);
-                    setBanSteamId("");
-                  }}
-                  className="text-gray-500 hover:text-white transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[10px] md:text-[11px] text-gray-400 mb-1">Ban Status:</p>
-                  <p className={`text-[11px] md:text-[12px] font-black ${banStatus.banned ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {banStatus.banned ? '❌ Banned' : '✅ Not Banned'}
-                  </p>
-                </div>
-              </div>
-              {banStatus.banned ? (
-                <button
-                  onClick={handleUnbanUser}
-                  disabled={banning}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {banning ? (
-                    <>
-                      <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Unbanning...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={12} /> Unban User
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleBanUser}
-                  disabled={banning}
-                  className="w-full bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-red-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {banning ? (
-                    <>
-                      <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Banning...
-                    </>
-                  ) : (
-                    <>
-                      <Ban size={12} /> Ban User
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          )}
+          {banStatus
+            ? (() => {
+                const bs = banStatus!;
+                return (
+                  <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[9px] md:text-[10px] uppercase tracking-[0.3em] text-gray-500">
+                        Status for {bs.steamId}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setBanStatus(null);
+                          setBanSteamId("");
+                        }}
+                        className="text-gray-500 hover:text-white transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-[10px] md:text-[11px] text-gray-400 mb-1">Ban Status:</p>
+                        <p className={`text-[11px] md:text-[12px] font-black ${bs.banned ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {bs.banned ? '❌ Banned' : '✅ Not Banned'}
+                        </p>
+                      </div>
+                    </div>
+                    {bs.banned ? (
+                      <button
+                        onClick={handleUnbanUser}
+                        disabled={banning}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                      >
+                        {banning ? (
+                          <>
+                            <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Unbanning...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={12} /> Unban User
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleBanUser}
+                        disabled={banning}
+                        className="w-full bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest transition-all shadow-xl shadow-red-600/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                      >
+                        {banning ? (
+                          <>
+                            <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> Banning...
+                          </>
+                        ) : (
+                          <>
+                            <Ban size={12} /> Ban User
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()
+            : null}
         </div>
 
         {/* Reports Section */}
@@ -3686,11 +3699,16 @@ export default function AdminPage() {
                       ? 'X posting is enabled. Posts will be created automatically.' 
                       : 'X posting is disabled. Enable to start posting.'}
                   </p>
-                  {xPostingLastPost && (
-                    <p className="text-[9px] md:text-[10px] text-gray-600 mt-1">
-                      Last post: {new Date(xPostingLastPost).toLocaleString()}
-                    </p>
-                  )}
+                  {xPostingLastPost
+                    ? (() => {
+                        const last = xPostingLastPost!;
+                        return (
+                          <p className="text-[9px] md:text-[10px] text-gray-600 mt-1">
+                            Last post: {new Date(last).toLocaleString()}
+                          </p>
+                        );
+                      })()
+                    : null}
                   {xPostingStatus && (
                     <div className="mt-2 space-y-1">
                       <p className="text-[9px] md:text-[10px] text-gray-500">
@@ -3756,5 +3774,7 @@ export default function AdminPage() {
       </div>
     </div>
   );
+}
+
 }
 

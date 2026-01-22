@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Loader2, ArrowLeft, Ban, Clock, Crown, Search, User, Shield, Trash2, MessageSquare } from 'lucide-react';
@@ -24,7 +24,6 @@ interface UserInfo {
 export default function UserManagementPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
