@@ -470,7 +470,15 @@ export async function createAutomatedXPostWithImage(item: {
       } catch {
         errorData = { detail: responseText || 'Unknown error' };
       }
-      return { success: false, error: errorData.detail || errorData.title || errorData.message || 'Failed to post' };
+      const detail = String(errorData.detail || errorData.title || errorData.message || 'Failed to post');
+      if (detail.toLowerCase().includes('not permitted to perform this action')) {
+        return {
+          success: false,
+          error:
+            'X rejected the request (403). Your X Developer app/token likely does not have write access. Set app permissions to Read and write and regenerate the access token/secret.',
+        };
+      }
+      return { success: false, error: detail };
     }
 
     const data = JSON.parse(responseText);
@@ -601,7 +609,15 @@ export async function createXPostWithImages(input: {
       } catch {
         errorData = { detail: responseText || 'Unknown error' };
       }
-      return { success: false, error: errorData.detail || errorData.title || errorData.message || 'Failed to post' };
+      const detail = String(errorData.detail || errorData.title || errorData.message || 'Failed to post');
+      if (detail.toLowerCase().includes('not permitted to perform this action')) {
+        return {
+          success: false,
+          error:
+            'X rejected the request (403). Your X Developer app/token likely does not have write access. Set app permissions to Read and write and regenerate the access token/secret.',
+        };
+      }
+      return { success: false, error: detail };
     }
 
     const data = JSON.parse(responseText);
