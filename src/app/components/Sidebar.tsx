@@ -481,47 +481,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </Link>
 
               {isOwner(user?.steamId) && (
-                <>
-                  <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+                <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
                     <Shield size={16} /> Admin Panel
                   </Link>
-
-                  <div className="mt-2 ml-3 space-y-2">
-                    <Link href="/admin/payments" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <Wallet size={14} /> Payments
-                    </Link>
-                    <Link href="/admin/pro" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <Shield size={14} /> Pro
-                    </Link>
-                    <Link href="/admin/purchases" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <ShoppingCart size={14} /> Purchases
-                    </Link>
-                    <Link href="/admin/fix-purchase" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <CheckCircle2 size={14} /> Fix Purchase
-                    </Link>
-                    <Link href="/admin/moderation" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <AlertTriangle size={14} /> Moderation
-                    </Link>
-                    <Link href="/admin/chat" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <MessageSquare size={14} /> Chat Admin
-                    </Link>
-                    <Link href="/admin/user" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <User size={14} /> Users
-                    </Link>
-                    <Link href="/admin/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <Bell size={14} /> Notifications
-                    </Link>
-                    <Link href="/admin/themes" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <Sparkles size={14} /> Themes
-                    </Link>
-                    <Link href="/admin/stripe" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <Coins size={14} /> Stripe
-                    </Link>
-                    <Link href="/admin/x-posting" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                      <Twitter size={14} /> X Posting
-                    </Link>
-                  </div>
-                </>
               )}
             </div>
 
@@ -758,47 +720,9 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
 
           {isOwner(user?.steamId) && (
-            <>
-              <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+            <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
                 <Shield size={16} /> Admin Panel
               </Link>
-
-              <div className="mt-2 ml-3 space-y-2">
-                <Link href="/admin/payments" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <Wallet size={14} /> Payments
-                </Link>
-                <Link href="/admin/pro" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <Shield size={14} /> Pro
-                </Link>
-                <Link href="/admin/purchases" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <ShoppingCart size={14} /> Purchases
-                </Link>
-                <Link href="/admin/fix-purchase" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <CheckCircle2 size={14} /> Fix Purchase
-                </Link>
-                <Link href="/admin/moderation" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <AlertTriangle size={14} /> Moderation
-                </Link>
-                <Link href="/admin/chat" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <MessageSquare size={14} /> Chat Admin
-                </Link>
-                <Link href="/admin/user" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <User size={14} /> Users
-                </Link>
-                <Link href="/admin/notifications" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <Bell size={14} /> Notifications
-                </Link>
-                <Link href="/admin/themes" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <Sparkles size={14} /> Themes
-                </Link>
-                <Link href="/admin/stripe" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <Coins size={14} /> Stripe
-                </Link>
-                <Link href="/admin/x-posting" className="flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-                  <Twitter size={14} /> X Posting
-                </Link>
-              </div>
-            </>
           )}
         </div>
 

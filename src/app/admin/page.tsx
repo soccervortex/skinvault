@@ -205,16 +205,44 @@ export default function AdminPage() {
   }, [user?.steamId]);
 
   const userIsOwner = isOwner(user?.steamId);
-  const [legacyMode, setLegacyMode] = useState(false);
+  const readLegacyMode = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const sp = new URLSearchParams(window.location.search);
+      return String(sp.get('legacy') || '').trim() === '1';
+    } catch {
+      return false;
+    }
+  };
+
+  const [legacyMode, setLegacyMode] = useState<boolean>(readLegacyMode);
 
   useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return;
-      const sp = new URLSearchParams(window.location.search);
-      setLegacyMode(String(sp.get('legacy') || '').trim() === '1');
-    } catch {
-      setLegacyMode(false);
-    }
+    if (typeof window === 'undefined') return;
+
+    const sync = () => setLegacyMode(readLegacyMode());
+    sync();
+
+    window.addEventListener('popstate', sync);
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function (...args: any[]) {
+      originalPushState.apply(window.history, args as any);
+      sync();
+    } as any;
+
+    window.history.replaceState = function (...args: any[]) {
+      originalReplaceState.apply(window.history, args as any);
+      sync();
+    } as any;
+
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
   }, []);
 
   useEffect(() => {
@@ -1236,7 +1264,10 @@ export default function AdminPage() {
               </div>
 
               <button
-                onClick={() => router.push('/admin?legacy=1')}
+                onClick={() => {
+                  setLegacyMode(true);
+                  router.push('/admin?legacy=1');
+                }}
                 className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-300"
               >
                 Legacy view
