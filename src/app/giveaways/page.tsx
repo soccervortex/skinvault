@@ -7,7 +7,6 @@ import Image from 'next/image';
 import { HelpCircle, Loader2, Sparkles, Ticket, Wallet, X } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
 import SpinWheel from '@/app/components/SpinWheel';
-import { getSpinTierByReward, getSpinTiersWithOdds } from '@/app/lib/spin-rewards';
 
 type PrizeItem = {
   id?: string;
@@ -72,7 +71,20 @@ type SpinHistorySummary = {
   bestReward: number;
 };
 
-const SPIN_TIERS = getSpinTiersWithOdds();
+const SPIN_TIERS = [
+  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9', odds: '30%' },
+  { reward: 25, label: 'Industrial Grade', color: '#5e98d9', odds: '25%' },
+  { reward: 50, label: 'Mil-Spec', color: '#4b69ff', odds: '22.5%' },
+  { reward: 100, label: 'Restricted', color: '#8847ff', odds: '15%' },
+  { reward: 500, label: 'Classified', color: '#d32ce6', odds: '10%' },
+  { reward: 1000, label: 'Covert', color: '#eb4b4b', odds: '5%' },
+  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b', odds: '2%' },
+  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b', odds: '1%' },
+  { reward: 10000, label: 'Contraband', color: '#ffd700', odds: '0.47%' },
+  { reward: 30000, label: 'Contraband', color: '#ffd700', odds: '0.23%' },
+  { reward: 50000, label: 'Contraband', color: '#ffd700', odds: '0.10%' },
+  { reward: 75000, label: 'Contraband', color: '#ffd700', odds: '0.06%' },
+];
 
 type MyClaimRow = {
   giveawayId: string;
@@ -987,9 +999,7 @@ export default function GiveawaysPage() {
   const spinResultTier = useMemo(() => {
     const r = Number(spinResultReward);
     if (!Number.isFinite(r)) return SPIN_TIERS[0];
-    const tier = getSpinTierByReward(r) as any;
-    const withOdds = SPIN_TIERS.find((t) => t.reward === tier.reward);
-    return withOdds || SPIN_TIERS[0];
+    return SPIN_TIERS.find((t) => t.reward === r) || SPIN_TIERS[0];
   }, [spinResultReward]);
 
   const enterGiveaway = async () => {

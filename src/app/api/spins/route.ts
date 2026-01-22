@@ -4,7 +4,6 @@ import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isOwner } from '@/app/utils/owner-ids';
 import { readCreators } from '@/app/api/creators/route';
-import { pickWeightedSpinReward } from '@/app/lib/spin-rewards';
 
 // --- Types ---
 type DailySpinDoc = {
@@ -57,8 +56,32 @@ function getSteamIdFromRequestOrBot(req: NextRequest): string | null {
 }
 
 // --- Reward Logic ---
+const REWARDS = [
+  { reward: 10, weight: 30 },
+  { reward: 25, weight: 25 },
+  { reward: 50, weight: 22.5 },
+  { reward: 100, weight: 15 },
+  { reward: 500, weight: 10 },
+  { reward: 1000, weight: 5 },
+  { reward: 2000, weight: 2 },
+  { reward: 5000, weight: 1 },
+  { reward: 10000, weight: 0.47 },
+  { reward: 30000, weight: 0.23 },
+  { reward: 50000, weight: 0.10 },
+  { reward: 75000, weight: 0.06 }
+];
+
 function getWeightedReward() {
-  return pickWeightedSpinReward();
+  const totalWeight = REWARDS.reduce((sum, item) => sum + item.weight, 0);
+  let random = Math.random() * totalWeight;
+
+  for (const item of REWARDS) {
+    if (random < item.weight) {
+      return item.reward;
+    }
+    random -= item.weight;
+  }
+  return REWARDS[0].reward; // Fallback
 }
 
 // --- Date Helpers ---

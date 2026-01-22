@@ -2,9 +2,23 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { SPIN_REWARD_TIERS, getSpinTierByReward } from '@/app/lib/spin-rewards';
 
-type RewardTier = (typeof SPIN_REWARD_TIERS)[number];
+const REWARD_TIERS = [
+  { reward: 10, label: 'Consumer Grade', color: '#b0c3d9' },
+  { reward: 25, label: 'Industrial Grade', color: '#5e98d9' },
+  { reward: 50, label: 'Mil-Spec', color: '#4b69ff' },
+  { reward: 100, label: 'Restricted', color: '#8847ff' },
+  { reward: 500, label: 'Classified', color: '#d32ce6' },
+  { reward: 1000, label: 'Covert', color: '#eb4b4b' },
+  { reward: 2000, label: 'Extraordinary', color: '#eb4b4b' },
+  { reward: 5000, label: 'Extraordinary', color: '#eb4b4b' },
+  { reward: 10000, label: 'Contraband', color: '#ffd700' },
+  { reward: 30000, label: 'Contraband', color: '#ffd700' },
+  { reward: 50000, label: 'Contraband', color: '#ffd700' },
+  { reward: 75000, label: 'Contraband', color: '#ffd700' },
+] as const;
+
+type RewardTier = (typeof REWARD_TIERS)[number];
 
 type SpinWheelHistoryItem = {
   reward: number;
@@ -19,15 +33,16 @@ type SpinWheelHistorySummary = {
 };
 
 function getTierByReward(reward: number): RewardTier {
-  return getSpinTierByReward(reward) as RewardTier;
+  const found = REWARD_TIERS.find((t) => t.reward === reward);
+  return found || REWARD_TIERS[0];
 }
 
 // Generate a list of items for the spinner reel
 const generateReelItems = (finalReward: number): RewardTier[] => {
   const items: RewardTier[] = [];
   for (let i = 0; i < 50; i++) {
-    const idx = Math.floor(Math.random() * SPIN_REWARD_TIERS.length);
-    items.push(SPIN_REWARD_TIERS[idx] as RewardTier);
+    const idx = Math.floor(Math.random() * REWARD_TIERS.length);
+    items.push(REWARD_TIERS[idx]);
   }
   items[45] = getTierByReward(finalReward);
   return items;
