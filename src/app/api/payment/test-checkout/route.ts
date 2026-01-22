@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      automatic_payment_methods: { enabled: true },
       line_items: [
         {
           price_data: {
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
         discountAmount: discountAmount.toString(),
         testMode: 'true',
       },
-    });
+    } as any);
 
     return NextResponse.json({ 
       sessionId: session.id, 

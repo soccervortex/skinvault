@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      automatic_payment_methods: { enabled: true },
       line_items: [
         {
           price_data: {
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         spins: info.spins.toString(),
         testMode: testMode ? 'true' : 'false',
       },
-    });
+    } as any);
 
     return NextResponse.json({ sessionId: session.id, url: session.url });
   } catch (error: any) {

@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
       ? `[TEST MODE] Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`
       : `Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`;
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+    const session = await (stripe.checkout.sessions as any).create({
+      automatic_payment_methods: { enabled: true },
       line_items: [
         {
           price_data: {
