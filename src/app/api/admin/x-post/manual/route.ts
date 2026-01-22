@@ -148,16 +148,19 @@ export async function GET(request: Request) {
     };
 
     // Get post history
-    const postHistory = (await dbGet<Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>>('x_posting_history')) || [];
+    const postHistoryRaw = await dbGet<
+      Array<{ date: string; postId: string; itemId: string; itemName: string; itemType: string }>
+    >('x_posting_history');
+    const postHistory = Array.isArray(postHistoryRaw) ? postHistoryRaw : [];
 
     // Count posts in different periods
     const weeklyPosts = postHistory.filter(p => {
-      const postDate = new Date(p.date);
+      const postDate = new Date((p as any)?.date);
       return postDate >= sevenDaysAgo;
     });
 
     const monthlyPosts = postHistory.filter(p => {
-      const postDate = new Date(p.date);
+      const postDate = new Date((p as any)?.date);
       return postDate >= monthStart;
     });
 
