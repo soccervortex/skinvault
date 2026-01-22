@@ -23,6 +23,47 @@ const PAYMENT_METHOD_TYPES = [
   'p24',
 ] as const;
 
+function parseInvalidPaymentMethodType(err: any): string | null {
+  const msg = String(err?.message || '').toLowerCase();
+  const m = msg.match(/payment method type provided:\s*([a-z0-9_]+)/i);
+  if (m?.[1]) return String(m[1]).toLowerCase();
+  return null;
+}
+
+async function createCheckoutSessionWithPaymentMethods(
+  stripe: Stripe,
+  params: any,
+  paymentMethodTypes: string[]
+) {
+  let remaining = Array.from(new Set((paymentMethodTypes || []).map((t) => String(t).toLowerCase())));
+  if (remaining.length === 0) remaining = ['card'];
+
+  for (let i = 0; i < paymentMethodTypes.length + 1; i += 1) {
+    try {
+      return await stripe.checkout.sessions.create(
+        {
+          ...params,
+          payment_method_types: remaining,
+        } as any
+      );
+    } catch (e: any) {
+      const bad = parseInvalidPaymentMethodType(e);
+      if (!bad) throw e;
+      const next = remaining.filter((t) => t !== bad);
+      if (next.length === remaining.length) throw e;
+      remaining = next;
+      if (remaining.length === 0) throw e;
+    }
+  }
+
+  return await stripe.checkout.sessions.create(
+    {
+      ...params,
+      payment_method_types: ['card'],
+    } as any
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -81,8 +122,7 @@ export async function POST(request: Request) {
     // Set expiration to 30 minutes from now
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: PAYMENT_METHOD_TYPES as any,
+    const session = await createCheckoutSessionWithPaymentMethods(stripe, {
       line_items: [
         {
           price_data: {
@@ -111,7 +151,7 @@ export async function POST(request: Request) {
         discountAmount: discountAmount.toString(),
         testMode: 'true',
       },
-    } as any);
+    }, Array.from(PAYMENT_METHOD_TYPES as any));
 
     return NextResponse.json({ 
       sessionId: session.id, 
