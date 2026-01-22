@@ -39,6 +39,8 @@ const SPIN_PACKS: Record<string, SpinPack> = {
   mega: { spins: 40, amount: 999, label: 'Mega Pack' },
   giant: { spins: 100, amount: 1999, label: 'Giant Pack' },
   whale: { spins: 300, amount: 4999, label: 'Whale Pack' },
+  titan: { spins: 500, amount: 7499, label: 'Titan Pack' },
+  legend: { spins: 750, amount: 9999, label: 'Legend Pack' },
 };
 
 const PAYMENT_METHOD_TYPES = [
@@ -123,10 +125,8 @@ export async function POST(request: NextRequest) {
 
     let testMode = false;
     try {
-      const { kv } = await import('@vercel/kv');
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-      }
+      const { dbGet } = await import('@/app/utils/database');
+      testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
     } catch {
     }
 
