@@ -388,6 +388,20 @@ export async function POST(request: Request) {
       const expiresAt = asIso(body?.expiresAt);
       const expiresUnix = toUnixSeconds(expiresAt);
 
+      const changingMaxRedemptions = typeof body?.maxRedemptions !== 'undefined'
+        && Number(existing.maxRedemptions ?? null) !== Number(maxRedemptions ?? null);
+      const changingExpiresAt = typeof body?.expiresAt !== 'undefined'
+        && String(existing.expiresAt ?? '') !== String(expiresAt ?? '');
+
+      if (changingMaxRedemptions || changingExpiresAt) {
+        return NextResponse.json(
+          {
+            error: 'Stripe does not allow updating max redemptions or expiry for existing promo codes. Create a new promo code instead.',
+          },
+          { status: 400 }
+        );
+      }
+
       const activeRequested = body?.active === true;
       const startsAt = typeof body?.startsAt === 'undefined' ? existing.startsAt : asIso(body?.startsAt);
       const startsMs = startsAt ? new Date(startsAt).getTime() : null;
@@ -402,10 +416,6 @@ export async function POST(request: Request) {
       const promoParams: any = {
         active: promoActive,
       };
-      if (expiresUnix) promoParams.expires_at = expiresUnix;
-      else promoParams.expires_at = null;
-      if (Number.isFinite(maxRedemptions as any) && maxRedemptions) promoParams.max_redemptions = maxRedemptions;
-      else promoParams.max_redemptions = null;
 
       await (stripe.promotionCodes as any).update(promoCodeId, promoParams);
 
@@ -413,7 +423,6 @@ export async function POST(request: Request) {
         const couponParams: any = {
           name: name || undefined,
         };
-        if (expiresUnix) couponParams.redeem_by = expiresUnix;
         await (stripe.coupons as any).update(existing.couponId, couponParams);
       } catch {
       }
