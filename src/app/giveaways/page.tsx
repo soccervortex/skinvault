@@ -80,11 +80,10 @@ const SPIN_TIERS = [
   { reward: 1000, label: 'Covert', color: '#eb4b4b', odds: '6.5%' },
   { reward: 2000, label: 'Extraordinary', color: '#eb4b4b', odds: '2.5%' },
   { reward: 5000, label: 'Extraordinary', color: '#eb4b4b', odds: '1%' },
-  { reward: 10000, label: 'Contraband', color: '#ffd700', odds: '0.5%' },
-  { reward: 30000, label: 'Contraband', color: '#ffd700', odds: '0.25%' },
-  { reward: 50000, label: 'Contraband', color: '#ffd700', odds: '0.12%' },
-  { reward: 75000, label: 'Contraband', color: '#ffd700', odds: '0.08%' },
-  { reward: 150000, label: 'Contraband', color: '#ffd700', odds: '0.05%' },
+  { reward: 10000, label: 'Contraband', color: '#ffd700', odds: '0.47%' },
+  { reward: 30000, label: 'Contraband', color: '#ffd700', odds: '0.23%' },
+  { reward: 50000, label: 'Contraband', color: '#ffd700', odds: '0.10%' },
+  { reward: 75000, label: 'Contraband', color: '#ffd700', odds: '0.06%' },
 ];
 
 type MyClaimRow = {

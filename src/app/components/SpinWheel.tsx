@@ -16,7 +16,6 @@ const REWARD_TIERS = [
   { reward: 30000, label: 'Contraband', color: '#ffd700' },
   { reward: 50000, label: 'Contraband', color: '#ffd700' },
   { reward: 75000, label: 'Contraband', color: '#ffd700' },
-  { reward: 150000, label: 'Contraband', color: '#ffd700' },
 ] as const;
 
 type RewardTier = (typeof REWARD_TIERS)[number];

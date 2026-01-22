@@ -65,11 +65,10 @@ const REWARDS = [
   { reward: 1000, weight: 6.5 },
   { reward: 2000, weight: 2.5 },
   { reward: 5000, weight: 1 },
-  { reward: 10000, weight: 0.5 },
-  { reward: 30000, weight: 0.25 },
-  { reward: 50000, weight: 0.12 },
-  { reward: 75000, weight: 0.08 },
-  { reward: 150000, weight: 0.05 }
+  { reward: 10000, weight: 0.47 },
+  { reward: 30000, weight: 0.23 },
+  { reward: 50000, weight: 0.10 },
+  { reward: 75000, weight: 0.06 }
 ];
 
 function getWeightedReward() {
