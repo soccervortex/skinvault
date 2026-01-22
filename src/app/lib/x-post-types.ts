@@ -823,65 +823,15 @@ export async function createDailySummaryPost(): Promise<{ success: boolean; post
       `Track your CS2 inventory:\nhttps://skinvaults.online\n\n` +
       `#CS2Skins #CounterStrike2 #Skinvaults #CS2 #CSGO #Skins\n@counterstrike`;
 
-    // Post the daily summary (same OAuth logic)
-    const X_API_KEY = process.env.X_API_KEY;
-    const X_API_SECRET = process.env.X_API_SECRET || process.env.X_APISECRET;
-    const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
-    const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
-
-    if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
-      return { success: false, error: 'X API credentials not configured' };
-    }
-
-    const url = 'https://api.twitter.com/2/tweets';
-    const method = 'POST';
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const nonce = crypto.randomBytes(16).toString('base64');
-
-    const params: Record<string, string> = {
-      oauth_consumer_key: X_API_KEY,
-      oauth_token: X_ACCESS_TOKEN,
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: timestamp,
-      oauth_nonce: nonce,
-      oauth_version: '1.0',
-    };
-
-    const paramString = Object.keys(params)
-      .sort()
-      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
-      .join('&');
-
-    const signatureBaseString = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
-    const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET)}`;
-    const signature = crypto.createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
-
-    params.oauth_signature = signature;
-
-    const authHeader = 'OAuth ' + Object.keys(params)
-      .sort()
-      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(params[key])}"`)
-      .join(', ');
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: dailyText.substring(0, 280), // X character limit
-      }),
+    const postResult = await createXPostWithImages({
+      text: dailyText,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('X API error:', errorText);
-      return { success: false, error: `X API error: ${response.status}` };
+    if (!postResult.success) {
+      return { success: false, error: postResult.error || 'Failed to create daily summary' };
     }
 
-    const data = await response.json();
-    return { success: true, postId: data.data?.id };
+    return { success: true, postId: postResult.postId };
   } catch (error: any) {
     console.error('Failed to create daily summary:', error);
     return { success: false, error: error.message || 'Failed to create daily summary' };

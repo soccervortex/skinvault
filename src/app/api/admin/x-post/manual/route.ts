@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     } else {
       return NextResponse.json(
         { error: result.error || 'Failed to create post' },
-        { status: 500 }
+        { status: 400 }
       );
     }
   } catch (error: any) {
