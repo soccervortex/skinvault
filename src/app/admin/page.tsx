@@ -89,6 +89,8 @@ export default function AdminPage() {
   const [fixError, setFixError] = useState<string | null>(null);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [loadingUserCount, setLoadingUserCount] = useState(true);
+  const [paymentsCount, setPaymentsCount] = useState<number>(0);
+  const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [timeouts, setTimeouts] = useState<Array<{ steamId: string; timeoutUntil: string; minutesRemaining: number }>>([]);
   const [loadingTimeouts, setLoadingTimeouts] = useState(true);
   const [searchSteamId, setSearchSteamId] = useState("");
@@ -479,6 +481,29 @@ export default function AdminPage() {
       }
     };
     loadUserCount();
+
+    const loadPaymentsCount = async () => {
+      if (!userIsOwner) return;
+      setLoadingPaymentsCount(true);
+      try {
+        const res = await fetch('/api/admin/payments', {
+          cache: 'no-store',
+          headers: {
+            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+          },
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const rows = Array.isArray((data as any)?.payments) ? (data as any).payments : [];
+        const paid = rows.filter((r: any) => r?.kind === 'paid' && r?.status === 'paid');
+        setPaymentsCount(paid.length);
+      } catch (e: any) {
+        console.error('Failed to load payments:', e);
+      } finally {
+        setLoadingPaymentsCount(false);
+      }
+    };
+    loadPaymentsCount();
 
     const loadTimeouts = async () => {
       if (!userIsOwner) return;
@@ -1275,6 +1300,47 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px] mb-6">
+                <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                  <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                    Total Users
+                  </p>
+                  <p className="text-xl md:text-2xl font-black text-blue-400">
+                    {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
+                  </p>
+                </div>
+                <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+                  <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                    Total Pro users
+                  </p>
+                  <p className="text-xl md:text-2xl font-black">{totals.total}</p>
+                </div>
+                <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                  <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                    Active
+                  </p>
+                  <p className="text-xl md:text-2xl font-black text-emerald-400">
+                    {totals.active}
+                  </p>
+                </div>
+                <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                  <p className="text-red-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                    Expired
+                  </p>
+                  <p className="text-xl md:text-2xl font-black text-red-400">
+                    {totals.expired}
+                  </p>
+                </div>
+                <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                  <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                    Payments
+                  </p>
+                  <p className="text-xl md:text-2xl font-black text-yellow-400">
+                    {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
                   <Shield className="text-blue-400" size={16} />
@@ -1545,7 +1611,7 @@ export default function AdminPage() {
           date passes.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px]">
           <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
             <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Total Users
@@ -1574,6 +1640,14 @@ export default function AdminPage() {
             </p>
             <p className="text-xl md:text-2xl font-black text-red-400">
               {totals.expired}
+            </p>
+          </div>
+          <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+              Payments
+            </p>
+            <p className="text-xl md:text-2xl font-black text-yellow-400">
+              {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
             </p>
           </div>
         </div>

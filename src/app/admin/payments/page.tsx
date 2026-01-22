@@ -36,6 +36,13 @@ export default function AdminPaymentsPage() {
   const [user, setUser] = useState<any>(null);
   const userIsOwner = useMemo(() => isOwner(user?.steamId), [user?.steamId]);
 
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [loadingUserCount, setLoadingUserCount] = useState(true);
+  const [totals, setTotals] = useState<{ total: number; active: number; expired: number }>({ total: 0, active: 0, expired: 0 });
+  const [loadingProStats, setLoadingProStats] = useState(true);
+  const [paymentsCount, setPaymentsCount] = useState<number>(0);
+  const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -98,11 +105,66 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  const loadUserCount = async () => {
+    if (!userIsOwner) return;
+    setLoadingUserCount(true);
+    try {
+      const res = await fetch('/api/admin/user-count', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json().catch(() => null);
+      setTotalUsers(Number((json as any)?.totalUsers || 0));
+    } catch {
+    } finally {
+      setLoadingUserCount(false);
+    }
+  };
+
+  const loadProStats = async () => {
+    if (!userIsOwner) return;
+    setLoadingProStats(true);
+    try {
+      const res = await fetch('/api/admin/pro/stats', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json().catch(() => null);
+      setTotals({
+        total: Number((json as any)?.total || 0),
+        active: Number((json as any)?.active || 0),
+        expired: Number((json as any)?.expired || 0),
+      });
+    } catch {
+    } finally {
+      setLoadingProStats(false);
+    }
+  };
+
+  const loadPaymentsCount = async () => {
+    if (!userIsOwner) return;
+    setLoadingPaymentsCount(true);
+    try {
+      const res = await fetch('/api/admin/payments?status=paid', {
+        cache: 'no-store',
+        headers: {
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+      });
+      if (!res.ok) return;
+      const json = await res.json().catch(() => null);
+      const rows = Array.isArray((json as any)?.payments) ? (json as any).payments : [];
+      setPaymentsCount(rows.length);
+    } catch {
+    } finally {
+      setLoadingPaymentsCount(false);
+    }
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!user) return;
     if (!userIsOwner) return;
     void load();
+    void loadUserCount();
+    void loadProStats();
+    void loadPaymentsCount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIsOwner]);
 
@@ -243,6 +305,49 @@ export default function AdminPaymentsPage() {
               You do not have access to this page.
             </div>
           )}
+
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+            <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Total Users
+              </p>
+              <p className="text-xl md:text-2xl font-black text-blue-400">
+                {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
+              </p>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Total Pro users
+              </p>
+              <p className="text-xl md:text-2xl font-black">
+                {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.total}
+              </p>
+            </div>
+            <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Active
+              </p>
+              <p className="text-xl md:text-2xl font-black text-emerald-400">
+                {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.active}
+              </p>
+            </div>
+            <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <p className="text-red-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Expired
+              </p>
+              <p className="text-xl md:text-2xl font-black text-red-400">
+                {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.expired}
+              </p>
+            </div>
+            <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Payments
+              </p>
+              <p className="text-xl md:text-2xl font-black text-yellow-400">
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
+              </p>
+            </div>
+          </div>
 
           <div className="mt-6 bg-black/40 border border-white/10 rounded-2xl p-4 md:p-5">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
