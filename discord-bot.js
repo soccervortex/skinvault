@@ -177,7 +177,7 @@ function startAutoAnnouncer() {
 const OWNER_STEAM_IDS = [
   '76561199235618867', // Original owner
   '76561199052427203', // Co-owner (TheRembler)
-  '76561198750974604', // Bot Website (Skinvaults)
+ // '76561198750974604', // Bot Website (Skinvaults)
 ];
 
 if (!DISCORD_TOKEN || !DISCORD_CLIENT_ID) {

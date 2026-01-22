@@ -40,6 +40,19 @@ const CONSUMABLE_PRICES: Record<string, number> = {
   'cache_boost': 199, // €1.99 - Longer price cache duration for free users
 };
 
+const PAYMENT_METHOD_TYPES = [
+  'card',
+  'link',
+  'paypal',
+  'klarna',
+  'ideal',
+  'bancontact',
+  'sofort',
+  'giropay',
+  'eps',
+  'p24',
+] as const;
+
 export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripeInstance();
@@ -119,7 +132,7 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await stripe.checkout.sessions.create({
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: PAYMENT_METHOD_TYPES as any,
       line_items: [
         {
           price_data: {

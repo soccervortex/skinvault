@@ -10,6 +10,19 @@ const PRICES: Record<string, { amount: number; months: number }> = {
   '6months': { amount: 4499, months: 6 }, // €44.99 in cents
 };
 
+const PAYMENT_METHOD_TYPES = [
+  'card',
+  'link',
+  'paypal',
+  'klarna',
+  'ideal',
+  'bancontact',
+  'sofort',
+  'giropay',
+  'eps',
+  'p24',
+] as const;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -69,7 +82,7 @@ export async function POST(request: Request) {
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
 
     const session = await stripe.checkout.sessions.create({
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: PAYMENT_METHOD_TYPES as any,
       line_items: [
         {
           price_data: {

@@ -37,6 +37,19 @@ const PRICES: Record<string, { amount: number; months: number }> = {
   '6months': { amount: 4499, months: 6 }, // €44.99 in cents
 };
 
+const PAYMENT_METHOD_TYPES = [
+  'card',
+  'link',
+  'paypal',
+  'klarna',
+  'ideal',
+  'bancontact',
+  'sofort',
+  'giropay',
+  'eps',
+  'p24',
+] as const;
+
 export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripeInstance();
@@ -103,8 +116,8 @@ export async function POST(request: NextRequest) {
       ? `[TEST MODE] Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`
       : `Premium access to SkinVaults for ${priceInfo.months} ${priceInfo.months === 1 ? 'month' : 'months'}`;
 
-    const session = await (stripe.checkout.sessions as any).create({
-      automatic_payment_methods: { enabled: true },
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: PAYMENT_METHOD_TYPES as any,
       line_items: [
         {
           price_data: {
@@ -152,7 +165,7 @@ export async function POST(request: NextRequest) {
         ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
         testMode: testMode ? 'true' : 'false',
       },
-    });
+    } as any);
 
     return NextResponse.json({ sessionId: session.id, url: session.url });
   } catch (error: any) {
