@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
 import {
@@ -91,6 +91,7 @@ export default function AdminPage() {
   const [loadingUserCount, setLoadingUserCount] = useState(true);
   const [paymentsCount, setPaymentsCount] = useState<number>(0);
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
+  const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [timeouts, setTimeouts] = useState<Array<{ steamId: string; timeoutUntil: string; minutesRemaining: number }>>([]);
   const [loadingTimeouts, setLoadingTimeouts] = useState(true);
   const [searchSteamId, setSearchSteamId] = useState("");
@@ -218,6 +219,29 @@ export default function AdminPage() {
   };
 
   const [legacyMode, setLegacyMode] = useState<boolean>(readLegacyMode);
+
+  const formatCurrencyAmount = (amount: number, currency: string) => {
+    const cur = String(currency || 'eur').toUpperCase();
+    const n = Number(amount || 0);
+    if (!Number.isFinite(n)) return `0 ${cur}`;
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: cur,
+        maximumFractionDigits: 2,
+      }).format(n);
+    } catch {
+      return `${n.toFixed(2)} ${cur}`;
+    }
+  };
+
+  const paidTotalLabel = useMemo(() => {
+    const entries = Object.entries(paidTotalByCurrency || {}).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    return entries
+      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
+      .join(' / ');
+  }, [paidTotalByCurrency]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -486,7 +510,7 @@ export default function AdminPage() {
       if (!userIsOwner) return;
       setLoadingPaymentsCount(true);
       try {
-        const res = await fetch('/api/admin/payments', {
+        const res = await fetch('/api/admin/payments?statsOnly=1', {
           cache: 'no-store',
           headers: {
             'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
@@ -494,9 +518,8 @@ export default function AdminPage() {
         });
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
-        const rows = Array.isArray((data as any)?.payments) ? (data as any).payments : [];
-        const paid = rows.filter((r: any) => r?.kind === 'paid' && r?.status === 'paid');
-        setPaymentsCount(paid.length);
+        setPaymentsCount(Number((data as any)?.paidCount || 0));
+        setPaidTotalByCurrency(((data as any)?.paidTotalByCurrency as Record<string, number>) || {});
       } catch (e: any) {
         console.error('Failed to load payments:', e);
       } finally {
@@ -1300,43 +1323,51 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px] mb-6">
-                <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 text-[10px] md:text-[11px] mb-6">
+                <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3">
                   <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                     Total Users
                   </p>
-                  <p className="text-xl md:text-2xl font-black text-blue-400">
+                  <p className="text-lg md:text-xl font-black text-blue-400">
                     {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
                   </p>
                 </div>
-                <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+                <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
                   <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                     Total Pro users
                   </p>
-                  <p className="text-xl md:text-2xl font-black">{totals.total}</p>
+                  <p className="text-lg md:text-xl font-black">{totals.total}</p>
                 </div>
-                <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
                   <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                     Active
                   </p>
-                  <p className="text-xl md:text-2xl font-black text-emerald-400">
+                  <p className="text-lg md:text-xl font-black text-emerald-400">
                     {totals.active}
                   </p>
                 </div>
-                <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3">
                   <p className="text-red-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                     Expired
                   </p>
-                  <p className="text-xl md:text-2xl font-black text-red-400">
+                  <p className="text-lg md:text-xl font-black text-red-400">
                     {totals.expired}
                   </p>
                 </div>
-                <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+                <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3">
                   <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                     Payments
                   </p>
-                  <p className="text-xl md:text-2xl font-black text-yellow-400">
+                  <p className="text-lg md:text-xl font-black text-yellow-400">
                     {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
+                  </p>
+                </div>
+                <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
+                  <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                    Revenue
+                  </p>
+                  <p className="text-lg md:text-xl font-black text-purple-400">
+                    {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
                   </p>
                 </div>
               </div>
@@ -1611,43 +1642,51 @@ export default function AdminPage() {
           date passes.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px]">
-          <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+          <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3">
             <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Total Users
             </p>
-            <p className="text-xl md:text-2xl font-black text-blue-400">
+            <p className="text-lg md:text-xl font-black text-blue-400">
               {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
             </p>
           </div>
-          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
             <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Total Pro users
             </p>
-            <p className="text-xl md:text-2xl font-black">{totals.total}</p>
+            <p className="text-lg md:text-xl font-black">{totals.total}</p>
           </div>
-          <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+          <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
             <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Active
             </p>
-            <p className="text-xl md:text-2xl font-black text-emerald-400">
+            <p className="text-lg md:text-xl font-black text-emerald-400">
               {totals.active}
             </p>
           </div>
-          <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+          <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3">
             <p className="text-red-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Expired
             </p>
-            <p className="text-xl md:text-2xl font-black text-red-400">
+            <p className="text-lg md:text-xl font-black text-red-400">
               {totals.expired}
             </p>
           </div>
-          <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+          <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3">
             <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
               Payments
             </p>
-            <p className="text-xl md:text-2xl font-black text-yellow-400">
+            <p className="text-lg md:text-xl font-black text-yellow-400">
               {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
+            </p>
+          </div>
+          <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
+            <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+              Revenue
+            </p>
+            <p className="text-lg md:text-xl font-black text-purple-400">
+              {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
             </p>
           </div>
         </div>

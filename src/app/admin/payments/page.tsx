@@ -42,6 +42,7 @@ export default function AdminPaymentsPage() {
   const [loadingProStats, setLoadingProStats] = useState(true);
   const [paymentsCount, setPaymentsCount] = useState<number>(0);
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
+  const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +106,29 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  const formatCurrencyAmount = (amount: number, currency: string) => {
+    const cur = String(currency || 'eur').toUpperCase();
+    const n = Number(amount || 0);
+    if (!Number.isFinite(n)) return `0 ${cur}`;
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: cur,
+        maximumFractionDigits: 2,
+      }).format(n);
+    } catch {
+      return `${n.toFixed(2)} ${cur}`;
+    }
+  };
+
+  const paidTotalLabel = useMemo(() => {
+    const entries = Object.entries(paidTotalByCurrency || {}).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    return entries
+      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
+      .join(' / ');
+  }, [paidTotalByCurrency]);
+
   const loadUserCount = async () => {
     if (!userIsOwner) return;
     setLoadingUserCount(true);
@@ -141,7 +165,7 @@ export default function AdminPaymentsPage() {
     if (!userIsOwner) return;
     setLoadingPaymentsCount(true);
     try {
-      const res = await fetch('/api/admin/payments?status=paid', {
+      const res = await fetch('/api/admin/payments?statsOnly=1', {
         cache: 'no-store',
         headers: {
           'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
@@ -149,8 +173,8 @@ export default function AdminPaymentsPage() {
       });
       if (!res.ok) return;
       const json = await res.json().catch(() => null);
-      const rows = Array.isArray((json as any)?.payments) ? (json as any).payments : [];
-      setPaymentsCount(rows.length);
+      setPaymentsCount(Number((json as any)?.paidCount || 0));
+      setPaidTotalByCurrency(((json as any)?.paidTotalByCurrency as Record<string, number>) || {});
     } catch {
     } finally {
       setLoadingPaymentsCount(false);
@@ -306,45 +330,53 @@ export default function AdminPaymentsPage() {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px]">
-            <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+            <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                 Total Users
               </p>
-              <p className="text-xl md:text-2xl font-black text-blue-400">
+              <p className="text-lg md:text-xl font-black text-blue-400">
                 {loadingUserCount ? <Loader2 className="animate-spin inline" size={20} /> : totalUsers}
               </p>
             </div>
-            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
               <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                 Total Pro users
               </p>
-              <p className="text-xl md:text-2xl font-black">
+              <p className="text-lg md:text-xl font-black">
                 {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.total}
               </p>
             </div>
-            <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                 Active
               </p>
-              <p className="text-xl md:text-2xl font-black text-emerald-400">
+              <p className="text-lg md:text-xl font-black text-emerald-400">
                 {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.active}
               </p>
             </div>
-            <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <div className="bg-black/40 border border-red-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-red-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                 Expired
               </p>
-              <p className="text-xl md:text-2xl font-black text-red-400">
+              <p className="text-lg md:text-xl font-black text-red-400">
                 {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.expired}
               </p>
             </div>
-            <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3 md:p-4">
+            <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                 Payments
               </p>
-              <p className="text-xl md:text-2xl font-black text-yellow-400">
+              <p className="text-lg md:text-xl font-black text-yellow-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
+              </p>
+            </div>
+            <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
+              <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Revenue
+              </p>
+              <p className="text-lg md:text-xl font-black text-purple-400">
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
               </p>
             </div>
           </div>

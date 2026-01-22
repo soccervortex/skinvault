@@ -263,9 +263,42 @@ export async function GET(request: Request) {
     const filterStatus = String(url.searchParams.get('status') || '').trim();
     const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
     const includeHidden = parseBool(url.searchParams.get('includeHidden'));
+    const statsOnly = parseBool(url.searchParams.get('statsOnly'));
 
     const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
     const failed = (await dbGet<Array<any>>('failed_purchases', false)) || [];
+
+    if (statsOnly) {
+      let paidRows = purchases.filter(Boolean);
+      if (!includeHidden) {
+        paidRows = paidRows.filter((p) => p?.hidden !== true);
+      }
+      if (filterSteamId) {
+        paidRows = paidRows.filter((p) => String(p?.steamId || '').trim() === filterSteamId);
+      }
+      if (filterType) {
+        paidRows = paidRows.filter((p) => String(p?.type || '').trim() === filterType);
+      }
+
+      let paidCount = 0;
+      const paidTotalByCurrency: Record<string, number> = {};
+      for (const p of paidRows) {
+        const row = normalizePaid(p);
+        if (row.kind !== 'paid' || row.status !== 'paid') continue;
+        paidCount += 1;
+        const cur = String(row.currency || 'eur').toLowerCase();
+        const amount = Number(row.amount || 0);
+        if (!Number.isFinite(amount)) continue;
+        paidTotalByCurrency[cur] = Number((paidTotalByCurrency[cur] || 0) + amount);
+      }
+
+      const res = NextResponse.json({
+        paidCount,
+        paidTotalByCurrency,
+      });
+      res.headers.set('cache-control', 'no-store');
+      return res;
+    }
 
     let rows: PaymentRow[] = [];
     rows = rows.concat(purchases.filter(Boolean).map(normalizePaid));
