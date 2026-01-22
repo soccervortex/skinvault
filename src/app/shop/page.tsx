@@ -16,6 +16,7 @@ export default function ShopPage() {
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [creditsRestriction, setCreditsRestriction] = useState<{ banned: boolean; timeoutActive: boolean; timeoutUntil: string | null } | null>(null);
   const [checkoutEmail, setCheckoutEmail] = useState('');
+  const [checkoutPromoCode, setCheckoutPromoCode] = useState('');
   const toast = useToast();
 
   const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale' | 'titan' | 'legend') => {
@@ -36,7 +37,7 @@ export default function ShopPage() {
       const res = await fetch('/api/payment/checkout-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pack, steamId: user.steamId, email }),
+        body: JSON.stringify({ pack, steamId: user.steamId, email, promoCode: String(checkoutPromoCode || '').trim() || undefined }),
       });
 
       const data = await res.json();
@@ -82,7 +83,7 @@ export default function ShopPage() {
       const res = await fetch('/api/payment/checkout-spins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pack, steamId: user.steamId, email }),
+        body: JSON.stringify({ pack, steamId: user.steamId, email, promoCode: String(checkoutPromoCode || '').trim() || undefined }),
       });
 
       const data = await res.json();
@@ -120,6 +121,12 @@ export default function ShopPage() {
       try {
         const storedEmail = window.localStorage.getItem('sv_checkout_email');
         if (storedEmail) setCheckoutEmail(String(storedEmail));
+      } catch {
+      }
+
+      try {
+        const storedPromo = window.localStorage.getItem('sv_checkout_promo');
+        if (storedPromo) setCheckoutPromoCode(String(storedPromo));
       } catch {
       }
       
@@ -174,6 +181,14 @@ export default function ShopPage() {
     }
   }, [checkoutEmail]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('sv_checkout_promo', String(checkoutPromoCode || '').trim());
+    } catch {
+    }
+  }, [checkoutPromoCode]);
+
   // Helper to check if user already has a consumable
   const hasConsumable = (type: string): boolean => {
     return userRewards.some((reward: any) => reward?.type === type);
@@ -197,7 +212,7 @@ export default function ShopPage() {
       const res = await fetch('/api/payment/checkout-consumable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, quantity, steamId: user.steamId, email }),
+        body: JSON.stringify({ type, quantity, steamId: user.steamId, email, promoCode: String(checkoutPromoCode || '').trim() || undefined }),
       });
 
       const data = await res.json();
@@ -256,6 +271,21 @@ export default function ShopPage() {
             />
             <p className="mt-2 text-[10px] text-gray-400">
               We’ll send your receipt/invoice to this email after payment.
+            </p>
+          </div>
+
+          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5">
+            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
+              Promo code (optional)
+            </p>
+            <input
+              value={checkoutPromoCode}
+              onChange={(e) => setCheckoutPromoCode(e.target.value)}
+              placeholder="WELCOME20"
+              className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-emerald-300 outline-none focus:border-emerald-500 transition-all placeholder:text-gray-700"
+            />
+            <p className="mt-2 text-[10px] text-gray-400">
+              Applied at checkout. Some codes are limited to one use per user.
             </p>
           </div>
 

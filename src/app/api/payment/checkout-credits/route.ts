@@ -7,6 +7,7 @@ import { getOwnerFreeCouponId } from '@/app/utils/stripe-owner-discount';
 import { dbGet } from '@/app/utils/database';
 import type { NextRequest } from 'next/server';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -38,6 +39,28 @@ type CreditPack = {
   amount: number; // in cents
   label: string;
 };
+
+type StoredPromo = {
+  promoCodeId: string;
+  couponId: string;
+  code: string;
+  testMode: boolean;
+  deletedAt: string | null;
+  singleUsePerUser?: boolean;
+};
+
+async function resolveStoredPromo(codeRaw: unknown, testMode: boolean): Promise<StoredPromo | null> {
+  const code = String(codeRaw || '').trim();
+  if (!code) return null;
+  const rows = (await dbGet<StoredPromo[]>('admin_stripe_coupons', false)) || [];
+  const list = Array.isArray(rows) ? rows : [];
+  const found = list.find((r) => {
+    if (!r || (r as any)?.deletedAt) return false;
+    if ((r as any)?.testMode !== testMode) return false;
+    return String((r as any)?.code || '').trim().toLowerCase() === code.toLowerCase();
+  }) as any;
+  return found || null;
+}
 
 const CREDIT_PACKS: Record<string, CreditPack> = {
   starter: { credits: 500, amount: 199, label: 'Starter Pack' },
@@ -106,7 +129,7 @@ async function createCheckoutSessionWithPaymentMethods(
 export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripeInstance();
-    const { pack, steamId, email } = await request.json();
+    const { pack, steamId, email, promoCode } = await request.json();
 
     const customerEmail = sanitizeEmail(String(email || ''));
     if (!customerEmail) {
@@ -148,6 +171,24 @@ export async function POST(request: NextRequest) {
     } catch {
     }
 
+    const promo = await resolveStoredPromo(promoCode, testMode);
+    if (promoCode && String(promoCode).trim() && !promo) {
+      return NextResponse.json({ error: 'Invalid promo code' }, { status: 400 });
+    }
+
+    if (promo?.singleUsePerUser === true) {
+      if (!hasMongoConfig()) {
+        return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+      }
+      const db = await getDatabase();
+      const col = db.collection('promo_single_use');
+      const key = `${steamId}_${promo.promoCodeId}`;
+      const existing = await col.findOne({ _id: key } as any);
+      if (existing) {
+        return NextResponse.json({ error: 'Promo code already used' }, { status: 400 });
+      }
+    }
+
     // Set expiration to 30 minutes from now
     const expiresAt = Math.floor(Date.now() / 1000) + 30 * 60;
 
@@ -164,6 +205,10 @@ export async function POST(request: NextRequest) {
       ownerCouponId = await getOwnerFreeCouponId(stripe, testMode);
       if (ownerCouponId) ownerDiscountApplied = true;
     }
+
+    const promoDiscount = !ownerDiscountApplied && promo?.promoCodeId
+      ? [{ promotion_code: promo.promoCodeId }]
+      : undefined;
 
     const session = await createCheckoutSessionWithPaymentMethods(stripe, {
       line_items: [
@@ -183,8 +228,10 @@ export async function POST(request: NextRequest) {
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
-      allow_promotion_codes: ownerDiscountApplied ? undefined : true,
-      discounts: ownerDiscountApplied && ownerCouponId ? [{ coupon: ownerCouponId }] : undefined,
+      allow_promotion_codes: undefined,
+      discounts: ownerDiscountApplied && ownerCouponId
+        ? [{ coupon: ownerCouponId }]
+        : promoDiscount,
       payment_intent_data: {
         receipt_email: customerEmail,
         metadata: {
@@ -192,6 +239,9 @@ export async function POST(request: NextRequest) {
           type: 'credits',
           pack: packId,
           credits: info.credits.toString(),
+          promoCode: promo?.code ? String(promo.code) : '',
+          promoCodeId: promo?.promoCodeId ? String(promo.promoCodeId) : '',
+          couponId: promo?.couponId ? String(promo.couponId) : '',
           ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
           testMode: testMode ? 'true' : 'false',
         },
@@ -204,6 +254,9 @@ export async function POST(request: NextRequest) {
         type: 'credits',
         pack: packId,
         credits: info.credits.toString(),
+        promoCode: promo?.code ? String(promo.code) : '',
+        promoCodeId: promo?.promoCodeId ? String(promo.promoCodeId) : '',
+        couponId: promo?.couponId ? String(promo.couponId) : '',
         testMode: testMode ? 'true' : 'false',
       },
     }, Array.from(PAYMENT_METHOD_TYPES as any));

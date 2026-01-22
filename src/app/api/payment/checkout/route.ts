@@ -5,6 +5,30 @@ import { isOwner } from '@/app/utils/owner-ids';
 import { getOwnerFreeCouponId } from '@/app/utils/stripe-owner-discount';
 import type { NextRequest } from 'next/server';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { dbGet } from '@/app/utils/database';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+
+type StoredPromo = {
+  promoCodeId: string;
+  couponId: string;
+  code: string;
+  testMode: boolean;
+  deletedAt: string | null;
+  singleUsePerUser?: boolean;
+};
+
+async function resolveStoredPromo(codeRaw: unknown, testMode: boolean): Promise<StoredPromo | null> {
+  const code = String(codeRaw || '').trim();
+  if (!code) return null;
+  const rows = (await dbGet<StoredPromo[]>('admin_stripe_coupons', false)) || [];
+  const list = Array.isArray(rows) ? rows : [];
+  const found = list.find((r) => {
+    if (!r || (r as any)?.deletedAt) return false;
+    if ((r as any)?.testMode !== testMode) return false;
+    return String((r as any)?.code || '').trim().toLowerCase() === code.toLowerCase();
+  }) as any;
+  return found || null;
+}
 
 // Helper to get Stripe instance (checks for test mode)
 async function getStripeInstance(): Promise<Stripe> {
@@ -18,7 +42,7 @@ async function getStripeInstance(): Promise<Stripe> {
   }
 
   // Use test keys if test mode is enabled
-  const secretKey = testMode 
+  const secretKey = testMode
     ? (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY)
     : process.env.STRIPE_SECRET_KEY;
 
@@ -27,8 +51,8 @@ async function getStripeInstance(): Promise<Stripe> {
   }
 
   return new Stripe(secretKey, {
-  apiVersion: '2025-12-15.clover',
-});
+    apiVersion: '2025-12-15.clover',
+  });
 }
 
 const PRICES: Record<string, { amount: number; months: number }> = {
@@ -129,12 +153,27 @@ export async function POST(request: NextRequest) {
     // Check if test mode is enabled
     let testMode = false;
     try {
-      const { kv } = await import('@vercel/kv');
-      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-        testMode = (await kv.get<boolean>('stripe_test_mode')) === true;
-      }
+      testMode = (await dbGet<boolean>('stripe_test_mode')) === true;
     } catch (error) {
       // Ignore
+    }
+
+    const adminPromo = await resolveStoredPromo(promoCode, testMode);
+    if (promoCode && String(promoCode).trim() && !adminPromo && !validPromoCodes.includes(String(promoCode).trim())) {
+      return NextResponse.json({ error: 'Invalid promo code' }, { status: 400 });
+    }
+
+    if (adminPromo?.singleUsePerUser === true) {
+      if (!hasMongoConfig()) {
+        return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+      }
+      const db = await getDatabase();
+      const col = db.collection('promo_single_use');
+      const key = `${steamId}_${adminPromo.promoCodeId}`;
+      const existing = await col.findOne({ _id: key } as any);
+      if (existing) {
+        return NextResponse.json({ error: 'Promo code already used' }, { status: 400 });
+      }
     }
 
     const sessionSteamId = getSteamIdFromRequest(request as any as NextRequest);
@@ -145,6 +184,10 @@ export async function POST(request: NextRequest) {
       ownerCouponId = await getOwnerFreeCouponId(stripe, testMode);
       if (ownerCouponId) ownerDiscountApplied = true;
     }
+
+    const promoDiscount = !ownerDiscountApplied && adminPromo?.promoCodeId
+      ? [{ promotion_code: adminPromo.promoCodeId }]
+      : undefined;
 
     // Set expiration to 30 minutes from now (minimum allowed by Stripe is 30 minutes)
     const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60); // 30 minutes in seconds
@@ -175,8 +218,10 @@ export async function POST(request: NextRequest) {
       customer_creation: 'always',
       customer_email: customerEmail,
       invoice_creation: { enabled: true },
-      allow_promotion_codes: ownerDiscountApplied ? undefined : true,
-      discounts: ownerDiscountApplied && ownerCouponId ? [{ coupon: ownerCouponId }] : undefined,
+      allow_promotion_codes: undefined,
+      discounts: ownerDiscountApplied && ownerCouponId
+        ? [{ coupon: ownerCouponId }]
+        : promoDiscount,
       payment_intent_data: {
         receipt_email: customerEmail,
         metadata: {
@@ -184,7 +229,9 @@ export async function POST(request: NextRequest) {
           type: 'pro',
           months: priceInfo.months.toString(),
           plan,
-          promoCode: promoCode || '',
+          promoCode: adminPromo?.code ? String(adminPromo.code) : (promoCode || ''),
+          promoCodeId: adminPromo?.promoCodeId ? String(adminPromo.promoCodeId) : '',
+          couponId: adminPromo?.couponId ? String(adminPromo.couponId) : '',
           originalAmount: priceInfo.amount.toString(),
           discountAmount: ownerDiscountApplied ? priceInfo.amount.toString() : discountAmount.toString(),
           ownerDiscount: ownerDiscountApplied ? 'true' : 'false',
@@ -199,7 +246,9 @@ export async function POST(request: NextRequest) {
         type: 'pro',
         months: priceInfo.months.toString(),
         plan,
-        promoCode: promoCode || '',
+        promoCode: adminPromo?.code ? String(adminPromo.code) : (promoCode || ''),
+        promoCodeId: adminPromo?.promoCodeId ? String(adminPromo.promoCodeId) : '',
+        couponId: adminPromo?.couponId ? String(adminPromo.couponId) : '',
         originalAmount: priceInfo.amount.toString(),
         discountAmount: ownerDiscountApplied ? priceInfo.amount.toString() : discountAmount.toString(),
         ownerDiscount: ownerDiscountApplied ? 'true' : 'false',

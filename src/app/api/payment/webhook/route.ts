@@ -202,6 +202,35 @@ export async function POST(request: Request) {
     if (!promoCodeId && metaPromoId) promoCodeId = metaPromoId;
     if (!couponId && metaCouponId) couponId = metaCouponId;
 
+    if (steamId && promoCodeId) {
+      try {
+        const stored = (await dbGet<Array<any>>('admin_stripe_coupons', false)) || [];
+        const list = Array.isArray(stored) ? stored : [];
+        const promoRecord = list.find((r) => String(r?.promoCodeId || '').trim() === String(promoCodeId || '').trim()) as any;
+        if (promoRecord?.singleUsePerUser === true) {
+          const db = await getDatabase();
+          const col = db.collection('promo_single_use');
+          const key = `${steamId}_${promoCodeId}`;
+          await col.updateOne(
+            { _id: key } as any,
+            {
+              $setOnInsert: {
+                _id: key,
+                steamId,
+                promoCodeId,
+                promoCode: promoCode || null,
+                couponId: couponId || null,
+                firstSessionId: session.id,
+                createdAt: new Date(),
+              } as any,
+            } as any,
+            { upsert: true }
+          );
+        }
+      } catch {
+      }
+    }
+
     // Handle spins purchase
     if (steamId && type === 'spins') {
       const spins = Number(session.metadata?.spins || 0);
