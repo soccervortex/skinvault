@@ -271,6 +271,7 @@ export async function GET(request: Request) {
     const filterType = String(url.searchParams.get('type') || '').trim();
     const filterStatus = String(url.searchParams.get('status') || '').trim();
     const filterPromo = String(url.searchParams.get('promo') || '').trim().toLowerCase();
+    const filterCoupon = String(url.searchParams.get('coupon') || '').trim().toLowerCase();
     const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
     const includeHidden = parseBool(url.searchParams.get('includeHidden'));
     const statsOnly = parseBool(url.searchParams.get('statsOnly'));
@@ -292,6 +293,10 @@ export async function GET(request: Request) {
 
       if (filterPromo) {
         paidRows = paidRows.filter((p) => String(p?.promoCode || '').trim().toLowerCase() === filterPromo);
+      }
+
+      if (filterCoupon) {
+        paidRows = paidRows.filter((p) => String(p?.couponId || '').trim().toLowerCase() === filterCoupon);
       }
 
       let paidCount = 0;
@@ -332,6 +337,10 @@ export async function GET(request: Request) {
 
     if (filterPromo) {
       rows = rows.filter((r) => String(r.promoCode || '').trim().toLowerCase() === filterPromo);
+    }
+
+    if (filterCoupon) {
+      rows = rows.filter((r) => String(r.couponId || '').trim().toLowerCase() === filterCoupon);
     }
 
     if (filterStatus && filterStatus !== 'all') {

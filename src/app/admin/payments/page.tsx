@@ -55,6 +55,7 @@ export default function AdminPaymentsPage() {
   const [type, setType] = useState<string>('');
   const [steamId, setSteamId] = useState<string>('');
   const [promo, setPromo] = useState<string>('');
+  const [coupon, setCoupon] = useState<string>('');
   const [q, setQ] = useState<string>('');
 
   const [includeHidden, setIncludeHidden] = useState(false);
@@ -88,6 +89,7 @@ export default function AdminPaymentsPage() {
       if (type) qs.set('type', type);
       if (steamId) qs.set('steamId', steamId);
       if (promo) qs.set('promo', promo);
+      if (coupon) qs.set('coupon', coupon);
       if (q) qs.set('q', q);
       if (includeHidden) qs.set('includeHidden', '1');
 
@@ -387,7 +389,7 @@ export default function AdminPaymentsPage() {
           </div>
 
           <div className="mt-6 bg-black/40 border border-white/10 rounded-2xl p-4 md:p-5">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Status</p>
                 <select
@@ -440,6 +442,16 @@ export default function AdminPaymentsPage() {
               </div>
 
               <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Coupon ID</p>
+                <input
+                  value={coupon}
+                  onChange={(e) => setCoupon(e.target.value)}
+                  placeholder="coupon_..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-[11px] font-black text-purple-300 outline-none"
+                />
+              </div>
+
+              <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Search</p>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -481,6 +493,7 @@ export default function AdminPaymentsPage() {
                     setType('');
                     setSteamId('');
                     setPromo('');
+                    setCoupon('');
                     setQ('');
                     setIncludeHidden(false);
                   }}
