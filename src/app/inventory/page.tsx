@@ -2243,7 +2243,24 @@ function InventoryContent() {
 
                 {(() => {
                   const sid = String(loggedInUser?.steamId || '').trim();
-                  const c = sid && /^\d{17}$/.test(sid) ? publicCoupons[0] : null;
+                  const c = sid && /^\d{17}$/.test(sid)
+                    ? publicCoupons.reduce<PublicCoupon | null>((best, cur) => {
+                        if (!cur) return best;
+                        if (!best) return cur;
+
+                        if (cur.kind === 'percent' && best.kind === 'percent') {
+                          const a = Number(cur.percentOff);
+                          const b = Number(best.percentOff);
+                          return (Number.isFinite(a) ? a : 0) > (Number.isFinite(b) ? b : 0) ? cur : best;
+                        }
+                        if (cur.kind === 'percent' && best.kind !== 'percent') return cur;
+                        if (cur.kind !== 'percent' && best.kind === 'percent') return best;
+
+                        const a = Number(cur.amountOff);
+                        const b = Number(best.amountOff);
+                        return (Number.isFinite(a) ? a : 0) > (Number.isFinite(b) ? b : 0) ? cur : best;
+                      }, null)
+                    : null;
                   if (!c) return null;
                   return (
                     <div className="w-full flex justify-start md:justify-end">
