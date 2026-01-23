@@ -55,15 +55,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       .limit(250)
       .toArray();
 
+    const origin = new URL(req.url).origin;
+
     const out = rows.map((r: any) => {
       const discordId = r?.discordId ? String(r.discordId) : null;
+      const steamIdRow = String(r?.steamId || '');
       return {
         id: String(r?._id || ''),
         giveawayId: id,
-        steamId: String(r?.steamId || ''),
+        steamId: steamIdRow,
         discordUsername: String(r?.discordUsername || ''),
         discordId,
         discordProfileUrl: discordId ? `https://discord.com/users/${encodeURIComponent(discordId)}` : null,
+        userProfileUrl: steamIdRow ? `${origin}/inventory/${encodeURIComponent(steamIdRow)}` : null,
         email: r?.email ? String(r.email) : null,
         status: String(r?.status || 'pending'),
         createdAt: r?.createdAt ? new Date(r.createdAt).toISOString() : null,

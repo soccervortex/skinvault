@@ -82,6 +82,7 @@ type ManualClaimRow = {
   discordUsername: string;
   discordId: string | null;
   discordProfileUrl: string | null;
+  userProfileUrl?: string | null;
   email: string | null;
   status: string;
   createdAt: string | null;
@@ -1105,6 +1106,11 @@ export default function AdminGiveawaysPage() {
                                     <div className="text-[10px] font-black uppercase tracking-widest">{c.steamId}</div>
                                     <div className="text-[9px] text-gray-500">Status: {String(c.status || '').toUpperCase()}</div>
                                     <div className="text-[9px] text-gray-500 break-all">Discord: {c.discordUsername}{c.discordId ? ` (${c.discordId})` : ''}</div>
+                                    {c.userProfileUrl ? (
+                                      <a href={c.userProfileUrl} target="_blank" rel="noreferrer" className="text-[9px] text-blue-400 break-all">
+                                        {c.userProfileUrl}
+                                      </a>
+                                    ) : null}
                                     {c.discordProfileUrl ? (
                                       <a href={c.discordProfileUrl} target="_blank" rel="noreferrer" className="text-[9px] text-blue-400 break-all">
                                         {c.discordProfileUrl}

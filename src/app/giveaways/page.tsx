@@ -245,6 +245,7 @@ export default function GiveawaysPage() {
 
   const [tradeUrlModalOpen, setTradeUrlModalOpen] = useState(false);
   const [tradeUrlModalClaimId, setTradeUrlModalClaimId] = useState<string | null>(null);
+  const [tradeUrlModalFlow, setTradeUrlModalFlow] = useState<'bot' | 'manual' | null>(null);
   const [tradeUrlInput, setTradeUrlInput] = useState('');
   const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
   const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
@@ -264,8 +265,9 @@ export default function GiveawaysPage() {
     }
   }, []);
 
-  const openTradeUrlModal = (giveawayId: string | null) => {
+  const openTradeUrlModal = (giveawayId: string | null, flow: 'bot' | 'manual' = 'bot') => {
     setTradeUrlModalClaimId(giveawayId);
+    setTradeUrlModalFlow(flow);
     setTradeUrlModalOpen(true);
     setTradeUrlInput('');
     if (!user?.steamId) return;
@@ -316,6 +318,12 @@ export default function GiveawaysPage() {
         }),
       });
       const json = await res.json().catch(() => null);
+      if (!res.ok && String(json?.code || '') === 'trade_url_missing') {
+        setManualClaimModalOpen(false);
+        openTradeUrlModal(id, 'manual');
+        toast.error('Trade URL not set. Please set it to submit your claim.');
+        return;
+      }
       if (!res.ok) throw new Error(json?.error || 'Failed');
       toast.success('Claim submitted');
       setManualClaimModalOpen(false);
@@ -369,7 +377,11 @@ export default function GiveawaysPage() {
       setTradeUrlModalOpen(false);
       const gid = tradeUrlModalClaimId;
       setTradeUrlModalClaimId(null);
-      if (gid) {
+      const flow = tradeUrlModalFlow;
+      setTradeUrlModalFlow(null);
+      if (flow === 'manual') {
+        await submitManualClaim();
+      } else if (gid) {
         await claimPrizeById(gid);
       }
     } catch (e: any) {
@@ -1772,6 +1784,7 @@ export default function GiveawaysPage() {
           aria-labelledby="trade-url-modal-title"
           onClick={() => {
             setTradeUrlModalOpen(false);
+            setTradeUrlModalFlow(null);
           }}
         >
           <div
@@ -1782,6 +1795,7 @@ export default function GiveawaysPage() {
               onClick={() => {
                 setTradeUrlModalOpen(false);
                 setTradeUrlModalClaimId(null);
+                setTradeUrlModalFlow(null);
               }}
               className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
               aria-label="Close trade URL modal"
@@ -1829,6 +1843,7 @@ export default function GiveawaysPage() {
                 onClick={() => {
                   setTradeUrlModalOpen(false);
                   setTradeUrlModalClaimId(null);
+                  setTradeUrlModalFlow(null);
                 }}
                 className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 hover:bg-white/10 text-white"
                 disabled={tradeUrlSaving}

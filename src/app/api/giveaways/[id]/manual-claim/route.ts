@@ -9,6 +9,24 @@ export const runtime = 'nodejs';
 
 type ManualClaimStatus = 'pending' | 'contacted' | 'awaiting_user' | 'sent' | 'completed' | 'rejected';
 
+function isValidTradeUrl(raw: string): boolean {
+  const s = String(raw || '').trim();
+  if (!s) return false;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    if (u.hostname !== 'steamcommunity.com') return false;
+    if (u.pathname !== '/tradeoffer/new/') return false;
+    const partner = u.searchParams.get('partner');
+    const token = u.searchParams.get('token');
+    if (!partner || !/^\d+$/.test(partner)) return false;
+    if (!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeUsername(u: string): string {
   return String(u || '')
     .split('#')[0]
@@ -25,7 +43,6 @@ async function resolveDiscordIdByUsername(username: string): Promise<string | nu
     const connections = (await dbGet<Record<string, any>>('discord_connections')) || {};
     for (const [, connection] of Object.entries(connections)) {
       if (!connection?.discordUsername) continue;
-      if (connection.expiresAt && Date.now() > connection.expiresAt) continue;
 
       const stored = normalizeUsername(String(connection.discordUsername));
       if (stored === query || stored.includes(query) || query.includes(stored)) {
@@ -38,6 +55,21 @@ async function resolveDiscordIdByUsername(username: string): Promise<string | nu
   }
 
   return null;
+}
+
+async function resolveDiscordIdForClaim(steamId: string, discordUsername: string): Promise<string | null> {
+  const sid = String(steamId || '').trim();
+  if (!sid) return null;
+
+  try {
+    const connections = (await dbGet<Record<string, any>>('discord_connections')) || {};
+    const direct = connections[sid];
+    const directId = direct?.discordId ? String(direct.discordId).trim() : '';
+    if (directId) return directId;
+  } catch {
+  }
+
+  return await resolveDiscordIdByUsername(discordUsername);
 }
 
 function mapStatusToWinnerClaimStatus(s: ManualClaimStatus): string {
@@ -94,6 +126,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const giveawaysCol = db.collection('giveaways');
     const winnersCol = db.collection('giveaway_winners');
     const manualClaimsCol = db.collection('giveaway_manual_claims');
+    const settingsCol = db.collection('user_settings');
 
     const giveaway: any = await giveawaysCol.findOne(
       { _id: giveawayId } as any,
@@ -124,6 +157,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ error: 'Claim window expired' }, { status: 400 });
     }
 
+    const settings: any = await settingsCol.findOne({ _id: steamId } as any, { projection: { tradeUrl: 1 } } as any);
+    const tradeUrl = String(settings?.tradeUrl || '').trim();
+    if (!isValidTradeUrl(tradeUrl)) {
+      return NextResponse.json(
+        {
+          error:
+            'Trade URL not set. Set your Steam trade URL first: https://steamcommunity.com/tradeoffer/new/?partner=...&token=...',
+          code: 'trade_url_missing',
+        },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
 
     const existing: any = await manualClaimsCol.findOne(
@@ -139,7 +185,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ ok: true, queued: true }, { status: 200 });
     }
 
-    const discordId = await resolveDiscordIdByUsername(discordUsername);
+    const discordId = await resolveDiscordIdForClaim(steamId, discordUsername);
 
     const insertDoc: any = {
       giveawayId,
@@ -173,14 +219,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     let webhookError: string | null = null;
 
     if (webhookUrl) {
-      const profileUrl = discordId ? `https://discord.com/users/${encodeURIComponent(discordId)}` : null;
+      const origin = new URL(req.url).origin;
+      const discordProfileUrl = discordId ? `https://discord.com/users/${encodeURIComponent(discordId)}` : null;
+      const userProfileUrl = `${origin}/inventory/${encodeURIComponent(steamId)}`;
       const contentLines: string[] = [];
       contentLines.push('New manual giveaway claim request');
       contentLines.push(`Giveaway: ${String(giveaway?.title || '')}`);
       contentLines.push(`SteamID: ${steamId}`);
+      contentLines.push(`User Profile: ${userProfileUrl}`);
       contentLines.push(`Discord: ${discordUsername}`);
-      if (discordId) contentLines.push(`Discord ID: ${discordId}`);
-      if (profileUrl) contentLines.push(`Profile: ${profileUrl}`);
+      contentLines.push(`Discord ID: ${discordId || '(not found)'}`);
+      if (discordProfileUrl) contentLines.push(`Discord Profile: ${discordProfileUrl}`);
       if (email) contentLines.push(`Email: ${email}`);
       contentLines.push(`Status: pending`);
 
