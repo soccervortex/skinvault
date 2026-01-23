@@ -15,6 +15,8 @@ type PaymentRow = {
   steamId: string | null;
   timestamp: string;
   amount: number;
+  feeAmount: number | null;
+  netAmount: number;
   currency: string;
   customerEmail: string | null;
   promoCode: string | null;
@@ -44,6 +46,18 @@ function normalizePaid(p: any): PaymentRow {
   const sessionId = String(p?.sessionId || '').trim() || null;
   const status: PaymentStatus = p?.fulfilled === false ? 'unfulfilled' : 'paid';
 
+  const amount = Number(p?.amount || 0);
+  const currency = String(p?.currency || 'eur');
+  const fee = Number(p?.feeAmount);
+  const netStored = Number(p?.netAmount);
+
+  const feeAmount = Number.isFinite(fee) ? fee : null;
+  const netAmount = Number.isFinite(netStored)
+    ? netStored
+    : Number.isFinite(fee)
+      ? amount - fee
+      : amount;
+
   return {
     id: `paid:${sessionId || String(p?._id || p?.id || '').trim() || String(Math.random())}`,
     kind: 'paid',
@@ -51,8 +65,10 @@ function normalizePaid(p: any): PaymentRow {
     type: p?.type ? String(p.type) : null,
     steamId: p?.steamId ? String(p.steamId) : null,
     timestamp: asIso(p?.timestamp),
-    amount: Number(p?.amount || 0),
-    currency: String(p?.currency || 'eur'),
+    amount,
+    feeAmount,
+    netAmount,
+    currency,
     customerEmail: p?.customerEmail ? sanitizeEmail(String(p.customerEmail)) : null,
     promoCode: p?.promoCode ? String(p.promoCode) : null,
     promoCodeId: p?.promoCodeId ? String(p.promoCodeId) : null,
@@ -87,6 +103,8 @@ function normalizeFailed(f: any): PaymentRow {
     steamId: f?.steamId ? String(f.steamId) : null,
     timestamp: asIso(f?.timestamp),
     amount: Number(f?.amount || 0),
+    feeAmount: null,
+    netAmount: 0,
     currency: String(f?.currency || 'eur'),
     customerEmail: f?.customerEmail ? sanitizeEmail(String(f.customerEmail)) : null,
     promoCode: f?.promoCode ? String(f.promoCode) : null,
@@ -155,6 +173,22 @@ async function getReceiptPatch(
 
     const receiptNumber = String((charge as any)?.receipt_number || '').trim();
     if (receiptNumber) out.receiptNumber = receiptNumber;
+
+    try {
+      const rawBt = (charge as any)?.balance_transaction;
+      let bt: any = null;
+      if (typeof rawBt === 'string' && rawBt) {
+        bt = await stripe.balanceTransactions.retrieve(rawBt);
+      } else if (rawBt && typeof rawBt === 'object') {
+        bt = rawBt;
+      }
+      const feeMinor = Number(bt?.fee);
+      const netMinor = Number(bt?.net);
+      if (bt?.id) out.balanceTransactionId = String(bt.id);
+      if (Number.isFinite(feeMinor)) out.feeAmount = feeMinor / 100;
+      if (Number.isFinite(netMinor)) out.netAmount = netMinor / 100;
+    } catch {
+    }
 
     const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
     if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
@@ -306,7 +340,7 @@ export async function GET(request: Request) {
         if (row.kind !== 'paid' || row.status !== 'paid') continue;
         paidCount += 1;
         const cur = String(row.currency || 'eur').toLowerCase();
-        const amount = Number(row.amount || 0);
+        const amount = Number(row.netAmount || 0);
         if (!Number.isFinite(amount)) continue;
         paidTotalByCurrency[cur] = Number((paidTotalByCurrency[cur] || 0) + amount);
       }

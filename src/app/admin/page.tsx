@@ -1333,7 +1333,7 @@ function AdminPageInner() {
                 </div>
                 <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
                   <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
-                    Revenue
+                    Net Revenue
                   </p>
                   <p className="text-lg md:text-xl font-black text-purple-400">
                     {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
@@ -1664,7 +1664,7 @@ function AdminPageInner() {
           </div>
           <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
             <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
-              Revenue
+              Net Revenue
             </p>
             <p className="text-lg md:text-xl font-black text-purple-400">
               {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}

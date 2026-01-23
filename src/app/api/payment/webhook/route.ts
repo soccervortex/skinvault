@@ -56,6 +56,22 @@ async function getReceiptPatch(
     const receiptNumber = String((charge as any)?.receipt_number || '').trim();
     if (receiptNumber) out.receiptNumber = receiptNumber;
 
+    try {
+      const rawBt = (charge as any)?.balance_transaction;
+      let bt: any = null;
+      if (typeof rawBt === 'string' && rawBt) {
+        bt = await stripe.balanceTransactions.retrieve(rawBt);
+      } else if (rawBt && typeof rawBt === 'object') {
+        bt = rawBt;
+      }
+      const feeMinor = Number(bt?.fee);
+      const netMinor = Number(bt?.net);
+      if (bt?.id) out.balanceTransactionId = String(bt.id);
+      if (Number.isFinite(feeMinor)) out.feeAmount = feeMinor / 100;
+      if (Number.isFinite(netMinor)) out.netAmount = netMinor / 100;
+    } catch {
+    }
+
     const chargeEmail = sanitizeEmail(String((charge as any)?.billing_details?.email || ''));
     if (!out.customerEmail && chargeEmail) out.customerEmail = chargeEmail;
 
