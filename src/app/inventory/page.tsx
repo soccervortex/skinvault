@@ -331,7 +331,6 @@ function InventoryContent() {
   const [compareModalItem, setCompareModalItem] = useState<any>(null);
 
   const [publicCoupons, setPublicCoupons] = useState<PublicCoupon[]>([]);
-  const [publicCouponsLoading, setPublicCouponsLoading] = useState(false);
 
   const [publicStatusLoading, setPublicStatusLoading] = useState(false);
   const [publicStatus, setPublicStatus] = useState<PublicProfileStatus | null>(null);
@@ -412,7 +411,6 @@ function InventoryContent() {
 
   useEffect(() => {
     let cancelled = false;
-    setPublicCouponsLoading(true);
     const sid = String(loggedInUser?.steamId || '').trim();
     const qs = /^\d{17}$/.test(sid) ? `?steamId=${encodeURIComponent(sid)}` : '';
     fetch(`/api/coupons/public${qs}`, { cache: 'no-store' })
@@ -429,10 +427,6 @@ function InventoryContent() {
       .catch(() => {
         if (cancelled) return;
         setPublicCoupons([]);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setPublicCouponsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -1859,7 +1853,7 @@ function InventoryContent() {
 
             <section className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center gap-2 flex-wrap mb-4">
-                <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-500">What you can do here</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">What you can do here</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                   <div className="bg-black/40 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-5">
                     <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-500">
@@ -2162,90 +2156,90 @@ function InventoryContent() {
                     </div>
                   )}
               </div>
-              </div>
-              <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-3">
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10">
-                    <Wallet size={16} className="text-blue-400" />
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits</div>
-                    <div className="text-[11px] font-black text-white">
-                      {publicStatusLoading ? '—' : (Number.isFinite(Number(publicStatus?.creditsBalance)) ? Number(publicStatus?.creditsBalance || 0).toLocaleString('en-US') : '—')}
+            </div>
+            <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-3">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10">
+                  <Wallet size={16} className="text-blue-400" />
+                  <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits</div>
+                  <div className="text-[11px] font-black text-white">
+                    {publicStatusLoading ? '—' : (Number.isFinite(Number(publicStatus?.creditsBalance)) ? Number(publicStatus?.creditsBalance || 0).toLocaleString('en-US') : '—')}
+                  </div>
+                </div>
+
+                {!!publicStatus?.banned && (
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30"
+                    title={publicStatus?.banReason ? `Banned: ${String(publicStatus.banReason)}` : 'Banned'}
+                  >
+                    <Skull size={16} className="text-red-400" />
+                    <div className="text-[9px] font-black uppercase tracking-widest text-red-300">Banned</div>
+                  </div>
+                )}
+
+                {!!publicStatus?.timeoutActive && (
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30"
+                    title={(() => {
+                      const until = publicStatus?.timeoutUntil ? String(publicStatus.timeoutUntil) : '';
+                      const reason = publicStatus?.timeoutReason ? String(publicStatus.timeoutReason) : '';
+                      if (reason && until) return `Timeout: ${reason} (until ${until})`;
+                      if (reason) return `Timeout: ${reason}`;
+                      if (until) return `Timeout until ${until}`;
+                      return 'Timeout active';
+                    })()}
+                  >
+                    <Lock size={16} className="text-amber-300" />
+                    <div className="text-[9px] font-black uppercase tracking-widest text-amber-200">
+                      Timeout{Number.isFinite(Number(publicStatus?.timeoutMinutesRemaining)) ? ` (${Number(publicStatus?.timeoutMinutesRemaining || 0)}m)` : ''}
                     </div>
                   </div>
+                )}
 
-                  {!!publicStatus?.banned && (
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30"
-                      title={publicStatus?.banReason ? `Banned: ${String(publicStatus.banReason)}` : 'Banned'}
-                    >
-                      <Skull size={16} className="text-red-400" />
-                      <div className="text-[9px] font-black uppercase tracking-widest text-red-300">Banned</div>
-                    </div>
-                  )}
+                {!!publicStatus?.creditsBanned && (
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30"
+                    title="Credits restricted: banned"
+                  >
+                    <Skull size={16} className="text-fuchsia-300" />
+                    <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Credits Banned</div>
+                  </div>
+                )}
 
-                  {!!publicStatus?.timeoutActive && (
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30"
-                      title={(() => {
-                        const until = publicStatus?.timeoutUntil ? String(publicStatus.timeoutUntil) : '';
-                        const reason = publicStatus?.timeoutReason ? String(publicStatus.timeoutReason) : '';
-                        if (reason && until) return `Timeout: ${reason} (until ${until})`;
-                        if (reason) return `Timeout: ${reason}`;
-                        if (until) return `Timeout until ${until}`;
-                        return 'Timeout active';
-                      })()}
-                    >
-                      <Lock size={16} className="text-amber-300" />
-                      <div className="text-[9px] font-black uppercase tracking-widest text-amber-200">
-                        Timeout{Number.isFinite(Number(publicStatus?.timeoutMinutesRemaining)) ? ` (${Number(publicStatus?.timeoutMinutesRemaining || 0)}m)` : ''}
-                      </div>
+                {!!publicStatus?.creditsTimeoutActive && (
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30"
+                    title={(() => {
+                      const until = publicStatus?.creditsTimeoutUntil ? String(publicStatus.creditsTimeoutUntil) : '';
+                      if (until) return `Credits timeout until ${until}`;
+                      return 'Credits timeout active';
+                    })()}
+                  >
+                    <Lock size={16} className="text-fuchsia-200" />
+                    <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">
+                      Credits Timeout{Number.isFinite(Number(publicStatus?.creditsTimeoutMinutesRemaining)) ? ` (${Number(publicStatus?.creditsTimeoutMinutesRemaining || 0)}m)` : ''}
                     </div>
-                  )}
-
-                  {!!publicStatus?.creditsBanned && (
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30"
-                      title="Credits restricted: banned"
-                    >
-                      <Skull size={16} className="text-fuchsia-300" />
-                      <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Credits Banned</div>
-                    </div>
-                  )}
-
-                  {!!publicStatus?.creditsTimeoutActive && (
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30"
-                      title={(() => {
-                        const until = publicStatus?.creditsTimeoutUntil ? String(publicStatus.creditsTimeoutUntil) : '';
-                        if (until) return `Credits timeout until ${until}`;
-                        return 'Credits timeout active';
-                      })()}
-                    >
-                      <Lock size={16} className="text-fuchsia-200" />
-                      <div className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">
-                        Credits Timeout{Number.isFinite(Number(publicStatus?.creditsTimeoutMinutesRemaining)) ? ` (${Number(publicStatus?.creditsTimeoutMinutesRemaining || 0)}m)` : ''}
-                      </div>
-                    </div>
-                  )}
-                  {canOpenNotifications && (
-                    <button
-                      onClick={() => {
-                        setNotificationsOpen(true);
-                        void loadNotifications();
-                      }}
-                      className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 transition-all"
-                      aria-label="Notifications"
-                      title={loggedInIsOwner && String(loggedInUser?.steamId || '').trim() !== String(viewedUser?.steamId || '').trim() ? 'View user notifications' : 'Your notifications'}
-                    >
-                      <Mail size={16} className="text-gray-300" />
-                      {notificationsUnreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
-                          {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
+                {canOpenNotifications && (
+                  <button
+                    onClick={() => {
+                      setNotificationsOpen(true);
+                      void loadNotifications();
+                    }}
+                    className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 transition-all"
+                    aria-label="Notifications"
+                    title={loggedInIsOwner && String(loggedInUser?.steamId || '').trim() !== String(viewedUser?.steamId || '').trim() ? 'View user notifications' : 'Your notifications'}
+                  >
+                    <Mail size={16} className="text-gray-300" />
+                    {notificationsUnreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+                        {notificationsUnreadCount > 99 ? '99+' : notificationsUnreadCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
 
                 {(() => {
                   const sid = String(loggedInUser?.steamId || '').trim();
@@ -2485,47 +2479,6 @@ function InventoryContent() {
                 </div>
               </section>
             )}
-
-            {publicCouponsLoading ? (
-              <div className="bg-[#11141d] border border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
-                  <Loader2 className="animate-spin" size={14} />
-                  Loading coupons
-                </div>
-              </div>
-            ) : publicCoupons.length > 0 ? (
-              <div className="bg-[#11141d] border border-white/5 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl">
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Public Coupons</div>
-                <div className="mt-1 text-xl md:text-2xl font-black italic uppercase tracking-tighter">Save money</div>
-                <div className="mt-2 text-[11px] text-gray-400">These codes are safe to share.</div>
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {publicCoupons.slice(0, 6).map((c) => {
-                    const label = c.kind === 'percent'
-                      ? (Number.isFinite(Number(c.percentOff)) ? `${Number(c.percentOff)}% OFF` : 'DISCOUNT')
-                      : (Number.isFinite(Number(c.amountOff)) ? `${Number(c.amountOff)} OFF` : 'DISCOUNT');
-                    return (
-                      <div key={c.code} className="bg-black/30 border border-white/10 rounded-2xl p-4 md:p-5 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">{label}</div>
-                          <div className="mt-1 text-[12px] font-black text-white truncate">{c.name || c.code}</div>
-                          <div className="mt-1 text-[10px] text-gray-500 truncate">Use code: <span className="text-emerald-300 font-black">{c.code}</span></div>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            const ok = await copyToClipboard(String(c.code));
-                            if (ok) toast.success('Coupon copied');
-                          }}
-                          className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white transition-all"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
 
             <section className="space-y-6 md:space-y-10">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2 md:px-6">
