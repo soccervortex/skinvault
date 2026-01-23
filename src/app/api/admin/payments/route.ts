@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { sanitizeEmail } from '@/app/utils/sanitize';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
+import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 import Stripe from 'stripe';
 
 const ADMIN_HEADER = 'x-admin-key';
@@ -126,6 +128,21 @@ function normalizeFailed(f: any): PaymentRow {
 function parseBool(value: any): boolean {
   const v = String(value ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+function addMoney(map: Record<string, number>, currency: string, amount: number) {
+  const cur = String(currency || 'eur').toLowerCase();
+  const n = Number(amount || 0);
+  if (!Number.isFinite(n)) return;
+  map[cur] = Number((map[cur] || 0) + n);
+}
+
+async function readCreatorsFromDb(): Promise<Array<{ slug: string; partnerSteamId?: string }>> {
+  const stored = (await dbGet<any[]>('creators_v1', false)) || [];
+  const list = Array.isArray(stored) ? stored : [];
+  return list
+    .map((c: any) => ({ slug: String(c?.slug || ''), partnerSteamId: c?.partnerSteamId ? String(c.partnerSteamId) : undefined }))
+    .filter((c) => !!String(c.slug || '').trim());
 }
 
 function getStripeSecretKeyFromRecord(record: any): string | null {
@@ -335,19 +352,115 @@ export async function GET(request: Request) {
 
       let paidCount = 0;
       const paidTotalByCurrency: Record<string, number> = {};
+      const ownerTotalByCurrency: Record<string, number> = {};
+      const coOwnerTotalByCurrency: Record<string, number> = {};
+      const partnerCommissionTotalByCurrency: Record<string, number> = {};
+      const futurePartnerCommissionTotalByCurrency: Record<string, number> = {};
+
+      const ownerSteamId = OWNER_STEAM_IDS?.[0] ? String(OWNER_STEAM_IDS[0]) : null;
+      const coOwnerSteamId = OWNER_STEAM_IDS?.[1] ? String(OWNER_STEAM_IDS[1]) : null;
+
+      const canComputePartnerSplits = hasMongoConfig();
+
+      const paidSteamIds: string[] = [];
+      for (const p of paidRows) {
+        const sid = String(p?.steamId || '').trim();
+        if (/^\d{17}$/.test(sid)) paidSteamIds.push(sid);
+      }
+      const uniquePaidSteamIds = Array.from(new Set(paidSteamIds));
+
+      const referralByUser = new Map<string, string>();
+      const refSlugByUser = new Map<string, string>();
+      const partnerByRefSlug = new Map<string, string>();
+
+      if (canComputePartnerSplits && uniquePaidSteamIds.length > 0) {
+        try {
+          const db = await getDatabase();
+
+          const referrals = await db
+            .collection('affiliate_referrals')
+            .find({ _id: { $in: uniquePaidSteamIds } } as any, { projection: { _id: 1, referrerSteamId: 1 } } as any)
+            .toArray();
+
+          for (const r of referrals as any[]) {
+            const user = String(r?._id || '').trim();
+            const referrer = String(r?.referrerSteamId || '').trim();
+            if (user && /^\d{17}$/.test(referrer)) referralByUser.set(user, referrer);
+          }
+
+          const attributions = await db
+            .collection('creator_attribution')
+            .find({ steamId: { $in: uniquePaidSteamIds } } as any, { projection: { steamId: 1, refSlug: 1 } } as any)
+            .toArray();
+
+          for (const a of attributions as any[]) {
+            const user = String(a?.steamId || '').trim();
+            const slug = String(a?.refSlug || '').trim().toLowerCase();
+            if (user && slug) refSlugByUser.set(user, slug);
+          }
+
+          const creators = await readCreatorsFromDb();
+          for (const c of creators as any[]) {
+            const slug = String(c?.slug || '').trim().toLowerCase();
+            const psid = String(c?.partnerSteamId || '').trim();
+            if (slug && /^\d{17}$/.test(psid)) partnerByRefSlug.set(slug, psid);
+          }
+        } catch {
+        }
+      }
+
       for (const p of paidRows) {
         const row = normalizePaid(p);
         if (row.kind !== 'paid' || row.status !== 'paid') continue;
         paidCount += 1;
-        const cur = String(row.currency || 'eur').toLowerCase();
-        const amount = Number(row.netAmount || 0);
-        if (!Number.isFinite(amount)) continue;
-        paidTotalByCurrency[cur] = Number((paidTotalByCurrency[cur] || 0) + amount);
+
+        const cur = String(row.currency || 'eur');
+        const gross = Number(row.amount || 0);
+        const net = Number(row.netAmount || 0);
+        if (!Number.isFinite(net)) continue;
+
+        addMoney(paidTotalByCurrency, cur, net);
+
+        const buyerSteamId = String(row.steamId || '').trim();
+        const base = Math.max(0, net);
+
+        let partnerCommission = 0;
+        let futurePartnerCommission = 0;
+
+        if (canComputePartnerSplits && /^\d{17}$/.test(buyerSteamId) && base > 0) {
+          const referrerSteamId = referralByUser.get(buyerSteamId) || null;
+          if (referrerSteamId) {
+            futurePartnerCommission = base * 0.1;
+            addMoney(futurePartnerCommissionTotalByCurrency, cur, futurePartnerCommission);
+          }
+
+          const slug = refSlugByUser.get(buyerSteamId) || null;
+          const partnerSteamId = slug ? partnerByRefSlug.get(slug) || null : null;
+          const partnerEligible = !!(partnerSteamId && gross >= 10);
+          if (partnerEligible) {
+            partnerCommission = base * 0.15;
+            addMoney(partnerCommissionTotalByCurrency, cur, partnerCommission);
+          }
+        }
+
+        const commissionsTotal = Math.min(base, Math.max(0, partnerCommission + futurePartnerCommission));
+        const remaining = Math.max(0, base - commissionsTotal);
+
+        if (ownerSteamId) addMoney(ownerTotalByCurrency, cur, remaining * 0.7);
+        if (coOwnerSteamId) addMoney(coOwnerTotalByCurrency, cur, remaining * 0.3);
       }
 
       const res = NextResponse.json({
         paidCount,
         paidTotalByCurrency,
+        splits: {
+          ownerSteamId,
+          coOwnerSteamId,
+          ownerTotalByCurrency,
+          coOwnerTotalByCurrency,
+          partnerCommissionTotalByCurrency,
+          futurePartnerCommissionTotalByCurrency,
+        },
       });
       res.headers.set('cache-control', 'no-store');
       return res;

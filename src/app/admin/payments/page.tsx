@@ -46,6 +46,7 @@ export default function AdminPaymentsPage() {
   const [paymentsCount, setPaymentsCount] = useState<number>(0);
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
+  const [paymentSplits, setPaymentSplits] = useState<any>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +137,22 @@ export default function AdminPaymentsPage() {
       .join(' / ');
   }, [paidTotalByCurrency]);
 
+  const formatCurrencyMapLabel = (m: any) => {
+    const entries = Object.entries((m || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    return entries
+      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
+      .join(' / ');
+  };
+
+  const ownerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.ownerTotalByCurrency), [paymentSplits]);
+  const coOwnerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.coOwnerTotalByCurrency), [paymentSplits]);
+  const partnerCommissionLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.partnerCommissionTotalByCurrency), [paymentSplits]);
+  const futurePartnerCommissionLabel = useMemo(
+    () => formatCurrencyMapLabel(paymentSplits?.futurePartnerCommissionTotalByCurrency),
+    [paymentSplits]
+  );
+
   const loadUserCount = async () => {
     if (!userIsOwner) return;
     setLoadingUserCount(true);
@@ -182,6 +199,7 @@ export default function AdminPaymentsPage() {
       const json = await res.json().catch(() => null);
       setPaymentsCount(Number((json as any)?.paidCount || 0));
       setPaidTotalByCurrency(((json as any)?.paidTotalByCurrency as Record<string, number>) || {});
+      setPaymentSplits((json as any)?.splits || null);
     } catch {
     } finally {
       setLoadingPaymentsCount(false);
@@ -387,6 +405,27 @@ export default function AdminPaymentsPage() {
               </p>
             </div>
           </div>
+
+          {paymentSplits && !loadingPaymentsCount && (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
+                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Owner (70%)</p>
+                <p className="text-lg md:text-xl font-black">{ownerSplitLabel}</p>
+              </div>
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
+                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Co-owner (30%)</p>
+                <p className="text-lg md:text-xl font-black">{coOwnerSplitLabel}</p>
+              </div>
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
+                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Partner (15%)</p>
+                <p className="text-lg md:text-xl font-black">{partnerCommissionLabel}</p>
+              </div>
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
+                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Future Partner (10%)</p>
+                <p className="text-lg md:text-xl font-black">{futurePartnerCommissionLabel}</p>
+              </div>
+            </div>
+          )}
 
           <div className="mt-6 bg-black/40 border border-white/10 rounded-2xl p-4 md:p-5">
             <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
