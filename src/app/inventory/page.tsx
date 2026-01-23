@@ -145,6 +145,30 @@ type PublicCoupon = {
   expiresAt: string | null;
 };
 
+function formatCouponValue(c: PublicCoupon): string {
+  if (c.kind === 'percent') {
+    const p = Number(c.percentOff);
+    return Number.isFinite(p) && p > 0 ? `${p}%` : 'Discount';
+  }
+
+  const cents = Number(c.amountOff);
+  if (!Number.isFinite(cents) || cents <= 0) return 'Discount';
+
+  const iso = String(c.currency || '').trim().toUpperCase();
+  const symbol = (() => {
+    if (iso === 'EUR') return '€';
+    if (iso === 'USD') return '$';
+    if (iso === 'GBP') return '£';
+    return '';
+  })();
+
+  const amount = cents / 100;
+  const decimals = Math.abs(amount - Math.round(amount)) < 0.000001 ? 0 : 2;
+  const formatted = amount.toFixed(decimals);
+  if (symbol) return `${symbol}${formatted}`;
+  return iso ? `${formatted} ${iso}` : formatted;
+}
+
 function hexToRgba(hex: string, alpha: number) {
   try {
     const h = String(hex || '').trim().replace('#', '');
@@ -389,7 +413,9 @@ function InventoryContent() {
   useEffect(() => {
     let cancelled = false;
     setPublicCouponsLoading(true);
-    fetch('/api/coupons/public', { cache: 'no-store' })
+    const sid = String(loggedInUser?.steamId || '').trim();
+    const qs = /^\d{17}$/.test(sid) ? `?steamId=${encodeURIComponent(sid)}` : '';
+    fetch(`/api/coupons/public${qs}`, { cache: 'no-store' })
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
         if (cancelled) return;
@@ -411,7 +437,7 @@ function InventoryContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loggedInUser?.steamId]);
 
   const notificationsTargetSteamId = useMemo(() => {
     const loggedInSteamId = String(loggedInUser?.steamId || '').trim();
@@ -432,22 +458,27 @@ function InventoryContent() {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      const steamId = String(viewedUser?.steamId || '').trim();
-      if (!steamId || !/^\d{17}$/.test(steamId)) {
-        if (!cancelled) setPublicStatus(null);
-        return;
-      }
-
-      setPublicStatusLoading(true);
       try {
-        const res = await fetch(`/api/user/profile-public?steamId=${encodeURIComponent(steamId)}`, { cache: 'no-store' });
-        const json = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(json?.error || 'Failed to load profile status');
-        if (!cancelled) setPublicStatus(json as any);
+        const steamId = String(viewedUser?.steamId || '').trim();
+        if (!steamId || !/^\d{17}$/.test(steamId)) {
+          if (!cancelled) setPublicStatus(null);
+          if (!cancelled) setPublicStatusLoading(false);
+          return;
+        }
+
+        setPublicStatusLoading(true);
+        try {
+          const res = await fetch(`/api/user/profile-public?steamId=${encodeURIComponent(steamId)}`, { cache: 'no-store' });
+          const json = await res.json().catch(() => null);
+          if (!res.ok) throw new Error(json?.error || 'Failed to load profile status');
+          if (!cancelled) setPublicStatus(json as any);
+        } catch {
+          if (!cancelled) setPublicStatus(null);
+        } finally {
+          if (!cancelled) setPublicStatusLoading(false);
+        }
       } catch {
         if (!cancelled) setPublicStatus(null);
-      } finally {
-        if (!cancelled) setPublicStatusLoading(false);
       }
     };
 
@@ -2215,6 +2246,19 @@ function InventoryContent() {
                     </button>
                   )}
                 </div>
+
+                {(() => {
+                  const sid = String(loggedInUser?.steamId || '').trim();
+                  const c = sid && /^\d{17}$/.test(sid) ? publicCoupons[0] : null;
+                  if (!c) return null;
+                  return (
+                    <div className="w-full flex justify-start md:justify-end">
+                      <div className="text-[10px] font-black text-emerald-300">
+                        Coupon Available: <span className="text-emerald-200">{c.code}</span> ({formatCouponValue(c)})
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
                   <TrendingUp className="text-emerald-500 shrink-0" size={24} />
