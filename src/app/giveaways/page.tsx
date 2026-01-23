@@ -245,7 +245,7 @@ export default function GiveawaysPage() {
 
   const [tradeUrlModalOpen, setTradeUrlModalOpen] = useState(false);
   const [tradeUrlModalClaimId, setTradeUrlModalClaimId] = useState<string | null>(null);
-  const [tradeUrlModalFlow, setTradeUrlModalFlow] = useState<'bot' | 'manual' | null>(null);
+  const [tradeUrlModalFlow, setTradeUrlModalFlow] = useState<'bot' | 'manual_submit' | 'manual_open' | null>(null);
   const [tradeUrlInput, setTradeUrlInput] = useState('');
   const [tradeUrlLoading, setTradeUrlLoading] = useState(false);
   const [tradeUrlSaving, setTradeUrlSaving] = useState(false);
@@ -265,12 +265,21 @@ export default function GiveawaysPage() {
     }
   }, []);
 
-  const openTradeUrlModal = (giveawayId: string | null, flow: 'bot' | 'manual' = 'bot') => {
+  const openTradeUrlModal = (
+    giveawayId: string | null,
+    flow: 'bot' | 'manual_submit' | 'manual_open' = 'bot',
+    prefillTradeUrl?: string | null
+  ) => {
     setTradeUrlModalClaimId(giveawayId);
     setTradeUrlModalFlow(flow);
     setTradeUrlModalOpen(true);
     setTradeUrlInput('');
     if (!user?.steamId) return;
+
+    if (typeof prefillTradeUrl === 'string') {
+      setTradeUrlInput(String(prefillTradeUrl || '').trim());
+      return;
+    }
 
     setTradeUrlLoading(true);
     fetch('/api/user/trade-url', { cache: 'no-store' })
@@ -292,6 +301,47 @@ export default function GiveawaysPage() {
     setManualDiscordUsername('');
     setManualEmail('');
     setManualClaimModalOpen(true);
+  };
+
+  const isValidTradeUrl = (raw: string): boolean => {
+    const s = String(raw || '').trim();
+    if (!s) return false;
+    try {
+      const u = new URL(s);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+      if (u.hostname !== 'steamcommunity.com') return false;
+      if (u.pathname !== '/tradeoffer/new/') return false;
+      const partner = u.searchParams.get('partner');
+      const token = u.searchParams.get('token');
+      if (!partner || !/^\d+$/.test(partner)) return false;
+      if (!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const ensureValidTradeUrlOrOpenModal = async (
+    giveawayId: string,
+    flow: 'bot' | 'manual_submit' | 'manual_open'
+  ): Promise<boolean> => {
+    if (!user?.steamId) {
+      toast.error('Sign in with Steam first');
+      return false;
+    }
+    try {
+      const res = await fetch('/api/user/trade-url', { cache: 'no-store' });
+      const json = await res.json().catch(() => null);
+      const t = String(json?.tradeUrl || '').trim();
+      if (res.ok && isValidTradeUrl(t)) return true;
+      openTradeUrlModal(giveawayId, flow, t);
+      toast.error(t ? 'Trade URL is invalid. Please update it.' : 'Trade URL not set. Please set it.');
+      return false;
+    } catch {
+      openTradeUrlModal(giveawayId, flow);
+      toast.error('Trade URL not set. Please set it.');
+      return false;
+    }
   };
 
   const submitManualClaim = async () => {
@@ -320,7 +370,7 @@ export default function GiveawaysPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok && String(json?.code || '') === 'trade_url_missing') {
         setManualClaimModalOpen(false);
-        openTradeUrlModal(id, 'manual');
+        openTradeUrlModal(id, 'manual_submit');
         toast.error('Trade URL not set. Please set it to submit your claim.');
         return;
       }
@@ -379,8 +429,10 @@ export default function GiveawaysPage() {
       setTradeUrlModalClaimId(null);
       const flow = tradeUrlModalFlow;
       setTradeUrlModalFlow(null);
-      if (flow === 'manual') {
+      if (flow === 'manual_submit') {
         await submitManualClaim();
+      } else if (flow === 'manual_open') {
+        openManualClaimModal(gid);
       } else if (gid) {
         await claimPrizeById(gid);
       }
@@ -867,14 +919,23 @@ export default function GiveawaysPage() {
 
   const claimPrize = async () => {
     if (!detail?.id) return;
-    if (String((detail as any)?.claimMode || 'bot') === 'manual') {
-      openManualClaimModal(detail.id);
-      return;
-    }
     if (!user?.steamId) {
       toast.error('Sign in with Steam first');
       return;
     }
+
+    if (String((detail as any)?.claimMode || 'bot') === 'manual') {
+      const ok = await ensureValidTradeUrlOrOpenModal(detail.id, 'manual_open');
+      if (!ok) return;
+      openManualClaimModal(detail.id);
+      return;
+    }
+
+    {
+      const ok = await ensureValidTradeUrlOrOpenModal(detail.id, 'bot');
+      if (!ok) return;
+    }
+
     setClaimingPrize(true);
     try {
       const res = await fetch(`/api/giveaways/${encodeURIComponent(detail.id)}/claim`, {
@@ -906,6 +967,8 @@ export default function GiveawaysPage() {
     if (!id) return;
     const mode = myClaims.find((c) => String(c.giveawayId || '') === id)?.claimMode;
     if (String(mode || 'bot') === 'manual') {
+      const ok = await ensureValidTradeUrlOrOpenModal(id, 'manual_open');
+      if (!ok) return;
       openManualClaimModal(id);
       return;
     }
@@ -913,6 +976,12 @@ export default function GiveawaysPage() {
       toast.error('Sign in with Steam first');
       return;
     }
+
+    {
+      const ok = await ensureValidTradeUrlOrOpenModal(id, 'bot');
+      if (!ok) return;
+    }
+
     setClaimingPrize(true);
     try {
       const res = await fetch(`/api/giveaways/${encodeURIComponent(id)}/claim`, {
