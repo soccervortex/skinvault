@@ -425,45 +425,7 @@ export default function AdminPaymentsPage() {
             </div>
           )}
 
-          {stripeBalanceTransactions && (
-            <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
-              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Stripe balance breakdown</div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 text-[10px] md:text-[11px]">
-                <div className="bg-black/30 border border-white/10 rounded-xl p-3">
-                  <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black mb-1">Balance Net (period)</div>
-                  <div className="text-[12px] font-black">{stripeBalanceNetLabel}</div>
-                </div>
-                <div className="bg-black/30 border border-white/10 rounded-xl p-3">
-                  <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black mb-1">Balance Fees (period)</div>
-                  <div className="text-[12px] font-black">{stripeBalanceFeeLabel}</div>
-                </div>
-              </div>
-
-              {Array.isArray(stripeBalanceTransactions?.netByType) && stripeBalanceTransactions.netByType.length > 0 && (
-                <table className="w-full text-left text-[9px] md:text-[10px]">
-                  <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
-                    <tr>
-                      <th className="py-2 pr-3">Type</th>
-                      <th className="py-2 pr-3">Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stripeBalanceTransactions.netByType
-                      .slice()
-                      .sort((a, b) => String(a.type).localeCompare(String(b.type)))
-                      .map((row) => (
-                        <tr key={row.type} className="border-b border-white/5 last:border-b-0">
-                          <td className="py-2 pr-3 uppercase tracking-widest text-gray-300 font-black">{String(row.type).replaceAll('_', ' ')}</td>
-                          <td className="py-2 pr-3 whitespace-nowrap font-black">{formatCurrencyMapLabel(row.totalByCurrency)}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 text-[10px] md:text-[11px]">
             <div className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-blue-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
                 Total Users
@@ -496,29 +458,41 @@ export default function AdminPaymentsPage() {
                 {loadingProStats ? <Loader2 className="animate-spin inline" size={20} /> : totals.expired}
               </p>
             </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px]">
             <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3">
-              <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
-                Payments
-              </p>
+              <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Payments</p>
               <p className="text-lg md:text-xl font-black text-yellow-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paymentsCount}
               </p>
             </div>
+
             <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
-              <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
-                Net Revenue
-              </p>
+              <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Net Revenue</p>
               <p className="text-lg md:text-xl font-black text-purple-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
               </p>
             </div>
 
             <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
-              <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
-                Stripe Payouts (Paid)
-              </p>
+              <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Payouts (Paid)</p>
               <p className="text-lg md:text-xl font-black text-emerald-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripePayoutsPaidLabel}
+              </p>
+            </div>
+
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
+              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Balance Net</p>
+              <p className="text-lg md:text-xl font-black">
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripeBalanceNetLabel}
+              </p>
+            </div>
+
+            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
+              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Balance Fees</p>
+              <p className="text-lg md:text-xl font-black">
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripeBalanceFeeLabel}
               </p>
             </div>
           </div>
@@ -574,6 +548,35 @@ export default function AdminPaymentsPage() {
               Use this if Net Revenue is higher than your bank deposits (older rows may be missing Stripe fee/net).
             </div>
           </div>
+
+          {stripeBalanceTransactions && Array.isArray(stripeBalanceTransactions?.netByType) && stripeBalanceTransactions.netByType.length > 0 && (
+            <details className="mt-3 bg-black/40 border border-white/10 rounded-2xl p-4">
+              <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">
+                Stripe balance transaction details
+              </summary>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left text-[9px] md:text-[10px]">
+                  <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
+                    <tr>
+                      <th className="py-2 pr-3">Type</th>
+                      <th className="py-2 pr-3">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stripeBalanceTransactions.netByType
+                      .slice()
+                      .sort((a, b) => String(a.type).localeCompare(String(b.type)))
+                      .map((row) => (
+                        <tr key={row.type} className="border-b border-white/5 last:border-b-0">
+                          <td className="py-2 pr-3 uppercase tracking-widest text-gray-300 font-black">{String(row.type).replaceAll('_', ' ')}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap font-black">{formatCurrencyMapLabel(row.totalByCurrency)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
 
           {stakeholderRows.length > 0 && (
             <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
