@@ -159,6 +159,28 @@ function addStakeholder(
   addMoney(existing.totalByCurrency, currency, n);
 }
 
+async function getPaidPayoutTotalsByCurrency(stripe: Stripe): Promise<Record<string, number>> {
+  const totals: Record<string, number> = {};
+  try {
+    let startingAfter: string | undefined = undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const res = await stripe.payouts.list({ limit: 100, status: 'paid', starting_after: startingAfter });
+      for (const p of res.data) {
+        const amtMinor = Number((p as any)?.amount);
+        const cur = String((p as any)?.currency || 'eur');
+        if (!Number.isFinite(amtMinor)) continue;
+        addMoney(totals, cur, amtMinor / 100);
+      }
+      const last = res.data[res.data.length - 1];
+      if (!last || !res.has_more) break;
+      startingAfter = String((last as any)?.id || '').trim() || undefined;
+      if (!startingAfter) break;
+    }
+  } catch {
+  }
+  return totals;
+}
+
 async function readCreatorsFromDb(): Promise<Array<{ slug: string; partnerSteamId?: string }>> {
   const stored = (await dbGet<any[]>('creators_v1', false)) || [];
   const list = Array.isArray(stored) ? stored : [];
@@ -380,6 +402,19 @@ export async function GET(request: Request) {
       const futurePartnerCommissionTotalByCurrency: Record<string, number> = {};
       const stakeholders: Record<string, { steamId: string; role: string; totalByCurrency: Record<string, number> }> = {};
 
+      const stripePayoutsPaidTotalByCurrency: Record<string, number> = {};
+      try {
+        const stripeKey = process.env.STRIPE_SECRET_KEY;
+        if (stripeKey) {
+          const stripe = createStripe(stripeKey);
+          const totals = await getPaidPayoutTotalsByCurrency(stripe);
+          for (const [k, v] of Object.entries(totals)) {
+            stripePayoutsPaidTotalByCurrency[String(k).toLowerCase()] = Number(v);
+          }
+        }
+      } catch {
+      }
+
       const ownerSteamId = OWNER_STEAM_IDS?.[0] ? String(OWNER_STEAM_IDS[0]) : null;
       const coOwnerSteamId = OWNER_STEAM_IDS?.[1] ? String(OWNER_STEAM_IDS[1]) : null;
 
@@ -488,6 +523,7 @@ export async function GET(request: Request) {
       const res = NextResponse.json({
         paidCount,
         paidTotalByCurrency,
+        stripePayoutsPaidTotalByCurrency,
         splits: {
           ownerSteamId,
           coOwnerSteamId,

@@ -52,6 +52,7 @@ export default function AdminPaymentsPage() {
   const [paymentsCount, setPaymentsCount] = useState<number>(0);
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
+  const [stripePayoutsPaidTotalByCurrency, setStripePayoutsPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [paymentSplits, setPaymentSplits] = useState<any>(null);
   const [backfillingFees, setBackfillingFees] = useState(false);
 
@@ -143,6 +144,14 @@ export default function AdminPaymentsPage() {
       .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
       .join(' / ');
   }, [paidTotalByCurrency]);
+
+  const stripePayoutsPaidLabel = useMemo(() => {
+    const entries = Object.entries(stripePayoutsPaidTotalByCurrency || {}).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    return entries
+      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
+      .join(' / ');
+  }, [stripePayoutsPaidTotalByCurrency]);
 
   const formatCurrencyMapLabel = (m: any) => {
     const entries = Object.entries((m || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
@@ -242,6 +251,7 @@ export default function AdminPaymentsPage() {
       const json = await res.json().catch(() => null);
       setPaymentsCount(Number((json as any)?.paidCount || 0));
       setPaidTotalByCurrency(((json as any)?.paidTotalByCurrency as Record<string, number>) || {});
+      setStripePayoutsPaidTotalByCurrency(((json as any)?.stripePayoutsPaidTotalByCurrency as Record<string, number>) || {});
       setPaymentSplits((json as any)?.splits || null);
     } catch {
     } finally {
@@ -445,6 +455,15 @@ export default function AdminPaymentsPage() {
               </p>
               <p className="text-lg md:text-xl font-black text-purple-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
+              </p>
+            </div>
+
+            <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
+              <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">
+                Stripe Payouts (Paid)
+              </p>
+              <p className="text-lg md:text-xl font-black text-emerald-400">
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripePayoutsPaidLabel}
               </p>
             </div>
           </div>
