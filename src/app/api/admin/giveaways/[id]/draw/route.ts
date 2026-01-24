@@ -49,10 +49,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const giveaway: any = await giveawaysCol.findOne({ _id: giveawayId } as any);
     if (!giveaway) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const claimMode = String(giveaway?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot';
+    const claimModeRaw = String(giveaway?.claimMode || 'bot')
+      .trim()
+      .toLowerCase();
+    const claimMode = claimModeRaw === 'manual' ? 'manual' : 'bot';
 
     const existing = await winnersCol.findOne({ _id: id } as any);
-    if (existing?.winners) {
+    if (Array.isArray(existing?.winners) && existing.winners.length > 0) {
       return NextResponse.json({ ok: true, winners: existing.winners, alreadyDrawn: true }, { status: 200 });
     }
 

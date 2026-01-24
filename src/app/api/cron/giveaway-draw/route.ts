@@ -123,9 +123,12 @@ export async function GET(req: NextRequest) {
       }
 
       try {
-        const claimMode = String(g?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot';
+        const claimModeRaw = String(g?.claimMode || 'bot')
+          .trim()
+          .toLowerCase();
+        const claimMode = claimModeRaw === 'manual' ? 'manual' : 'bot';
         const existing = await winnersCol.findOne({ _id: id } as any, { projection: { winners: 1 } } as any);
-        if (existing?.winners) {
+        if (Array.isArray((existing as any)?.winners) && (existing as any).winners.length > 0) {
           skippedAlreadyDrawnCount++;
           try {
             await giveawaysCol.updateOne({ _id: oid } as any, { $set: { drawnAt: now, updatedAt: now } } as any);

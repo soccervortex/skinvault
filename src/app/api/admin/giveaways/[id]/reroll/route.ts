@@ -88,6 +88,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const giveaway: any = await giveawaysCol.findOne({ _id: giveawayId } as any);
     if (!giveaway) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    const claimModeRaw = String(giveaway?.claimMode || 'bot')
+      .trim()
+      .toLowerCase();
+    const claimMode = claimModeRaw === 'manual' ? 'manual' : 'bot';
+
     const existing: any = await winnersCol.findOne({ _id: id } as any);
     if (!existing?.winners || !Array.isArray(existing.winners)) {
       return NextResponse.json({ error: 'No winners to reroll' }, { status: 400 });
@@ -125,11 +130,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     const excluded = new Set<string>(keep.map((w) => w.steamId));
 
-    const targetCount = Math.min(winnerCount, keep.length + toReplace.length);
+    const existingWinnerCount = Array.isArray(existing?.winners) ? existing.winners.length : 0;
+    const fallbackModeAll = existingWinnerCount === 0;
+    const targetCount = fallbackModeAll ? winnerCount : Math.min(winnerCount, keep.length + toReplace.length);
     const now = new Date();
     const deadline = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const picked: any[] = [...keep].slice(0, targetCount);
+    const picked: any[] = fallbackModeAll ? [] : [...keep].slice(0, targetCount);
 
     while (picked.length < targetCount) {
       const pool = normalized.filter((e) => !excluded.has(String(e.steamId || '')));
@@ -143,7 +150,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       const settings: any = await settingsCol.findOne({ _id: one.steamId } as any, { projection: { tradeUrl: 1 } });
       const tradeUrl = String(settings?.tradeUrl || '').trim();
 
-      if (!isValidTradeUrl(tradeUrl)) {
+      if (claimMode !== 'manual' && !isValidTradeUrl(tradeUrl)) {
         await createUserNotification(
           db,
           one.steamId,
