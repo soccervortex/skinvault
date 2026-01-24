@@ -34,6 +34,12 @@ type PaymentRow = {
   hiddenAt: string | null;
 };
 
+type StakeholderSplitRow = {
+  steamId: string;
+  role: string;
+  totalByCurrency: Record<string, number>;
+};
+
 export default function AdminPaymentsPage() {
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
@@ -47,6 +53,7 @@ export default function AdminPaymentsPage() {
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [paymentSplits, setPaymentSplits] = useState<any>(null);
+  const [backfillingFees, setBackfillingFees] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +159,42 @@ export default function AdminPaymentsPage() {
     () => formatCurrencyMapLabel(paymentSplits?.futurePartnerCommissionTotalByCurrency),
     [paymentSplits]
   );
+
+  const stakeholderRows = useMemo(() => {
+    const list = Array.isArray(paymentSplits?.stakeholders) ? (paymentSplits.stakeholders as StakeholderSplitRow[]) : [];
+    const sorted = list
+      .map((r) => ({ ...r, steamId: String(r?.steamId || '').trim(), role: String(r?.role || '').trim() }))
+      .filter((r) => /^\d{17}$/.test(r.steamId))
+      .sort((a, b) => {
+        if (a.role !== b.role) return a.role.localeCompare(b.role);
+        return a.steamId.localeCompare(b.steamId);
+      });
+    return sorted;
+  }, [paymentSplits]);
+
+  const backfillMissingFees = async () => {
+    if (!userIsOwner) return;
+    setBackfillingFees(true);
+    try {
+      const res = await fetch('/api/admin/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ action: 'backfill_missing_fees', limit: 25 }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed'));
+      toast.success(`Backfill done: updated ${Number(json?.updated || 0)} / scanned ${Number(json?.scanned || 0)}`);
+      await loadPaymentsCount();
+      await load();
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Failed'));
+    } finally {
+      setBackfillingFees(false);
+    }
+  };
 
   const loadUserCount = async () => {
     if (!userIsOwner) return;
@@ -424,6 +467,48 @@ export default function AdminPaymentsPage() {
                 <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Future Partner (10%)</p>
                 <p className="text-lg md:text-xl font-black">{futurePartnerCommissionLabel}</p>
               </div>
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              disabled={backfillingFees || !userIsOwner}
+              onClick={() => backfillMissingFees()}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] border transition-all ${
+                backfillingFees
+                  ? 'bg-black/30 border-white/10 text-gray-400'
+                  : 'bg-purple-600/20 border-purple-500/40 text-purple-300 hover:bg-purple-600/30'
+              }`}
+            >
+              {backfillingFees ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw size={14} />}
+              Backfill missing fees
+            </button>
+            <div className="text-[10px] text-gray-500">
+              Use this if Net Revenue is higher than your bank deposits (older rows may be missing Stripe fee/net).
+            </div>
+          </div>
+
+          {stakeholderRows.length > 0 && (
+            <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Payout breakdown (SteamID)</div>
+              <table className="w-full text-left text-[9px] md:text-[10px]">
+                <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
+                  <tr>
+                    <th className="py-2 pr-3">Role</th>
+                    <th className="py-2 pr-3">SteamID</th>
+                    <th className="py-2 pr-3">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stakeholderRows.map((r) => (
+                    <tr key={`${r.role}:${r.steamId}`} className="border-b border-white/5 last:border-b-0">
+                      <td className="py-2 pr-3 uppercase tracking-widest text-gray-300 font-black">{r.role.replaceAll('_', ' ')}</td>
+                      <td className="py-2 pr-3 font-mono break-all">{r.steamId}</td>
+                      <td className="py-2 pr-3 whitespace-nowrap font-black">{formatCurrencyMapLabel(r.totalByCurrency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

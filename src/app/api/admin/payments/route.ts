@@ -137,6 +137,28 @@ function addMoney(map: Record<string, number>, currency: string, amount: number)
   map[cur] = Number((map[cur] || 0) + n);
 }
 
+function addStakeholder(
+  stakeholders: Record<string, { steamId: string; role: string; totalByCurrency: Record<string, number> }>,
+  steamId: string | null,
+  role: string,
+  currency: string,
+  amount: number
+) {
+  const sid = String(steamId || '').trim();
+  if (!/^\d{17}$/.test(sid)) return;
+  const n = Number(amount || 0);
+  if (!Number.isFinite(n) || n === 0) return;
+  const existing = stakeholders[sid];
+  if (!existing) {
+    const totalByCurrency: Record<string, number> = {};
+    addMoney(totalByCurrency, currency, n);
+    stakeholders[sid] = { steamId: sid, role, totalByCurrency };
+    return;
+  }
+  if (existing.role !== role) existing.role = 'multiple';
+  addMoney(existing.totalByCurrency, currency, n);
+}
+
 async function readCreatorsFromDb(): Promise<Array<{ slug: string; partnerSteamId?: string }>> {
   const stored = (await dbGet<any[]>('creators_v1', false)) || [];
   const list = Array.isArray(stored) ? stored : [];
@@ -356,6 +378,7 @@ export async function GET(request: Request) {
       const coOwnerTotalByCurrency: Record<string, number> = {};
       const partnerCommissionTotalByCurrency: Record<string, number> = {};
       const futurePartnerCommissionTotalByCurrency: Record<string, number> = {};
+      const stakeholders: Record<string, { steamId: string; role: string; totalByCurrency: Record<string, number> }> = {};
 
       const ownerSteamId = OWNER_STEAM_IDS?.[0] ? String(OWNER_STEAM_IDS[0]) : null;
       const coOwnerSteamId = OWNER_STEAM_IDS?.[1] ? String(OWNER_STEAM_IDS[1]) : null;
@@ -427,27 +450,39 @@ export async function GET(request: Request) {
         let partnerCommission = 0;
         let futurePartnerCommission = 0;
 
+        const eligibleForCommissions = gross >= 10;
+
         if (canComputePartnerSplits && /^\d{17}$/.test(buyerSteamId) && base > 0) {
           const referrerSteamId = referralByUser.get(buyerSteamId) || null;
-          if (referrerSteamId) {
+          if (referrerSteamId && eligibleForCommissions) {
             futurePartnerCommission = base * 0.1;
             addMoney(futurePartnerCommissionTotalByCurrency, cur, futurePartnerCommission);
+            addStakeholder(stakeholders, referrerSteamId, 'future_partner', cur, futurePartnerCommission);
           }
 
           const slug = refSlugByUser.get(buyerSteamId) || null;
           const partnerSteamId = slug ? partnerByRefSlug.get(slug) || null : null;
-          const partnerEligible = !!(partnerSteamId && gross >= 10);
+          const partnerEligible = !!(partnerSteamId && eligibleForCommissions);
           if (partnerEligible) {
             partnerCommission = base * 0.15;
             addMoney(partnerCommissionTotalByCurrency, cur, partnerCommission);
+            addStakeholder(stakeholders, partnerSteamId, 'partner', cur, partnerCommission);
           }
         }
 
         const commissionsTotal = Math.min(base, Math.max(0, partnerCommission + futurePartnerCommission));
         const remaining = Math.max(0, base - commissionsTotal);
 
-        if (ownerSteamId) addMoney(ownerTotalByCurrency, cur, remaining * 0.7);
-        if (coOwnerSteamId) addMoney(coOwnerTotalByCurrency, cur, remaining * 0.3);
+        if (ownerSteamId) {
+          const amt = remaining * 0.7;
+          addMoney(ownerTotalByCurrency, cur, amt);
+          addStakeholder(stakeholders, ownerSteamId, 'owner', cur, amt);
+        }
+        if (coOwnerSteamId) {
+          const amt = remaining * 0.3;
+          addMoney(coOwnerTotalByCurrency, cur, amt);
+          addStakeholder(stakeholders, coOwnerSteamId, 'co_owner', cur, amt);
+        }
       }
 
       const res = NextResponse.json({
@@ -460,6 +495,7 @@ export async function GET(request: Request) {
           coOwnerTotalByCurrency,
           partnerCommissionTotalByCurrency,
           futurePartnerCommissionTotalByCurrency,
+          stakeholders: Object.values(stakeholders),
         },
       });
       res.headers.set('cache-control', 'no-store');
@@ -653,6 +689,56 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ ok: true, updated: true });
+    }
+
+    if (action === 'backfill_missing_fees') {
+      const limit = Math.max(1, Math.min(50, Number(body?.limit || 20)));
+
+      const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
+      const candidates = purchases
+        .filter((p) => {
+          if (!p) return false;
+          if (p?.hidden === true) return false;
+          const sessionId = String(p?.sessionId || '').trim();
+          if (!sessionId) return false;
+          const hasNet = Number.isFinite(Number(p?.netAmount));
+          const hasFee = Number.isFinite(Number(p?.feeAmount));
+          return !hasNet || !hasFee;
+        })
+        .sort((a, b) => new Date(String(b?.timestamp || '')).getTime() - new Date(String(a?.timestamp || '')).getTime())
+        .slice(0, limit);
+
+      const stripeByKey = new Map<string, Stripe>();
+      let updatedCount = 0;
+      let scannedCount = 0;
+
+      for (const record of candidates) {
+        scannedCount += 1;
+        const secretKey = getStripeSecretKeyFromRecord(record);
+        if (!secretKey) continue;
+
+        let stripe = stripeByKey.get(secretKey);
+        if (!stripe) {
+          stripe = createStripe(secretKey);
+          stripeByKey.set(secretKey, stripe);
+        }
+
+        const sessionId = String(record?.sessionId || '').trim();
+        try {
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          const receiptPatch = await getReceiptPatch(stripe, session);
+          const patch: Record<string, any> = {};
+          if ('feeAmount' in receiptPatch) patch.feeAmount = receiptPatch.feeAmount;
+          if ('netAmount' in receiptPatch) patch.netAmount = receiptPatch.netAmount;
+          if ('balanceTransactionId' in receiptPatch) patch.balanceTransactionId = receiptPatch.balanceTransactionId;
+          if (Object.keys(patch).length === 0) continue;
+          await patchPurchase(sessionId, patch);
+          updatedCount += 1;
+        } catch {
+        }
+      }
+
+      return NextResponse.json({ ok: true, scanned: scannedCount, updated: updatedCount });
     }
 
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
