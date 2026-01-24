@@ -40,6 +40,12 @@ type ProEntry = {
   daysRemaining: number;
 };
 
+type StripeBalanceTransactionsBreakdown = {
+  netTotalByCurrency: Record<string, number>;
+  feeTotalByCurrency: Record<string, number>;
+  netByType: Array<{ type: string; totalByCurrency: Record<string, number> }>;
+};
+
 function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -94,6 +100,7 @@ function AdminPageInner() {
   const [paymentsCount, setPaymentsCount] = useState<number>(0);
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
+  const [stripeBalanceTransactions, setStripeBalanceTransactions] = useState<StripeBalanceTransactionsBreakdown | null>(null);
   const [timeouts, setTimeouts] = useState<Array<{ steamId: string; timeoutUntil: string; minutesRemaining: number }>>([]);
   const [loadingTimeouts, setLoadingTimeouts] = useState(true);
   const [searchSteamId, setSearchSteamId] = useState("");
@@ -242,6 +249,26 @@ function AdminPageInner() {
       .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
       .join(' / ');
   }, [paidTotalByCurrency]);
+
+  const formatCurrencyMapLabel = (m: any) => {
+    const entries = Object.entries((m || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    return entries
+      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
+      .join(' / ');
+  };
+
+  const stripeBalanceNetLabel = useMemo(
+    () => formatCurrencyMapLabel(stripeBalanceTransactions?.netTotalByCurrency),
+    [stripeBalanceTransactions]
+  );
+
+  const netRevenueLabel = useMemo(() => {
+    const byCur = stripeBalanceTransactions?.netTotalByCurrency || null;
+    const entries = Object.entries((byCur || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return paidTotalLabel;
+    return stripeBalanceNetLabel;
+  }, [paidTotalLabel, stripeBalanceNetLabel, stripeBalanceTransactions]);
 
   useEffect(() => {
     if (!userIsOwner) return;
@@ -492,6 +519,7 @@ function AdminPageInner() {
         const data = await res.json().catch(() => null);
         setPaymentsCount(Number((data as any)?.paidCount || 0));
         setPaidTotalByCurrency(((data as any)?.paidTotalByCurrency as Record<string, number>) || {});
+        setStripeBalanceTransactions(((data as any)?.stripeBalanceTransactions as StripeBalanceTransactionsBreakdown) || null);
       } catch (e: any) {
         console.error('Failed to load payments:', e);
       } finally {
@@ -1338,7 +1366,7 @@ function AdminPageInner() {
                     Net Revenue
                   </p>
                   <p className="text-lg md:text-xl font-black text-purple-400">
-                    {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
+                    {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : netRevenueLabel}
                   </p>
                 </div>
               </div>
@@ -1680,7 +1708,7 @@ function AdminPageInner() {
               Net Revenue
             </p>
             <p className="text-lg md:text-xl font-black text-purple-400">
-              {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
+              {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : netRevenueLabel}
             </p>
           </div>
         </div>

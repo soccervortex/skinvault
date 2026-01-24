@@ -126,13 +126,6 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const addMoney = (totals: Record<string, number>, currency: string, amount: number) => {
-    const c = String(currency || 'eur').toLowerCase();
-    const n = Number(amount || 0);
-    if (!c || !Number.isFinite(n)) return;
-    totals[c] = (Number(totals[c] || 0) || 0) + n;
-  };
-
   const formatCurrencyAmount = (amount: number, currency: string) => {
     const cur = String(currency || 'eur').toUpperCase();
     const n = Number(amount || 0);
@@ -177,18 +170,12 @@ export default function AdminPaymentsPage() {
   const stripeBalanceNetLabel = useMemo(() => formatCurrencyMapLabel(stripeBalanceTransactions?.netTotalByCurrency), [stripeBalanceTransactions]);
   const stripeBalanceFeeLabel = useMemo(() => formatCurrencyMapLabel(stripeBalanceTransactions?.feeTotalByCurrency), [stripeBalanceTransactions]);
 
-  const reconciliationDiffLabel = useMemo(() => {
+  const netRevenueLabel = useMemo(() => {
     const byCur = stripeBalanceTransactions?.netTotalByCurrency || null;
-    const entries = Object.entries(paidTotalByCurrency || {}).filter(([, v]) => Number.isFinite(Number(v)));
-    if (!byCur || entries.length === 0) return formatCurrencyAmount(0, 'eur');
-    const out: Record<string, number> = {};
-    for (const [cur, netRevenue] of entries) {
-      const c = String(cur || 'eur').toLowerCase();
-      const stripeNet = Number((byCur as any)?.[c] ?? (byCur as any)?.[String(cur || 'eur').toUpperCase()] ?? 0);
-      addMoney(out, c, Number(netRevenue || 0) - (Number.isFinite(stripeNet) ? stripeNet : 0));
-    }
-    return formatCurrencyMapLabel(out);
-  }, [paidTotalByCurrency, stripeBalanceTransactions]);
+    const entries = Object.entries((byCur || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return paidTotalLabel;
+    return stripeBalanceNetLabel;
+  }, [paidTotalLabel, stripeBalanceNetLabel, stripeBalanceTransactions]);
 
   const backfillMissingFees = async () => {
     if (!userIsOwner) return;
@@ -455,7 +442,7 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-4 text-[10px] md:text-[11px]">
             <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Payments</p>
               <p className="text-lg md:text-xl font-black text-yellow-400">
@@ -466,7 +453,7 @@ export default function AdminPaymentsPage() {
             <div className="bg-black/40 border border-purple-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-purple-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Net Revenue</p>
               <p className="text-lg md:text-xl font-black text-purple-400">
-                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : paidTotalLabel}
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : netRevenueLabel}
               </p>
             </div>
 
@@ -474,13 +461,6 @@ export default function AdminPaymentsPage() {
               <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Payouts (Paid)</p>
               <p className="text-lg md:text-xl font-black text-emerald-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripePayoutsPaidLabel}
-              </p>
-            </div>
-
-            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Reconciliation (diff)</p>
-              <p className="text-lg md:text-xl font-black">
-                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : reconciliationDiffLabel}
               </p>
             </div>
           </div>

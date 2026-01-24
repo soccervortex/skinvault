@@ -153,6 +153,7 @@ export default function AdminPayoutsPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(String(json?.error || 'Failed'));
       toast.success('Stakeholder added');
+      setShowOnlyWithOwed(false);
       setNewStakeholderSteamId('');
       setNewStakeholderName('');
       setNewStakeholderCurrency('eur');
