@@ -156,6 +156,44 @@ function safePct(raw: any): number {
   return Math.min(100, n);
 }
 
+function prevMonthKey(monthKey: string): string {
+  const [yRaw, mRaw] = String(monthKey || '').split('-');
+  const y = Number(yRaw);
+  const m = Number(mRaw);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return monthKeyForDate(new Date());
+  const d = new Date(Date.UTC(y, m - 2, 1, 0, 0, 0, 0));
+  return monthKeyForDate(d);
+}
+
+function monthKeyToIsoDate(monthKey: string): string {
+  const { start } = monthRangeUtc(monthKey);
+  const y = start.getUTCFullYear();
+  const m = start.getUTCMonth() + 1;
+  const d = start.getUTCDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+async function fetchFrankfurterRates(dateIso: string, currencies: string[]): Promise<Record<string, number>> {
+  const unique = Array.from(new Set(currencies.map((c) => normalizeCurrency(c)).filter((c) => c && c !== 'eur'))).sort();
+  if (unique.length === 0) return {};
+
+  const url = `https://api.frankfurter.app/${encodeURIComponent(dateIso)}?from=EUR&to=${encodeURIComponent(unique.join(','))}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) return {};
+  const json: any = await res.json().catch(() => null);
+  const ratesRaw = json?.rates && typeof json.rates === 'object' ? json.rates : null;
+  if (!ratesRaw) return {};
+
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(ratesRaw)) {
+    const cur = normalizeCurrency(k);
+    const n = Number(v);
+    if (!cur || cur === 'eur' || !Number.isFinite(n) || n <= 0) continue;
+    out[cur] = n;
+  }
+  return out;
+}
+
 export async function GET(request: Request) {
   const adminKey = request.headers.get(ADMIN_HEADER);
   const expected = process.env.ADMIN_PRO_TOKEN;
@@ -197,6 +235,16 @@ export async function GET(request: Request) {
     const refSlugByUser = new Map<string, string>();
     const partnerByRefSlug = new Map<string, string>();
 
+    try {
+      const creators = await readCreatorsFromDb();
+      for (const c of creators as any[]) {
+        const slug = String(c?.slug || '').trim().toLowerCase();
+        const psid = String(c?.partnerSteamId || '').trim();
+        if (slug && /^\d{17}$/.test(psid)) partnerByRefSlug.set(slug, psid);
+      }
+    } catch {
+    }
+
     if (uniquePaidSteamIds.length > 0) {
       try {
         const referrals = await db
@@ -219,13 +267,6 @@ export async function GET(request: Request) {
           const user = String(a?.steamId || '').trim();
           const slug = String(a?.refSlug || '').trim().toLowerCase();
           if (user && slug) refSlugByUser.set(user, slug);
-        }
-
-        const creators = await readCreatorsFromDb();
-        for (const c of creators as any[]) {
-          const slug = String(c?.slug || '').trim().toLowerCase();
-          const psid = String(c?.partnerSteamId || '').trim();
-          if (slug && /^\d{17}$/.test(psid)) partnerByRefSlug.set(slug, psid);
         }
       } catch {
       }
@@ -303,6 +344,52 @@ export async function GET(request: Request) {
       fxByCurrency.set(cur, rate);
     }
 
+    const partnerSteamIds = new Set<string>(Array.from(partnerByRefSlug.values()).map((v) => String(v).trim()));
+
+    const neededFxCurrencies = new Set<string>();
+    for (const s of savedStakeholders) {
+      const c = normalizeCurrency(s?.payoutCurrency);
+      if (c && c !== 'eur') neededFxCurrencies.add(c);
+    }
+    for (const c of Array.from(neededFxCurrencies.values())) {
+      if (!fxByCurrency.has(c)) {
+        const prevKey = prevMonthKey(monthKey);
+        if (prevKey && prevKey !== monthKey) {
+          const prev = await fxCol.findOne({ _id: `${prevKey}:${c}` } as any, { projection: { rateEurToCurrency: 1 } } as any);
+          const pr = Number((prev as any)?.rateEurToCurrency);
+          if (Number.isFinite(pr) && pr > 0) fxByCurrency.set(c, pr);
+        }
+      }
+    }
+
+    const missingCurrencies = Array.from(neededFxCurrencies.values()).filter((c) => c !== 'eur' && !fxByCurrency.has(c));
+    if (missingCurrencies.length > 0) {
+      try {
+        const dateIso = monthKeyToIsoDate(monthKey);
+        const fetched = await fetchFrankfurterRates(dateIso, missingCurrencies);
+        const now = new Date();
+        for (const [cur, rate] of Object.entries(fetched)) {
+          if (!cur || !Number.isFinite(rate) || rate <= 0) continue;
+          fxByCurrency.set(cur, rate);
+          const docId = `${monthKey}:${cur}`;
+          await fxCol.updateOne(
+            { _id: docId } as any,
+            {
+              $set: {
+                monthKey,
+                currency: cur,
+                rateEurToCurrency: rate,
+                updatedAt: now,
+              },
+              $setOnInsert: { createdAt: now },
+            } as any,
+            { upsert: true }
+          );
+        }
+      } catch {
+      }
+    }
+
     const paymentDocs: any[] = await paymentsCol
       .find(
         { monthKey, steamId: { $in: allSteamIds } } as any,
@@ -344,7 +431,15 @@ export async function GET(request: Request) {
       .map((sid) => {
         const computed = stakeholders[sid] || null;
         const saved = savedBySteamId.get(sid) || null;
-        const role = computed?.role ? String(computed.role) : 'unknown';
+        const role = computed?.role
+          ? String(computed.role)
+          : ownerSteamId && sid === ownerSteamId
+            ? 'owner'
+            : coOwnerSteamId && sid === coOwnerSteamId
+              ? 'co_owner'
+              : partnerSteamIds.has(sid)
+                ? 'partner'
+                : 'unknown';
 
         const totalByCurrency: Record<string, number> = computed?.totalByCurrency || {};
         const owedEur = Number(totalByCurrency?.eur || 0);
@@ -523,6 +618,15 @@ export async function POST(request: Request) {
       }
 
       await paymentsCol.deleteOne({ _id: oid, monthKey, steamId } as any);
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
+
+    if (action === 'delete_stakeholder') {
+      const steamId = String(body?.steamId || '').trim();
+      if (!/^\d{17}$/.test(steamId)) return NextResponse.json({ error: 'Invalid steamId' }, { status: 400 });
+
+      await stakeholdersCol.deleteOne({ steamId } as any);
+      await paymentsCol.deleteMany({ steamId } as any);
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 

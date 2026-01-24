@@ -87,6 +87,7 @@ export default function AdminPayoutsPage() {
   const [paymentCurrency, setPaymentCurrency] = useState('eur');
   const [paymentNote, setPaymentNote] = useState('');
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const [deletingStakeholderSteamId, setDeletingStakeholderSteamId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -119,6 +120,33 @@ export default function AdminPayoutsPage() {
       setFxRates({});
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteStakeholder = async (steamId: string) => {
+    if (!userIsOwner) return;
+    const sid = String(steamId || '').trim();
+    if (!/^\d{17}$/.test(sid)) return;
+    if (!confirm('Delete stakeholder? This will also delete all saved payment entries for this SteamID.')) return;
+
+    setDeletingStakeholderSteamId(sid);
+    try {
+      const res = await fetch('/api/admin/payouts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ action: 'delete_stakeholder', steamId: sid }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Failed'));
+      toast.success('Deleted');
+      await load();
+    } catch (e: any) {
+      toast.error(String(e?.message || 'Failed'));
+    } finally {
+      setDeletingStakeholderSteamId(null);
     }
   };
 
@@ -188,8 +216,13 @@ export default function AdminPayoutsPage() {
         if (pc && pc !== 'eur') s.add(pc);
       }
     }
-    return Array.from(s.values()).sort();
-  }, [rows]);
+    return Array.from(s.values())
+      .filter((c) => {
+        const n = Number((fxRates as any)?.[c]);
+        return !Number.isFinite(n) || n <= 0;
+      })
+      .sort();
+  }, [rows, fxRates]);
 
   const upsertStakeholder = async (steamId: string, next: { displayName: string; payoutCurrency: string; conversionFeePct: number }) => {
     if (!userIsOwner) return;
@@ -475,7 +508,9 @@ export default function AdminPayoutsPage() {
                     onAddPayment={openAddPayment}
                     onCopy={copy}
                     onDeletePayment={deletePayment}
+                    onDeleteStakeholder={deleteStakeholder}
                     deletingPaymentId={deletingPaymentId}
+                    deletingStakeholderSteamId={deletingStakeholderSteamId}
                   />
                 ))}
               </tbody>
@@ -605,7 +640,9 @@ function StakeholderRowView({
   onAddPayment,
   onCopy,
   onDeletePayment,
+  onDeleteStakeholder,
   deletingPaymentId,
+  deletingStakeholderSteamId,
 }: {
   row: StakeholderRow;
   saving: boolean;
@@ -613,7 +650,9 @@ function StakeholderRowView({
   onAddPayment: (steamId: string, defaultCurrency: string) => void;
   onCopy: (text: string) => void;
   onDeletePayment: (steamId: string, id: string) => void;
+  onDeleteStakeholder: (steamId: string) => void;
   deletingPaymentId: string | null;
+  deletingStakeholderSteamId: string | null;
 }) {
   const [displayName, setDisplayName] = useState(row.displayName || '');
   const [payoutCurrency, setPayoutCurrency] = useState(row.payoutCurrency || 'eur');
@@ -691,6 +730,13 @@ function StakeholderRowView({
             className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10"
           >
             Add paid
+          </button>
+          <button
+            disabled={deletingStakeholderSteamId === row.steamId}
+            onClick={() => onDeleteStakeholder(row.steamId)}
+            className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-red-600/20 border border-red-500/30 text-red-300 hover:bg-red-600/30"
+          >
+            {deletingStakeholderSteamId === row.steamId ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
           </button>
         </div>
 
