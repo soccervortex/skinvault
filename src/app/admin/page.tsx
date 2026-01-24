@@ -94,7 +94,6 @@ function AdminPageInner() {
   const [paymentsCount, setPaymentsCount] = useState<number>(0);
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
-  const [paymentSplits, setPaymentSplits] = useState<any>(null);
   const [timeouts, setTimeouts] = useState<Array<{ steamId: string; timeoutUntil: string; minutesRemaining: number }>>([]);
   const [loadingTimeouts, setLoadingTimeouts] = useState(true);
   const [searchSteamId, setSearchSteamId] = useState("");
@@ -243,22 +242,6 @@ function AdminPageInner() {
       .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
       .join(' / ');
   }, [paidTotalByCurrency]);
-
-  const formatCurrencyMapLabel = (m: any) => {
-    const entries = Object.entries((m || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
-    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
-    return entries
-      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
-      .join(' / ');
-  };
-
-  const ownerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.ownerTotalByCurrency), [paymentSplits]);
-  const coOwnerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.coOwnerTotalByCurrency), [paymentSplits]);
-  const partnerCommissionLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.partnerCommissionTotalByCurrency), [paymentSplits]);
-  const futurePartnerCommissionLabel = useMemo(
-    () => formatCurrencyMapLabel(paymentSplits?.futurePartnerCommissionTotalByCurrency),
-    [paymentSplits]
-  );
 
   useEffect(() => {
     if (!userIsOwner) return;
@@ -509,7 +492,6 @@ function AdminPageInner() {
         const data = await res.json().catch(() => null);
         setPaymentsCount(Number((data as any)?.paidCount || 0));
         setPaidTotalByCurrency(((data as any)?.paidTotalByCurrency as Record<string, number>) || {});
-        setPaymentSplits((data as any)?.splits || null);
       } catch (e: any) {
         console.error('Failed to load payments:', e);
       } finally {
@@ -1361,27 +1343,6 @@ function AdminPageInner() {
                 </div>
               </div>
 
-              {paymentSplits && !loadingPaymentsCount && (
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                  <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                    <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Owner (70%)</p>
-                    <p className="text-lg md:text-xl font-black">{ownerSplitLabel}</p>
-                  </div>
-                  <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                    <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Co-owner (30%)</p>
-                    <p className="text-lg md:text-xl font-black">{coOwnerSplitLabel}</p>
-                  </div>
-                  <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                    <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Partner (15%)</p>
-                    <p className="text-lg md:text-xl font-black">{partnerCommissionLabel}</p>
-                  </div>
-                  <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                    <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Future Partner (10%)</p>
-                    <p className="text-lg md:text-xl font-black">{futurePartnerCommissionLabel}</p>
-                  </div>
-                </div>
-              )}
-
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
                   <Shield className="text-blue-400" size={16} />
@@ -1402,6 +1363,17 @@ function AdminPageInner() {
                     <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Payments</div>
                   </div>
                   <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Payments Manager</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/payouts')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Wallet className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Payouts</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Monthly Payouts</div>
                 </button>
 
                 <button

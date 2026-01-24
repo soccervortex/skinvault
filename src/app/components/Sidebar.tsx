@@ -481,9 +481,18 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               </Link>
 
               {isOwner(user?.steamId) && (
-                <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+                <>
+                  <Link
+                    href="/admin/payouts"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin/payouts' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}
+                  >
+                    <Wallet size={16} /> Payouts
+                  </Link>
+                  <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
                     <Shield size={16} /> Admin Panel
                   </Link>
+                </>
               )}
             </div>
 
@@ -720,9 +729,17 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           </Link>
 
           {isOwner(user?.steamId) && (
-            <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
-                <Shield size={16} /> Admin Panel
+            <>
+              <Link
+                href="/admin/payouts"
+                className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/admin/payouts' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}
+              >
+                <Wallet size={16} /> Payouts
               </Link>
+              <Link href="/admin" className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
+                  <Shield size={16} /> Admin Panel
+                </Link>
+            </>
           )}
         </div>
 

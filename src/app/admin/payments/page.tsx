@@ -34,12 +34,6 @@ type PaymentRow = {
   hiddenAt: string | null;
 };
 
-type StakeholderSplitRow = {
-  steamId: string;
-  role: string;
-  totalByCurrency: Record<string, number>;
-};
-
 type StripeBalanceTransactionsBreakdown = {
   netTotalByCurrency: Record<string, number>;
   feeTotalByCurrency: Record<string, number>;
@@ -60,7 +54,6 @@ export default function AdminPaymentsPage() {
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [stripePayoutsPaidTotalByCurrency, setStripePayoutsPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [stripeBalanceTransactions, setStripeBalanceTransactions] = useState<StripeBalanceTransactionsBreakdown | null>(null);
-  const [paymentSplits, setPaymentSplits] = useState<any>(null);
   const [backfillingFees, setBackfillingFees] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -197,26 +190,6 @@ export default function AdminPaymentsPage() {
     return formatCurrencyMapLabel(out);
   }, [paidTotalByCurrency, stripeBalanceTransactions]);
 
-  const ownerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.ownerTotalByCurrency), [paymentSplits]);
-  const coOwnerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.coOwnerTotalByCurrency), [paymentSplits]);
-  const partnerCommissionLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.partnerCommissionTotalByCurrency), [paymentSplits]);
-  const futurePartnerCommissionLabel = useMemo(
-    () => formatCurrencyMapLabel(paymentSplits?.futurePartnerCommissionTotalByCurrency),
-    [paymentSplits]
-  );
-
-  const stakeholderRows = useMemo(() => {
-    const list = Array.isArray(paymentSplits?.stakeholders) ? (paymentSplits.stakeholders as StakeholderSplitRow[]) : [];
-    const sorted = list
-      .map((r) => ({ ...r, steamId: String(r?.steamId || '').trim(), role: String(r?.role || '').trim() }))
-      .filter((r) => /^\d{17}$/.test(r.steamId))
-      .sort((a, b) => {
-        if (a.role !== b.role) return a.role.localeCompare(b.role);
-        return a.steamId.localeCompare(b.steamId);
-      });
-    return sorted;
-  }, [paymentSplits]);
-
   const backfillMissingFees = async () => {
     if (!userIsOwner) return;
     setBackfillingFees(true);
@@ -292,7 +265,6 @@ export default function AdminPaymentsPage() {
       setPaidTotalByCurrency(((json as any)?.paidTotalByCurrency as Record<string, number>) || {});
       setStripePayoutsPaidTotalByCurrency(((json as any)?.stripePayoutsPaidTotalByCurrency as Record<string, number>) || {});
       setStripeBalanceTransactions(((json as any)?.stripeBalanceTransactions as StripeBalanceTransactionsBreakdown) || null);
-      setPaymentSplits((json as any)?.splits || null);
     } catch {
     } finally {
       setLoadingPaymentsCount(false);
@@ -513,27 +485,6 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
 
-          {paymentSplits && !loadingPaymentsCount && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 text-[10px] md:text-[11px]">
-              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Owner (70%)</p>
-                <p className="text-lg md:text-xl font-black">{ownerSplitLabel}</p>
-              </div>
-              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Co-owner (30%)</p>
-                <p className="text-lg md:text-xl font-black">{coOwnerSplitLabel}</p>
-              </div>
-              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Partner (15%)</p>
-                <p className="text-lg md:text-xl font-black">{partnerCommissionLabel}</p>
-              </div>
-              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-                <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Future Partner (10%)</p>
-                <p className="text-lg md:text-xl font-black">{futurePartnerCommissionLabel}</p>
-              </div>
-            </div>
-          )}
-
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Period</div>
@@ -609,30 +560,6 @@ export default function AdminPaymentsPage() {
                   </tbody>
                 </table>
               )}
-            </div>
-          )}
-
-          {showStripeAdvanced && stakeholderRows.length > 0 && (
-            <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
-              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Payout breakdown (SteamID)</div>
-              <table className="w-full text-left text-[9px] md:text-[10px]">
-                <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
-                  <tr>
-                    <th className="py-2 pr-3">Role</th>
-                    <th className="py-2 pr-3">SteamID</th>
-                    <th className="py-2 pr-3">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stakeholderRows.map((r) => (
-                    <tr key={`${r.role}:${r.steamId}`} className="border-b border-white/5 last:border-b-0">
-                      <td className="py-2 pr-3 uppercase tracking-widest text-gray-300 font-black">{r.role.replaceAll('_', ' ')}</td>
-                      <td className="py-2 pr-3 font-mono break-all">{r.steamId}</td>
-                      <td className="py-2 pr-3 whitespace-nowrap font-black">{formatCurrencyMapLabel(r.totalByCurrency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
 
