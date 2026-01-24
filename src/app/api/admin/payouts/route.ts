@@ -341,6 +341,20 @@ export async function GET(request: Request) {
 
     const allSteamIds = Array.from(new Set<string>([...stakeholderIds, ...savedStakeholders.map((s) => String(s?.steamId || '').trim())].filter((s) => /^\d{17}$/.test(s))));
 
+    const futurePartnerSteamIds = new Set<string>();
+    try {
+      const refDocs = await db
+        .collection('affiliate_referrals')
+        .find({ referrerSteamId: { $in: allSteamIds } } as any, { projection: { referrerSteamId: 1 } } as any)
+        .limit(5000)
+        .toArray();
+      for (const r of refDocs as any[]) {
+        const sid = String(r?.referrerSteamId || '').trim();
+        if (/^\d{17}$/.test(sid)) futurePartnerSteamIds.add(sid);
+      }
+    } catch {
+    }
+
     const fxDocs: any[] = await fxCol
       .find({ monthKey } as any, { projection: { _id: 0, monthKey: 1, currency: 1, rateEurToCurrency: 1 } } as any)
       .toArray();
@@ -448,6 +462,8 @@ export async function GET(request: Request) {
               ? 'co_owner'
               : partnerSteamIds.has(sid)
                 ? 'partner'
+                : futurePartnerSteamIds.has(sid)
+                  ? 'future_partner'
                 : 'unknown';
 
         const totalByCurrency: Record<string, number> = computed?.totalByCurrency || {};

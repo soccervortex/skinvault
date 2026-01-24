@@ -1057,6 +1057,12 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                   />
                 </button>
               </div>
+
+              <div className="w-full text-[11px] text-gray-500">
+                {[itemTypeLabel, categoryLabel, wearName, isStatTrak ? 'StatTrak' : null, isSouvenir ? 'Souvenir' : null]
+                  .filter(Boolean)
+                  .join(' • ')}
+              </div>
               </div>
             </div>
 
