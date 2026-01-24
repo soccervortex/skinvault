@@ -1078,19 +1078,20 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
             <div className="lg:col-span-7 space-y-5 md:space-y-6">
             <div className="space-y-3">
-              <h1 className="text-2xl md:text-4xl font-semibold text-white leading-tight break-words">
+              <h1 className="text-xl sm:text-2xl md:text-4xl font-semibold text-white leading-tight whitespace-nowrap overflow-hidden text-ellipsis md:whitespace-normal md:overflow-visible md:break-words">
                 {item?.name}
               </h1>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Share Button */}
                 {typeof window !== 'undefined' && (
-                  <ShareButton
-                    url={window.location.href}
-                    title={`${item?.name} - SkinVaults`}
-                    text={`Check out ${item?.name} on SkinVaults`}
-                    variant="icon"
-                    className="hidden md:flex"
-                  />
+                  <div className="hidden md:flex">
+                    <ShareButton
+                      url={window.location.href}
+                      title={`${item?.name} - SkinVaults`}
+                      text={`Check out ${item?.name} on SkinVaults`}
+                      variant="icon"
+                    />
+                  </div>
                 )}
                 {/* Compare Button */}
                 <button
