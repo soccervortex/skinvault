@@ -86,6 +86,7 @@ export default function AdminPaymentsPage() {
   const [editInvoiceNumber, setEditInvoiceNumber] = useState('');
 
   const [periodDays, setPeriodDays] = useState<'all' | '7' | '30'>('all');
+  const [showStripeAdvanced, setShowStripeAdvanced] = useState(false);
 
   useEffect(() => {
     try {
@@ -132,6 +133,13 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  const addMoney = (totals: Record<string, number>, currency: string, amount: number) => {
+    const c = String(currency || 'eur').toLowerCase();
+    const n = Number(amount || 0);
+    if (!c || !Number.isFinite(n)) return;
+    totals[c] = (Number(totals[c] || 0) || 0) + n;
+  };
+
   const formatCurrencyAmount = (amount: number, currency: string) => {
     const cur = String(currency || 'eur').toUpperCase();
     const n = Number(amount || 0);
@@ -173,6 +181,19 @@ export default function AdminPaymentsPage() {
 
   const stripeBalanceNetLabel = useMemo(() => formatCurrencyMapLabel(stripeBalanceTransactions?.netTotalByCurrency), [stripeBalanceTransactions]);
   const stripeBalanceFeeLabel = useMemo(() => formatCurrencyMapLabel(stripeBalanceTransactions?.feeTotalByCurrency), [stripeBalanceTransactions]);
+
+  const reconciliationDiffLabel = useMemo(() => {
+    const byCur = stripeBalanceTransactions?.netTotalByCurrency || null;
+    const entries = Object.entries(paidTotalByCurrency || {}).filter(([, v]) => Number.isFinite(Number(v)));
+    if (!byCur || entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    const out: Record<string, number> = {};
+    for (const [cur, netRevenue] of entries) {
+      const c = String(cur || 'eur').toLowerCase();
+      const stripeNet = Number((byCur as any)?.[c] ?? (byCur as any)?.[String(cur || 'eur').toUpperCase()] ?? 0);
+      addMoney(out, c, Number(netRevenue || 0) - (Number.isFinite(stripeNet) ? stripeNet : 0));
+    }
+    return formatCurrencyMapLabel(out);
+  }, [paidTotalByCurrency, stripeBalanceTransactions]);
 
   const ownerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.ownerTotalByCurrency), [paymentSplits]);
   const coOwnerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.coOwnerTotalByCurrency), [paymentSplits]);
@@ -483,16 +504,9 @@ export default function AdminPaymentsPage() {
             </div>
 
             <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Balance Net</p>
+              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Reconciliation (diff)</p>
               <p className="text-lg md:text-xl font-black">
-                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripeBalanceNetLabel}
-              </p>
-            </div>
-
-            <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-3">
-              <p className="text-gray-500 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Balance Fees</p>
-              <p className="text-lg md:text-xl font-black">
-                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripeBalanceFeeLabel}
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : reconciliationDiffLabel}
               </p>
             </div>
           </div>
@@ -533,6 +547,14 @@ export default function AdminPaymentsPage() {
             </div>
 
             <button
+              type="button"
+              onClick={() => setShowStripeAdvanced((v) => !v)}
+              className="bg-black/40 border border-white/10 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] hover:border-white/20"
+            >
+              {showStripeAdvanced ? 'Hide Advanced' : 'Show Advanced'}
+            </button>
+
+            <button
               disabled={backfillingFees || !userIsOwner}
               onClick={() => backfillMissingFees()}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] border transition-all ${
@@ -549,12 +571,22 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
 
-          {stripeBalanceTransactions && Array.isArray(stripeBalanceTransactions?.netByType) && stripeBalanceTransactions.netByType.length > 0 && (
-            <details className="mt-3 bg-black/40 border border-white/10 rounded-2xl p-4">
-              <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">
-                Stripe balance transaction details
-              </summary>
-              <div className="mt-3 overflow-x-auto">
+          {showStripeAdvanced && stripeBalanceTransactions && (
+            <div className="mt-3 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Stripe (advanced)</div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-[10px] md:text-[11px]">
+                <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                  <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black mb-1">Balance Net (period)</div>
+                  <div className="text-[12px] font-black">{stripeBalanceNetLabel}</div>
+                </div>
+                <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                  <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black mb-1">Balance Fees (period)</div>
+                  <div className="text-[12px] font-black">{stripeBalanceFeeLabel}</div>
+                </div>
+              </div>
+
+              {Array.isArray(stripeBalanceTransactions?.netByType) && stripeBalanceTransactions.netByType.length > 0 && (
                 <table className="w-full text-left text-[9px] md:text-[10px]">
                   <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
                     <tr>
@@ -574,8 +606,8 @@ export default function AdminPaymentsPage() {
                       ))}
                   </tbody>
                 </table>
-              </div>
-            </details>
+              )}
+            </div>
           )}
 
           {stakeholderRows.length > 0 && (
