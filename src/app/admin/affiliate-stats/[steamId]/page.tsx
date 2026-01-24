@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { isOwner } from '@/app/utils/owner-ids';
-import { ArrowLeft, Loader2, Star, Users, Gift, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Loader2, Star, Users, Gift, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 type ReferralRow = {
   referredSteamId: string;
@@ -70,6 +70,11 @@ export default function AffiliateUserAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
 
+  const [manualReferredSteamId, setManualReferredSteamId] = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualOk, setManualOk] = useState<string | null>(null);
+
   const page = safeInt(searchParams.get('page'), 1, 1, 100000);
   const limit = safeInt(searchParams.get('limit'), 100, 1, 500);
 
@@ -96,7 +101,7 @@ export default function AffiliateUserAdminPage() {
     }
   }, [userLoaded, userIsOwner, router]);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!userLoaded) return;
     if (!userIsOwner) return;
     if (!/^\d{17}$/.test(steamId)) {
@@ -105,38 +110,38 @@ export default function AffiliateUserAdminPage() {
       return;
     }
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const qs = new URLSearchParams();
-        qs.set('steamId', steamId);
-        qs.set('page', String(page));
-        qs.set('limit', String(limit));
+    setLoading(true);
+    setError(null);
+    try {
+      const qs = new URLSearchParams();
+      qs.set('steamId', steamId);
+      qs.set('page', String(page));
+      qs.set('limit', String(limit));
 
-        const res = await fetch(`/api/admin/affiliate-user?${qs.toString()}`, {
-          headers: {
-            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          },
-          cache: 'no-store',
-        });
-        const json = (await res.json().catch(() => null)) as ApiResponse | null;
-        if (!res.ok || !json) {
-          setError((json as any)?.error || 'Failed to load affiliate');
-          setData(null);
-        } else {
-          setData(json);
-        }
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load affiliate');
+      const res = await fetch(`/api/admin/affiliate-user?${qs.toString()}`, {
+        headers: {
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        cache: 'no-store',
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse | null;
+      if (!res.ok || !json) {
+        setError((json as any)?.error || 'Failed to load affiliate');
         setData(null);
-      } finally {
-        setLoading(false);
+      } else {
+        setData(json);
       }
-    };
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load affiliate');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [limit, page, steamId, userIsOwner, userLoaded]);
 
+  useEffect(() => {
     void load();
-  }, [userLoaded, userIsOwner, steamId, page, limit]);
+  }, [load]);
 
   const totals = data?.totals || null;
   const referralsRows = useMemo(() => {
@@ -171,6 +176,45 @@ export default function AffiliateUserAdminPage() {
   if (!userIsOwner) {
     return null;
   }
+
+  const manageReferral = async (action: 'add' | 'delete', referredSteamId: string) => {
+    setManualLoading(true);
+    setManualError(null);
+    setManualOk(null);
+    try {
+      const ref = String(referredSteamId || '').trim();
+      if (!/^\d{17}$/.test(ref)) throw new Error('Invalid referred Steam ID');
+      if (ref === steamId) throw new Error('Cannot refer self');
+
+      const res = await fetch('/api/admin/affiliate-referrals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ action, referrerSteamId: steamId, referredSteamId: ref }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(String(json?.error || 'Request failed'));
+
+      if (action === 'delete' && Number(json?.deleted || 0) <= 0) {
+        throw new Error('Referral not found');
+      }
+
+      if (action === 'add') {
+        setManualOk('Referral added');
+        setManualReferredSteamId('');
+      } else {
+        setManualOk('Referral removed');
+      }
+
+      await load();
+    } catch (e: any) {
+      setManualError(String(e?.message || 'Failed'));
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
@@ -211,19 +255,28 @@ export default function AffiliateUserAdminPage() {
             ) : (
               <>
                 {totals ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-8">
-                    <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Referrals</div>
-                      <div className="text-2xl font-black mt-2">{totals.referrals}</div>
+                  <div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-8">
+                      <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">
+                        <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Referrals</div>
+                        <div className="text-2xl font-black mt-2">{totals.referrals}</div>
+                      </div>
+                      <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">
+                        <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Milestone Claims</div>
+                        <div className="text-2xl font-black mt-2">{totals.claims}</div>
+                      </div>
+                      <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">
+                        <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Credits Granted</div>
+                        <div className="text-2xl font-black mt-2">{totals.creditsGranted}</div>
+                      </div>
                     </div>
-                    <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Milestone Claims</div>
-                      <div className="text-2xl font-black mt-2">{totals.claims}</div>
-                    </div>
-                    <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4">
-                      <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black">Credits Granted</div>
-                      <div className="text-2xl font-black mt-2">{totals.creditsGranted}</div>
-                    </div>
+
+                    {manualError && (
+                      <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-300 text-[11px]">{manualError}</div>
+                    )}
+                    {manualOk && (
+                      <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-300 text-[11px]">{manualOk}</div>
+                    )}
                   </div>
                 ) : null}
 
@@ -234,7 +287,25 @@ export default function AffiliateUserAdminPage() {
                       Referred Users
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
+                        <input
+                          value={manualReferredSteamId}
+                          onChange={(e) => setManualReferredSteamId(e.target.value)}
+                          placeholder="Add referred SteamID..."
+                          className="w-[220px] max-w-[70vw] bg-transparent text-[11px] font-black text-white placeholder-gray-500 outline-none"
+                        />
+                        <button
+                          disabled={manualLoading}
+                          onClick={() => manageReferral('add', manualReferredSteamId)}
+                          className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                            manualLoading ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          }`}
+                        >
+                          Add
+                        </button>
+                      </div>
+
                       <button
                         disabled={page <= 1}
                         onClick={() => setPage(page - 1)}
@@ -269,6 +340,7 @@ export default function AffiliateUserAdminPage() {
                             <th className="py-3 pr-4">Referred Steam ID</th>
                             <th className="py-3 pr-4">Created</th>
                             <th className="py-3 pr-4">Landing</th>
+                            <th className="py-3 pr-4">Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -277,6 +349,22 @@ export default function AffiliateUserAdminPage() {
                               <td className="py-3 pr-4 text-[11px] font-black text-gray-300">{r.referredSteamId}</td>
                               <td className="py-3 pr-4 text-[11px] text-gray-400">{r.createdAt ? new Date(r.createdAt).toLocaleString('en-US') : '—'}</td>
                               <td className="py-3 pr-4 text-[11px] text-gray-400 truncate max-w-[520px]">{r.landing || '—'}</td>
+                              <td className="py-3 pr-4">
+                                <button
+                                  disabled={manualLoading}
+                                  onClick={async () => {
+                                    const ok = window.confirm(`Remove referral ${r.referredSteamId} from ${steamId}?`);
+                                    if (!ok) return;
+                                    await manageReferral('delete', r.referredSteamId);
+                                  }}
+                                  className={`inline-flex items-center justify-center px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    manualLoading ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'
+                                  }`}
+                                >
+                                  <Trash2 size={14} className="mr-2" />
+                                  Delete
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
