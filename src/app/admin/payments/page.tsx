@@ -78,6 +78,8 @@ export default function AdminPaymentsPage() {
   const [editInvoicePdf, setEditInvoicePdf] = useState('');
   const [editInvoiceNumber, setEditInvoiceNumber] = useState('');
 
+  const [periodDays, setPeriodDays] = useState<'all' | '7' | '30'>('all');
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -101,6 +103,7 @@ export default function AdminPaymentsPage() {
       if (coupon) qs.set('coupon', coupon);
       if (q) qs.set('q', q);
       if (includeHidden) qs.set('includeHidden', '1');
+      if (periodDays !== 'all') qs.set('days', periodDays);
 
       const res = await fetch(`/api/admin/payments?${qs.toString()}`, {
         cache: 'no-store',
@@ -241,7 +244,10 @@ export default function AdminPaymentsPage() {
     if (!userIsOwner) return;
     setLoadingPaymentsCount(true);
     try {
-      const res = await fetch('/api/admin/payments?statsOnly=1', {
+      const qs = new URLSearchParams();
+      qs.set('statsOnly', '1');
+      if (periodDays !== 'all') qs.set('days', periodDays);
+      const res = await fetch(`/api/admin/payments?${qs.toString()}`, {
         cache: 'no-store',
         headers: {
           'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
@@ -268,7 +274,7 @@ export default function AdminPaymentsPage() {
     void loadProStats();
     void loadPaymentsCount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userIsOwner]);
+  }, [userIsOwner, periodDays]);
 
   const uniqueTypes = useMemo(() => {
     const s = new Set<string>();
@@ -490,6 +496,19 @@ export default function AdminPaymentsPage() {
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Period</div>
+              <select
+                value={periodDays}
+                onChange={(e) => setPeriodDays(e.target.value as any)}
+                className="bg-black/40 border border-white/10 rounded-xl py-2 px-3 text-[10px] font-black text-white outline-none"
+              >
+                <option value="all">All time</option>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+              </select>
+            </div>
+
             <button
               disabled={backfillingFees || !userIsOwner}
               onClick={() => backfillMissingFees()}

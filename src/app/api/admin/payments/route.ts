@@ -159,12 +159,16 @@ function addStakeholder(
   addMoney(existing.totalByCurrency, currency, n);
 }
 
-async function getPaidPayoutTotalsByCurrency(stripe: Stripe): Promise<Record<string, number>> {
+async function getPaidPayoutTotalsByCurrency(stripe: Stripe, createdGte: number | null): Promise<Record<string, number>> {
   const totals: Record<string, number> = {};
   try {
     let startingAfter: string | undefined = undefined;
     for (let page = 0; page < 10; page += 1) {
-      const res = await stripe.payouts.list({ limit: 100, status: 'paid', starting_after: startingAfter });
+      const params: any = { limit: 100, status: 'paid', starting_after: startingAfter };
+      if (createdGte && Number.isFinite(createdGte)) {
+        params.created = { gte: createdGte };
+      }
+      const res = await stripe.payouts.list(params);
       for (const p of res.data) {
         const amtMinor = Number((p as any)?.amount);
         const cur = String((p as any)?.currency || 'eur');
@@ -370,6 +374,11 @@ export async function GET(request: Request) {
     const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
     const includeHidden = parseBool(url.searchParams.get('includeHidden'));
     const statsOnly = parseBool(url.searchParams.get('statsOnly'));
+    const daysRaw = String(url.searchParams.get('days') || '').trim();
+    const days = Number(daysRaw);
+    const hasDays = Number.isFinite(days) && days > 0;
+    const cutoffMs = hasDays ? Date.now() - days * 24 * 60 * 60 * 1000 : null;
+    const cutoffUnix = hasDays && cutoffMs ? Math.floor(cutoffMs / 1000) : null;
 
     const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
     const failed = (await dbGet<Array<any>>('failed_purchases', false)) || [];
@@ -378,6 +387,14 @@ export async function GET(request: Request) {
       let paidRows = purchases.filter(Boolean);
       if (!includeHidden) {
         paidRows = paidRows.filter((p) => p?.hidden !== true);
+      }
+
+      if (cutoffMs) {
+        paidRows = paidRows.filter((p) => {
+          const ts = new Date(String(p?.timestamp || '')).getTime();
+          if (!Number.isFinite(ts)) return false;
+          return ts >= cutoffMs;
+        });
       }
       if (filterSteamId) {
         paidRows = paidRows.filter((p) => String(p?.steamId || '').trim() === filterSteamId);
@@ -407,7 +424,7 @@ export async function GET(request: Request) {
         const stripeKey = process.env.STRIPE_SECRET_KEY;
         if (stripeKey) {
           const stripe = createStripe(stripeKey);
-          const totals = await getPaidPayoutTotalsByCurrency(stripe);
+          const totals = await getPaidPayoutTotalsByCurrency(stripe, cutoffUnix);
           for (const [k, v] of Object.entries(totals)) {
             stripePayoutsPaidTotalByCurrency[String(k).toLowerCase()] = Number(v);
           }
@@ -541,6 +558,14 @@ export async function GET(request: Request) {
     let rows: PaymentRow[] = [];
     rows = rows.concat(purchases.filter(Boolean).map(normalizePaid));
     rows = rows.concat(failed.filter(Boolean).map(normalizeFailed));
+
+    if (cutoffMs) {
+      rows = rows.filter((r) => {
+        const ts = new Date(String(r?.timestamp || '')).getTime();
+        if (!Number.isFinite(ts)) return false;
+        return ts >= cutoffMs;
+      });
+    }
 
     if (!includeHidden) {
       rows = rows.filter((r) => r.hidden !== true);
