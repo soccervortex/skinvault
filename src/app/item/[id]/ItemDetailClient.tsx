@@ -970,17 +970,17 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
               </div>
             </div>
             <div className="mt-4 md:mt-6 flex flex-wrap items-center gap-2 md:gap-3">
-              <div className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
+              <div className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
                 <Tag size={12} className="text-gray-400" />
                 <span className="text-[11px] font-medium text-gray-300">{item?.rarity?.name || 'Standard'}</span>
               </div>
               {item?.weapon?.name && (
-                <div className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
+                <div className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
                   <Box size={12} className="text-gray-400" />
                   <span className="text-[11px] font-medium text-gray-300">{item.weapon.name}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
+              <div className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-[#11141d] border border-white/10">
                 <ShieldCheck size={12} className="text-green-400" />
                 <span className="text-[11px] font-medium text-green-300">Verified</span>
               </div>
@@ -1060,7 +1060,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
               {(() => {
                 const raw = (item as any)?.description;
-                const text = raw ? String(raw).replace(/<[^>]*>/g, '').trim() : '';
+                const text = raw ? String(raw).replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim() : '';
                 if (!text) return null;
                 return (
                   <div className="w-full text-[11px] text-gray-500 whitespace-pre-line">
