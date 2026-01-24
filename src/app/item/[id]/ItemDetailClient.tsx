@@ -984,7 +984,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 <ShieldCheck size={12} className="text-green-400" />
                 <span className="text-[11px] font-medium text-green-300">Verified</span>
               </div>
-              <div className="md:hidden flex-1 flex justify-end gap-2">
+              <div className="md:hidden w-full flex justify-center gap-2">
                 {/* Share Button (Mobile) */}
                 {typeof window !== 'undefined' && (
                   <ShareButton
@@ -992,7 +992,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                     title={`${item?.name} - SkinVaults`}
                     text={`Check out ${item?.name} on SkinVaults`}
                     variant="icon"
-                    className="inline-flex"
+                    className=""
                   />
                 )}
 
@@ -1060,7 +1060,12 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
 
               {(() => {
                 const raw = (item as any)?.description;
-                const text = raw ? String(raw).replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim() : '';
+                const text = raw
+                  ? String(raw)
+                      .replace(/\\n/g, '\n')
+                      .replace(/<[^>]*>/g, '')
+                      .trim()
+                  : '';
                 if (!text) return null;
                 return (
                   <div className="w-full text-[11px] text-gray-500 whitespace-pre-line">
