@@ -77,7 +77,6 @@ export default function AdminPayoutsPage() {
   const [newStakeholderSteamId, setNewStakeholderSteamId] = useState('');
   const [newStakeholderName, setNewStakeholderName] = useState('');
   const [newStakeholderCurrency, setNewStakeholderCurrency] = useState('eur');
-  const [newStakeholderFeePct, setNewStakeholderFeePct] = useState('0');
   const [addingStakeholder, setAddingStakeholder] = useState(false);
 
   const [savingSteamId, setSavingSteamId] = useState<string | null>(null);
@@ -159,8 +158,6 @@ export default function AdminPayoutsPage() {
     }
     const displayName = String(newStakeholderName || '').trim();
     const payoutCurrency = normalizeCurrency(newStakeholderCurrency);
-    const pct = Number(String(newStakeholderFeePct || '').replace(',', '.'));
-    const conversionFeePct = Number.isFinite(pct) ? pct : 0;
 
     setAddingStakeholder(true);
     try {
@@ -175,7 +172,6 @@ export default function AdminPayoutsPage() {
           steamId,
           displayName,
           payoutCurrency,
-          conversionFeePct,
         }),
       });
       const json = await res.json().catch(() => null);
@@ -185,7 +181,6 @@ export default function AdminPayoutsPage() {
       setNewStakeholderSteamId('');
       setNewStakeholderName('');
       setNewStakeholderCurrency('eur');
-      setNewStakeholderFeePct('0');
       await load();
     } catch (e: any) {
       toast.error(String(e?.message || 'Failed'));
@@ -239,7 +234,6 @@ export default function AdminPayoutsPage() {
           steamId,
           displayName: next.displayName,
           payoutCurrency: next.payoutCurrency,
-          conversionFeePct: next.conversionFeePct,
         }),
       });
       const json = await res.json().catch(() => null);
@@ -409,7 +403,7 @@ export default function AdminPayoutsPage() {
 
           <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4">
             <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Add stakeholder</div>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="md:col-span-2">
                 <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">SteamID</div>
                 <input
@@ -434,15 +428,6 @@ export default function AdminPayoutsPage() {
                   value={newStakeholderCurrency}
                   onChange={(e) => setNewStakeholderCurrency(e.target.value)}
                   placeholder="eur"
-                  className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black"
-                />
-              </div>
-              <div>
-                <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Fee %</div>
-                <input
-                  value={newStakeholderFeePct}
-                  onChange={(e) => setNewStakeholderFeePct(e.target.value)}
-                  placeholder="0"
                   className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black"
                 />
               </div>
@@ -490,7 +475,6 @@ export default function AdminPayoutsPage() {
                   <th className="py-2 pr-3">Role</th>
                   <th className="py-2 pr-3">SteamID</th>
                   <th className="py-2 pr-3">Payout cur</th>
-                  <th className="py-2 pr-3">Fee %</th>
                   <th className="py-2 pr-3">Owed (EUR)</th>
                   <th className="py-2 pr-3">Owed (net)</th>
                   <th className="py-2 pr-3">Paid</th>
@@ -582,6 +566,7 @@ export default function AdminPayoutsPage() {
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>
@@ -656,13 +641,11 @@ function StakeholderRowView({
 }) {
   const [displayName, setDisplayName] = useState(row.displayName || '');
   const [payoutCurrency, setPayoutCurrency] = useState(row.payoutCurrency || 'eur');
-  const [feePct, setFeePct] = useState(String(row.conversionFeePct ?? 0));
 
   useEffect(() => {
     setDisplayName(row.displayName || '');
     setPayoutCurrency(row.payoutCurrency || 'eur');
-    setFeePct(String(row.conversionFeePct ?? 0));
-  }, [row.displayName, row.payoutCurrency, row.conversionFeePct]);
+  }, [row.displayName, row.payoutCurrency]);
 
   const owedEurLabel = formatCurrencyAmount(Number(row.owedEur || 0), 'eur');
   const owedNetLabel = row.owedNetPayoutCurrency == null ? '-' : formatCurrencyAmount(Number(row.owedNetPayoutCurrency || 0), row.payoutCurrency);
@@ -696,13 +679,6 @@ function StakeholderRowView({
           className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[10px] font-black"
         />
       </td>
-      <td className="py-3 pr-3">
-        <input
-          value={feePct}
-          onChange={(e) => setFeePct(e.target.value)}
-          className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[10px] font-black"
-        />
-      </td>
       <td className="py-3 pr-3 whitespace-nowrap font-black">{owedEurLabel}</td>
       <td className="py-3 pr-3 whitespace-nowrap font-black">{owedNetLabel}</td>
       <td className="py-3 pr-3 whitespace-nowrap font-black">{paidLabel}</td>
@@ -712,15 +688,16 @@ function StakeholderRowView({
           <button
             disabled={saving}
             onClick={() => {
-              const pct = Number(String(feePct || '').replace(',', '.'));
               void onSave(row.steamId, {
                 displayName,
                 payoutCurrency: normalizeCurrency(payoutCurrency),
-                conversionFeePct: Number.isFinite(pct) ? pct : 0,
+                conversionFeePct: 0,
               });
             }}
             className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-              saving ? 'bg-black/30 border-white/10 text-gray-400' : 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
+              saving
+                ? 'bg-black/30 border-white/10 text-gray-400'
+                : 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
             }`}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}

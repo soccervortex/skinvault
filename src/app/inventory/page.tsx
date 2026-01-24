@@ -2572,27 +2572,27 @@ function InventoryContent() {
                                 </div>
                               )}
                               {(isStatTrak || isSouvenir || nonTradable || nonMarketable) && (
-                                <div className="flex flex-wrap items-center gap-1.5">
+                                <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
                                   {isStatTrak && (
-                                    <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-[8px] font-black uppercase tracking-widest text-orange-300">StatTrak</span>
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-[8px] font-black uppercase tracking-widest text-orange-300">StatTrak</span>
                                   )}
                                   {isSouvenir && (
-                                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[8px] font-black uppercase tracking-widest text-yellow-300">Souvenir</span>
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[8px] font-black uppercase tracking-widest text-yellow-300">Souvenir</span>
                                   )}
                                   {nonTradable && (
-                                    <span className="px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-[8px] font-black uppercase tracking-widest text-red-300">Not tradable</span>
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-[8px] font-black uppercase tracking-widest text-red-300">Not tradable</span>
                                   )}
                                   {nonMarketable && (
-                                    <span className="px-2 py-0.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-[8px] font-black uppercase tracking-widest text-gray-300">Not marketable</span>
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-[8px] font-black uppercase tracking-widest text-gray-300">Not marketable</span>
                                   )}
                                 </div>
                               )}
                               <div className="min-h-[14px] md:min-h-[16px] flex items-center">
                                 <div className="text-[10px] md:text-[11px] font-black italic">
-                                  {getPriceForItem(item, itemPrices) 
+                                  {getPriceForItem(item, itemPrices)
                                     ? <span className="text-emerald-500">{getPriceForItem(item, itemPrices)}</span>
-                                      : priceScanDone 
-                                        ? (nonMarketable ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
+                                    : priceScanDone
+                                      ? (nonMarketable ? <span className="text-gray-500">NOT MARKETABLE</span> : <span className="text-gray-500">NO PRICE</span>)
                                       : <span className="text-gray-600 animate-pulse">
                                           {isPro ? '⚡ FAST SCAN...' : 'SCANNING...'}
                                         </span>}

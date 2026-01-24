@@ -156,6 +156,15 @@ function safePct(raw: any): number {
   return Math.min(100, n);
 }
 
+function defaultConversionFeePct(currency: string): number {
+  const cur = normalizeCurrency(currency);
+  if (!cur || cur === 'eur') return 0;
+  const envRaw = process.env.PAYOUT_DEFAULT_CONVERSION_FEE_PCT;
+  const envN = Number(String(envRaw ?? '').replace(',', '.'));
+  if (Number.isFinite(envN) && envN >= 0 && envN <= 100) return envN;
+  return 10.3;
+}
+
 function prevMonthKey(monthKey: string): string {
   const [yRaw, mRaw] = String(monthKey || '').split('-');
   const y = Number(yRaw);
@@ -445,7 +454,7 @@ export async function GET(request: Request) {
         const owedEur = Number(totalByCurrency?.eur || 0);
 
         const payoutCurrency = normalizeCurrency(saved?.payoutCurrency || 'eur');
-        const feePct = safePct(saved?.conversionFeePct);
+        const feePct = defaultConversionFeePct(payoutCurrency);
         const rate = payoutCurrency === 'eur' ? 1 : fxByCurrency.get(payoutCurrency) || null;
 
         const grossPayout = rate && Number.isFinite(owedEur) ? owedEur * rate : null;
@@ -534,7 +543,8 @@ export async function POST(request: Request) {
 
       const displayName = String(body?.displayName || '').trim().slice(0, 40);
       const payoutCurrency = normalizeCurrency(body?.payoutCurrency || 'eur');
-      const conversionFeePct = safePct(body?.conversionFeePct);
+      const hasFee = Object.prototype.hasOwnProperty.call(body || {}, 'conversionFeePct');
+      const conversionFeePct = hasFee ? safePct(body?.conversionFeePct) : defaultConversionFeePct(payoutCurrency);
 
       const now = new Date();
       await stakeholdersCol.updateOne(
