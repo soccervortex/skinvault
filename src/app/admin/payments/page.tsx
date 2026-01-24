@@ -40,6 +40,12 @@ type StakeholderSplitRow = {
   totalByCurrency: Record<string, number>;
 };
 
+type StripeBalanceTransactionsBreakdown = {
+  netTotalByCurrency: Record<string, number>;
+  feeTotalByCurrency: Record<string, number>;
+  netByType: Array<{ type: string; totalByCurrency: Record<string, number> }>;
+};
+
 export default function AdminPaymentsPage() {
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
@@ -53,6 +59,7 @@ export default function AdminPaymentsPage() {
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [stripePayoutsPaidTotalByCurrency, setStripePayoutsPaidTotalByCurrency] = useState<Record<string, number>>({});
+  const [stripeBalanceTransactions, setStripeBalanceTransactions] = useState<StripeBalanceTransactionsBreakdown | null>(null);
   const [paymentSplits, setPaymentSplits] = useState<any>(null);
   const [backfillingFees, setBackfillingFees] = useState(false);
 
@@ -164,6 +171,9 @@ export default function AdminPaymentsPage() {
       .join(' / ');
   };
 
+  const stripeBalanceNetLabel = useMemo(() => formatCurrencyMapLabel(stripeBalanceTransactions?.netTotalByCurrency), [stripeBalanceTransactions]);
+  const stripeBalanceFeeLabel = useMemo(() => formatCurrencyMapLabel(stripeBalanceTransactions?.feeTotalByCurrency), [stripeBalanceTransactions]);
+
   const ownerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.ownerTotalByCurrency), [paymentSplits]);
   const coOwnerSplitLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.coOwnerTotalByCurrency), [paymentSplits]);
   const partnerCommissionLabel = useMemo(() => formatCurrencyMapLabel(paymentSplits?.partnerCommissionTotalByCurrency), [paymentSplits]);
@@ -258,6 +268,7 @@ export default function AdminPaymentsPage() {
       setPaymentsCount(Number((json as any)?.paidCount || 0));
       setPaidTotalByCurrency(((json as any)?.paidTotalByCurrency as Record<string, number>) || {});
       setStripePayoutsPaidTotalByCurrency(((json as any)?.stripePayoutsPaidTotalByCurrency as Record<string, number>) || {});
+      setStripeBalanceTransactions(((json as any)?.stripeBalanceTransactions as StripeBalanceTransactionsBreakdown) || null);
       setPaymentSplits((json as any)?.splits || null);
     } catch {
     } finally {
@@ -411,6 +422,44 @@ export default function AdminPaymentsPage() {
           {!userIsOwner && user && (
             <div className="mt-6 bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-[11px] text-red-300">
               You do not have access to this page.
+            </div>
+          )}
+
+          {stripeBalanceTransactions && (
+            <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Stripe balance breakdown</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 text-[10px] md:text-[11px]">
+                <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                  <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black mb-1">Balance Net (period)</div>
+                  <div className="text-[12px] font-black">{stripeBalanceNetLabel}</div>
+                </div>
+                <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                  <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black mb-1">Balance Fees (period)</div>
+                  <div className="text-[12px] font-black">{stripeBalanceFeeLabel}</div>
+                </div>
+              </div>
+
+              {Array.isArray(stripeBalanceTransactions?.netByType) && stripeBalanceTransactions.netByType.length > 0 && (
+                <table className="w-full text-left text-[9px] md:text-[10px]">
+                  <thead className="text-gray-500 uppercase tracking-[0.2em] border-b border-white/10">
+                    <tr>
+                      <th className="py-2 pr-3">Type</th>
+                      <th className="py-2 pr-3">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stripeBalanceTransactions.netByType
+                      .slice()
+                      .sort((a, b) => String(a.type).localeCompare(String(b.type)))
+                      .map((row) => (
+                        <tr key={row.type} className="border-b border-white/5 last:border-b-0">
+                          <td className="py-2 pr-3 uppercase tracking-widest text-gray-300 font-black">{String(row.type).replaceAll('_', ' ')}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap font-black">{formatCurrencyMapLabel(row.totalByCurrency)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 

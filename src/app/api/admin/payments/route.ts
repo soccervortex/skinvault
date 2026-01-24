@@ -185,6 +185,57 @@ async function getPaidPayoutTotalsByCurrency(stripe: Stripe, createdGte: number 
   return totals;
 }
 
+async function getBalanceTransactionBreakdown(
+  stripe: Stripe,
+  createdGte: number | null
+): Promise<{
+  netTotalByCurrency: Record<string, number>;
+  feeTotalByCurrency: Record<string, number>;
+  netByType: Array<{ type: string; totalByCurrency: Record<string, number> }>;
+}> {
+  const netTotalByCurrency: Record<string, number> = {};
+  const feeTotalByCurrency: Record<string, number> = {};
+  const byType: Record<string, Record<string, number>> = {};
+
+  try {
+    let startingAfter: string | undefined = undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const params: any = { limit: 100, starting_after: startingAfter };
+      if (createdGte && Number.isFinite(createdGte)) {
+        params.created = { gte: createdGte };
+      }
+      const res = await stripe.balanceTransactions.list(params);
+      for (const bt of res.data) {
+        const type = String((bt as any)?.type || 'unknown').trim() || 'unknown';
+        const cur = String((bt as any)?.currency || 'eur');
+        const netMinor = Number((bt as any)?.net);
+        const feeMinor = Number((bt as any)?.fee);
+
+        if (Number.isFinite(netMinor)) {
+          addMoney(netTotalByCurrency, cur, netMinor / 100);
+          if (!byType[type]) byType[type] = {};
+          addMoney(byType[type], cur, netMinor / 100);
+        }
+        if (Number.isFinite(feeMinor)) {
+          addMoney(feeTotalByCurrency, cur, feeMinor / 100);
+        }
+      }
+
+      const last = res.data[res.data.length - 1];
+      if (!last || !res.has_more) break;
+      startingAfter = String((last as any)?.id || '').trim() || undefined;
+      if (!startingAfter) break;
+    }
+  } catch {
+  }
+
+  const netByType = Object.entries(byType)
+    .map(([type, totalByCurrency]) => ({ type, totalByCurrency }))
+    .filter((e) => Object.values(e.totalByCurrency).some((v) => Number.isFinite(Number(v)) && Number(v) !== 0));
+
+  return { netTotalByCurrency, feeTotalByCurrency, netByType };
+}
+
 async function readCreatorsFromDb(): Promise<Array<{ slug: string; partnerSteamId?: string }>> {
   const stored = (await dbGet<any[]>('creators_v1', false)) || [];
   const list = Array.isArray(stored) ? stored : [];
@@ -420,6 +471,11 @@ export async function GET(request: Request) {
       const stakeholders: Record<string, { steamId: string; role: string; totalByCurrency: Record<string, number> }> = {};
 
       const stripePayoutsPaidTotalByCurrency: Record<string, number> = {};
+      let stripeBalanceTransactions: {
+        netTotalByCurrency: Record<string, number>;
+        feeTotalByCurrency: Record<string, number>;
+        netByType: Array<{ type: string; totalByCurrency: Record<string, number> }>;
+      } | null = null;
       try {
         const stripeKey = process.env.STRIPE_SECRET_KEY;
         if (stripeKey) {
@@ -428,6 +484,8 @@ export async function GET(request: Request) {
           for (const [k, v] of Object.entries(totals)) {
             stripePayoutsPaidTotalByCurrency[String(k).toLowerCase()] = Number(v);
           }
+
+          stripeBalanceTransactions = await getBalanceTransactionBreakdown(stripe, cutoffUnix);
         }
       } catch {
       }
@@ -541,6 +599,7 @@ export async function GET(request: Request) {
         paidCount,
         paidTotalByCurrency,
         stripePayoutsPaidTotalByCurrency,
+        stripeBalanceTransactions,
         splits: {
           ownerSteamId,
           coOwnerSteamId,
@@ -642,6 +701,56 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const action = String(body?.action || '').trim();
     const id = String(body?.id || '').trim();
+
+    if (action === 'backfill_missing_fees') {
+      const limit = Math.max(1, Math.min(50, Number(body?.limit || 20)));
+
+      const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
+      const candidates = purchases
+        .filter((p) => {
+          if (!p) return false;
+          if (p?.hidden === true) return false;
+          const sessionId = String(p?.sessionId || '').trim();
+          if (!sessionId) return false;
+          const hasNet = Number.isFinite(Number(p?.netAmount));
+          const hasFee = Number.isFinite(Number(p?.feeAmount));
+          return !hasNet || !hasFee;
+        })
+        .sort((a, b) => new Date(String(b?.timestamp || '')).getTime() - new Date(String(a?.timestamp || '')).getTime())
+        .slice(0, limit);
+
+      const stripeByKey = new Map<string, Stripe>();
+      let updatedCount = 0;
+      let scannedCount = 0;
+
+      for (const record of candidates) {
+        scannedCount += 1;
+        const secretKey = getStripeSecretKeyFromRecord(record);
+        if (!secretKey) continue;
+
+        let stripe = stripeByKey.get(secretKey);
+        if (!stripe) {
+          stripe = createStripe(secretKey);
+          stripeByKey.set(secretKey, stripe);
+        }
+
+        const sessionId = String(record?.sessionId || '').trim();
+        try {
+          const session = await stripe.checkout.sessions.retrieve(sessionId);
+          const receiptPatch = await getReceiptPatch(stripe, session);
+          const patch: Record<string, any> = {};
+          if ('feeAmount' in receiptPatch) patch.feeAmount = receiptPatch.feeAmount;
+          if ('netAmount' in receiptPatch) patch.netAmount = receiptPatch.netAmount;
+          if ('balanceTransactionId' in receiptPatch) patch.balanceTransactionId = receiptPatch.balanceTransactionId;
+          if (Object.keys(patch).length === 0) continue;
+          await patchPurchase(sessionId, patch);
+          updatedCount += 1;
+        } catch {
+        }
+      }
+
+      return NextResponse.json({ ok: true, scanned: scannedCount, updated: updatedCount });
+    }
 
     if (!id || !id.includes(':')) {
       return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -750,56 +859,6 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ ok: true, updated: true });
-    }
-
-    if (action === 'backfill_missing_fees') {
-      const limit = Math.max(1, Math.min(50, Number(body?.limit || 20)));
-
-      const purchases = (await dbGet<Array<any>>('purchase_history', false)) || [];
-      const candidates = purchases
-        .filter((p) => {
-          if (!p) return false;
-          if (p?.hidden === true) return false;
-          const sessionId = String(p?.sessionId || '').trim();
-          if (!sessionId) return false;
-          const hasNet = Number.isFinite(Number(p?.netAmount));
-          const hasFee = Number.isFinite(Number(p?.feeAmount));
-          return !hasNet || !hasFee;
-        })
-        .sort((a, b) => new Date(String(b?.timestamp || '')).getTime() - new Date(String(a?.timestamp || '')).getTime())
-        .slice(0, limit);
-
-      const stripeByKey = new Map<string, Stripe>();
-      let updatedCount = 0;
-      let scannedCount = 0;
-
-      for (const record of candidates) {
-        scannedCount += 1;
-        const secretKey = getStripeSecretKeyFromRecord(record);
-        if (!secretKey) continue;
-
-        let stripe = stripeByKey.get(secretKey);
-        if (!stripe) {
-          stripe = createStripe(secretKey);
-          stripeByKey.set(secretKey, stripe);
-        }
-
-        const sessionId = String(record?.sessionId || '').trim();
-        try {
-          const session = await stripe.checkout.sessions.retrieve(sessionId);
-          const receiptPatch = await getReceiptPatch(stripe, session);
-          const patch: Record<string, any> = {};
-          if ('feeAmount' in receiptPatch) patch.feeAmount = receiptPatch.feeAmount;
-          if ('netAmount' in receiptPatch) patch.netAmount = receiptPatch.netAmount;
-          if ('balanceTransactionId' in receiptPatch) patch.balanceTransactionId = receiptPatch.balanceTransactionId;
-          if (Object.keys(patch).length === 0) continue;
-          await patchPurchase(sessionId, patch);
-          updatedCount += 1;
-        } catch {
-        }
-      }
-
-      return NextResponse.json({ ok: true, scanned: scannedCount, updated: updatedCount });
     }
 
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
