@@ -145,11 +145,13 @@ export default function AdminPaymentsPage() {
     const n = Number(amount || 0);
     if (!Number.isFinite(n)) return `0 ${cur}`;
     try {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat('nl-NL', {
         style: 'currency',
         currency: cur,
         maximumFractionDigits: 2,
-      }).format(n);
+      })
+        .format(n)
+        .replaceAll('\u00A0', '');
     } catch {
       return `${n.toFixed(2)} ${cur}`;
     }
@@ -610,7 +612,7 @@ export default function AdminPaymentsPage() {
             </div>
           )}
 
-          {stakeholderRows.length > 0 && (
+          {showStripeAdvanced && stakeholderRows.length > 0 && (
             <div className="mt-4 bg-black/40 border border-white/10 rounded-2xl p-4 overflow-x-auto">
               <div className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-black mb-3">Payout breakdown (SteamID)</div>
               <table className="w-full text-left text-[9px] md:text-[10px]">

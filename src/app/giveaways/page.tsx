@@ -253,6 +253,7 @@ export default function GiveawaysPage() {
   const [manualClaimModalOpen, setManualClaimModalOpen] = useState(false);
   const [manualClaimGiveawayId, setManualClaimGiveawayId] = useState<string | null>(null);
   const [manualDiscordUsername, setManualDiscordUsername] = useState('');
+  const [manualDiscordId, setManualDiscordId] = useState('');
   const [manualEmail, setManualEmail] = useState('');
   const [manualClaimSending, setManualClaimSending] = useState(false);
 
@@ -299,6 +300,7 @@ export default function GiveawaysPage() {
   const openManualClaimModal = (giveawayId: string | null) => {
     setManualClaimGiveawayId(giveawayId);
     setManualDiscordUsername('');
+    setManualDiscordId('');
     setManualEmail('');
     setManualClaimModalOpen(true);
   };
@@ -355,6 +357,10 @@ export default function GiveawaysPage() {
       toast.error('Discord username is required');
       return;
     }
+    if (!/^\d{17,20}$/.test(String(manualDiscordId || '').trim())) {
+      toast.error('Discord ID is required');
+      return;
+    }
 
     setManualClaimSending(true);
     try {
@@ -364,6 +370,7 @@ export default function GiveawaysPage() {
         body: JSON.stringify({
           steamId: String(user?.steamId || ''),
           discordUsername: String(manualDiscordUsername || '').trim(),
+          discordId: String(manualDiscordId || '').trim(),
           email: String(manualEmail || '').trim(),
         }),
       });
@@ -1970,6 +1977,18 @@ export default function GiveawaysPage() {
                 value={String(user?.steamId || '')}
                 readOnly
                 className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black text-gray-300"
+              />
+            </div>
+
+            <div className="mt-4">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Discord ID</div>
+              <input
+                value={manualDiscordId}
+                onChange={(e) => setManualDiscordId(e.target.value)}
+                placeholder="Your Discord ID (Developer Mode)"
+                className="w-full mt-2 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[11px] font-black"
+                disabled={manualClaimSending}
+                inputMode="numeric"
               />
             </div>
 

@@ -72,6 +72,11 @@ async function resolveDiscordIdForClaim(steamId: string, discordUsername: string
   return await resolveDiscordIdByUsername(discordUsername);
 }
 
+function isValidDiscordId(raw: string): boolean {
+  const s = String(raw || '').trim();
+  return /^\d{17,20}$/.test(s);
+}
+
 function mapStatusToWinnerClaimStatus(s: ManualClaimStatus): string {
   if (s === 'pending') return 'manual_pending';
   if (s === 'contacted') return 'manual_contacted';
@@ -112,6 +117,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const body = await req.json().catch(() => null);
     const steamIdInput = String(body?.steamId || '').trim();
     const discordUsername = String(body?.discordUsername || '').trim();
+    const discordIdInput = String(body?.discordId || '').trim();
     const email = sanitizeEmail(String(body?.email || ''));
 
     if (steamIdInput !== steamId) {
@@ -120,6 +126,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     if (!discordUsername) {
       return NextResponse.json({ error: 'Discord username is required' }, { status: 400 });
+    }
+
+    if (!isValidDiscordId(discordIdInput)) {
+      return NextResponse.json({ error: 'Discord ID is required' }, { status: 400 });
     }
 
     const db = await getDatabase();
@@ -134,7 +144,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     );
     if (!giveaway || giveaway?.archivedAt) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const claimMode = String(giveaway?.claimMode || 'bot') === 'manual' ? 'manual' : 'bot';
+    const claimMode = String(giveaway?.claimMode || 'bot').trim().toLowerCase() === 'manual' ? 'manual' : 'bot';
     if (claimMode !== 'manual') {
       return NextResponse.json({ error: 'This giveaway uses bot claims' }, { status: 400 });
     }
@@ -185,7 +195,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ ok: true, queued: true }, { status: 200 });
     }
 
-    const discordId = await resolveDiscordIdForClaim(steamId, discordUsername);
+    const discordId = discordIdInput;
 
     const insertDoc: any = {
       giveawayId,
@@ -220,7 +230,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     if (webhookUrl) {
       const origin = new URL(req.url).origin;
-      const discordProfileUrl = discordId ? `https://discord.com/users/${encodeURIComponent(discordId)}` : null;
+      const discordProfileUrl = discordId ? `https://discordapp.com/users/${encodeURIComponent(discordId)}` : null;
       const userProfileUrl = `${origin}/inventory/${encodeURIComponent(steamId)}`;
       const contentLines: string[] = [];
       contentLines.push('New manual giveaway claim request');

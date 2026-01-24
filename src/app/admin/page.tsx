@@ -224,11 +224,13 @@ function AdminPageInner() {
     const n = Number(amount || 0);
     if (!Number.isFinite(n)) return `0 ${cur}`;
     try {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat('nl-NL', {
         style: 'currency',
         currency: cur,
         maximumFractionDigits: 2,
-      }).format(n);
+      })
+        .format(n)
+        .replaceAll('\u00A0', '');
     } catch {
       return `${n.toFixed(2)} ${cur}`;
     }

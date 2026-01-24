@@ -66,7 +66,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         steamId: steamIdRow,
         discordUsername: String(r?.discordUsername || ''),
         discordId,
-        discordProfileUrl: discordId ? `https://discord.com/users/${encodeURIComponent(discordId)}` : null,
+        discordProfileUrl: discordId ? `https://discordapp.com/users/${encodeURIComponent(discordId)}` : null,
         userProfileUrl: steamIdRow ? `${origin}/inventory/${encodeURIComponent(steamIdRow)}` : null,
         email: r?.email ? String(r.email) : null,
         status: String(r?.status || 'pending'),
