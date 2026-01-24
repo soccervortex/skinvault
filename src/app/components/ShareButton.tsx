@@ -84,14 +84,14 @@ export default function ShareButton({
   return (
     <button
       onClick={handleShare}
-      className={`p-2 rounded-lg border border-white/10 bg-black/60 hover:border-blue-500 hover:bg-blue-500/10 transition-all ${className}`}
+      className={`inline-flex items-center justify-center p-2.5 min-h-[44px] rounded-xl border border-white/10 bg-black/40 hover:bg-white/5 transition-all ${className}`}
       aria-label="Share"
       title="Share"
     >
       {copied ? (
-        <Check size={14} className="text-green-400" />
+        <Check size={16} className="text-green-400" />
       ) : (
-        <Share2 size={14} className="text-blue-400" />
+        <Share2 size={16} className="text-blue-400" />
       )}
     </button>
   );

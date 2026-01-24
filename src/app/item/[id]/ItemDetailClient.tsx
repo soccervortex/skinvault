@@ -1058,11 +1058,16 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 </button>
               </div>
 
-              <div className="w-full text-[11px] text-gray-500">
-                {[itemTypeLabel, categoryLabel, wearName, isStatTrak ? 'StatTrak' : null, isSouvenir ? 'Souvenir' : null]
-                  .filter(Boolean)
-                  .join(' • ')}
-              </div>
+              {(() => {
+                const raw = (item as any)?.description;
+                const text = raw ? String(raw).replace(/<[^>]*>/g, '').trim() : '';
+                if (!text) return null;
+                return (
+                  <div className="w-full text-[11px] text-gray-500 whitespace-pre-line">
+                    {text}
+                  </div>
+                );
+              })()}
               </div>
             </div>
 
