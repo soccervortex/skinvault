@@ -15,6 +15,8 @@ export default function ProInfoPage() {
   const [checkoutPromoCode, setCheckoutPromoCode] = useState('');
   const toast = useToast();
 
+  const proSpinsPerDay = Math.max(1, Math.floor(Number(process.env.NEXT_PUBLIC_PRO_SPINS_PER_DAY || 5)));
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -272,6 +274,7 @@ export default function ProInfoPage() {
             <p className="font-black uppercase tracking-[0.3em] text-gray-500">What you unlock</p>
             <ul className="space-y-1 text-gray-300 text-[10px]">
               <li>– Monthly Pro credits stipend</li>
+              <li>– Daily spins ({proSpinsPerDay}/day)</li>
               <li>– Unlimited wishlist size</li>
               <li>– ⚡ Faster price scanning (10x speed)</li>
               <li>– ⚡ Priority API requests</li>
@@ -311,10 +314,10 @@ export default function ProInfoPage() {
               {isPro ? 'Extend Your Pro Subscription' : 'Choose Your Plan'}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4 md:space-y-5">
                 <div>
                   <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-1">1 Month</p>
-                  <p className="text-xl md:text-2xl font-black text-white">€9.99</p>
+                  <p className="text-2xl md:text-2xl font-black text-white leading-none">€9.99</p>
                 </div>
                 <button
                   onClick={() => handleCheckout('1month')}
@@ -333,13 +336,13 @@ export default function ProInfoPage() {
                 </button>
               </div>
 
-              <div className="bg-black/40 border border-blue-500/40 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4 relative">
+              <div className="bg-black/40 border border-blue-500/40 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4 md:space-y-5 relative">
                 <div className="absolute -top-2 md:-top-3 left-1/2 -translate-x-1/2 px-2 md:px-3 py-0.5 rounded-full bg-blue-600 text-[7px] md:text-[8px] font-black uppercase tracking-[0.2em]">
                   Popular
                 </div>
                 <div>
                   <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-1">3 Months</p>
-                  <p className="text-xl md:text-2xl font-black text-white">€24.99</p>
+                  <p className="text-2xl md:text-2xl font-black text-white leading-none">€24.99</p>
                   <p className="text-[8px] md:text-[9px] text-emerald-400 mt-1">Save €5</p>
                 </div>
                 <button
@@ -359,10 +362,10 @@ export default function ProInfoPage() {
                 </button>
               </div>
 
-              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-3 md:space-y-4">
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4 md:space-y-5">
                 <div>
                   <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-1">6 Months</p>
-                  <p className="text-xl md:text-2xl font-black text-white">€44.99</p>
+                  <p className="text-2xl md:text-2xl font-black text-white leading-none">€44.99</p>
                   <p className="text-[8px] md:text-[9px] text-emerald-400 mt-1">Save €15</p>
                 </div>
                 <button
@@ -382,7 +385,7 @@ export default function ProInfoPage() {
                 </button>
               </div>
             </div>
-            <p className="text-[10px] md:text-[11px] text-gray-400">
+            <p className="mt-6 text-[10px] md:text-[11px] text-gray-400">
           Grant or extend <span className="text-emerald-400 font-bold">Pro</span>{" "}
           for any SteamID64. Pro automatically becomes inactive when the expiry
           date passes.
