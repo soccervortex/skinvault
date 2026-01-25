@@ -1,6 +1,6 @@
 import type { Db } from 'mongodb';
 
-export type PluginType = 'tawkto' | 'external_script';
+export type PluginType = 'tawkto' | 'external_script' | 'inline_script';
 
 export type PluginDoc = {
   _id: string;

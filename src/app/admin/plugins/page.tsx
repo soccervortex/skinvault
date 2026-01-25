@@ -10,7 +10,7 @@ type PluginDoc = {
   _id: string;
   slug: string;
   name: string;
-  type: 'tawkto' | 'external_script';
+  type: 'tawkto' | 'external_script' | 'inline_script';
   enabled: boolean;
   deleted?: boolean;
   config?: Record<string, any>;
@@ -28,10 +28,11 @@ export default function AdminPluginsPage() {
 
   const [newSlug, setNewSlug] = useState('');
   const [newName, setNewName] = useState('');
-  const [newType, setNewType] = useState<'tawkto' | 'external_script'>('external_script');
+  const [newType, setNewType] = useState<'tawkto' | 'external_script' | 'inline_script'>('external_script');
   const [newEnabled, setNewEnabled] = useState(true);
   const [newTawkUrl, setNewTawkUrl] = useState('');
   const [newScriptSrc, setNewScriptSrc] = useState('');
+  const [newInlineHtml, setNewInlineHtml] = useState('');
 
   const broadcastPluginsChanged = () => {
     try {
@@ -155,7 +156,9 @@ export default function AdminPluginsPage() {
 
     const config = newType === 'tawkto'
       ? { embedUrl: String(newTawkUrl || '').trim() }
-      : { src: String(newScriptSrc || '').trim() };
+      : newType === 'inline_script'
+        ? { html: String(newInlineHtml || '').trim() }
+        : { src: String(newScriptSrc || '').trim() };
 
     try {
       const res = await fetch('/api/admin/plugins', {
@@ -186,6 +189,7 @@ export default function AdminPluginsPage() {
       setNewEnabled(true);
       setNewTawkUrl('');
       setNewScriptSrc('');
+      setNewInlineHtml('');
       setMessage('Created');
       setTimeout(() => setMessage(null), 2000);
     } catch (e: any) {
@@ -280,6 +284,7 @@ export default function AdminPluginsPage() {
                   const isBusy = saving === p._id;
                   const tawkUrl = String(p?.config?.embedUrl || '');
                   const scriptSrc = String(p?.config?.src || '');
+                  const inlineHtml = String(p?.config?.html || '');
 
                   return (
                     <div key={p._id} className="bg-black/30 border border-white/10 rounded-2xl p-4">
@@ -327,6 +332,21 @@ export default function AdminPluginsPage() {
                               />
                             </div>
                           </div>
+                        ) : p.type === 'inline_script' ? (
+                          <div className="md:col-span-2">
+                            <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Embed snippet</label>
+                            <textarea
+                              defaultValue={inlineHtml}
+                              onBlur={(e) => {
+                                const next = String(e.target.value || '');
+                                if (next === inlineHtml) return;
+                                void updatePlugin(p._id, { config: { html: next } });
+                              }}
+                              placeholder="Paste the full embed snippet (script + noscript, etc.)"
+                              rows={8}
+                              className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-black text-blue-400 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
+                            />
+                          </div>
                         ) : (
                           <div>
                             <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Script src</label>
@@ -345,7 +365,7 @@ export default function AdminPluginsPage() {
                       </div>
 
                       <div className="mt-3 text-[10px] text-gray-500">
-                        Changes apply on next page load. If you toggle a plugin and don’t see it immediately, hard refresh.
+                        Changes apply instantly.
                       </div>
                     </div>
                   );
@@ -398,6 +418,7 @@ export default function AdminPluginsPage() {
                   className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-black text-blue-400 outline-none focus:border-blue-500 transition-all"
                 >
                   <option value="external_script">External Script</option>
+                  <option value="inline_script">Inline Script</option>
                   <option value="tawkto">Tawk.to</option>
                 </select>
               </div>
@@ -421,6 +442,17 @@ export default function AdminPluginsPage() {
                     value={newTawkUrl}
                     onChange={(e) => setNewTawkUrl(e.target.value)}
                     placeholder="https://embed.tawk.to/..."
+                    className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-black text-blue-400 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
+                  />
+                </div>
+              ) : newType === 'inline_script' ? (
+                <div className="md:col-span-2">
+                  <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Embed snippet</label>
+                  <textarea
+                    value={newInlineHtml}
+                    onChange={(e) => setNewInlineHtml(e.target.value)}
+                    placeholder="Paste the full embed snippet (script + noscript, etc.)"
+                    rows={8}
                     className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-black text-blue-400 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
                   />
                 </div>

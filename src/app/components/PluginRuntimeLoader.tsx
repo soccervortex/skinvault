@@ -5,9 +5,11 @@ import React, { useEffect, useRef } from 'react';
 type RuntimePlugin = {
   id: string;
   slug: string;
-  type: 'tawkto' | 'external_script';
+  type: 'tawkto' | 'external_script' | 'inline_script';
   config?: Record<string, any>;
 };
+
+const inlineObservers = new Map<string, MutationObserver>();
 
 function safeString(v: any): string {
   return String(v ?? '').trim();
@@ -143,6 +145,137 @@ function removeManagedExternalScripts(allowedIds: Set<string>) {
   }
 }
 
+function removeInlinePlugin(slug: string) {
+  try {
+    try {
+      const obs = inlineObservers.get(slug);
+      if (obs) obs.disconnect();
+      inlineObservers.delete(slug);
+    } catch {
+    }
+
+    const id = `plugin-inline-${slug}`;
+    const el = document.getElementById(id);
+    if (el) el.parentNode?.removeChild(el);
+
+    const scripts = Array.from(document.querySelectorAll(`script[data-plugin-inline="${CSS.escape(slug)}"]`));
+    for (const s of scripts) {
+      s.parentNode?.removeChild(s);
+    }
+
+    const iframes = Array.from(document.querySelectorAll(`iframe[data-plugin-inline="${CSS.escape(slug)}"]`));
+    for (const f of iframes) {
+      f.parentNode?.removeChild(f);
+    }
+  } catch {
+  }
+}
+
+function ensureInlinePlugin(slug: string, html: string) {
+  const cleanSlug = safeString(slug);
+  const cleanHtml = String(html || '').trim();
+  if (!cleanSlug) return;
+
+  if (!cleanHtml) {
+    removeInlinePlugin(cleanSlug);
+    return;
+  }
+
+  try {
+    const id = `plugin-inline-${cleanSlug}`;
+    const existing = document.getElementById(id);
+    const existingHash = safeString(existing?.getAttribute('data-inline-hash'));
+    const nextHash = `${cleanHtml.length}:${cleanHtml.slice(0, 32)}:${cleanHtml.slice(-32)}`;
+
+    if (existing && existingHash === nextHash) {
+      return;
+    }
+
+    removeInlinePlugin(cleanSlug);
+
+    try {
+      const obs = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          const nodes = Array.from(m.addedNodes || []);
+          for (const n of nodes) {
+            const el = n as any;
+            const tag = safeString(el?.tagName || '').toLowerCase();
+            if (tag === 'script' || tag === 'iframe') {
+              try {
+                el.setAttribute('data-plugin-managed', '1');
+                el.setAttribute('data-plugin-inline', cleanSlug);
+              } catch {
+              }
+            }
+          }
+        }
+      });
+
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+      inlineObservers.set(cleanSlug, obs);
+
+      window.setTimeout(() => {
+        try {
+          const current = inlineObservers.get(cleanSlug);
+          if (current === obs) {
+            obs.disconnect();
+            inlineObservers.delete(cleanSlug);
+          }
+        } catch {
+        }
+      }, 10000);
+    } catch {
+    }
+
+    const tmp = document.createElement('div');
+    tmp.innerHTML = cleanHtml;
+
+    const scripts = Array.from(tmp.querySelectorAll('script'));
+    for (const s of scripts) {
+      const ns = document.createElement('script');
+      const src = safeString((s as HTMLScriptElement).src);
+
+      if (src) {
+        ns.src = src;
+        ns.async = (s as HTMLScriptElement).async;
+      } else {
+        ns.text = (s as HTMLScriptElement).text || s.textContent || '';
+      }
+
+      const type = safeString((s as HTMLScriptElement).type);
+      if (type) ns.type = type;
+
+      ns.setAttribute('data-plugin-managed', '1');
+      ns.setAttribute('data-plugin-inline', cleanSlug);
+
+      document.body.appendChild(ns);
+      s.parentNode?.removeChild(s);
+    }
+
+    const container = document.createElement('div');
+    container.id = id;
+    container.setAttribute('data-plugin-managed', '1');
+    container.setAttribute('data-inline-hash', nextHash);
+    container.appendChild(tmp);
+    document.body.appendChild(container);
+  } catch {
+  }
+}
+
+function removeManagedInlinePlugins(allowed: Set<string>) {
+  try {
+    const nodes = Array.from(document.querySelectorAll('div[id^="plugin-inline-"]'));
+    for (const n of nodes) {
+      const id = safeString((n as any)?.id || '');
+      const slug = id.startsWith('plugin-inline-') ? id.slice('plugin-inline-'.length) : '';
+      if (slug && !allowed.has(slug)) {
+        removeInlinePlugin(slug);
+      }
+    }
+  } catch {
+  }
+}
+
 function ensureTawk(embedUrl: string) {
   const url = safeString(embedUrl);
   if (!url) return;
@@ -186,6 +319,11 @@ export default function PluginRuntimeLoader() {
       .map((p) => ({ id: safeString(p.slug || p.id), src: safeString(p?.config?.src) }))
       .filter((p) => !!p.id && !!p.src);
 
+    const inline = plugins
+      .filter((p) => p && p.type === 'inline_script')
+      .map((p) => ({ id: safeString(p.slug || p.id), html: String(p?.config?.html || '') }))
+      .filter((p) => !!p.id);
+
     const allowed = new Set<string>(external.map((p) => p.id));
 
     for (const p of external) {
@@ -193,6 +331,12 @@ export default function PluginRuntimeLoader() {
     }
 
     removeManagedExternalScripts(allowed);
+
+    const allowedInline = new Set<string>(inline.map((p) => p.id));
+    for (const p of inline) {
+      ensureInlinePlugin(p.id, p.html);
+    }
+    removeManagedInlinePlugins(allowedInline);
 
     const tawk = plugins.find((p) => p && p.type === 'tawkto' && safeString(p.slug || p.id) === 'tawk');
     const tawkUrl = safeString((tawk as any)?.config?.embedUrl);

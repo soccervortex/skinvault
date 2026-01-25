@@ -23,7 +23,7 @@ function isAuthorized(request: NextRequest): boolean {
 
 function sanitizePluginType(value: unknown): PluginType | null {
   const t = String(value || '').trim();
-  if (t === 'tawkto' || t === 'external_script') return t;
+  if (t === 'tawkto' || t === 'external_script' || t === 'inline_script') return t;
   return null;
 }
 
@@ -34,6 +34,13 @@ function sanitizeConfig(type: PluginType, config: unknown): Record<string, any> 
     const embedUrl = String(raw?.embedUrl || '').trim();
     return {
       embedUrl: embedUrl || null,
+    };
+  }
+
+  if (type === 'inline_script') {
+    const html = String(raw?.html || '').trim();
+    return {
+      html: html || null,
     };
   }
 
