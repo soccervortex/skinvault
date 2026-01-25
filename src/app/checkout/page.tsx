@@ -88,6 +88,7 @@ function writeCart(items: CartItem[]): void {
   try {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(CART_KEY, JSON.stringify(Array.isArray(items) ? items : []));
+    window.dispatchEvent(new CustomEvent('sv-cart-updated'));
   } catch {
   }
 }

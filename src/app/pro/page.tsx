@@ -5,12 +5,16 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import { Crown, CheckCircle2, Loader2, CreditCard, Gift, Sparkles, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/app/components/Toast';
+import CartAddedModal from '@/app/components/CartAddedModal';
+import { addToCart } from '@/app/utils/cart-client';
 
 export default function ProInfoPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [freeMonthEligible, setFreeMonthEligible] = useState(false);
   const [claimingFreeMonth, setClaimingFreeMonth] = useState(false);
+  const [cartModalOpen, setCartModalOpen] = useState(false);
+  const [cartModalMessage, setCartModalMessage] = useState<string>('');
   const toast = useToast();
 
   const proSpinsPerDay = Math.max(1, Math.floor(Number(process.env.NEXT_PUBLIC_PRO_SPINS_PER_DAY || 5)));
@@ -97,10 +101,8 @@ export default function ProInfoPage() {
 
     setLoading(plan);
     try {
-      // Check if user has claimed any theme gift with promo code reward
       let promoCode: string | undefined = undefined;
       try {
-        // Check all possible themes for promo codes
         const themes = ['christmas', 'halloween', 'easter', 'sinterklaas', 'newyear', 'oldyear'];
         for (const theme of themes) {
           const giftResponse = await fetch(`/api/gift/claim?steamId=${user.steamId}&theme=${theme}`);
@@ -108,25 +110,38 @@ export default function ProInfoPage() {
             const giftData = await giftResponse.json();
             if (giftData.claimed && giftData.reward?.type === 'promo_code' && giftData.reward?.value) {
               promoCode = giftData.reward.value;
-              break; // Use first found promo code
+              break;
             }
           }
         }
-      } catch (error) {
-        console.error('Failed to check gift reward:', error);
+      } catch {
       }
 
-      const qp = promoCode ? `&promoCode=${encodeURIComponent(promoCode)}` : '';
-      window.location.href = `/checkout?type=pro&plan=${encodeURIComponent(plan)}${qp}`;
-    } catch (error) {
-      toast.error('Payment system error. Please try again.');
-      setLoading(null);
+      if (promoCode) {
+        try {
+          localStorage.setItem('sv_checkout_promo', String(promoCode));
+        } catch {
+        }
+      }
+
+      addToCart({ kind: 'pro', plan } as any);
+      setCartModalMessage('Pro plan was added to your cart.');
+      setCartModalOpen(true);
+    } catch {
+      toast.error('Failed to add item to cart. Please try again.');
     }
+    setLoading(null);
   };
 
   return (
     <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
+      <CartAddedModal
+        isOpen={cartModalOpen}
+        onClose={() => setCartModalOpen(false)}
+        title="Added to cart"
+        message={cartModalMessage || 'Your item was added to your cart.'}
+      />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="w-full max-w-4xl mx-auto bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
           <div className="flex items-center justify-between gap-3 md:gap-4">

@@ -12,6 +12,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { isOwner } from '@/app/utils/owner-ids';
 import ChatPreloader from './ChatPreloader';
 import { getUnreadCounts } from '@/app/utils/chat-notifications';
+import { getCartItemCount, readCart } from '@/app/utils/cart-client';
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
   const controller = new AbortController();
@@ -36,6 +37,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const [hasActiveTheme, setHasActiveTheme] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsUnreadCount, setNotificationsUnreadCount] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
  
 
   // 1. Sync User state met LocalStorage & andere tabbladen
@@ -272,6 +274,25 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
     };
   }, [user?.steamId]);
 
+  useEffect(() => {
+    const updateCartCount = () => {
+      try {
+        setCartCount(getCartItemCount(readCart()));
+      } catch {
+        setCartCount(0);
+      }
+    };
+
+    updateCartCount();
+    window.addEventListener('sv-cart-updated', updateCartCount as any);
+    window.addEventListener('storage', updateCartCount as any);
+
+    return () => {
+      window.removeEventListener('sv-cart-updated', updateCartCount as any);
+      window.removeEventListener('storage', updateCartCount as any);
+    };
+  }, []);
+
  
 
   const handleToggleTheme = async () => {
@@ -383,6 +404,21 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   return (
     <>
       <ChatPreloader />
+
+      <Link
+        href="/checkout"
+        className="fixed bottom-6 right-6 z-[150] bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-2xl shadow-blue-600/20 border border-white/10 transition-all"
+        aria-label="Open cart"
+      >
+        <div className="relative flex items-center justify-center w-12 h-12">
+          <ShoppingCart size={18} />
+          {cartCount > 0 && (
+            <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5 border border-black/30">
+              {cartCount > 99 ? '99+' : cartCount}
+            </span>
+          )}
+        </div>
+      </Link>
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

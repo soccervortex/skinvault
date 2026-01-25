@@ -7,6 +7,8 @@ import { ShoppingCart, Package, Loader2, Heart, Download, Zap, Clock, MessageSqu
 import { useToast } from '@/app/components/Toast';
 import { checkProStatus } from '@/app/utils/proxy-utils';
 import { preloadRewards } from '@/app/utils/pro-limits';
+import CartAddedModal from '@/app/components/CartAddedModal';
+import { addToCart } from '@/app/utils/cart-client';
 
 export default function ShopPage() {
   const [user, setUser] = useState<any>(null);
@@ -15,6 +17,8 @@ export default function ShopPage() {
   const [userRewards, setUserRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [creditsRestriction, setCreditsRestriction] = useState<{ banned: boolean; timeoutActive: boolean; timeoutUntil: string | null } | null>(null);
+  const [cartModalOpen, setCartModalOpen] = useState(false);
+  const [cartModalMessage, setCartModalMessage] = useState<string>('');
   const toast = useToast();
 
   const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale' | 'titan' | 'legend') => {
@@ -24,8 +28,20 @@ export default function ShopPage() {
       return;
     }
 
+    if (creditsRestriction?.banned || creditsRestriction?.timeoutActive) {
+      toast.error('Credits purchases are restricted for this account.');
+      return;
+    }
+
     setLoading(`credits_${pack}`);
-    window.location.href = `/checkout?type=credits&pack=${encodeURIComponent(pack)}`;
+    try {
+      addToCart({ kind: 'credits', pack, quantity: 1 } as any);
+      setCartModalMessage('Credits were added to your cart.');
+      setCartModalOpen(true);
+    } catch {
+      toast.error('Failed to add item to cart.');
+    }
+    setLoading(null);
   };
 
   const handleSpinsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale' | 'titan' | 'legend') => {
@@ -36,7 +52,14 @@ export default function ShopPage() {
     }
 
     setLoading(`spins_${pack}`);
-    window.location.href = `/checkout?type=spins&pack=${encodeURIComponent(pack)}`;
+    try {
+      addToCart({ kind: 'spins', pack, quantity: 1 } as any);
+      setCartModalMessage('Spins were added to your cart.');
+      setCartModalOpen(true);
+    } catch {
+      toast.error('Failed to add item to cart.');
+    }
+    setLoading(null);
   };
 
   useEffect(() => {
@@ -102,12 +125,25 @@ export default function ShopPage() {
     }
 
     setLoading(`${type}_${quantity}`);
-    window.location.href = `/checkout?type=consumable&consumableType=${encodeURIComponent(type)}&quantity=${encodeURIComponent(quantity)}`;
+    try {
+      addToCart({ kind: 'consumable', consumableType: type, quantity } as any);
+      setCartModalMessage('Item was added to your cart.');
+      setCartModalOpen(true);
+    } catch {
+      toast.error('Failed to add item to cart.');
+    }
+    setLoading(null);
   };
 
   return (
     <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
+      <CartAddedModal
+        isOpen={cartModalOpen}
+        onClose={() => setCartModalOpen(false)}
+        title="Added to cart"
+        message={cartModalMessage || 'Your item was added to your cart.'}
+      />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="w-full max-w-4xl mx-auto bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl space-y-6 md:space-y-8">
           <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
