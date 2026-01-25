@@ -262,6 +262,16 @@ export async function POST(request: Request) {
       });
     }
 
+    if (type === 'cart') {
+      return NextResponse.json(
+        {
+          fulfilled: false,
+          error: 'Cart purchases cannot be manually fulfilled via this endpoint. Please wait for the webhook, then refresh.',
+        },
+        { status: 400 }
+      );
+    }
+
     // Fulfill the purchase
 
     // Handle credits purchase
@@ -738,6 +748,14 @@ export async function GET(request: Request) {
         ...(purchase.type === 'consumable' && { consumableType: purchase.consumableType, quantity: purchase.quantity }),
         ...(purchase.type === 'credits' && { credits: purchase.credits, pack: purchase.pack }),
         ...(purchase.type === 'spins' && { spins: purchase.spins, pack: purchase.pack }),
+        ...(purchase.type === 'cart' && {
+          cartId: (purchase as any).cartId || null,
+          items: (purchase as any).items || [],
+          grantedCredits: (purchase as any).grantedCredits || 0,
+          grantedSpins: (purchase as any).grantedSpins || 0,
+          grantedProMonths: (purchase as any).grantedProMonths || 0,
+          consumablesGranted: (purchase as any).consumablesGranted || [],
+        }),
       }
     });
 

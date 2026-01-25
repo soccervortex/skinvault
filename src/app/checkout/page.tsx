@@ -2,12 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { useToast } from '@/app/components/Toast';
-import { CreditCard, Loader2, ShoppingCart } from 'lucide-react';
+import { CreditCard, Loader2, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 
 type CheckoutType = 'pro' | 'credits' | 'spins' | 'consumable';
+
+const CART_KEY = 'sv_cart_v1';
 
 const PRO_PLANS: Record<string, { label: string; amount: number; months: number }> = {
   '1month': { label: '1 Month', amount: 999, months: 1 },
@@ -43,6 +45,17 @@ const CONSUMABLES: Record<string, { label: string; amount: number }> = {
   cache_boost: { label: 'Price Cache Boost', amount: 199 },
 };
 
+type ProPlanId = '1month' | '3months' | '6months';
+type CreditsPackId = keyof typeof CREDIT_PACKS;
+type SpinsPackId = keyof typeof SPIN_PACKS;
+type ConsumableId = keyof typeof CONSUMABLES;
+
+type CartItem =
+  | { kind: 'pro'; plan: ProPlanId }
+  | { kind: 'credits'; pack: CreditsPackId; quantity: number }
+  | { kind: 'spins'; pack: SpinsPackId; quantity: number }
+  | { kind: 'consumable'; consumableType: ConsumableId; quantity: number };
+
 function formatEurCents(amount: number): string {
   const n = Number(amount);
   if (!Number.isFinite(n)) return '€—';
@@ -55,9 +68,34 @@ function parsePositiveInt(raw: string | null, fallback: number): number {
   return Math.max(1, Math.floor(n));
 }
 
+function clampInt(n: number, min: number, max: number): number {
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function readCart(): CartItem[] {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(CART_KEY) : null;
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as any) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCart(items: CartItem[]): void {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(CART_KEY, JSON.stringify(Array.isArray(items) ? items : []));
+  } catch {
+  }
+}
+
 export default function CheckoutPage() {
   const toast = useToast();
   const params = useSearchParams();
+  const router = useRouter();
 
   const [steamId, setSteamId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -65,6 +103,7 @@ export default function CheckoutPage() {
 
   const [email, setEmail] = useState('');
   const [promoCode, setPromoCode] = useState('');
+  const [cart, setCart] = useState<CartItem[]>([]);
 
   const type = (String(params.get('type') || '').trim().toLowerCase() as CheckoutType) || null;
   const plan = String(params.get('plan') || '').trim();
@@ -75,64 +114,40 @@ export default function CheckoutPage() {
   const urlEmail = String(params.get('email') || '').trim();
   const urlPromo = String(params.get('promoCode') || params.get('promo') || '').trim();
 
-  const summary = useMemo(() => {
-    if (!type) return null;
-
-    if (type === 'pro') {
-      const info = PRO_PLANS[plan];
-      if (!info) return null;
-      return {
-        title: 'Pro Checkout',
-        productLabel: `SkinVaults Pro - ${info.label}`,
-        details: `${info.months} month${info.months === 1 ? '' : 's'} access`,
-        amount: info.amount,
-        actionLabel: 'Proceed to payment',
-        backHref: '/pro',
-      };
-    }
-
-    if (type === 'credits') {
-      const info = CREDIT_PACKS[pack];
-      if (!info) return null;
-      return {
-        title: 'Credits Checkout',
-        productLabel: `Credits - ${info.label}`,
-        details: `${info.credits.toLocaleString('en-US')} credits`,
-        amount: info.amount,
-        actionLabel: 'Proceed to payment',
-        backHref: '/shop',
-      };
-    }
-
-    if (type === 'spins') {
-      const info = SPIN_PACKS[pack];
-      if (!info) return null;
-      return {
-        title: 'Spins Checkout',
-        productLabel: `Spins - ${info.label}`,
-        details: `${info.spins.toLocaleString('en-US')} spins`,
-        amount: info.amount,
-        actionLabel: 'Proceed to payment',
-        backHref: '/shop',
-      };
-    }
-
-    if (type === 'consumable') {
-      const info = CONSUMABLES[consumableType];
-      if (!info) return null;
-      const total = info.amount * quantity;
-      return {
-        title: 'Checkout',
-        productLabel: info.label,
-        details: `Quantity: ${quantity.toLocaleString('en-US')}`,
-        amount: total,
-        actionLabel: 'Proceed to payment',
-        backHref: '/shop',
-      };
-    }
-
-    return null;
-  }, [consumableType, pack, plan, quantity, type]);
+  const cartSummary = useMemo(() => {
+    const items = Array.isArray(cart) ? cart : [];
+    const rows = items.map((it) => {
+      if (it.kind === 'pro') {
+        const info = PRO_PLANS[it.plan];
+        const label = info ? `SkinVaults Pro - ${info.label}` : 'SkinVaults Pro';
+        const amount = info ? info.amount : 0;
+        return { key: `pro:${it.plan}`, label, detail: info ? `${info.months} months` : '', qty: 1, amount };
+      }
+      if (it.kind === 'credits') {
+        const info = CREDIT_PACKS[it.pack];
+        const qty = clampInt(it.quantity, 1, 99);
+        const label = info ? `Credits - ${info.label}` : 'Credits';
+        const amount = info ? info.amount * qty : 0;
+        const detail = info ? `${(info.credits * qty).toLocaleString('en-US')} credits` : '';
+        return { key: `credits:${it.pack}`, label, detail, qty, amount };
+      }
+      if (it.kind === 'spins') {
+        const info = SPIN_PACKS[it.pack];
+        const qty = clampInt(it.quantity, 1, 99);
+        const label = info ? `Spins - ${info.label}` : 'Spins';
+        const amount = info ? info.amount * qty : 0;
+        const detail = info ? `${(info.spins * qty).toLocaleString('en-US')} spins` : '';
+        return { key: `spins:${it.pack}`, label, detail, qty, amount };
+      }
+      const info = CONSUMABLES[it.consumableType];
+      const qty = clampInt(it.quantity, 1, 100);
+      const label = info ? info.label : 'Consumable';
+      const amount = info ? info.amount * qty : 0;
+      return { key: `consumable:${it.consumableType}`, label, detail: `Quantity: ${qty}`, qty, amount };
+    });
+    const total = rows.reduce((sum, r) => sum + (Number.isFinite(r.amount) ? r.amount : 0), 0);
+    return { rows, total };
+  }, [cart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,11 +202,86 @@ export default function CheckoutPage() {
     } catch {
     }
 
+    try {
+      setCart(readCart());
+    } catch {
+      setCart([]);
+    }
+
     void initAuth();
     return () => {
       cancelled = true;
     };
   }, [urlEmail, urlPromo]);
+
+  useEffect(() => {
+    if (!type) return;
+
+    const next = readCart();
+
+    try {
+      if (type === 'pro') {
+        const planKey = String(plan || '').trim() as any;
+        if (planKey && PRO_PLANS[planKey]) {
+          const withPro: CartItem[] = [{ kind: 'pro', plan: planKey }, ...next.filter((i) => i.kind !== 'pro')];
+          setCart(withPro);
+          writeCart(withPro);
+          router.replace('/checkout');
+        }
+        return;
+      }
+
+      if (type === 'credits') {
+        const packKey = String(pack || '').trim() as any;
+        if (packKey && CREDIT_PACKS[packKey]) {
+          const existing = next.find((i) => i.kind === 'credits' && i.pack === packKey) as any;
+          if (existing) {
+            existing.quantity = clampInt(Number(existing.quantity || 1) + 1, 1, 99);
+          } else {
+            next.push({ kind: 'credits', pack: packKey, quantity: 1 });
+          }
+          setCart(next);
+          writeCart(next);
+          router.replace('/checkout');
+        }
+        return;
+      }
+
+      if (type === 'spins') {
+        const packKey = String(pack || '').trim() as any;
+        if (packKey && SPIN_PACKS[packKey]) {
+          const existing = next.find((i) => i.kind === 'spins' && i.pack === packKey) as any;
+          if (existing) {
+            existing.quantity = clampInt(Number(existing.quantity || 1) + 1, 1, 99);
+          } else {
+            next.push({ kind: 'spins', pack: packKey, quantity: 1 });
+          }
+          setCart(next);
+          writeCart(next);
+          router.replace('/checkout');
+        }
+        return;
+      }
+
+      if (type === 'consumable') {
+        const t = String(consumableType || '').trim() as any;
+        if (t && CONSUMABLES[t]) {
+          const q = clampInt(quantity, 1, 100);
+          const existing = next.find((i) => i.kind === 'consumable' && i.consumableType === t) as any;
+          if (existing) {
+            existing.quantity = clampInt(Number(existing.quantity || 1) + q, 1, 100);
+          } else {
+            next.push({ kind: 'consumable', consumableType: t, quantity: q });
+          }
+          setCart(next);
+          writeCart(next);
+          router.replace('/checkout');
+        }
+        return;
+      }
+    } catch {
+    }
+  }, [consumableType, pack, plan, quantity, router, type]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -210,8 +300,9 @@ export default function CheckoutPage() {
   }, [promoCode]);
 
   const submit = async () => {
-    if (!summary) {
-      toast.error('Invalid checkout selection.');
+    const items = Array.isArray(cart) ? cart : [];
+    if (items.length === 0) {
+      toast.error('Your cart is empty.');
       return;
     }
 
@@ -230,30 +321,10 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
-      let endpoint = '';
-      let payload: any = { steamId, email: cleanEmail };
+      const payload: any = { steamId, email: cleanEmail, items };
       if (cleanPromo) payload.promoCode = cleanPromo;
 
-      if (type === 'pro') {
-        endpoint = '/api/payment/checkout';
-        payload.plan = plan;
-      } else if (type === 'credits') {
-        endpoint = '/api/payment/checkout-credits';
-        payload.pack = pack;
-      } else if (type === 'spins') {
-        endpoint = '/api/payment/checkout-spins';
-        payload.pack = pack;
-      } else if (type === 'consumable') {
-        endpoint = '/api/payment/checkout-consumable';
-        payload.type = consumableType;
-        payload.quantity = quantity;
-      } else {
-        toast.error('Invalid checkout type.');
-        setSubmitting(false);
-        return;
-      }
-
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/payment/checkout-cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -279,7 +350,8 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!summary) {
+  const isEmpty = (cartSummary.rows || []).length === 0;
+  if (isEmpty) {
     return (
       <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
@@ -291,10 +363,10 @@ export default function CheckoutPage() {
               </div>
               <div>
                 <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Checkout</p>
-                <h1 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Invalid selection</h1>
+                <h1 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Your cart is empty</h1>
               </div>
             </div>
-            <p className="text-[11px] md:text-[12px] text-gray-400">Please go back and select a product first.</p>
+            <p className="text-[11px] md:text-[12px] text-gray-400">Add items from Shop or Pro, then come back here to pay.</p>
             <div className="flex items-center gap-3 flex-wrap">
               <Link href="/shop" className="bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all">
                 Shop
@@ -321,29 +393,114 @@ export default function CheckoutPage() {
               </div>
               <div>
                 <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black mb-1">Checkout</p>
-                <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">{summary.title}</h1>
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-black italic uppercase tracking-tighter">Shopping Cart</h1>
               </div>
             </div>
 
             <Link
-              href={summary.backHref}
+              href="/shop"
               className="hidden sm:inline-flex items-center gap-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white py-2 md:py-3 px-4 md:px-6 rounded-xl md:rounded-2xl font-black uppercase text-[9px] md:text-[10px] tracking-widest transition-all"
             >
-              Back
+              Shop
             </Link>
           </div>
 
-          <div className="bg-black/40 border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Product</div>
-                <div className="mt-2 text-lg md:text-xl font-black text-white truncate">{summary.productLabel}</div>
-                <div className="mt-1 text-[11px] text-gray-400">{summary.details}</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Total</div>
-                <div className="mt-2 text-2xl font-black text-white leading-none">{formatEurCents(summary.amount)}</div>
-              </div>
+          <div className="bg-black/40 border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-6 space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Items</div>
+              <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Total</div>
+            </div>
+
+            <div className="space-y-2">
+              {cartSummary.rows.map((row) => (
+                <div key={row.key} className="flex items-center justify-between gap-3 bg-black/30 border border-white/10 rounded-xl p-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] md:text-[11px] font-black text-white truncate">{row.label}</div>
+                    <div className="text-[10px] text-gray-400 truncate">{row.detail}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl px-2 py-1">
+                      <button
+                        onClick={() => {
+                          const next = (cart || []).map((i) => ({ ...i })) as any[];
+                          if (row.key.startsWith('credits:')) {
+                            const pack = row.key.split(':')[1] as any;
+                            const it = next.find((x) => x.kind === 'credits' && x.pack === pack);
+                            if (it) it.quantity = clampInt(Number(it.quantity || 1) - 1, 1, 99);
+                          } else if (row.key.startsWith('spins:')) {
+                            const pack = row.key.split(':')[1] as any;
+                            const it = next.find((x) => x.kind === 'spins' && x.pack === pack);
+                            if (it) it.quantity = clampInt(Number(it.quantity || 1) - 1, 1, 99);
+                          } else if (row.key.startsWith('consumable:')) {
+                            const t = row.key.split(':')[1] as any;
+                            const it = next.find((x) => x.kind === 'consumable' && x.consumableType === t);
+                            if (it) it.quantity = clampInt(Number(it.quantity || 1) - 1, 1, 100);
+                          }
+                          setCart(next as any);
+                          writeCart(next as any);
+                        }}
+                        disabled={row.key.startsWith('pro:')}
+                        className="p-1 disabled:opacity-40"
+                        title="Decrease"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <div className="text-[10px] font-black text-white w-6 text-center">{row.qty}</div>
+                      <button
+                        onClick={() => {
+                          const next = (cart || []).map((i) => ({ ...i })) as any[];
+                          if (row.key.startsWith('credits:')) {
+                            const pack = row.key.split(':')[1] as any;
+                            const it = next.find((x) => x.kind === 'credits' && x.pack === pack);
+                            if (it) it.quantity = clampInt(Number(it.quantity || 1) + 1, 1, 99);
+                          } else if (row.key.startsWith('spins:')) {
+                            const pack = row.key.split(':')[1] as any;
+                            const it = next.find((x) => x.kind === 'spins' && x.pack === pack);
+                            if (it) it.quantity = clampInt(Number(it.quantity || 1) + 1, 1, 99);
+                          } else if (row.key.startsWith('consumable:')) {
+                            const t = row.key.split(':')[1] as any;
+                            const it = next.find((x) => x.kind === 'consumable' && x.consumableType === t);
+                            if (it) it.quantity = clampInt(Number(it.quantity || 1) + 1, 1, 100);
+                          }
+                          setCart(next as any);
+                          writeCart(next as any);
+                        }}
+                        disabled={row.key.startsWith('pro:')}
+                        className="p-1 disabled:opacity-40"
+                        title="Increase"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] font-black text-white w-[88px] text-right">{formatEurCents(row.amount)}</div>
+
+                    <button
+                      onClick={() => {
+                        const next = (cart || []).filter((i) => {
+                          if (row.key.startsWith('pro:')) return i.kind !== 'pro';
+                          if (row.key.startsWith('credits:')) return !(i.kind === 'credits' && `credits:${i.pack}` === row.key);
+                          if (row.key.startsWith('spins:')) return !(i.kind === 'spins' && `spins:${i.pack}` === row.key);
+                          if (row.key.startsWith('consumable:')) return !(i.kind === 'consumable' && `consumable:${i.consumableType}` === row.key);
+                          return true;
+                        });
+                        setCart(next);
+                        writeCart(next);
+                      }}
+                      className="p-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-xl transition-all"
+                      title="Remove"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 flex items-center justify-between">
+              <div className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Subtotal</div>
+              <div className="text-2xl font-black text-white leading-none">{formatEurCents(cartSummary.total)}</div>
             </div>
           </div>
 
@@ -398,7 +555,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <>
-                    <CreditCard size={14} /> {summary.actionLabel}
+                    <CreditCard size={14} /> Proceed to payment
                   </>
                 )}
               </button>

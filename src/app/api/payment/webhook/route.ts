@@ -247,6 +247,220 @@ export async function POST(request: Request) {
       }
     }
 
+    // Handle cart purchase (multi-item checkout)
+    if (steamId && type === 'cart') {
+      const cartId = String((session.metadata as any)?.cartId || '').trim();
+      if (!cartId) {
+        return NextResponse.json({ received: true, message: 'Missing cartId' });
+      }
+
+      try {
+        const purchasesKey = 'purchase_history';
+        const existingPurchases = (await dbGet<Array<any>>(purchasesKey)) || [];
+        const existingPurchase = existingPurchases.find((p) => p?.sessionId === session.id);
+        const alreadyFulfilled = !!existingPurchase;
+
+        if (alreadyFulfilled) {
+          if (existingPurchase && Object.keys(invoicePatch).length > 0 && !existingPurchase?.invoiceId) {
+            try {
+              await updatePurchaseDiscordStatus(session.id, invoicePatch);
+            } catch {
+            }
+          }
+
+          if (existingPurchase && Object.keys(receiptPatch).length > 0 && !existingPurchase?.receiptUrl) {
+            try {
+              await updatePurchaseDiscordStatus(session.id, receiptPatch);
+            } catch {
+            }
+          }
+
+          return NextResponse.json({ received: true, message: 'Already fulfilled' });
+        }
+
+        const pendingKey = `pending_cart_${cartId}`;
+        const pending = await dbGet<any>(pendingKey);
+        const pendingSteamId = String(pending?.steamId || '').trim();
+        const pendingItems = Array.isArray(pending?.items) ? pending.items : [];
+        if (!pending || pendingSteamId !== steamId || pendingItems.length < 1) {
+          console.error('[cart] Missing or invalid pending cart', { cartId, steamId, pendingSteamId, hasItems: pendingItems.length });
+          return NextResponse.json({ received: true, message: 'Pending cart missing' });
+        }
+
+        const db = await getDatabase();
+        const creditsCol = db.collection('user_credits');
+        const ledgerCol = db.collection('credits_ledger');
+        const bonusCol = db.collection('bonus_spins');
+        const now = new Date();
+
+        let grantedCredits = 0;
+        let grantedSpins = 0;
+        let grantedProMonths = 0;
+        const consumablesGranted: Array<{ consumableType: string; quantity: number }> = [];
+
+        for (const it of pendingItems) {
+          const kind = String((it as any)?.kind || '').trim();
+
+          if (kind === 'pro') {
+            const plan = String((it as any)?.plan || '').trim();
+            const planMonths = plan === '6months' ? 6 : plan === '3months' ? 3 : plan === '1month' ? 1 : 0;
+            if (planMonths > 0) {
+              try {
+                await grantPro(steamId, planMonths);
+                grantedProMonths += planMonths;
+              } catch (e) {
+                console.error('[cart] Failed to grant Pro', e);
+              }
+            }
+            continue;
+          }
+
+          if (kind === 'credits') {
+            const pack = String((it as any)?.pack || '').trim();
+            const qtyRaw = Number((it as any)?.quantity || 1);
+            const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.min(99, Math.floor(qtyRaw))) : 1;
+            const packCredits = pack === 'legend' ? 75000 : pack === 'titan' ? 50000 : pack === 'whale' ? 30000 : pack === 'giant' ? 10000 : pack === 'mega' ? 4000 : pack === 'value' ? 1500 : pack === 'starter' ? 500 : 0;
+            if (packCredits > 0) {
+              const credits = packCredits * qty;
+              grantedCredits += credits;
+              try {
+                await creditsCol.updateOne(
+                  { _id: steamId } as any,
+                  { $setOnInsert: { _id: steamId, steamId }, $inc: { balance: credits }, $set: { updatedAt: now } } as any,
+                  { upsert: true } as any
+                );
+                await ledgerCol.insertOne({
+                  steamId,
+                  delta: credits,
+                  type: 'purchase_credits',
+                  createdAt: now,
+                  meta: { sessionId: session.id, cartId, pack, qty },
+                } as any);
+              } catch (e) {
+                console.error('[cart] Failed to grant credits', e);
+              }
+            }
+            continue;
+          }
+
+          if (kind === 'spins') {
+            const pack = String((it as any)?.pack || '').trim();
+            const qtyRaw = Number((it as any)?.quantity || 1);
+            const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.min(99, Math.floor(qtyRaw))) : 1;
+            const packSpins = pack === 'legend' ? 750 : pack === 'titan' ? 500 : pack === 'whale' ? 300 : pack === 'giant' ? 100 : pack === 'mega' ? 40 : pack === 'value' ? 15 : pack === 'starter' ? 5 : 0;
+            if (packSpins > 0) {
+              const spins = packSpins * qty;
+              grantedSpins += spins;
+              try {
+                await bonusCol.updateOne(
+                  { _id: steamId } as any,
+                  {
+                    $setOnInsert: { _id: steamId, steamId, createdAt: now } as any,
+                    $inc: { count: spins },
+                    $set: { updatedAt: now },
+                  } as any,
+                  { upsert: true } as any
+                );
+              } catch (e) {
+                console.error('[cart] Failed to grant spins', e);
+              }
+            }
+            continue;
+          }
+
+          if (kind === 'consumable') {
+            const consumableType = String((it as any)?.consumableType || '').trim();
+            const qtyRaw = Number((it as any)?.quantity || 1);
+            const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.min(100, Math.floor(qtyRaw))) : 1;
+            if (consumableType && qty > 0) {
+              try {
+                const rewardsKey = 'user_rewards';
+                const existingRewards = (await dbGet<Record<string, any[]>>(rewardsKey)) || {};
+                const userRewards = existingRewards[steamId] || [];
+                for (let i = 0; i < qty; i += 1) {
+                  userRewards.push({
+                    type: consumableType,
+                    grantedAt: new Date().toISOString(),
+                    source: 'purchase',
+                    sessionId: session.id,
+                    cartId,
+                  });
+                }
+                existingRewards[steamId] = userRewards;
+                await dbSet(rewardsKey, existingRewards);
+                consumablesGranted.push({ consumableType, quantity: qty });
+              } catch (e) {
+                console.error('[cart] Failed to grant consumable', e);
+              }
+            }
+            continue;
+          }
+        }
+
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+          existingPurchases.push({
+            steamId,
+            type: 'cart',
+            cartId,
+            items: pendingItems,
+            grantedCredits,
+            grantedSpins,
+            grantedProMonths,
+            consumablesGranted,
+            promoCode,
+            promoCodeId,
+            couponId,
+            amount,
+            currency,
+            sessionId: session.id,
+            timestamp: new Date().toISOString(),
+            fulfilled: true,
+            fulfilledAt: new Date().toISOString(),
+            paymentIntentId: (session.payment_intent as string) || null,
+            customerId: (session.customer as string) || null,
+            discordNotified: false,
+            discordNotifyAttempts: 0,
+            ...invoicePatch,
+            ...receiptPatch,
+          });
+          await dbSet(purchasesKey, existingPurchases.slice(-1000));
+        } catch (e) {
+          console.error('[cart] Failed to record purchase history', e);
+        }
+
+        try {
+          await dbSet(pendingKey, {
+            ...(pending && typeof pending === 'object' ? pending : {}),
+            fulfilled: true,
+            fulfilledAt: new Date().toISOString(),
+            sessionId: session.id,
+          });
+        } catch {
+        }
+
+        try {
+          await createUserNotification(
+            db,
+            steamId,
+            'purchase_cart',
+            'Purchase Successful',
+            'Your purchase was successful. Items have been added to your account.',
+            { cartId, sessionId: session.id, grantedCredits, grantedSpins, grantedProMonths, consumablesGranted }
+          );
+        } catch {
+        }
+
+        console.log(`✅ Cart purchase fulfilled for ${steamId} (cartId=${cartId})`);
+        return NextResponse.json({ received: true, ok: true });
+      } catch (error) {
+        console.error('❌ Failed to fulfill cart purchase:', error);
+        // Return 200 to prevent Stripe retries; can be handled manually
+        return NextResponse.json({ received: true, ok: false });
+      }
+    }
+
     // Handle spins purchase
     if (steamId && type === 'spins') {
       const spins = Number(session.metadata?.spins || 0);

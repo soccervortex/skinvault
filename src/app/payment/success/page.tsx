@@ -1,28 +1,28 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | 'credits' | 'spins' | null>(null);
+  const [purchaseType, setPurchaseType] = useState<'pro' | 'consumable' | 'credits' | 'spins' | 'cart' | null>(null);
   const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
     const steamId = searchParams.get('steamId');
-    const type = searchParams.get('type'); // 'pro' or 'consumable' or 'credits'
+    const type = searchParams.get('type'); // 'pro' | 'consumable' | 'credits' | 'spins' | 'cart'
     const months = searchParams.get('months');
     const consumableType = searchParams.get('consumableType');
     const quantity = searchParams.get('quantity');
     const credits = searchParams.get('credits');
     const pack = searchParams.get('pack');
     const spins = searchParams.get('spins');
+    const cartId = searchParams.get('cartId');
 
     if (!sessionId || !steamId || !type) {
       setError('Missing payment information');
@@ -55,7 +55,13 @@ function PaymentSuccessContent() {
       return;
     }
 
-    setPurchaseType(type as 'pro' | 'consumable' | 'credits' | 'spins');
+    if (type === 'cart' && !cartId) {
+      setError('Missing payment information (cartId)');
+      setLoading(false);
+      return;
+    }
+
+    setPurchaseType(type as 'pro' | 'consumable' | 'credits' | 'spins' | 'cart');
 
     // Give webhook a moment to process, then verify and refresh user data
     const verifyAndRefresh = async (retries = 5) => {
@@ -166,6 +172,11 @@ function PaymentSuccessContent() {
           } catch (e) {
             // Ignore errors
           }
+        } else if (type === 'cart') {
+          try {
+            localStorage.removeItem('sv_cart_v1');
+          } catch {
+          }
         }
 
         setLoading(false);
@@ -177,7 +188,9 @@ function PaymentSuccessContent() {
             ? 'Failed to verify payment. Your Pro status may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId
             : type === 'consumable'
               ? 'Failed to verify payment. Your consumable may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId
-              : 'Failed to verify payment. Your credits may take a few moments to appear. If they don\'t appear, please contact support with your session ID: ' + sessionId;
+              : type === 'cart'
+                ? 'Failed to verify payment. Your purchase may take a few moments to activate. If it doesn\'t appear, please contact support with your session ID: ' + sessionId
+                : 'Failed to verify payment. Your credits may take a few moments to appear. If they don\'t appear, please contact support with your session ID: ' + sessionId;
           setError(errorMsg);
           setLoading(false);
         }
@@ -231,6 +244,8 @@ function PaymentSuccessContent() {
         <p className="text-[10px] md:text-[11px] text-gray-400">
           {purchaseType === 'pro'
             ? 'Your Pro subscription has been activated. You can now enjoy all premium features.'
+            : purchaseType === 'cart'
+              ? 'Your purchase has been processed successfully. Items will appear shortly.'
             : purchaseType === 'credits'
               ? purchaseDetails?.credits
                 ? `Your ${purchaseDetails.credits} credits have been added to your account.`
