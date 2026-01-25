@@ -15,8 +15,6 @@ export default function ShopPage() {
   const [userRewards, setUserRewards] = useState<any[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [creditsRestriction, setCreditsRestriction] = useState<{ banned: boolean; timeoutActive: boolean; timeoutUntil: string | null } | null>(null);
-  const [checkoutEmail, setCheckoutEmail] = useState('');
-  const [checkoutPromoCode, setCheckoutPromoCode] = useState('');
   const toast = useToast();
 
   const handleCreditsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale' | 'titan' | 'legend') => {
@@ -26,43 +24,8 @@ export default function ShopPage() {
       return;
     }
 
-    const email = String(checkoutEmail || '').trim();
-    if (!email) {
-      toast.error('Please enter your email to receive your receipt.');
-      return;
-    }
-
     setLoading(`credits_${pack}`);
-    try {
-      const res = await fetch('/api/payment/checkout-credits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pack, steamId: user.steamId, email, promoCode: String(checkoutPromoCode || '').trim() || undefined }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          toast.error('You must be signed in with Steam to purchase. Please sign in first.');
-          setTimeout(() => window.location.href = '/inventory', 2000);
-        } else {
-          toast.error(data.error || 'Failed to create checkout session');
-        }
-        setLoading(null);
-        return;
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error('Failed to redirect to checkout');
-        setLoading(null);
-      }
-    } catch (error) {
-      toast.error('Failed to process purchase. Please try again.');
-      setLoading(null);
-    }
+    window.location.href = `/checkout?type=credits&pack=${encodeURIComponent(pack)}`;
   };
 
   const handleSpinsCheckout = async (pack: 'starter' | 'value' | 'mega' | 'giant' | 'whale' | 'titan' | 'legend') => {
@@ -72,43 +35,8 @@ export default function ShopPage() {
       return;
     }
 
-    const email = String(checkoutEmail || '').trim();
-    if (!email) {
-      toast.error('Please enter your email to receive your receipt.');
-      return;
-    }
-
     setLoading(`spins_${pack}`);
-    try {
-      const res = await fetch('/api/payment/checkout-spins', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pack, steamId: user.steamId, email, promoCode: String(checkoutPromoCode || '').trim() || undefined }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          toast.error('You must be signed in with Steam to purchase. Please sign in first.');
-          setTimeout(() => window.location.href = '/inventory', 2000);
-        } else {
-          toast.error(data.error || 'Failed to create checkout session');
-        }
-        setLoading(null);
-        return;
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error('Failed to redirect to checkout');
-        setLoading(null);
-      }
-    } catch (error) {
-      toast.error('Failed to process purchase. Please try again.');
-      setLoading(null);
-    }
+    window.location.href = `/checkout?type=spins&pack=${encodeURIComponent(pack)}`;
   };
 
   useEffect(() => {
@@ -117,18 +45,6 @@ export default function ShopPage() {
       const stored = window.localStorage.getItem('steam_user');
       const parsedUser = stored ? JSON.parse(stored) : null;
       setUser(parsedUser);
-
-      try {
-        const storedEmail = window.localStorage.getItem('sv_checkout_email');
-        if (storedEmail) setCheckoutEmail(String(storedEmail));
-      } catch {
-      }
-
-      try {
-        const storedPromo = window.localStorage.getItem('sv_checkout_promo');
-        if (storedPromo) setCheckoutPromoCode(String(storedPromo));
-      } catch {
-      }
       
       // Check Pro status
       if (parsedUser?.steamId) {
@@ -173,22 +89,6 @@ export default function ShopPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('sv_checkout_email', String(checkoutEmail || '').trim());
-    } catch {
-    }
-  }, [checkoutEmail]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('sv_checkout_promo', String(checkoutPromoCode || '').trim());
-    } catch {
-    }
-  }, [checkoutPromoCode]);
-
   // Helper to check if user already has a consumable
   const hasConsumable = (type: string): boolean => {
     return userRewards.some((reward: any) => reward?.type === type);
@@ -201,43 +101,8 @@ export default function ShopPage() {
       return;
     }
 
-    const email = String(checkoutEmail || '').trim();
-    if (!email) {
-      toast.error('Please enter your email to receive your receipt.');
-      return;
-    }
-
     setLoading(`${type}_${quantity}`);
-    try {
-      const res = await fetch('/api/payment/checkout-consumable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, quantity, steamId: user.steamId, email, promoCode: String(checkoutPromoCode || '').trim() || undefined }),
-      });
-
-      const data = await res.json();
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          toast.error('You must be signed in with Steam to purchase. Please sign in first.');
-          setTimeout(() => window.location.href = '/inventory', 2000);
-        } else {
-          toast.error(data.error || 'Failed to create checkout session');
-        }
-        setLoading(null);
-        return;
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error('Failed to redirect to checkout');
-        setLoading(null);
-      }
-    } catch (error) {
-      toast.error('Failed to process purchase. Please try again.');
-      setLoading(null);
-    }
+    window.location.href = `/checkout?type=consumable&consumableType=${encodeURIComponent(type)}&quantity=${encodeURIComponent(quantity)}`;
   };
 
   return (
@@ -258,36 +123,6 @@ export default function ShopPage() {
           <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed mb-6 md:mb-8">
             Purchase credits, spins, and consumables to enhance your account. Perfect if you only need specific features without a full Pro subscription.
           </p>
-
-          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5">
-            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
-              Receipt email
-            </p>
-            <input
-              value={checkoutEmail}
-              onChange={(e) => setCheckoutEmail(e.target.value)}
-              placeholder="you@email.com"
-              className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
-            />
-            <p className="mt-2 text-[10px] text-gray-400">
-              We’ll send your receipt/invoice to this email after payment.
-            </p>
-          </div>
-
-          <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5">
-            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
-              Promo code (optional)
-            </p>
-            <input
-              value={checkoutPromoCode}
-              onChange={(e) => setCheckoutPromoCode(e.target.value)}
-              placeholder="WELCOME20"
-              className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-emerald-300 outline-none focus:border-emerald-500 transition-all placeholder:text-gray-700"
-            />
-            <p className="mt-2 text-[10px] text-gray-400">
-              Applied at checkout. Some codes are limited to one use per user.
-            </p>
-          </div>
 
           <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-5 md:p-6 space-y-4">
             <div className="flex items-center gap-3">

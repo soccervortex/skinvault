@@ -11,8 +11,6 @@ export default function ProInfoPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [freeMonthEligible, setFreeMonthEligible] = useState(false);
   const [claimingFreeMonth, setClaimingFreeMonth] = useState(false);
-  const [checkoutEmail, setCheckoutEmail] = useState('');
-  const [checkoutPromoCode, setCheckoutPromoCode] = useState('');
   const toast = useToast();
 
   const proSpinsPerDay = Math.max(1, Math.floor(Number(process.env.NEXT_PUBLIC_PRO_SPINS_PER_DAY || 5)));
@@ -28,18 +26,6 @@ export default function ProInfoPage() {
       const stored = window.localStorage.getItem('steam_user');
       const parsedUser = stored ? JSON.parse(stored) : null;
       setUser(parsedUser);
-
-      try {
-        const storedEmail = window.localStorage.getItem('sv_checkout_email');
-        if (storedEmail) setCheckoutEmail(String(storedEmail));
-      } catch {
-      }
-
-      try {
-        const storedPromo = window.localStorage.getItem('sv_checkout_promo');
-        if (storedPromo) setCheckoutPromoCode(String(storedPromo));
-      } catch {
-      }
       
       // Check if eligible for free month (only if not Pro)
       const userIsPro = parsedUser?.proUntil && new Date(parsedUser.proUntil) > new Date();
@@ -59,22 +45,6 @@ export default function ProInfoPage() {
       setUser(null);
     }
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('sv_checkout_email', String(checkoutEmail || '').trim());
-    } catch {
-    }
-  }, [checkoutEmail]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('sv_checkout_promo', String(checkoutPromoCode || '').trim());
-    } catch {
-    }
-  }, [checkoutPromoCode]);
 
   const isPro = user?.proUntil && new Date(user.proUntil) > new Date();
 
@@ -125,13 +95,6 @@ export default function ProInfoPage() {
       return;
     }
 
-    const email = String(checkoutEmail || '').trim();
-    if (!email) {
-      toast.error('Please enter your email to receive your receipt.');
-      setLoading(null);
-      return;
-    }
-
     setLoading(plan);
     try {
       // Check if user has claimed any theme gift with promo code reward
@@ -153,38 +116,8 @@ export default function ProInfoPage() {
         console.error('Failed to check gift reward:', error);
       }
 
-      const manual = String(checkoutPromoCode || '').trim();
-      const effectivePromo = manual ? manual : promoCode;
-      
-      const res = await fetch('/api/payment/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, steamId: user.steamId, promoCode: effectivePromo, email }),
-      });
-
-      const data = await res.json();
-      
-      if (!res.ok) {
-        // Handle authentication errors
-        if (res.status === 401) {
-          toast.error(data.error || 'You must be signed in with Steam to purchase Pro.');
-          // Clear potentially stale user data
-          localStorage.removeItem('steam_user');
-          setTimeout(() => window.location.href = '/inventory', 2000);
-        } else {
-          toast.error(data.error || 'Failed to start checkout');
-        }
-        setLoading(null);
-        return;
-      }
-
-      if (data.url) {
-        toast.info('Redirecting to payment...');
-        window.location.href = data.url;
-      } else {
-        toast.error(data.error || 'Failed to start checkout');
-        setLoading(null);
-      }
+      const qp = promoCode ? `&promoCode=${encodeURIComponent(promoCode)}` : '';
+      window.location.href = `/checkout?type=pro&plan=${encodeURIComponent(plan)}${qp}`;
     } catch (error) {
       toast.error('Payment system error. Please try again.');
       setLoading(null);
@@ -390,36 +323,6 @@ export default function ProInfoPage() {
           for any SteamID64. Pro automatically becomes inactive when the expiry
           date passes.
         </p>
-
-        <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5">
-          <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
-            Receipt email
-          </p>
-          <input
-            value={checkoutEmail}
-            onChange={(e) => setCheckoutEmail(e.target.value)}
-            placeholder="you@email.com"
-            className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-blue-500 outline-none focus:border-blue-500 transition-all placeholder:text-gray-700"
-          />
-          <p className="mt-2 text-[10px] text-gray-400">
-            We’ll send your receipt/invoice to this email after payment.
-          </p>
-        </div>
-
-        <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-5">
-          <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">
-            Promo code (optional)
-          </p>
-          <input
-            value={checkoutPromoCode}
-            onChange={(e) => setCheckoutPromoCode(e.target.value)}
-            placeholder="WELCOME20"
-            className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-emerald-300 outline-none focus:border-emerald-500 transition-all placeholder:text-gray-700"
-          />
-          <p className="mt-2 text-[10px] text-gray-400">
-            Applied at checkout. Some codes are limited to one use per user.
-          </p>
-        </div>
           </div>
         )}
 
