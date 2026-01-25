@@ -1472,6 +1472,17 @@ function AdminPageInner() {
                 </button>
 
                 <button
+                  onClick={() => router.push('/admin/plugins')}
+                  className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Plug className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">System</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Plugin Manager</div>
+                </button>
+
+                <button
                   onClick={() => router.push('/admin/reports')}
                   className="bg-black/40 border border-orange-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-orange-500/50 transition-all"
                 >

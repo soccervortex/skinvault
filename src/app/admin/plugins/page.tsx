@@ -33,6 +33,16 @@ export default function AdminPluginsPage() {
   const [newTawkUrl, setNewTawkUrl] = useState('');
   const [newScriptSrc, setNewScriptSrc] = useState('');
 
+  const broadcastPluginsChanged = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const ts = Date.now().toString();
+      window.localStorage.setItem('sv_plugins_changed', ts);
+      window.dispatchEvent(new CustomEvent('pluginsChanged'));
+    } catch {
+    }
+  };
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -96,6 +106,7 @@ export default function AdminPluginsPage() {
       } else {
         await loadPlugins();
       }
+      broadcastPluginsChanged();
       setMessage('Saved');
       setTimeout(() => setMessage(null), 2000);
     } catch (e: any) {
@@ -123,6 +134,7 @@ export default function AdminPluginsPage() {
         return;
       }
       setPlugins((prev) => prev.filter((p) => p._id !== slug));
+      broadcastPluginsChanged();
       setMessage('Deleted');
       setTimeout(() => setMessage(null), 2000);
     } catch (e: any) {
@@ -168,6 +180,7 @@ export default function AdminPluginsPage() {
       } else {
         await loadPlugins();
       }
+      broadcastPluginsChanged();
       setNewSlug('');
       setNewName('');
       setNewEnabled(true);
