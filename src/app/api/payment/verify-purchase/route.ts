@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailureStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { createUserNotification } from '@/app/utils/user-notifications';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 
@@ -127,6 +127,19 @@ export async function POST(request: Request) {
 
     // Check if payment was successful
     if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+      try {
+        await notifyPaymentFailureStrict({
+          title: '❌ Payment Not Completed',
+          type: String(session.metadata?.type || ''),
+          steamId,
+          sessionId,
+          stage: 'verify_purchase_payment_status',
+          error: `Payment not completed (status=${session.payment_status})`,
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency || 'eur',
+        });
+      } catch {
+      }
       return NextResponse.json({ 
         error: 'Payment not completed',
         paymentStatus: session.payment_status 
@@ -135,6 +148,19 @@ export async function POST(request: Request) {
 
     // Verify Steam ID matches
     if (session.metadata?.steamId !== steamId) {
+      try {
+        await notifyPaymentFailureStrict({
+          title: '❌ Steam ID Mismatch',
+          type: String(session.metadata?.type || ''),
+          steamId,
+          sessionId,
+          stage: 'verify_purchase_steam_mismatch',
+          error: `Steam mismatch expected=${String(session.metadata?.steamId || '')} provided=${steamId}`,
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency || 'eur',
+        });
+      } catch {
+      }
       return NextResponse.json({ 
         error: 'Steam ID mismatch',
         expected: session.metadata?.steamId,
@@ -263,6 +289,20 @@ export async function POST(request: Request) {
     }
 
     if (type === 'cart') {
+      try {
+        await notifyPaymentFailureStrict({
+          title: '⚠️ Cart Manual Verification Blocked',
+          type: 'cart',
+          steamId,
+          sessionId,
+          cartId: String((session.metadata as any)?.cartId || ''),
+          stage: 'verify_purchase_manual_cart_blocked',
+          error: 'Cart purchases cannot be manually fulfilled via verify-purchase POST. Wait for Stripe webhook.',
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency || 'eur',
+        });
+      } catch {
+      }
       return NextResponse.json(
         {
           fulfilled: false,
@@ -693,6 +733,14 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Purchase verification error:', error);
+    try {
+      await notifyPaymentFailureStrict({
+        title: '❌ Purchase Verification Error',
+        stage: 'verify_purchase_post',
+        error: error?.message || 'Failed to verify purchase',
+      });
+    } catch {
+    }
     return NextResponse.json({ 
       error: error.message || 'Failed to verify purchase' 
     }, { status: 500 });

@@ -9,20 +9,22 @@ export type WebhookCategory =
   | 'events'          // User logins and other events
   | 'pro'             // Pro grants (admin) and purchases
   | 'purchases'       // All purchases (Pro and consumables)
+  | 'payment_success' // Successful payments (including carts)
+  | 'payment_failed'  // Failed payments / fulfillment errors
   | 'moderation'      // User bans/unbans
   | 'reports';        // Chat and item reports
 
 // Default webhook URLs (can be overridden by environment variables)
 const DEFAULT_WEBHOOKS: Record<WebhookCategory, string> = {
-  users: 'https://discord.com/api/webhooks/1455368741062967327/FP9ky0VAlS0mptl5R8c4S5_SGCwfkTqe6rw0As7Ejq5xjvoBc3-AxUQZelEzQ0sOTonc',
-  events: 'https://discord.com/api/webhooks/1455371861582938157/kHRb3FjF645160e8LrccCbUDjUZYGEHYPqUuciBUs9aJpwfNXTt-YKfUd66oDW4cAClg',
-  pro: 'https://discord.com/api/webhooks/1455368871564415142/M_aHYhMBAnCO0AW7MP023FN1ZBskivJfJ0iu7M78wAplgw7ooDC4vl8F6M4f_xMj5hQx',
-  purchases: 'https://discord.com/api/webhooks/1455369022769074432/iz6AU1xg1bHRddES_zQZ9ZsV3_FNko4vZR2-uAi8pSxkmD_9RSURN6CXNjaQfI9cW7xL',
-  moderation: 'https://discord.com/api/webhooks/1455369157129277686/8XumBuRF7bxbZVW2rsEhv9zAEHmSjiqypP0aT8kk8DxDJrimyBTt5Rgr9WYJPB1vYLpi',
-  reports: 'https://discord.com/api/webhooks/1455369270765682698/IzYE6FYJCyXzZJyiuqKDThW3B9daqc9KJkGFm29hyGW9xfBUCAtQCoHNaJ_v0a3Pka0H',
+  users: '',
+  events: '',
+  pro: '',
+  purchases: '',
+  payment_success: '',
+  payment_failed: '',
+  moderation: '',
+  reports: '',
 };
-
-const DEFAULT_WEBHOOK_URL = 'https://discord.com/api/webhooks/1455365997094633606/v8N3tDRUekgyGtsquJ8HhXkX2kMVxycoZJLgilvNtLV6TEFsUFUwxJ8YE5Girk5ENdUa';
 
 // Get webhook URL for a specific category
 function getWebhookUrl(category: WebhookCategory): string | null {
@@ -34,13 +36,11 @@ function getWebhookUrl(category: WebhookCategory): string | null {
     return categoryUrl;
   }
   
-  // Use default webhook for this category
-  if (DEFAULT_WEBHOOKS[category]) {
-    return DEFAULT_WEBHOOKS[category];
-  }
-  
+  // Use default webhook for this category (left blank by default)
+  if (DEFAULT_WEBHOOKS[category]) return DEFAULT_WEBHOOKS[category];
+
   // Final fallback to general webhook
-  return process.env.DISCORD_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
+  return process.env.DISCORD_WEBHOOK_URL || null;
 }
 
 async function postDiscordWebhook(webhookUrl: string, embeds: DiscordEmbed[], strict: boolean): Promise<void> {
@@ -118,6 +118,68 @@ export async function sendDiscordWebhookStrict(embeds: DiscordEmbed[], category:
     throw new Error(`No webhook URL configured for category: ${category}`);
   }
   await postDiscordWebhook(webhookUrl, embeds, true);
+}
+
+export async function notifyCartPurchaseStrict(
+  steamId: string,
+  cartId: string,
+  summary: { grantedCredits: number; grantedSpins: number; grantedProMonths: number; itemCount: number },
+  amount: number,
+  currency: string,
+  sessionId: string
+): Promise<void> {
+  const embed: DiscordEmbed = {
+    title: '🛒 Cart Purchase',
+    description: 'A user has completed a cart checkout.',
+    color: 0x00ff00,
+    fields: [
+      { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+      { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
+      { name: 'Items', value: `${Math.max(0, Math.floor(Number(summary?.itemCount || 0)))}`, inline: true },
+      { name: 'Granted Credits', value: `${Math.max(0, Math.floor(Number(summary?.grantedCredits || 0))).toLocaleString('en-US')}`, inline: true },
+      { name: 'Granted Spins', value: `${Math.max(0, Math.floor(Number(summary?.grantedSpins || 0))).toLocaleString('en-US')}`, inline: true },
+      { name: 'Pro Months', value: `${Math.max(0, Math.floor(Number(summary?.grantedProMonths || 0)))}`, inline: true },
+      { name: 'Amount', value: `${Number(amount || 0).toFixed(2)} ${String(currency || 'eur').toUpperCase()}`, inline: true },
+      { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+      { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+    ],
+    footer: { text: 'SkinVaults Notification System' },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhookStrict([embed], 'payment_success');
+}
+
+export async function notifyPaymentFailureStrict(payload: {
+  title?: string;
+  type?: string;
+  steamId?: string;
+  sessionId?: string;
+  cartId?: string;
+  stage?: string;
+  error?: string;
+  amount?: number;
+  currency?: string;
+}): Promise<void> {
+  const embed: DiscordEmbed = {
+    title: payload.title || '❌ Payment Failure',
+    description: 'A payment or fulfillment step failed.',
+    color: 0xff0000,
+    fields: [
+      ...(payload.type ? [{ name: 'Type', value: String(payload.type), inline: true }] : []),
+      ...(payload.steamId ? [{ name: 'Steam ID', value: `\`${payload.steamId}\``, inline: true }] : []),
+      ...(payload.cartId ? [{ name: 'Cart ID', value: `\`${payload.cartId}\``, inline: true }] : []),
+      ...(payload.amount != null ? [{ name: 'Amount', value: `${Number(payload.amount || 0).toFixed(2)} ${String(payload.currency || 'eur').toUpperCase()}`, inline: true }] : []),
+      ...(payload.sessionId ? [{ name: 'Session ID', value: `\`${payload.sessionId}\``, inline: false }] : []),
+      ...(payload.stage ? [{ name: 'Stage', value: String(payload.stage), inline: false }] : []),
+      ...(payload.error ? [{ name: 'Error', value: String(payload.error).slice(0, 900), inline: false }] : []),
+      { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+    ],
+    footer: { text: 'SkinVaults Notification System' },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhookStrict([embed], 'payment_failed');
 }
 
 /**
