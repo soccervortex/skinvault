@@ -8,7 +8,7 @@ type SpinHistoryDoc = {
   reward: number;
   createdAt: Date;
   day: string;
-  role: 'owner' | 'creator' | 'user';
+  role: 'owner' | 'creator' | 'pro' | 'user';
   deletedAt?: Date;
 };
 

@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isOwner, OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 import { readCreators } from '@/app/api/creators/route';
+import { getProUntil } from '@/app/utils/pro-storage';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -126,7 +127,13 @@ function getCreatorDailyLimit(): number {
   return Math.max(1, Math.floor(raw));
 }
 
-async function getRoleAndLimit(steamId: string): Promise<{ role: 'owner' | 'creator' | 'user'; dailyLimit: number | null }> {
+function getProDailyLimit(): number {
+  const raw = Number(process.env.PRO_SPINS_PER_DAY || 5);
+  if (!Number.isFinite(raw)) return 5;
+  return Math.max(1, Math.floor(raw));
+}
+
+async function getRoleAndLimit(steamId: string): Promise<{ role: 'owner' | 'creator' | 'pro' | 'user'; dailyLimit: number | null }> {
   if (isOwner(steamId)) return { role: 'owner', dailyLimit: null };
   try {
     const creators = await readCreators();
@@ -134,6 +141,18 @@ async function getRoleAndLimit(steamId: string): Promise<{ role: 'owner' | 'crea
     if (isCreator) return { role: 'creator', dailyLimit: getCreatorDailyLimit() };
   } catch {
   }
+
+  try {
+    const proUntil = await getProUntil(steamId);
+    if (proUntil) {
+      const d = new Date(proUntil);
+      if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
+        return { role: 'pro', dailyLimit: getProDailyLimit() };
+      }
+    }
+  } catch {
+  }
+
   return { role: 'user', dailyLimit: 1 };
 }
 
