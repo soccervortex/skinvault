@@ -1954,8 +1954,8 @@ function InventoryContent() {
 
         {!websiteProfilePrivate && viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
-            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
-              <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 md:gap-8">
+              <div className="flex items-center gap-4 md:gap-6 w-full lg:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -2002,7 +2002,7 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="grid grid-cols-2 gap-2 w-full md:flex md:items-center md:gap-3 md:flex-wrap">
+                    <div className="grid grid-cols-2 gap-2 w-full lg:flex lg:items-center lg:gap-3 lg:flex-wrap">
                       <button
                         onClick={() => setIsEditingProfile((v) => !v)}
                         className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
@@ -2157,7 +2157,7 @@ function InventoryContent() {
                   )}
               </div>
             </div>
-            <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-3">
+            <div className="w-full lg:w-auto flex flex-col items-start lg:items-end gap-3">
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10">
                   <Wallet size={16} className="text-blue-400" />
@@ -2263,7 +2263,7 @@ function InventoryContent() {
                     : null;
                   if (!c) return null;
                   return (
-                    <div className="w-full flex justify-start md:justify-end">
+                    <div className="w-full flex justify-start lg:justify-end">
                       <div className="text-[10px] font-black text-emerald-300">
                         Coupon Available: <span className="text-emerald-200">{c.code}</span> ({formatCouponValue(c)})
                       </div>
@@ -2271,7 +2271,7 @@ function InventoryContent() {
                   );
                 })()}
 
-                <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full md:w-auto">
+                <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full lg:w-auto">
                   <TrendingUp className="text-emerald-500 shrink-0" size={24} />
                   <div className="min-w-0">
                     <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
@@ -2505,12 +2505,12 @@ function InventoryContent() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                   <label htmlFor="inventory-search" className="sr-only">Search vault</label>
-                  <input 
+                  <input
                     id="inventory-search"
-                    value={searchQuery} 
-                    onChange={(e) => setSearchQuery(e.target.value)} 
-                    className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-4 md:px-6 text-[10px] md:text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl" 
-                    placeholder="SEARCH VAULT..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-[#11141d] border border-white/5 rounded-2xl py-2.5 md:py-3 px-4 md:px-6 text-[10px] md:text-[11px] outline-none font-black uppercase tracking-widest focus:border-blue-500/50 w-full sm:w-72 transition-all shadow-xl"
+                    placeholder="SEARCH VAULT..."
                   />
                   <label htmlFor="inventory-sort" className="sr-only">Sort items</label>
                   <select
@@ -2543,11 +2543,8 @@ function InventoryContent() {
                     const wishlistKey = itemKey;
 
                     const labels = getWeaponAndSkinLabels(item);
-                    const isStatTrak = /stattrak/i.test(getItemDisplayName(item));
-                    const isSouvenir = /souvenir/i.test(getItemDisplayName(item));
-                    const nonTradable = isNonTradable(item);
                     const nonMarketable = isNonMarketable(item);
-                    
+
                     return (
                       <div key={idx} className="group relative">
                         <Link
@@ -2564,27 +2561,13 @@ function InventoryContent() {
                               />
                             </div>
                             <div className="mt-auto space-y-1.5 md:space-y-2">
-                              <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">{getItemDisplayName(item)}</p>
+                              <p className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-white/90 line-clamp-2">
+                                {getItemDisplayName(item)}
+                              </p>
                               {(labels.weaponName !== '—' || labels.skinName) && (
                                 <div className="text-[9px] text-gray-500 truncate">
                                   {labels.weaponName !== '—' ? <span className="text-gray-400 font-black">{labels.weaponName}</span> : null}
                                   {labels.skinName ? <span> {labels.weaponName !== '—' ? '•' : ''} {labels.skinName}</span> : null}
-                                </div>
-                              )}
-                              {(isStatTrak || isSouvenir || nonTradable || nonMarketable) && (
-                                <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
-                                  {isStatTrak && (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-[8px] font-black uppercase tracking-widest text-orange-300">StatTrak</span>
-                                  )}
-                                  {isSouvenir && (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[8px] font-black uppercase tracking-widest text-yellow-300">Souvenir</span>
-                                  )}
-                                  {nonTradable && (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-[8px] font-black uppercase tracking-widest text-red-300">Not tradable</span>
-                                  )}
-                                  {nonMarketable && (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-[8px] font-black uppercase tracking-widest text-gray-300">Not marketable</span>
-                                  )}
                                 </div>
                               )}
                               <div className="min-h-[14px] md:min-h-[16px] flex items-center">

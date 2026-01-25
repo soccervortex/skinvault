@@ -28,9 +28,7 @@ function ensureTawkHiddenStyle() {
 iframe[src*="tawk"],
 iframe[name^="tawk"],
 iframe[title*="Tawk"],
-iframe[title*="tawk"],
-iframe[title*="chat"],
-iframe[title*="Chat"] {
+iframe[title*="tawk"] {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
