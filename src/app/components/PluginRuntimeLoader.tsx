@@ -13,14 +13,62 @@ function safeString(v: any): string {
   return String(v ?? '').trim();
 }
 
+function ensureTawkHiddenStyle() {
+  try {
+    const id = 'plugin-tawk-hidden-style';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.setAttribute('data-plugin-managed', '1');
+    style.textContent = `
+[id^="tawk"],
+[class*="tawk"],
+iframe[src*="tawk"],
+iframe[name^="tawk"],
+iframe[title*="Tawk"],
+iframe[title*="tawk"],
+iframe[title*="chat"],
+iframe[title*="Chat"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+`;
+    document.head.appendChild(style);
+  } catch {
+  }
+}
+
+function removeTawkHiddenStyle() {
+  try {
+    const el = document.getElementById('plugin-tawk-hidden-style');
+    if (el) el.parentNode?.removeChild(el);
+  } catch {
+  }
+}
+
 function removeTawkArtifacts() {
   try {
+    try {
+      const api = (window as any).Tawk_API;
+      if (api?.hideWidget) api.hideWidget();
+      if (api?.minimize) api.minimize();
+    } catch {
+    }
+
     const scripts = Array.from(document.querySelectorAll('script'));
     for (const s of scripts) {
       const src = safeString((s as HTMLScriptElement).src);
       if (src.includes('embed.tawk.to')) {
         s.parentNode?.removeChild(s);
       }
+    }
+
+    try {
+      document.getElementById('plugin-tawk')?.parentNode?.removeChild(document.getElementById('plugin-tawk') as any);
+      document.getElementById('tawkto')?.parentNode?.removeChild(document.getElementById('tawkto') as any);
+    } catch {
     }
 
     const ids = [
@@ -60,6 +108,8 @@ function removeTawkArtifacts() {
       (window as any).Tawk_LoadStart = undefined;
     } catch {
     }
+
+    ensureTawkHiddenStyle();
   } catch {
   }
 }
@@ -96,6 +146,8 @@ function removeManagedExternalScripts(allowedIds: Set<string>) {
 function ensureTawk(embedUrl: string) {
   const url = safeString(embedUrl);
   if (!url) return;
+
+  removeTawkHiddenStyle();
 
   try {
     (window as any).Tawk_API = (window as any).Tawk_API || {};
