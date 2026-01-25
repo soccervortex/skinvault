@@ -2002,7 +2002,7 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="grid grid-cols-2 gap-2 w-full lg:flex lg:items-center lg:gap-3 lg:flex-wrap">
+                    <div className="mt-2 md:mt-3 grid grid-cols-2 gap-2 w-full lg:flex lg:items-center lg:gap-3 lg:flex-wrap">
                       <button
                         onClick={() => setIsEditingProfile((v) => !v)}
                         className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
