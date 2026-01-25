@@ -26,6 +26,7 @@ import {
   Bell,
   Twitter,
   Tag,
+  Plug,
 } from "lucide-react";
 import { ThemeType } from "@/app/utils/theme-storage";
 import { isOwner } from "@/app/utils/owner-ids";
@@ -1756,6 +1757,17 @@ function AdminPageInner() {
                 <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Giveaways</div>
               </div>
               <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Giveaway Manager</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/plugins')}
+              className="bg-black/40 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 text-left hover:border-blue-500/50 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Plug className="text-blue-400" size={16} />
+                <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">System</div>
+              </div>
+              <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Plugin Manager</div>
             </button>
 
             <button

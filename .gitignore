@@ -42,6 +42,9 @@ next-env.d.ts
 
 ENV_SETUP.md
 API_KEYS_SETUP.md
+tawk-complete-articles.md
+tawk-knowledge-base.md
+tawk-setup-guide.md
 UpdatePrices.ps1
 service_log.txt
 service_log.txt

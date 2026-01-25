@@ -25,6 +25,8 @@ import CreatorAnalyticsTracker from "./components/CreatorAnalyticsTracker";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { SITE_CONFIG, ALL_KEYWORDS } from "@/lib/seo-config";
+import { hasMongoConfig, getDatabase } from "@/app/utils/mongodb-client";
+import { getEnabledPlugins } from "@/app/utils/plugins";
 
 config.autoAddCss = false;
 
@@ -126,6 +128,28 @@ async function getHomePageRating() {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const ratingData = await getHomePageRating();
+  let enabledPlugins: Array<any> = [];
+
+  try {
+    if (hasMongoConfig()) {
+      const db = await getDatabase();
+      enabledPlugins = await getEnabledPlugins(db as any);
+    }
+  } catch {
+    enabledPlugins = [];
+  }
+
+  const tawkPlugin = enabledPlugins.find((p: any) => String(p?.type || '') === 'tawkto' && String(p?.slug || p?._id || '') === 'tawk');
+  const tawkEmbedUrl = String((tawkPlugin as any)?.config?.embedUrl || '').trim();
+  const tawkEnabled = !!(tawkPlugin && tawkEmbedUrl);
+
+  const externalScripts = enabledPlugins
+    .filter((p: any) => String(p?.type || '') === 'external_script')
+    .map((p: any) => ({
+      id: String(p?.slug || p?._id || ''),
+      src: String(p?.config?.src || '').trim(),
+    }))
+    .filter((p: any) => !!p.id && !!p.src);
 
   // --- 3. STRUCTURED DATA (The Advanced Secret whisper) ---
   const softwareApplicationSchema = {
@@ -201,21 +225,27 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </ErrorBoundary>
         <VercelAnalytics />
 
-        <Script
-          id="tawkto"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+        {externalScripts.map((p: any) => (
+          <Script key={p.id} src={p.src} strategy="afterInteractive" />
+        ))}
+
+        {tawkEnabled ? (
+          <Script
+            id="tawkto"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
 (function(){
 var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
 s1.async=true;
-s1.src='https://embed.tawk.to/69757cfbdcaf61197c394bfd/1jfpf0dpc';
+s1.src='${tawkEmbedUrl.replace(/'/g, "\\'")}';
 s1.charset='UTF-8';
 s1.setAttribute('crossorigin','*');
 s0.parentNode.insertBefore(s1,s0);
 })();`,
-          }}
-        />
+            }}
+          />
+        ) : null}
       </body>
     </html>
   );
