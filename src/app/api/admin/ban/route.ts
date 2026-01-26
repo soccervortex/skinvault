@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
-import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { notifyUserBan, notifyUserUnban } from '@/app/utils/discord-webhook';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
 
-const ADMIN_HEADER = 'x-admin-key';
+import { isAdminRequest } from '@/app/utils/admin-auth';
+
 const BANNED_KEY = 'banned_steam_ids';
 const BAN_REASONS_KEY = 'ban_reasons';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    if (!isAdminRequest(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if user is owner
     const url = new URL(request.url);
     const steamIdParam = url.searchParams.get('steamId');
@@ -20,17 +25,6 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     const bodySteamId = body?.steamId;
     
-    // Use body steamId if available, otherwise check query param
-    // For owner check, we'd need to get it from the request somehow
-    // For now, we'll just check the admin key
-    
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const rawSteamId = bodySteamId || steamIdParam;
     const steamId = rawSteamId ? sanitizeSteamId(rawSteamId) : null;
     
@@ -97,12 +91,7 @@ export async function POST(request: Request) {
 
 // GET: Check if Steam ID is banned
 export async function GET(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isAdminRequest(request as any)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const url = new URL(request.url);
@@ -128,12 +117,7 @@ export async function GET(request: Request) {
 
 // DELETE: Unban a Steam ID
 export async function DELETE(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isAdminRequest(request as any)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const url = new URL(request.url);

@@ -310,7 +310,7 @@ export default function ChatPage() {
         const parsedUser = stored ? JSON.parse(stored) : null;
         if (!parsedUser?.steamId) return;
         
-        const res = await fetch(`/api/admin/ban?steamId=${parsedUser.steamId}`);
+        const res = await fetch(`/api/user/ban-status?steamId=${parsedUser.steamId}`);
         if (res.ok) {
           const data = await res.json();
           if (data.banned === true) {

@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         // Check if user is still banned (if steamId is stored)
         if (notification.steamId) {
           try {
-            const response = await fetch(`/api/admin/ban?steamId=${notification.steamId}`);
+            const response = await fetch(`/api/user/ban-status?steamId=${notification.steamId}`);
             if (response.ok) {
               const data = await response.json();
               // If user is no longer banned, clear the notification

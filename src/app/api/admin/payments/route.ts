@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
+import { isAdminRequest } from '@/app/utils/admin-auth';
 import Stripe from 'stripe';
-
-const ADMIN_HEADER = 'x-admin-key';
 
 type PaymentStatus = 'paid' | 'payment_failed' | 'expired' | 'unfulfilled' | 'unknown';
 
@@ -411,13 +411,8 @@ async function patchFailed(id: string, patch: Record<string, any>) {
   }
 }
 
-export async function GET(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function GET(request: NextRequest) {
+  if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const url = new URL(request.url);
@@ -700,13 +695,8 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function POST(request: NextRequest) {
+  if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await request.json().catch(() => ({}));

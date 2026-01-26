@@ -1,16 +1,10 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
+import type { NextRequest } from 'next/server';
 import { dbGet } from '@/app/utils/database';
+import { isAdminRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
-
-export async function GET(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function GET(request: NextRequest) {
+  if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const { searchParams } = new URL(request.url);

@@ -6,7 +6,7 @@ export async function isBanned(steamId: string): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`/api/admin/ban?steamId=${steamId}`);
+    const response = await fetch(`/api/user/ban-status?steamId=${steamId}`);
     if (response.ok) {
       const data = await response.json();
       return data.banned === true;

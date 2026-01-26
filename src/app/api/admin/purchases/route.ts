@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { isAdminRequest } from '@/app/utils/admin-auth';
 
 async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<string, any>) {
   const purchasesKey = 'purchase_history';
@@ -19,14 +19,9 @@ async function updatePurchaseDiscordStatus(sessionId: string, patch: Record<stri
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const url = new URL(request.url);
     const targetSteamId = url.searchParams.get('steamId'); // Target user's Steam ID to filter by
@@ -72,14 +67,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json().catch(() => ({}));
     const action = String(body?.action || '').trim();
