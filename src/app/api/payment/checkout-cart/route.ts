@@ -8,6 +8,7 @@ import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
+import { upsertCartTrackingMessage } from '@/app/utils/discord-webhook';
 
 async function getStripeInstance(): Promise<Stripe> {
   let testMode = false;
@@ -227,9 +228,11 @@ export async function POST(request: NextRequest) {
       ? [{ promotion_code: promo.promoCodeId }]
       : undefined;
 
-    const cartId = randomId();
+    const cartIdRaw = String(body?.cartId || '').trim();
+    const cartId = /^[a-zA-Z0-9_-]{6,80}$/.test(cartIdRaw) ? cartIdRaw : randomId();
 
     const line_items: any[] = [];
+    let totalMinor = 0;
 
     for (const it of items) {
       const kind = String(it?.kind || '').trim();
@@ -237,6 +240,7 @@ export async function POST(request: NextRequest) {
         const plan = String(it?.plan || '').trim();
         const info = PRO_PLANS[plan];
         if (!info) continue;
+        totalMinor += info.amount;
         line_items.push({
           price_data: {
             currency: 'eur',
@@ -258,6 +262,7 @@ export async function POST(request: NextRequest) {
         const info = CREDIT_PACKS[pack];
         if (!info) continue;
         const qty = safeQty(it?.quantity, 1, 99);
+        totalMinor += info.amount * qty;
         line_items.push({
           price_data: {
             currency: 'eur',
@@ -279,6 +284,7 @@ export async function POST(request: NextRequest) {
         const info = SPIN_PACKS[pack];
         if (!info) continue;
         const qty = safeQty(it?.quantity, 1, 99);
+        totalMinor += info.amount * qty;
         line_items.push({
           price_data: {
             currency: 'eur',
@@ -300,6 +306,7 @@ export async function POST(request: NextRequest) {
         const info = CONSUMABLES[consumableType];
         if (!info) continue;
         const qty = safeQty(it?.quantity, 1, 100);
+        totalMinor += info.amount * qty;
         line_items.push({
           price_data: {
             currency: 'eur',
@@ -334,6 +341,18 @@ export async function POST(request: NextRequest) {
       testMode,
       createdAt: new Date().toISOString(),
     });
+
+    try {
+      await upsertCartTrackingMessage({
+        cartId,
+        steamId,
+        items,
+        status: 'checkout_started',
+        amount: totalMinor / 100,
+        currency: 'eur',
+      } as any);
+    } catch {
+    }
 
     const session = await createCheckoutSessionWithPaymentMethods(stripe, {
       line_items,

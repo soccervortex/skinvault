@@ -177,6 +177,10 @@ function PaymentSuccessContent() {
             localStorage.removeItem('sv_cart_v1');
           } catch {
           }
+          try {
+            localStorage.removeItem('sv_cart_id');
+          } catch {
+          }
         }
 
         setLoading(false);

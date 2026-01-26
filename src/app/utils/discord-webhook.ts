@@ -78,6 +78,72 @@ async function postDiscordWebhook(webhookUrl: string, embeds: DiscordEmbed[], st
   }
 }
 
+type DiscordWebhookMessage = {
+  id: string;
+  channel_id?: string;
+  timestamp?: string;
+};
+
+async function postDiscordWebhookWait(
+  webhookUrl: string,
+  embeds: DiscordEmbed[],
+  strict: boolean
+): Promise<DiscordWebhookMessage | null> {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), 10_000) : null;
+  try {
+    const u = webhookUrl.includes('?') ? `${webhookUrl}&wait=true` : `${webhookUrl}?wait=true`;
+    const res = await fetch(u, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds }),
+      signal: controller?.signal,
+    });
+    if (!res.ok) {
+      let text = '';
+      try {
+        text = await res.text();
+      } catch {
+      }
+      const msg = `Discord webhook failed (${res.status} ${res.statusText})${text ? `: ${text.slice(0, 500)}` : ''}`;
+      if (strict) throw new Error(msg);
+      console.error(msg);
+      return null;
+    }
+    const json = await res.json().catch(() => null);
+    const id = String(json?.id || '').trim();
+    if (!id) return null;
+    return { id, channel_id: json?.channel_id, timestamp: json?.timestamp };
+  } catch (error) {
+    if (strict) throw error;
+    console.error(`Failed to send Discord webhook (wait):`, error);
+    return null;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function deleteDiscordWebhookMessage(webhookUrl: string, messageId: string): Promise<void> {
+  const id = String(messageId || '').trim();
+  if (!id) return;
+  const base = String(webhookUrl || '').split('?')[0];
+  if (!base) return;
+  const url = `${base}/messages/${encodeURIComponent(id)}`;
+  try {
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) {
+      let text = '';
+      try {
+        text = await res.text();
+      } catch {
+      }
+      console.error(`Discord webhook delete failed (${res.status} ${res.statusText})${text ? `: ${text.slice(0, 300)}` : ''}`);
+    }
+  } catch (e) {
+    console.error('Discord webhook delete failed:', e);
+  }
+}
+
 interface DiscordEmbed {
   title?: string;
   description?: string;
@@ -287,7 +353,23 @@ export async function notifyProPurchase(steamId: string, months: number, amount:
   // Send to both 'pro' and 'purchases' channels
   await sendDiscordWebhook([embed], 'pro');
   await sendDiscordWebhook([embed], 'purchases');
-  await sendDiscordWebhook([embed], 'payment_success');
+  await sendDiscordWebhook([
+    {
+      title: '✅ Payment Successful',
+      color: 0x00ff00,
+      fields: [
+        { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+        { name: 'Type', value: 'pro', inline: true },
+        { name: 'Items', value: `${months} month${months !== 1 ? 's' : ''} Pro`, inline: false },
+        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
+        { name: 'Expires', value: proUntil ? `<t:${Math.floor(new Date(proUntil).getTime() / 1000)}:F>` : 'N/A', inline: true },
+        { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+        { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+      ],
+      footer: { text: 'SkinVaults Notification System' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'payment_success');
 }
 
 export async function notifyConsumablePurchaseStrict(steamId: string, consumableType: string, quantity: number, amount: number, currency: string, sessionId: string): Promise<void> {
@@ -342,7 +424,23 @@ export async function notifyConsumablePurchaseStrict(steamId: string, consumable
     timestamp: new Date().toISOString(),
   };
 
-  await sendDiscordWebhookStrict([embed], 'payment_success');
+  await sendDiscordWebhook([embed], 'purchases');
+  await sendDiscordWebhookStrict([
+    {
+      title: '✅ Payment Successful',
+      color: 0x00ff00,
+      fields: [
+        { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+        { name: 'Type', value: 'consumable', inline: true },
+        { name: 'Items', value: `${quantity}x ${typeName}`, inline: false },
+        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
+        { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+        { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+      ],
+      footer: { text: 'SkinVaults Notification System' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'payment_success');
 }
 
 export async function notifyCreditsPurchaseStrict(steamId: string, credits: number, pack: string, amount: number, currency: string, sessionId: string): Promise<void> {
@@ -386,7 +484,23 @@ export async function notifyCreditsPurchaseStrict(steamId: string, credits: numb
     timestamp: new Date().toISOString(),
   };
 
-  await sendDiscordWebhookStrict([embed], 'payment_success');
+  await sendDiscordWebhook([embed], 'purchases');
+  await sendDiscordWebhookStrict([
+    {
+      title: '✅ Payment Successful',
+      color: 0x00ff00,
+      fields: [
+        { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+        { name: 'Type', value: 'spins', inline: true },
+        { name: 'Items', value: details, inline: false },
+        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
+        { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+        { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+      ],
+      footer: { text: 'SkinVaults Notification System' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'payment_success');
 }
 
 export async function notifySpinsPurchaseStrict(steamId: string, spins: number, pack: string, amount: number, currency: string, sessionId: string): Promise<void> {
@@ -430,7 +544,23 @@ export async function notifySpinsPurchaseStrict(steamId: string, spins: number, 
     timestamp: new Date().toISOString(),
   };
 
-  await sendDiscordWebhookStrict([embed], 'payment_success');
+  await sendDiscordWebhook([embed], 'purchases');
+  await sendDiscordWebhookStrict([
+    {
+      title: '✅ Payment Successful',
+      color: 0x00ff00,
+      fields: [
+        { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+        { name: 'Type', value: 'credits', inline: true },
+        { name: 'Items', value: details, inline: false },
+        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
+        { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+        { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+      ],
+      footer: { text: 'SkinVaults Notification System' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'payment_success');
 }
 
 export async function notifyProPurchaseStrict(steamId: string, months: number, amount: number, currency: string, proUntil: string, sessionId: string): Promise<void> {
@@ -476,8 +606,153 @@ export async function notifyProPurchaseStrict(steamId: string, months: number, a
     timestamp: new Date().toISOString(),
   };
 
-  await sendDiscordWebhookStrict([embed], 'pro');
-  await sendDiscordWebhookStrict([embed], 'payment_success');
+  await sendDiscordWebhook([embed], 'pro');
+  await sendDiscordWebhook([embed], 'purchases');
+  await sendDiscordWebhookStrict([
+    {
+      title: '✅ Payment Successful',
+      color: 0x00ff00,
+      fields: [
+        { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+        { name: 'Type', value: 'pro', inline: true },
+        { name: 'Items', value: `${months} month${months !== 1 ? 's' : ''} Pro`, inline: false },
+        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
+        { name: 'Expires', value: proUntil ? `<t:${Math.floor(new Date(proUntil).getTime() / 1000)}:F>` : 'N/A', inline: true },
+        { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+        { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+      ],
+      footer: { text: 'SkinVaults Notification System' },
+      timestamp: new Date().toISOString(),
+    },
+  ], 'payment_success');
+}
+
+type CartTrackingPayload = {
+  cartId: string;
+  steamId: string;
+  steamName?: string | null;
+  items: any[];
+  status: 'active' | 'paid' | 'failed' | 'expired' | 'updated' | 'checkout_started';
+  amount?: number | null;
+  currency?: string | null;
+  grantedSummary?: string | null;
+  sessionId?: string | null;
+  reason?: string | null;
+};
+
+function formatCartItems(items: any[]): string {
+  const out: string[] = [];
+  for (const it of Array.isArray(items) ? items : []) {
+    const kind = String((it as any)?.kind || '').trim();
+    if (kind === 'pro') {
+      const plan = String((it as any)?.plan || '').trim();
+      out.push(`Pro (${plan})`);
+      continue;
+    }
+    if (kind === 'credits') {
+      const pack = String((it as any)?.pack || '').trim();
+      const qty = Number((it as any)?.quantity || 1);
+      out.push(`Credits (${pack}) x${Math.max(1, Math.floor(qty))}`);
+      continue;
+    }
+    if (kind === 'spins') {
+      const pack = String((it as any)?.pack || '').trim();
+      const qty = Number((it as any)?.quantity || 1);
+      out.push(`Spins (${pack}) x${Math.max(1, Math.floor(qty))}`);
+      continue;
+    }
+    if (kind === 'consumable') {
+      const t = String((it as any)?.consumableType || '').trim();
+      const qty = Number((it as any)?.quantity || 1);
+      out.push(`${t} x${Math.max(1, Math.floor(qty))}`);
+      continue;
+    }
+  }
+  return out.length ? out.join('\n') : 'Empty';
+}
+
+export async function fetchSteamNameForWebhook(steamId: string): Promise<string | null> {
+  try {
+    const apiKey = process.env.STEAM_API_KEY;
+    if (!apiKey) return null;
+    const safeSteamId = String(steamId || '').trim();
+    if (!/^\d{17}$/.test(safeSteamId)) return null;
+    const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${encodeURIComponent(apiKey)}&steamids=${encodeURIComponent(safeSteamId)}`;
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const data: any = await res.json().catch(() => null);
+    const player = data?.response?.players?.[0];
+    const name = String(player?.personaname || player?.realname || '').trim();
+    return name || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function upsertCartTrackingMessage(payload: CartTrackingPayload): Promise<void> {
+  try {
+    const webhookUrl = getWebhookUrl('cart');
+    if (!webhookUrl) return;
+
+    const cartId = String(payload?.cartId || '').trim();
+    const steamId = String(payload?.steamId || '').trim();
+    if (!cartId || !steamId) return;
+
+    const { dbGet, dbSet } = await import('@/app/utils/database');
+    const key = 'discord_cart_tracking_messages';
+    const existing = (await dbGet<Record<string, any>>(key, false)) || {};
+    const prev = existing[cartId];
+    const prevMessageId = String(prev?.messageId || '').trim();
+
+    if (prevMessageId) {
+      await deleteDiscordWebhookMessage(webhookUrl, prevMessageId);
+    }
+
+    const steamName = String(payload?.steamName || '').trim() || (await fetchSteamNameForWebhook(steamId)) || null;
+    const status = String(payload?.status || 'updated');
+    const statusLabel =
+      status === 'paid' ? 'Paid' :
+      status === 'failed' ? 'Failed' :
+      status === 'expired' ? 'Expired' :
+      status === 'checkout_started' ? 'Checkout Started' :
+      status === 'active' ? 'Active' :
+      'Updated';
+
+    const amount = typeof payload?.amount === 'number' ? payload.amount : null;
+    const currency = String(payload?.currency || 'eur');
+
+    const embed: DiscordEmbed = {
+      title: `🛒 Cart (${statusLabel})`,
+      color: status === 'paid' ? 0x00ff00 : status === 'failed' ? 0xff0000 : status === 'expired' ? 0xff9900 : 0x5865f2,
+      fields: [
+        ...(steamName ? [{ name: 'Username', value: steamName, inline: true }] : []),
+        { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+        { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
+        ...(payload?.sessionId ? [{ name: 'Session ID', value: `\`${String(payload.sessionId)}\``, inline: false }] : []),
+        ...(amount !== null ? [{ name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true }] : []),
+        { name: 'Items', value: formatCartItems(payload?.items || []), inline: false },
+        ...(payload?.grantedSummary ? [{ name: 'Granted', value: String(payload.grantedSummary), inline: false }] : []),
+        ...(payload?.reason ? [{ name: 'Reason', value: `\`${String(payload.reason).slice(0, 900)}\``, inline: false }] : []),
+        { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+      ],
+      footer: { text: 'SkinVaults Notification System' },
+      timestamp: new Date().toISOString(),
+    };
+
+    const msg = await postDiscordWebhookWait(webhookUrl, [embed], false);
+    const messageId = String(msg?.id || '').trim();
+    if (messageId) {
+      existing[cartId] = {
+        cartId,
+        steamId,
+        messageId,
+        updatedAt: new Date().toISOString(),
+      };
+      await dbSet(key, existing);
+    }
+  } catch (e) {
+    console.error('Failed to upsert cart tracking message:', e);
+  }
 }
 
 export async function notifyPaymentFailed(
@@ -527,6 +802,56 @@ export async function notifyCartEvent(
   };
 
   await sendDiscordWebhook([embed], 'cart');
+}
+
+export async function notifyCartPurchaseSuccess(
+  steamId: string,
+  cartId: string,
+  items: any[],
+  amount: number,
+  currency: string,
+  sessionId: string,
+  grantedSummary: string
+): Promise<void> {
+  const safeCurrency = String(currency || 'eur');
+  const itemsText = formatCartItems(items);
+
+  const purchasesEmbed: DiscordEmbed = {
+    title: '🛒 Cart Purchase',
+    description: 'A user has purchased multiple items via cart checkout.',
+    color: 0x00ff00,
+    fields: [
+      { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+      { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
+      { name: 'Amount', value: `${Number(amount).toFixed(2)} ${safeCurrency.toUpperCase()}`, inline: true },
+      { name: 'Items', value: itemsText, inline: false },
+      { name: 'Granted', value: grantedSummary || 'N/A', inline: false },
+      { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+      { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+    ],
+    footer: { text: 'SkinVaults Notification System' },
+    timestamp: new Date().toISOString(),
+  };
+
+  const paymentEmbed: DiscordEmbed = {
+    title: '✅ Payment Successful',
+    color: 0x00ff00,
+    fields: [
+      { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+      { name: 'Type', value: 'cart', inline: true },
+      { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
+      { name: 'Amount', value: `${Number(amount).toFixed(2)} ${safeCurrency.toUpperCase()}`, inline: true },
+      { name: 'Items', value: itemsText, inline: false },
+      { name: 'Granted', value: grantedSummary || 'N/A', inline: false },
+      { name: 'Session ID', value: `\`${sessionId}\``, inline: false },
+      { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+    ],
+    footer: { text: 'SkinVaults Notification System' },
+    timestamp: new Date().toISOString(),
+  };
+
+  await sendDiscordWebhook([purchasesEmbed], 'purchases');
+  await sendDiscordWebhook([paymentEmbed], 'payment_success');
 }
 
 /**

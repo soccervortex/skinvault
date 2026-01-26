@@ -4,7 +4,7 @@ import { grantPro } from '@/app/utils/pro-storage';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { captureError, captureMessage } from '@/app/lib/error-handler';
 import { sendInngestEvent } from '@/app/lib/inngest';
-import { notifyCartEvent, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailed, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyCartEvent, notifyCartPurchaseSuccess, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailed, notifyProPurchaseStrict, notifySpinsPurchaseStrict, upsertCartTrackingMessage } from '@/app/utils/discord-webhook';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
 import { sanitizeEmail } from '@/app/utils/sanitize';
@@ -465,6 +465,29 @@ export async function POST(request: Request) {
         } catch {
         }
 
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+          const grantedSummary = `Credits: ${grantedCredits.toLocaleString('en-US')}\nSpins: ${grantedSpins.toLocaleString('en-US')}\nPro months: ${grantedProMonths}\nConsumables: ${consumablesGranted.map((c) => `${c.quantity}x ${c.consumableType}`).join(', ') || 'None'}`;
+
+          try {
+            await notifyCartPurchaseSuccess(steamId, cartId, pendingItems, amount, String(currency), session.id, grantedSummary);
+          } catch {
+          }
+
+          await upsertCartTrackingMessage({
+            cartId,
+            steamId,
+            items: pendingItems,
+            status: 'paid',
+            amount,
+            currency,
+            sessionId: session.id,
+            grantedSummary,
+          } as any);
+        } catch {
+        }
+
         console.log(`✅ Cart purchase fulfilled for ${steamId} (cartId=${cartId})`);
         return NextResponse.json({ received: true, ok: true });
       } catch (error) {
@@ -496,6 +519,29 @@ export async function POST(request: Request) {
             { name: 'Amount', value: `${amount.toFixed(2)} ${String(currency).toUpperCase()}`, inline: true },
             { name: 'Error', value: `\`${error instanceof Error ? error.message : 'Unknown error'}\``, inline: false },
           ], 0xff0000);
+        } catch {
+        }
+
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+          await upsertCartTrackingMessage({
+            cartId,
+            steamId,
+            items: (() => {
+              try {
+                const raw = (session.metadata as any)?.items;
+                if (Array.isArray(raw)) return raw;
+              } catch {
+              }
+              return [];
+            })(),
+            status: 'failed',
+            amount,
+            currency,
+            sessionId: session.id,
+            reason: error instanceof Error ? error.message : 'Unknown error',
+          } as any);
         } catch {
         }
 
@@ -1153,6 +1199,7 @@ export async function POST(request: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     const steamId = String(session.metadata?.steamId || '').trim();
     const type = String(session.metadata?.type || '').trim();
+    const cartId = String((session.metadata as any)?.cartId || '').trim();
     const amount = typeof session.amount_total === 'number' ? session.amount_total / 100 : 0;
     const currency = String(session.currency || 'eur');
     const customerEmail = sanitizeEmail(String((session as any)?.customer_details?.email || (session as any)?.customer_email || ''));
@@ -1186,6 +1233,22 @@ export async function POST(request: Request) {
     } catch {
     }
 
+    if (type === 'cart' && cartId && steamId) {
+      try {
+        await upsertCartTrackingMessage({
+          cartId,
+          steamId,
+          items: [],
+          status: 'expired',
+          amount,
+          currency,
+          sessionId: session.id,
+          reason: 'Checkout expired',
+        } as any);
+      } catch {
+      }
+    }
+
     return NextResponse.json({ received: true });
   }
 
@@ -1193,6 +1256,7 @@ export async function POST(request: Request) {
     const pi = event.data.object as Stripe.PaymentIntent;
     const steamId = String((pi.metadata as any)?.steamId || '').trim();
     const type = String((pi.metadata as any)?.type || '').trim();
+    const cartId = String((pi.metadata as any)?.cartId || '').trim();
     const amount = typeof pi.amount === 'number' ? pi.amount / 100 : 0;
     const currency = String(pi.currency || 'eur');
     const customerEmail = sanitizeEmail(String((pi as any)?.receipt_email || ''));
@@ -1226,6 +1290,21 @@ export async function POST(request: Request) {
         { name: 'Error', value: `\`${errorMsg}\``, inline: false },
       ]);
     } catch {
+    }
+
+    if (type === 'cart' && cartId && steamId) {
+      try {
+        await upsertCartTrackingMessage({
+          cartId,
+          steamId,
+          items: [],
+          status: 'failed',
+          amount,
+          currency,
+          reason: errorMsg,
+        } as any);
+      } catch {
+      }
     }
 
     return NextResponse.json({ received: true });

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { notifyCartEvent, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailed, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyCartEvent, notifyCartPurchaseSuccess, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailed, notifyProPurchaseStrict, notifySpinsPurchaseStrict, upsertCartTrackingMessage } from '@/app/utils/discord-webhook';
 import { createUserNotification } from '@/app/utils/user-notifications';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 
@@ -464,6 +464,29 @@ export async function POST(request: Request) {
             { name: 'Amount', value: `${amount.toFixed(2)} ${String(currency).toUpperCase()}`, inline: true },
             { name: 'Granted', value: `Credits: ${grantedCredits.toLocaleString('en-US')}\nSpins: ${grantedSpins.toLocaleString('en-US')}\nPro months: ${grantedProMonths}\nConsumables: ${consumablesGranted.map((c) => `${c.quantity}x ${c.consumableType}`).join(', ') || 'None'}`, inline: false },
           ]);
+        } catch {
+        }
+
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+          const grantedSummary = `Credits: ${grantedCredits.toLocaleString('en-US')}\nSpins: ${grantedSpins.toLocaleString('en-US')}\nPro months: ${grantedProMonths}\nConsumables: ${consumablesGranted.map((c) => `${c.quantity}x ${c.consumableType}`).join(', ') || 'None'}`;
+
+          try {
+            await notifyCartPurchaseSuccess(steamId, cartId, pendingItems, amount, String(currency), session.id, grantedSummary);
+          } catch {
+          }
+
+          await upsertCartTrackingMessage({
+            cartId,
+            steamId,
+            items: pendingItems,
+            status: 'paid',
+            amount,
+            currency,
+            sessionId: session.id,
+            grantedSummary,
+          } as any);
         } catch {
         }
 

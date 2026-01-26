@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import { useToast } from '@/app/components/Toast';
 import { CreditCard, Loader2, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { getOrCreateCartId, writeCart as writeCartClient } from '@/app/utils/cart-client';
 
 type CheckoutType = 'pro' | 'credits' | 'spins' | 'consumable';
 
@@ -86,9 +87,7 @@ function readCart(): CartItem[] {
 
 function writeCart(items: CartItem[]): void {
   try {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(CART_KEY, JSON.stringify(Array.isArray(items) ? items : []));
-    window.dispatchEvent(new CustomEvent('sv-cart-updated'));
+    writeCartClient(items as any);
   } catch {
   }
 }
@@ -324,6 +323,7 @@ export default function CheckoutPage() {
     try {
       const payload: any = { steamId, email: cleanEmail, items };
       if (cleanPromo) payload.promoCode = cleanPromo;
+      payload.cartId = getOrCreateCartId();
 
       const res = await fetch('/api/payment/checkout-cart', {
         method: 'POST',
