@@ -2125,9 +2125,22 @@ function InventoryContent() {
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="flex-1 min-w-0 text-[clamp(1.25rem,3.6vw,2.25rem)] md:text-[clamp(1.5rem,2.8vw,2.5rem)] font-black italic uppercase tracking-tighter leading-none whitespace-normal break-all">
-                      {formatProfileName(viewedUser?.name || "User")}
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <h1 className="flex-1 min-w-0 font-black italic uppercase leading-none whitespace-nowrap">
+                      {(() => {
+                        const n = formatProfileName(viewedUser?.name || 'User');
+                        const len = n.length;
+                        const reduce = Math.max(0, len - 12) * 0.07;
+                        const tracking = len > 20 ? 'tracking-tight' : 'tracking-tighter';
+                        return (
+                          <span
+                            className={tracking}
+                            style={{ fontSize: `clamp(1.25rem, calc(4.2vw - ${reduce}rem), 2.5rem)` }}
+                          >
+                            {n}
+                          </span>
+                        );
+                      })()}
                     </h1>
 
                     {vaultRank && (
