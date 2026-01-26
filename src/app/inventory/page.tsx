@@ -2093,12 +2093,12 @@ function InventoryContent() {
 
         {!websiteProfilePrivate && viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
-            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 md:gap-8">
-              <div className="flex items-center gap-4 md:gap-6 w-full lg:w-auto">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 md:gap-8">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 w-full xl:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="w-full sm:w-auto min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
+                    <h1 className="flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
 
@@ -2141,7 +2141,7 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="mt-2 md:mt-3 grid grid-cols-2 gap-2 w-full lg:flex lg:items-center lg:gap-3 lg:flex-wrap">
+                    <div className="mt-2 md:mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:flex xl:items-center xl:gap-3 xl:flex-wrap">
                       <button
                         onClick={() => setIsEditingProfile((v) => !v)}
                         className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
@@ -2161,7 +2161,7 @@ function InventoryContent() {
                       <button
                         onClick={handleForceRefreshInventory}
                         disabled={refreshingInventory}
-                        className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                        className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
                       >
                         {refreshingInventory ? 'Refreshing...' : 'Refresh Inventory'}
                       </button>
@@ -2327,8 +2327,8 @@ function InventoryContent() {
                   )}
               </div>
             </div>
-            <div className="w-full lg:w-auto flex flex-col items-start lg:items-end gap-3">
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="w-full xl:w-auto flex flex-col items-start xl:items-end gap-3">
+              <div className="flex items-center gap-2 flex-wrap justify-start xl:justify-end">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10">
                   <Wallet size={16} className="text-blue-400" />
                   <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">Credits</div>
@@ -2433,7 +2433,7 @@ function InventoryContent() {
                     : null;
                   if (!c) return null;
                   return (
-                    <div className="w-full flex justify-start lg:justify-end">
+                    <div className="w-full flex justify-start xl:justify-end">
                       <div className="text-[10px] font-black text-emerald-300">
                         Coupon Available: <span className="text-emerald-200">{c.code}</span> ({formatCouponValue(c)})
                       </div>
@@ -2441,7 +2441,7 @@ function InventoryContent() {
                   );
                 })()}
 
-                <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full lg:w-auto">
+                <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 md:px-10 py-4 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 shadow-inner w-full xl:w-auto">
                   <TrendingUp className="text-emerald-500 shrink-0" size={24} />
                   <div className="min-w-0">
                     <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Vault Value</p>
@@ -2451,7 +2451,7 @@ function InventoryContent() {
               </div>
             </header>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
               <StatCard
                 label="Total Items"
                 icon={<PackageOpen size={12} />}
@@ -2491,7 +2491,7 @@ function InventoryContent() {
             </div>
 
             {isPro && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
                 <StatCard
                   label="ADR"
                   icon={<Target size={12} />}
