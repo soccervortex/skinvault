@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailureStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
+import { notifyCartEvent, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailed, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { createUserNotification } from '@/app/utils/user-notifications';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 
@@ -127,19 +127,6 @@ export async function POST(request: Request) {
 
     // Check if payment was successful
     if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
-      try {
-        await notifyPaymentFailureStrict({
-          title: '❌ Payment Not Completed',
-          type: String(session.metadata?.type || ''),
-          steamId,
-          sessionId,
-          stage: 'verify_purchase_payment_status',
-          error: `Payment not completed (status=${session.payment_status})`,
-          amount: session.amount_total ? session.amount_total / 100 : 0,
-          currency: session.currency || 'eur',
-        });
-      } catch {
-      }
       return NextResponse.json({ 
         error: 'Payment not completed',
         paymentStatus: session.payment_status 
@@ -148,19 +135,6 @@ export async function POST(request: Request) {
 
     // Verify Steam ID matches
     if (session.metadata?.steamId !== steamId) {
-      try {
-        await notifyPaymentFailureStrict({
-          title: '❌ Steam ID Mismatch',
-          type: String(session.metadata?.type || ''),
-          steamId,
-          sessionId,
-          stage: 'verify_purchase_steam_mismatch',
-          error: `Steam mismatch expected=${String(session.metadata?.steamId || '')} provided=${steamId}`,
-          amount: session.amount_total ? session.amount_total / 100 : 0,
-          currency: session.currency || 'eur',
-        });
-      } catch {
-      }
       return NextResponse.json({ 
         error: 'Steam ID mismatch',
         expected: session.metadata?.steamId,
@@ -289,27 +263,234 @@ export async function POST(request: Request) {
     }
 
     if (type === 'cart') {
-      try {
-        await notifyPaymentFailureStrict({
-          title: '⚠️ Cart Manual Verification Blocked',
-          type: 'cart',
-          steamId,
-          sessionId,
-          cartId: String((session.metadata as any)?.cartId || ''),
-          stage: 'verify_purchase_manual_cart_blocked',
-          error: 'Cart purchases cannot be manually fulfilled via verify-purchase POST. Wait for Stripe webhook.',
-          amount: session.amount_total ? session.amount_total / 100 : 0,
-          currency: session.currency || 'eur',
-        });
-      } catch {
+      const cartId = String((session.metadata as any)?.cartId || '').trim();
+      if (!cartId) {
+        return NextResponse.json({ fulfilled: false, error: 'Missing cartId on session' }, { status: 400 });
       }
-      return NextResponse.json(
-        {
-          fulfilled: false,
-          error: 'Cart purchases cannot be manually fulfilled via this endpoint. Please wait for the webhook, then refresh.',
-        },
-        { status: 400 }
-      );
+
+      try {
+        const pendingKey = `pending_cart_${cartId}`;
+        const pending = await dbGet<any>(pendingKey);
+        const pendingSteamId = String(pending?.steamId || '').trim();
+        const pendingItems = Array.isArray(pending?.items) ? pending.items : [];
+
+        if (pending?.fulfilled === true) {
+          return NextResponse.json({
+            fulfilled: true,
+            type: 'cart',
+            cartId,
+            message: 'Cart purchase already fulfilled',
+            ...invoicePatch,
+            ...receiptPatch,
+          });
+        }
+
+        if (!pending || pendingSteamId !== steamId || pendingItems.length < 1) {
+          return NextResponse.json(
+            { fulfilled: false, error: 'Pending cart missing or invalid. Please wait for webhook and refresh.' },
+            { status: 409 }
+          );
+        }
+
+        const { getDatabase, hasMongoConfig } = await import('@/app/utils/mongodb-client');
+        if (!hasMongoConfig()) {
+          return NextResponse.json({ fulfilled: false, error: 'Database not configured' }, { status: 503 });
+        }
+
+        const db = await getDatabase();
+        const creditsCol = db.collection('user_credits');
+        const ledgerCol = db.collection('credits_ledger');
+        const bonusCol = db.collection('bonus_spins');
+        const now = new Date();
+
+        const { grantPro } = await import('@/app/utils/pro-storage');
+
+        let grantedCredits = 0;
+        let grantedSpins = 0;
+        let grantedProMonths = 0;
+        const consumablesGranted: Array<{ consumableType: string; quantity: number }> = [];
+
+        for (const it of pendingItems) {
+          const kind = String((it as any)?.kind || '').trim();
+
+          if (kind === 'pro') {
+            const plan = String((it as any)?.plan || '').trim();
+            const planMonths = plan === '6months' ? 6 : plan === '3months' ? 3 : plan === '1month' ? 1 : 0;
+            if (planMonths > 0) {
+              try {
+                await grantPro(steamId, planMonths);
+                grantedProMonths += planMonths;
+              } catch {
+              }
+            }
+            continue;
+          }
+
+          if (kind === 'credits') {
+            const pack = String((it as any)?.pack || '').trim();
+            const qtyRaw = Number((it as any)?.quantity || 1);
+            const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.min(99, Math.floor(qtyRaw))) : 1;
+            const packCredits = pack === 'legend' ? 75000 : pack === 'titan' ? 50000 : pack === 'whale' ? 30000 : pack === 'giant' ? 10000 : pack === 'mega' ? 4000 : pack === 'value' ? 1500 : pack === 'starter' ? 500 : 0;
+            if (packCredits > 0) {
+              const credits = packCredits * qty;
+              grantedCredits += credits;
+              try {
+                await creditsCol.updateOne(
+                  { _id: steamId } as any,
+                  { $setOnInsert: { _id: steamId, steamId }, $inc: { balance: credits }, $set: { updatedAt: now } } as any,
+                  { upsert: true } as any
+                );
+                await ledgerCol.insertOne({
+                  steamId,
+                  delta: credits,
+                  type: 'purchase_credits',
+                  createdAt: now,
+                  meta: { sessionId: session.id, cartId, pack, qty, verifiedBy: 'manual_verification' },
+                } as any);
+              } catch {
+              }
+            }
+            continue;
+          }
+
+          if (kind === 'spins') {
+            const pack = String((it as any)?.pack || '').trim();
+            const qtyRaw = Number((it as any)?.quantity || 1);
+            const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.min(99, Math.floor(qtyRaw))) : 1;
+            const packSpins = pack === 'legend' ? 750 : pack === 'titan' ? 500 : pack === 'whale' ? 300 : pack === 'giant' ? 100 : pack === 'mega' ? 40 : pack === 'value' ? 15 : pack === 'starter' ? 5 : 0;
+            if (packSpins > 0) {
+              const spins = packSpins * qty;
+              grantedSpins += spins;
+              try {
+                await bonusCol.updateOne(
+                  { _id: steamId } as any,
+                  { $setOnInsert: { _id: steamId, steamId, createdAt: now } as any, $inc: { count: spins }, $set: { updatedAt: now } } as any,
+                  { upsert: true } as any
+                );
+              } catch {
+              }
+            }
+            continue;
+          }
+
+          if (kind === 'consumable') {
+            const consumableType = String((it as any)?.consumableType || '').trim();
+            const qtyRaw = Number((it as any)?.quantity || 1);
+            const qty = Number.isFinite(qtyRaw) ? Math.max(1, Math.min(100, Math.floor(qtyRaw))) : 1;
+            if (consumableType && qty > 0) {
+              try {
+                const rewardsKey = 'user_rewards';
+                const existingRewards = (await dbGet<Record<string, any[]>>(rewardsKey)) || {};
+                const userRewards = existingRewards[steamId] || [];
+                for (let i = 0; i < qty; i += 1) {
+                  userRewards.push({
+                    type: consumableType,
+                    grantedAt: new Date().toISOString(),
+                    source: 'purchase',
+                    sessionId: session.id,
+                    cartId,
+                  });
+                }
+                existingRewards[steamId] = userRewards;
+                await dbSet(rewardsKey, existingRewards);
+                consumablesGranted.push({ consumableType, quantity: qty });
+              } catch {
+              }
+            }
+            continue;
+          }
+        }
+
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+          existingPurchases.push({
+            steamId,
+            type: 'cart',
+            cartId,
+            items: pendingItems,
+            grantedCredits,
+            grantedSpins,
+            grantedProMonths,
+            consumablesGranted,
+            amount,
+            currency,
+            sessionId: session.id,
+            timestamp: new Date().toISOString(),
+            fulfilled: true,
+            fulfilledAt: new Date().toISOString(),
+            paymentIntentId: (session.payment_intent as string) || null,
+            customerId: (session.customer as string) || null,
+            discordNotified: true,
+            discordNotifyAttempts: 1,
+            discordNotifiedAt: new Date().toISOString(),
+            discordNotifyError: null,
+            ...invoicePatch,
+            ...receiptPatch,
+          });
+          await dbSet(purchasesKey, existingPurchases.slice(-1000));
+        } catch {
+        }
+
+        try {
+          await dbSet(pendingKey, {
+            ...(pending && typeof pending === 'object' ? pending : {}),
+            fulfilled: true,
+            fulfilledAt: new Date().toISOString(),
+            sessionId: session.id,
+          });
+        } catch {
+        }
+
+        try {
+          await createUserNotification(
+            db,
+            steamId,
+            'purchase_cart',
+            'Purchase Successful',
+            'Your purchase was successful. Items have been added to your account.',
+            { cartId, sessionId: session.id, grantedCredits, grantedSpins, grantedProMonths, consumablesGranted, verifiedBy: 'manual_verification' }
+          );
+        } catch {
+        }
+
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 0;
+          const currency = session.currency || 'eur';
+          await notifyCartEvent('🛒 Cart Purchase Fulfilled (Manual)', [
+            { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+            { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
+            { name: 'Session ID', value: `\`${session.id}\``, inline: false },
+            { name: 'Amount', value: `${amount.toFixed(2)} ${String(currency).toUpperCase()}`, inline: true },
+            { name: 'Granted', value: `Credits: ${grantedCredits.toLocaleString('en-US')}\nSpins: ${grantedSpins.toLocaleString('en-US')}\nPro months: ${grantedProMonths}\nConsumables: ${consumablesGranted.map((c) => `${c.quantity}x ${c.consumableType}`).join(', ') || 'None'}`, inline: false },
+          ]);
+        } catch {
+        }
+
+        return NextResponse.json({
+          fulfilled: true,
+          type: 'cart',
+          cartId,
+          grantedCredits,
+          grantedSpins,
+          grantedProMonths,
+          consumablesGranted,
+          ...invoicePatch,
+          ...receiptPatch,
+          message: 'Cart purchase fulfilled (manual verification)',
+        });
+      } catch (error: any) {
+        try {
+          await notifyPaymentFailed('❌ Manual Cart Fulfillment Failed', [
+            { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
+            { name: 'Type', value: 'cart', inline: true },
+            { name: 'Session ID', value: `\`${session.id}\``, inline: false },
+            { name: 'Error', value: `\`${error?.message || 'Unknown error'}\``, inline: false },
+          ]);
+        } catch {
+        }
+        return NextResponse.json({ fulfilled: false, error: error?.message || 'Failed to fulfill cart purchase' }, { status: 500 });
+      }
     }
 
     // Fulfill the purchase
@@ -733,14 +914,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Purchase verification error:', error);
-    try {
-      await notifyPaymentFailureStrict({
-        title: '❌ Purchase Verification Error',
-        stage: 'verify_purchase_post',
-        error: error?.message || 'Failed to verify purchase',
-      });
-    } catch {
-    }
     return NextResponse.json({ 
       error: error.message || 'Failed to verify purchase' 
     }, { status: 500 });

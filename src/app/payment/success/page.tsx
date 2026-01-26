@@ -75,48 +75,41 @@ function PaymentSuccessContent() {
           console.log('✅ Purchase already fulfilled');
           setPurchaseDetails(verifyData.purchase);
         } else {
-          if (type === 'cart') {
-            if (retries > 0) {
-              setTimeout(() => verifyAndRefresh(retries - 1), 1200);
-              return;
-            }
-          } else {
-            // If not fulfilled, try to fulfill it now (manual verification)
-            console.log('Purchase not fulfilled yet, attempting manual fulfillment...');
-            const fulfillRes = await fetch('/api/payment/verify-purchase', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sessionId, steamId }),
+          // If not fulfilled, try to fulfill it now (manual verification)
+          console.log('Purchase not fulfilled yet, attempting manual fulfillment...');
+          const fulfillRes = await fetch('/api/payment/verify-purchase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId, steamId }),
+          });
+          
+          if (!fulfillRes.ok) {
+            const errorData = await fulfillRes.json();
+            throw new Error(errorData.error || 'Fulfillment request failed');
+          }
+          
+          const fulfillData = await fulfillRes.json();
+          
+          if (fulfillData.fulfilled) {
+            console.log('✅ Purchase manually fulfilled:', fulfillData.message);
+            setPurchaseDetails({
+              type: fulfillData.type,
+              consumableType: fulfillData.consumableType,
+              quantity: fulfillData.quantity,
+              months: fulfillData.months,
+              proUntil: fulfillData.proUntil,
+              credits: fulfillData.credits,
+              spins: fulfillData.spins,
+              pack: fulfillData.pack,
+              receiptUrl: fulfillData.receiptUrl,
+              customerEmail: fulfillData.customerEmail,
+              invoiceId: fulfillData.invoiceId,
+              invoiceUrl: fulfillData.invoiceUrl,
+              invoicePdf: fulfillData.invoicePdf,
+              invoiceNumber: fulfillData.invoiceNumber,
             });
-            
-            if (!fulfillRes.ok) {
-              const errorData = await fulfillRes.json();
-              throw new Error(errorData.error || 'Fulfillment request failed');
-            }
-            
-            const fulfillData = await fulfillRes.json();
-            
-            if (fulfillData.fulfilled) {
-              console.log('✅ Purchase manually fulfilled:', fulfillData.message);
-              setPurchaseDetails({
-                type: fulfillData.type,
-                consumableType: fulfillData.consumableType,
-                quantity: fulfillData.quantity,
-                months: fulfillData.months,
-                proUntil: fulfillData.proUntil,
-                credits: fulfillData.credits,
-                spins: fulfillData.spins,
-                pack: fulfillData.pack,
-                receiptUrl: fulfillData.receiptUrl,
-                customerEmail: fulfillData.customerEmail,
-                invoiceId: fulfillData.invoiceId,
-                invoiceUrl: fulfillData.invoiceUrl,
-                invoicePdf: fulfillData.invoicePdf,
-                invoiceNumber: fulfillData.invoiceNumber,
-              });
-            } else {
-              throw new Error(fulfillData.error || 'Fulfillment failed');
-            }
+          } else {
+            throw new Error(fulfillData.error || 'Fulfillment failed');
           }
         }
 
@@ -180,11 +173,9 @@ function PaymentSuccessContent() {
             // Ignore errors
           }
         } else if (type === 'cart') {
-          if (verifyData.fulfilled) {
-            try {
-              localStorage.removeItem('sv_cart_v1');
-            } catch {
-            }
+          try {
+            localStorage.removeItem('sv_cart_v1');
+          } catch {
           }
         }
 
@@ -224,17 +215,15 @@ function PaymentSuccessContent() {
   }
 
   if (error) {
-    const backHref = purchaseType === 'pro' ? '/pro' : purchaseType === 'cart' ? '/checkout' : '/shop';
-    const backLabel = purchaseType === 'pro' ? 'Back to Pro' : purchaseType === 'cart' ? 'Back to Checkout' : 'Back to Shop';
     return (
       <div className="min-h-screen bg-[#08090d] text-white flex items-center justify-center font-sans px-4">
         <div className="w-full max-w-lg bg-[#11141d] border border-red-500/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center space-y-4 md:space-y-6">
           <p className="text-red-400 text-xs md:text-sm">{error}</p>
           <Link
-            href={backHref}
+            href="/pro"
             className="inline-block bg-blue-600 px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest hover:bg-blue-500 transition-all"
           >
-            {backLabel}
+            Back to Pro
           </Link>
         </div>
       </div>
