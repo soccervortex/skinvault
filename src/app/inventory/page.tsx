@@ -2121,15 +2121,13 @@ function InventoryContent() {
 
         {!websiteProfilePrivate && viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
-            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col xl:flex-row justify-between items-start xl:items-stretch gap-6 md:gap-8">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 w-full xl:w-auto">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
+              <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
-                <div className="flex-1 min-w-0 flex flex-col xl:h-full">
-                  <div className="flex items-start sm:items-center gap-2 flex-wrap">
-                    <h1 className="flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">
-                      <span className="block truncate px-1">
-                        {formatProfileName(viewedUser?.name || "User")}
-                      </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="flex-1 min-w-0 text-[clamp(1.25rem,3.6vw,2.25rem)] md:text-[clamp(1.5rem,2.8vw,2.5rem)] font-black italic uppercase tracking-tighter leading-none whitespace-normal break-all">
+                      {formatProfileName(viewedUser?.name || "User")}
                     </h1>
 
                     {vaultRank && (
@@ -2171,7 +2169,7 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="mt-5 md:mt-6 xl:mt-auto xl:pt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl xl:max-w-none xl:flex xl:items-center xl:gap-3 xl:flex-wrap">
+                    <div className="mt-5 md:mt-6 flex flex-col sm:flex-row gap-2 w-full flex-wrap">
                       <button
                         onClick={() => setIsEditingProfile((v) => !v)}
                         className={`w-full xl:w-auto flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
