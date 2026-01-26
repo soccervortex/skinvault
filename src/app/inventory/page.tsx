@@ -2126,7 +2126,7 @@ function InventoryContent() {
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0 flex flex-col xl:h-full">
                   <div className="flex items-start sm:items-center gap-2 flex-wrap">
-                    <h1 className="w-full sm:flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
+                    <h1 className="flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
 
