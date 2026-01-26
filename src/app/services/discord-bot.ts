@@ -2,6 +2,7 @@
 // Handles price alerts and sends Discord DMs
 
 import { dbGet, dbSet } from '@/app/utils/database';
+import { getCurrencyMetaFromSteamCode } from '@/app/utils/currency-preference';
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -157,18 +158,19 @@ export async function checkPriceAlerts(currentPrice: number | string, marketHash
         (alert.condition === 'above' && price >= alert.targetPrice);
 
       if (shouldTrigger) {
-        // Format price
-        const priceStr = new Intl.NumberFormat('en-US', {
+        // Format price (supports all Steam currencies)
+        const meta = getCurrencyMetaFromSteamCode(currency);
+        const priceStr = new Intl.NumberFormat(meta.locale, {
           style: 'currency',
-          currency: currency === '1' ? 'USD' : 'EUR',
+          currency: meta.iso,
         }).format(price);
 
         const message = `🔔 **Price Alert Triggered!**\n\n` +
           `**Item:** ${marketHashName}\n` +
           `**Current Price:** ${priceStr}\n` +
-          `**Target Price:** ${alert.condition === 'below' ? '≤' : '≥'} ${new Intl.NumberFormat('en-US', {
+          `**Target Price:** ${alert.condition === 'below' ? '≤' : '≥'} ${new Intl.NumberFormat(meta.locale, {
             style: 'currency',
-            currency: currency === '1' ? 'USD' : 'EUR',
+            currency: meta.iso,
           }).format(alert.targetPrice)}\n\n` +
           `View on SkinVaults: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://skinvaults.online'}/item/${encodeURIComponent(marketHashName)}`;
 

@@ -2100,12 +2100,12 @@ function InventoryContent() {
 
         {!websiteProfilePrivate && viewedUser && (
           <div className="max-w-6xl mx-auto space-y-12 pb-32">
-            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 md:gap-8">
+            <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col xl:flex-row justify-between items-start xl:items-stretch gap-6 md:gap-8">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 w-full xl:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex flex-col xl:h-full">
                   <div className="flex items-start sm:items-center gap-2 flex-wrap">
-                    <h1 className="w-full sm:flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none sm:truncate">
+                    <h1 className="w-full sm:flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none break-words">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
 
@@ -2148,10 +2148,10 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="mt-5 md:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:flex xl:items-center xl:gap-3 xl:flex-wrap">
+                    <div className="mt-5 md:mt-6 xl:mt-auto xl:pt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl xl:max-w-none xl:flex xl:items-center xl:gap-3 xl:flex-wrap">
                       <button
                         onClick={() => setIsEditingProfile((v) => !v)}
-                        className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
+                        className={`w-full xl:w-auto flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
                         title={isEditingProfile ? 'Exit edit mode' : 'Edit your profile'}
                       >
                         {isEditingProfile ? 'Editing' : 'Edit profile'}
@@ -2159,7 +2159,7 @@ function InventoryContent() {
 
                       <button
                         onClick={() => setViewAsOthers(true)}
-                        className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                        className="w-full xl:w-auto flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
                         title="Preview your profile as other users see it"
                       >
                         View as others
@@ -2168,7 +2168,7 @@ function InventoryContent() {
                       <button
                         onClick={handleForceRefreshInventory}
                         disabled={refreshingInventory}
-                        className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                        className={`w-full sm:col-span-2 xl:col-span-1 xl:flex-1 xl:min-w-[220px] flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${refreshingInventory ? 'bg-white/10 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
                       >
                         {refreshingInventory ? 'Refreshing...' : 'Refresh Inventory'}
                       </button>
@@ -2315,7 +2315,14 @@ function InventoryContent() {
                   )}
                   {!tradeUrlLoading && tradeUrl && !effectiveIsOwner && (
                     <div className="mt-3 space-y-2 max-w-full md:max-w-xs">
-                      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">Trade URL</p>
+                      <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">
+                        Trade URL
+                        <HelpTooltip
+                          title="What is a Trade URL?"
+                          content="This is the link you use to receive Steam trade offers. You can find yours in Steam → Inventory → Trade Offers → Who can send me Trade Offers? → Copy your Trade URL."
+                          className="ml-1"
+                        />
+                      </div>
                       <p className="text-[8px] md:text-[9px] text-gray-600 break-all bg-black/40 px-2 md:px-3 py-1.5 md:py-2 rounded-xl border border-white/5 select-all cursor-text">
                         {tradeUrl}
                       </p>
@@ -2464,88 +2471,6 @@ function InventoryContent() {
                 </div>
               </div>
 
-              <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-white/5">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-                  <StatCard
-                    label="Total Items"
-                    icon={<PackageOpen size={12} />}
-                    val={Number.isFinite(Number(totalItems)) ? Number(totalItems).toLocaleString('en-US') : null}
-                  />
-
-                  <StatCard
-                    label="Priced"
-                    icon={<TrendingUp size={12} />}
-                    val={Number.isFinite(Number(pricedItems)) ? Number(pricedItems).toLocaleString('en-US') : null}
-                  />
-
-                  <StatCard
-                    label="Unpriced"
-                    icon={<Target size={12} />}
-                    val={Number.isFinite(Number(totalItems - pricedItems)) ? Number(totalItems - pricedItems).toLocaleString('en-US') : null}
-                  />
-
-                  <StatCard
-                    label="K/D"
-                    icon={<Swords size={12} />}
-                    val={playerStats?.kd ?? null}
-                  />
-
-                  <StatCard
-                    label="HS%"
-                    icon={<CheckCircle2 size={12} />}
-                    val={playerStats?.hs ?? null}
-                    unit={playerStats?.hs ? '%' : ''}
-                  />
-
-                  <StatCard
-                    label="Wins"
-                    icon={<Award size={12} />}
-                    val={playerStats?.wins ?? null}
-                  />
-                </div>
-
-                {isPro && (
-                  <div className="mt-3 md:mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-                    <StatCard
-                      label="ADR"
-                      icon={<Target size={12} />}
-                      val={playerStats?.adr ?? null}
-                    />
-
-                    <StatCard
-                      label="Accuracy"
-                      icon={<CheckCircle2 size={12} />}
-                      val={playerStats?.accuracy ?? null}
-                      unit={playerStats?.accuracy ? '%' : ''}
-                    />
-
-                    <StatCard
-                      label="MVPs"
-                      icon={<Award size={12} />}
-                      val={playerStats?.mvps ?? null}
-                    />
-
-                    <StatCard
-                      label="Faceit ELO"
-                      icon={<TrendingUp size={12} />}
-                      val={faceitStats?.elo ?? null}
-                    />
-
-                    <StatCard
-                      label="Faceit Level"
-                      icon={<Trophy size={12} />}
-                      val={faceitStats?.level ?? null}
-                    />
-
-                    <StatCard
-                      label="Faceit WR"
-                      icon={<Swords size={12} />}
-                      val={faceitStats?.winRate ?? null}
-                      unit={faceitStats?.winRate ? '%' : ''}
-                    />
-                  </div>
-                )}
-              </div>
             </header>
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
@@ -2631,6 +2556,89 @@ function InventoryContent() {
                   This Steam account does not expose CS2 ownership/playtime publicly (or does not own CS2).
                 </div>
               )}
+
+              <div className="mt-6 pt-6 border-t border-white/5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+                  <StatCard
+                    label="Total Items"
+                    icon={<PackageOpen size={12} />}
+                    val={Number.isFinite(Number(totalItems)) ? Number(totalItems).toLocaleString('en-US') : null}
+                  />
+
+                  <StatCard
+                    label="Priced"
+                    icon={<TrendingUp size={12} />}
+                    val={Number.isFinite(Number(pricedItems)) ? Number(pricedItems).toLocaleString('en-US') : null}
+                  />
+
+                  <StatCard
+                    label="Unpriced"
+                    icon={<Target size={12} />}
+                    val={Number.isFinite(Number(totalItems - pricedItems)) ? Number(totalItems - pricedItems).toLocaleString('en-US') : null}
+                  />
+
+                  <StatCard
+                    label="K/D"
+                    icon={<Swords size={12} />}
+                    val={playerStats?.kd ?? null}
+                  />
+
+                  <StatCard
+                    label="HS%"
+                    icon={<CheckCircle2 size={12} />}
+                    val={playerStats?.hs ?? null}
+                    unit={playerStats?.hs ? '%' : ''}
+                  />
+
+                  <StatCard
+                    label="Wins"
+                    icon={<Award size={12} />}
+                    val={playerStats?.wins ?? null}
+                  />
+                </div>
+
+                {isPro && (
+                  <div className="mt-3 md:mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+                    <StatCard
+                      label="ADR"
+                      icon={<Target size={12} />}
+                      val={playerStats?.adr ?? null}
+                    />
+
+                    <StatCard
+                      label="Accuracy"
+                      icon={<CheckCircle2 size={12} />}
+                      val={playerStats?.accuracy ?? null}
+                      unit={playerStats?.accuracy ? '%' : ''}
+                    />
+
+                    <StatCard
+                      label="MVPs"
+                      icon={<Award size={12} />}
+                      val={playerStats?.mvps ?? null}
+                    />
+
+                    <StatCard
+                      label="Faceit ELO"
+                      icon={<TrendingUp size={12} />}
+                      val={faceitStats?.elo ?? null}
+                    />
+
+                    <StatCard
+                      label="Faceit Level"
+                      icon={<Trophy size={12} />}
+                      val={faceitStats?.level ?? null}
+                    />
+
+                    <StatCard
+                      label="Faceit WR"
+                      icon={<Swords size={12} />}
+                      val={faceitStats?.winRate ?? null}
+                      unit={faceitStats?.winRate ? '%' : ''}
+                    />
+                  </div>
+                )}
+              </div>
             </section>
 
             {statsPrivate && (

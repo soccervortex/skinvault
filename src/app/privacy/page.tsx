@@ -84,18 +84,18 @@ export default function PrivacyPage() {
               </h3>
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Wishlist items (stored locally in your browser and optionally synced to server)</li>
-                <li>Currency preferences (EUR/USD, stored in browser localStorage)</li>
-                <li>Price alert/tracker settings (target prices, conditions, stored in Vercel KV and MongoDB databases)</li>
+                <li>Currency preferences (Steam-supported currencies, stored in browser localStorage)</li>
+                <li>Price alert/tracker settings (target prices, conditions)</li>
                 <li>Contact form submissions (name, email, message, images)</li>
                 <li>Payment information (processed securely through Stripe - we do not store credit card details)</li>
                 <li>Compare list items (stored locally in browser, max 2 items)</li>
-                <li>Purchase history (Pro subscriptions and consumable purchases - stored in Vercel KV and MongoDB)</li>
+                <li>Purchase history (Pro subscriptions and consumable purchases)</li>
                 <li>Consumable purchases (wishlist slots, Discord access, price scan boost, cache boost - stored in user_rewards database key)</li>
-                <li>Chat messages (global chat messages and direct messages - stored in Vercel KV and MongoDB)</li>
-                <li>DM conversations (direct message threads between users - stored in Vercel KV and MongoDB)</li>
-                <li>DM invites (invitations to start direct message conversations - stored in Vercel KV and MongoDB)</li>
-                <li>Chat reports (reported messages with admin notes - stored in Vercel KV and MongoDB)</li>
-                <li>Admin actions (timeouts, bans, message deletions, pins - stored in Vercel KV and MongoDB)</li>
+                <li>Chat messages (global chat messages and direct messages)</li>
+                <li>DM conversations (direct message threads between users)</li>
+                <li>DM invites (invitations to start direct message conversations)</li>
+                <li>Chat reports (reported messages with admin notes)</li>
+                <li>Admin actions (timeouts, bans, message deletions, pins)</li>
               </ul>
 
               <h3 className="text-base md:text-lg font-black uppercase tracking-tighter mb-3 text-gray-400 mt-6">
@@ -166,7 +166,7 @@ export default function PrivacyPage() {
                     <li>Chat notification data (key: <code>sv_chat_notifications</code>) - unread counts, last check times</li>
                   </ul>
                 </li>
-                <li><strong>Vercel KV Database (Primary) and MongoDB (Backup/Fallback):</strong> 
+                <li><strong>MongoDB Database:</strong> 
                   <ul className="list-circle list-inside space-y-1 text-gray-400 ml-6 mt-2">
                     <li>Pro subscription data (key: <code>pro_users</code>)</li>
                     <li>First login timestamps (key: <code>first_logins</code>)</li>
@@ -186,9 +186,6 @@ export default function PrivacyPage() {
                     <li>Chat reports (key: <code>chat_reports</code>) - reported messages with admin notes</li>
                     <li>Chat timeouts (key: <code>chat_timeouts</code>) - temporary chat bans</li>
                   </ul>
-                  <p className="text-gray-300 mt-2 ml-4">
-                    <strong>Database System:</strong> We use a dual-database system for reliability. Vercel KV is the primary database for fast access. MongoDB automatically backs up all data and serves as a fallback when KV is unavailable or hits rate limits. Both databases are kept in sync automatically. Data is written to both databases simultaneously, and if KV fails, the system seamlessly switches to MongoDB.
-                  </p>
                 </li>
                 <li><strong>Stripe:</strong> Payment information (we do not store credit card details on our servers). Supports both production and test mode for payment testing.</li>
               </ul>
@@ -243,7 +240,7 @@ export default function PrivacyPage() {
               <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
                 <li>Your Steam authentication session (Steam ID, profile name, avatar)</li>
                 <li>Wishlist items (optionally synced to server for cross-device access)</li>
-                <li>Currency preferences (EUR/USD)</li>
+                <li>Currency preferences (Steam-supported currencies)</li>
                 <li>Price cache data (cached market prices for performance - Free: 30 min, Pro: 2 hours)</li>
                 <li>Dataset cache (item information from CS:GO API - cached for 12-24 hours)</li>
                 <li>Compare list (items selected for comparison, max 2 items)</li>

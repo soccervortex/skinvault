@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, Bell, TrendingUp, TrendingDown, Loader2, User, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { getPriceTrackerLimitSync, preloadRewards } from '@/app/utils/pro-limits';
+import { getCurrencyMetaFromSteamCode } from '@/app/utils/currency-preference';
 import HelpTooltip from './HelpTooltip';
 
 interface PriceTrackerModalProps {
@@ -441,10 +442,13 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-black text-white">
                           {alert.condition === 'below' ? '≤' : '≥'}{' '}
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: alert.currency === '1' ? 'USD' : 'EUR',
-                          }).format(alert.targetPrice)}
+                          {(() => {
+                            const meta = getCurrencyMetaFromSteamCode(String(alert.currency || '3'));
+                            return new Intl.NumberFormat(meta.locale, {
+                              style: 'currency',
+                              currency: meta.iso,
+                            }).format(alert.targetPrice);
+                          })()}
                         </p>
                         {alert.triggered && (
                           <span className="text-[8px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded mt-1 inline-block">

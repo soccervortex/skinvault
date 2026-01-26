@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getChatDatabase, getDatabase } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
+import { getCurrencyMetaFromSteamCode } from '@/app/utils/currency-preference';
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number) {
   const controller = new AbortController();
@@ -100,6 +101,7 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
   try {
     // Get price index from MongoDB
     const currencyStr = String(currency);
+    const meta = getCurrencyMetaFromSteamCode(currencyStr);
 
     const normalized = normalizeInventoryPayload(data);
 
@@ -177,16 +179,17 @@ async function enrichInventoryWithTotalValue(data: any, currency: number, origin
       descriptions: normalized.descriptions,
       totalInventoryValue: totalValue.toFixed(2),
       valuedItemCount,
-      currency: currency === 1 ? 'USD' : currency === 3 ? 'EUR' : String(currency),
+      currency: meta.iso,
       priceIndex: prices,
     };
   } catch (error) {
     console.warn('Failed to calculate total inventory value:', error);
+    const meta = getCurrencyMetaFromSteamCode(String(currency));
     return {
       ...data,
       totalInventoryValue: '0.00',
       valuedItemCount: 0,
-      currency: currency === 1 ? 'USD' : currency === 3 ? 'EUR' : String(currency)
+      currency: meta.iso
     };
   }
 }
