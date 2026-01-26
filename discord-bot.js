@@ -590,6 +590,18 @@ async function getSteamIdFromDiscord(discordId) {
   }
 }
 
+async function checkDiscordAccessStatus(steamId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/discord/status?steamId=${encodeURIComponent(steamId)}`);
+    if (!response.ok) return false;
+    const data = await response.json().catch(() => null);
+    if (data && data.requiresPro === true) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Check if user has Pro status
 async function checkProStatus(steamId) {
   try {
@@ -3113,9 +3125,11 @@ async function assignRoles(member) {
       }
     }
 
-    // If user has connected Discord, check for other roles
+    // If user has connected (or manually set) Discord ID, check for other roles
     if (steamId) {
       log(`✅ Found Steam ID for ${member.user.tag}: ${steamId}`);
+
+      const hasAccess = await checkDiscordAccessStatus(steamId);
 
       // Check if owner
       const isOwner = OWNER_STEAM_IDS.includes(steamId);
@@ -3143,20 +3157,87 @@ async function assignRoles(member) {
             log(`⚠️ Could not assign Pro Member role: ${error.message}`);
           }
         }
+      } else {
+        const proRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'pro member');
+        if (proRole && member.roles.cache.has(proRole.id)) {
+          try {
+            await member.roles.remove(proRole);
+            log(`✅ Removed Pro Member role from ${member.user.tag} (not Pro)`);
+          } catch (error) {
+            log(`⚠️ Could not remove Pro Member role: ${error.message}`);
+          }
+        }
       }
 
-      // Assign Verified role if Discord is connected
+      // Discord bot/community access role (Pro OR discord_access purchase)
+      const accessRole = await getOrCreateRole(guild, 'Discord Access', { color: 0x5865F2 });
+      if (accessRole) {
+        if (hasAccess) {
+          if (!member.roles.cache.has(accessRole.id)) {
+            try {
+              await member.roles.add(accessRole);
+              log(`✅ Assigned Discord Access role to ${member.user.tag}`);
+            } catch (error) {
+              log(`⚠️ Could not assign Discord Access role: ${error.message}`);
+            }
+          }
+        } else if (member.roles.cache.has(accessRole.id)) {
+          try {
+            await member.roles.remove(accessRole);
+            log(`✅ Removed Discord Access role from ${member.user.tag} (no access)`);
+          } catch (error) {
+            log(`⚠️ Could not remove Discord Access role: ${error.message}`);
+          }
+        }
+      }
+
+      // Verified role only if user has access
       const verifiedRole = await getOrCreateRole(guild, 'Verified', { color: 0x5865F2 }); // Discord blue
       if (verifiedRole) {
-        try {
-          await member.roles.add(verifiedRole);
-          log(`✅ Assigned Verified role to ${member.user.tag} (Discord connected)`);
-        } catch (error) {
-          log(`⚠️ Could not assign Verified role: ${error.message}`);
+        if (hasAccess) {
+          if (!member.roles.cache.has(verifiedRole.id)) {
+            try {
+              await member.roles.add(verifiedRole);
+              log(`✅ Assigned Verified role to ${member.user.tag} (has access)`);
+            } catch (error) {
+              log(`⚠️ Could not assign Verified role: ${error.message}`);
+            }
+          }
+        } else if (member.roles.cache.has(verifiedRole.id)) {
+          try {
+            await member.roles.remove(verifiedRole);
+            log(`✅ Removed Verified role from ${member.user.tag} (no access)`);
+          } catch (error) {
+            log(`⚠️ Could not remove Verified role: ${error.message}`);
+          }
         }
       }
     } else {
       log(`ℹ️ No Steam ID found for ${member.user.tag} - Discord not connected yet`);
+
+      const verifiedRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'verified');
+      if (verifiedRole && member.roles.cache.has(verifiedRole.id)) {
+        try {
+          await member.roles.remove(verifiedRole);
+        } catch {
+        }
+      }
+
+      const proRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'pro member');
+      if (proRole && member.roles.cache.has(proRole.id)) {
+        try {
+          await member.roles.remove(proRole);
+        } catch {
+        }
+      }
+
+      const accessRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'discord access');
+      if (accessRole && member.roles.cache.has(accessRole.id)) {
+        try {
+          await member.roles.remove(accessRole);
+        } catch {
+        }
+      }
     }
 
   } catch (error) {

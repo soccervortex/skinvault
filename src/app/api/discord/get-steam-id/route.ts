@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbGet } from '@/app/utils/database';
+import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 
 // Get Steam ID from Discord ID
 export async function GET(request: Request) {
@@ -23,6 +24,20 @@ export async function GET(request: Request) {
         }
         return NextResponse.json({ steamId, discordId, username: connection.discordUsername });
       }
+    }
+
+    // Fallback: check user_settings (manual Discord ID entry)
+    try {
+      if (hasMongoConfig()) {
+        const db = await getDatabase();
+        const col = db.collection<any>('user_settings');
+        const doc = await col.findOne({ discordId: String(discordId) } as any);
+        const steamId = String(doc?._id || doc?.steamId || '').trim();
+        if (/^\d{17}$/.test(steamId)) {
+          return NextResponse.json({ steamId, discordId, username: null });
+        }
+      }
+    } catch {
     }
 
     return NextResponse.json({ error: 'Discord account not connected' }, { status: 404 });

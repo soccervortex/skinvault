@@ -348,6 +348,11 @@ function InventoryContent() {
   const priceCacheRef = useRef<{ [key: string]: string }>({});
   const toast = useToast();
 
+  const [discordIdInput, setDiscordIdInput] = useState<string>('');
+  const [discordIdLoading, setDiscordIdLoading] = useState(false);
+  const [discordIdSaving, setDiscordIdSaving] = useState(false);
+  const [showDiscordIdModal, setShowDiscordIdModal] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     const onUserUpdated = () => {
@@ -481,6 +486,89 @@ function InventoryContent() {
       cancelled = true;
     };
   }, [viewedUser?.steamId]);
+
+  useEffect(() => {
+    if (!viewedUser?.steamId) return;
+    try {
+      if (typeof window !== 'undefined') {
+        const origin = window.location.origin;
+        setShareUrl(`${origin}/inventory/${viewedUser.steamId}?currency=${encodeURIComponent(currency.code)}`);
+      }
+    } catch {
+      setShareUrl(null);
+    }
+  }, [viewedUser, currency.code]);
+
+  useEffect(() => {
+    if (!viewedUser?.steamId || !loggedInUser?.steamId || loggedInUser.steamId !== viewedUser.steamId) {
+      setDiscordIdInput('');
+      return;
+    }
+
+    let cancelled = false;
+    setDiscordIdLoading(true);
+    fetch('/api/user/discord-id', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled) return;
+        const d = String(j?.discordId || '').trim();
+        setDiscordIdInput(d);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDiscordIdInput('');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setDiscordIdLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser?.steamId, loggedInUser?.steamId]);
+
+  useEffect(() => {
+    if (!isEditingProfile) return;
+    if (!effectiveIsOwner) return;
+    if (!(isPro || hasDiscordAccess)) return;
+    if (discordIdLoading) return;
+
+    const connected = !!discordStatus?.connected;
+    const hasManual = /^\d{17,20}$/.test(String(discordIdInput || '').trim());
+    if (!connected && !hasManual) {
+      setShowDiscordIdModal(true);
+    }
+  }, [isEditingProfile, effectiveIsOwner, isPro, hasDiscordAccess, discordIdLoading, discordStatus?.connected, discordIdInput]);
+
+  const handleSaveDiscordId = async () => {
+    if (!loggedInUser?.steamId || loggedInUser.steamId !== viewedUser?.steamId) {
+      toast.error('Sign in to update your Discord ID');
+      return;
+    }
+
+    setDiscordIdSaving(true);
+    try {
+      const res = await fetch('/api/user/discord-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discordId: discordIdInput }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(String(json?.error || 'Failed to save Discord ID'));
+        return;
+      }
+      const d = String(json?.discordId || '').trim();
+      setDiscordIdInput(d);
+      toast.success('Discord ID saved');
+      setShowDiscordIdModal(false);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save Discord ID');
+    } finally {
+      setDiscordIdSaving(false);
+    }
+  };
 
   const loadNotifications = async () => {
     if (!notificationsTargetSteamId) return;
@@ -1924,6 +2012,57 @@ function InventoryContent() {
 
   return (
     <>
+      {showDiscordIdModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-md bg-[#0b0d12] border border-white/10 rounded-[1.5rem] p-5">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-black uppercase tracking-widest text-white">Add your Discord ID</div>
+              <button
+                onClick={() => setShowDiscordIdModal(false)}
+                className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center"
+                aria-label="Close"
+              >
+                <X size={16} className="text-gray-200" />
+              </button>
+            </div>
+            <div className="mt-3 text-[10px] text-gray-400">
+              This helps us match your website account to your Discord account so the bot can assign roles.
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">
+                Discord ID
+                <span
+                  className="inline-flex items-center gap-1 text-gray-500"
+                  title="Enable Developer Mode in Discord, then right-click your profile and click Copy User ID"
+                >
+                  <HelpCircle size={12} />
+                </span>
+              </div>
+              <input
+                value={discordIdInput}
+                onChange={(e) => setDiscordIdInput(e.target.value)}
+                placeholder="123456789012345678"
+                className="mt-2 w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-black"
+              />
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowDiscordIdModal(false)}
+                className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 border border-white/10"
+              >
+                Later
+              </button>
+              <button
+                onClick={handleSaveDiscordId}
+                disabled={discordIdSaving}
+                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${discordIdSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
+              >
+                {discordIdSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
         <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
@@ -2041,7 +2180,7 @@ function InventoryContent() {
                                 })
                                 .catch(console.error);
                             }}
-                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] font-black uppercase tracking-widest"
                           >
                             <MessageSquare size={12} />
                             Connect Discord
@@ -2064,7 +2203,7 @@ function InventoryContent() {
                                 console.error('Failed to disconnect Discord:', error);
                               }
                             }}
-                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] font-black uppercase tracking-widest"
                           >
                             <MessageSquare size={12} />
                             Disconnect Discord
@@ -2076,7 +2215,7 @@ function InventoryContent() {
                         <>
                           <button
                             onClick={() => setShowManageTrackers(true)}
-                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest"
                           >
                             <Settings size={12} />
                             Manage Trackers
@@ -2112,6 +2251,37 @@ function InventoryContent() {
                             </div>
                             <div className="mt-2 text-[9px] text-gray-500">
                               This is visible to visitors on your inventory.
+                            </div>
+                          </div>
+
+                          <div className="w-full mt-2 bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
+                            <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">
+                              Discord ID
+                              <span
+                                className="inline-flex items-center gap-1 text-gray-500"
+                                title="Enable Developer Mode in Discord, then right-click your profile and click Copy User ID"
+                              >
+                                <HelpCircle size={12} />
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                              <input
+                                value={discordIdInput}
+                                onChange={(e) => setDiscordIdInput(e.target.value)}
+                                placeholder="123456789012345678"
+                                className="w-full md:flex-1 md:min-w-[240px] bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-[10px] md:text-[11px] font-black"
+                                disabled={discordIdLoading}
+                              />
+                              <button
+                                onClick={handleSaveDiscordId}
+                                disabled={discordIdSaving}
+                                className={`px-4 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${discordIdSaving ? 'bg-white/5 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
+                              >
+                                {discordIdSaving ? 'Saving...' : 'Save'}
+                              </button>
+                            </div>
+                            <div className="mt-2 text-[9px] text-gray-500">
+                              Used for Discord role syncing if you can’t connect via OAuth.
                             </div>
                           </div>
                         </>
