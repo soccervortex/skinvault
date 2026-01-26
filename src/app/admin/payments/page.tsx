@@ -53,6 +53,7 @@ export default function AdminPaymentsPage() {
   const [loadingPaymentsCount, setLoadingPaymentsCount] = useState(true);
   const [paidTotalByCurrency, setPaidTotalByCurrency] = useState<Record<string, number>>({});
   const [stripePayoutsPaidTotalByCurrency, setStripePayoutsPaidTotalByCurrency] = useState<Record<string, number>>({});
+  const [stripePayoutsInTransitTotalByCurrency, setStripePayoutsInTransitTotalByCurrency] = useState<Record<string, number>>({});
   const [stripeBalanceTransactions, setStripeBalanceTransactions] = useState<StripeBalanceTransactionsBreakdown | null>(null);
   const [backfillingFees, setBackfillingFees] = useState(false);
 
@@ -159,6 +160,14 @@ export default function AdminPaymentsPage() {
       .join(' / ');
   }, [stripePayoutsPaidTotalByCurrency]);
 
+  const stripePayoutsInTransitLabel = useMemo(() => {
+    const entries = Object.entries(stripePayoutsInTransitTotalByCurrency || {}).filter(([, v]) => Number.isFinite(Number(v)));
+    if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
+    return entries
+      .map(([cur, amt]) => formatCurrencyAmount(Number(amt || 0), cur))
+      .join(' / ');
+  }, [stripePayoutsInTransitTotalByCurrency]);
+
   const formatCurrencyMapLabel = (m: any) => {
     const entries = Object.entries((m || {}) as Record<string, number>).filter(([, v]) => Number.isFinite(Number(v)));
     if (entries.length === 0) return formatCurrencyAmount(0, 'eur');
@@ -251,6 +260,7 @@ export default function AdminPaymentsPage() {
       setPaymentsCount(Number((json as any)?.paidCount || 0));
       setPaidTotalByCurrency(((json as any)?.paidTotalByCurrency as Record<string, number>) || {});
       setStripePayoutsPaidTotalByCurrency(((json as any)?.stripePayoutsPaidTotalByCurrency as Record<string, number>) || {});
+      setStripePayoutsInTransitTotalByCurrency(((json as any)?.stripePayoutsInTransitTotalByCurrency as Record<string, number>) || {});
       setStripeBalanceTransactions(((json as any)?.stripeBalanceTransactions as StripeBalanceTransactionsBreakdown) || null);
     } catch {
     } finally {
@@ -442,7 +452,7 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-4 text-[10px] md:text-[11px]">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 text-[10px] md:text-[11px]">
             <div className="bg-black/40 border border-yellow-500/30 rounded-xl md:rounded-2xl p-3">
               <p className="text-yellow-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Payments</p>
               <p className="text-lg md:text-xl font-black text-yellow-400">
@@ -461,6 +471,13 @@ export default function AdminPaymentsPage() {
               <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Payouts (Paid)</p>
               <p className="text-lg md:text-xl font-black text-emerald-400">
                 {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripePayoutsPaidLabel}
+              </p>
+            </div>
+
+            <div className="bg-black/40 border border-emerald-500/30 rounded-xl md:rounded-2xl p-3">
+              <p className="text-emerald-400 uppercase font-black tracking-[0.3em] mb-1 text-[9px]">Stripe Payouts (In Transit)</p>
+              <p className="text-lg md:text-xl font-black text-emerald-400">
+                {loadingPaymentsCount ? <Loader2 className="animate-spin inline" size={20} /> : stripePayoutsInTransitLabel}
               </p>
             </div>
           </div>

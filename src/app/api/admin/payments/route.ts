@@ -159,12 +159,16 @@ function addStakeholder(
   addMoney(existing.totalByCurrency, currency, n);
 }
 
-async function getPaidPayoutTotalsByCurrency(stripe: Stripe, createdGte: number | null): Promise<Record<string, number>> {
+async function getPayoutTotalsByCurrency(
+  stripe: Stripe,
+  createdGte: number | null,
+  status: 'paid' | 'in_transit' | 'pending' | 'canceled' | 'failed'
+): Promise<Record<string, number>> {
   const totals: Record<string, number> = {};
   try {
     let startingAfter: string | undefined = undefined;
     for (let page = 0; page < 10; page += 1) {
-      const params: any = { limit: 100, status: 'paid', starting_after: startingAfter };
+      const params: any = { limit: 100, status, starting_after: startingAfter };
       if (createdGte && Number.isFinite(createdGte)) {
         params.created = { gte: createdGte };
       }
@@ -471,6 +475,7 @@ export async function GET(request: Request) {
       const stakeholders: Record<string, { steamId: string; role: string; totalByCurrency: Record<string, number> }> = {};
 
       const stripePayoutsPaidTotalByCurrency: Record<string, number> = {};
+      const stripePayoutsInTransitTotalByCurrency: Record<string, number> = {};
       let stripeBalanceTransactions: {
         netTotalByCurrency: Record<string, number>;
         feeTotalByCurrency: Record<string, number>;
@@ -480,9 +485,14 @@ export async function GET(request: Request) {
         const stripeKey = process.env.STRIPE_SECRET_KEY;
         if (stripeKey) {
           const stripe = createStripe(stripeKey);
-          const totals = await getPaidPayoutTotalsByCurrency(stripe, cutoffUnix);
+          const totals = await getPayoutTotalsByCurrency(stripe, cutoffUnix, 'paid');
           for (const [k, v] of Object.entries(totals)) {
             stripePayoutsPaidTotalByCurrency[String(k).toLowerCase()] = Number(v);
+          }
+
+          const inTransitTotals = await getPayoutTotalsByCurrency(stripe, cutoffUnix, 'in_transit');
+          for (const [k, v] of Object.entries(inTransitTotals)) {
+            stripePayoutsInTransitTotalByCurrency[String(k).toLowerCase()] = Number(v);
           }
 
           stripeBalanceTransactions = await getBalanceTransactionBreakdown(stripe, cutoffUnix);
@@ -599,6 +609,7 @@ export async function GET(request: Request) {
         paidCount,
         paidTotalByCurrency,
         stripePayoutsPaidTotalByCurrency,
+        stripePayoutsInTransitTotalByCurrency,
         stripeBalanceTransactions,
         splits: {
           ownerSteamId,
