@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import { AlertTriangle, Loader2, CheckCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 export default function ReportItemPage() {
+  const [tab, setTab] = useState<'item' | 'bug' | 'idea'>('item');
+
+  const [steamId, setSteamId] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
+  const [pageUrl, setPageUrl] = useState<string>('');
+
   const [itemName, setItemName] = useState('');
   const [itemId, setItemId] = useState('');
   const [itemImage, setItemImage] = useState('');
@@ -14,6 +20,44 @@ export default function ReportItemPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [bugTitle, setBugTitle] = useState('');
+  const [bugDescription, setBugDescription] = useState('');
+  const [bugSteps, setBugSteps] = useState('');
+  const [bugExpected, setBugExpected] = useState('');
+  const [bugActual, setBugActual] = useState('');
+  const [bugSubmitting, setBugSubmitting] = useState(false);
+  const [bugSubmitted, setBugSubmitted] = useState(false);
+  const [bugError, setBugError] = useState<string | null>(null);
+
+  const [ideaTitle, setIdeaTitle] = useState('');
+  const [ideaDescription, setIdeaDescription] = useState('');
+  const [ideaSubmitting, setIdeaSubmitting] = useState(false);
+  const [ideaSubmitted, setIdeaSubmitted] = useState(false);
+  const [ideaError, setIdeaError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const stored = window.localStorage.getItem('steam_user');
+      const parsed = stored ? JSON.parse(stored) : null;
+      const sid = String(parsed?.steamId || '').trim();
+      if (sid) setSteamId(sid);
+    } catch {
+    }
+
+    try {
+      setPageUrl(window.location.href);
+    } catch {
+    }
+  }, []);
+
+  const activeError = useMemo(() => {
+    if (tab === 'item') return error;
+    if (tab === 'bug') return bugError;
+    return ideaError;
+  }, [tab, error, bugError, ideaError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +106,102 @@ export default function ReportItemPage() {
     }
   };
 
+  const handleBugSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBugSubmitting(true);
+    setBugError(null);
+
+    if (!bugTitle.trim() || !bugDescription.trim()) {
+      setBugError('Please fill in all required fields.');
+      setBugSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/report/bug', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: bugTitle.trim(),
+          description: bugDescription.trim(),
+          steps: bugSteps.trim() || undefined,
+          expected: bugExpected.trim() || undefined,
+          actual: bugActual.trim() || undefined,
+          pageUrl: pageUrl || undefined,
+          email: email.trim() || undefined,
+          steamId: steamId || undefined,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+
+      if (!res.ok) {
+        setBugError(data.error || 'Failed to submit report.');
+      } else {
+        setBugSubmitted(true);
+        setTimeout(() => {
+          setBugTitle('');
+          setBugDescription('');
+          setBugSteps('');
+          setBugExpected('');
+          setBugActual('');
+          setBugSubmitted(false);
+        }, 3000);
+      }
+    } catch (err: any) {
+      setBugError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setBugSubmitting(false);
+    }
+  };
+
+  const handleIdeaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIdeaSubmitting(true);
+    setIdeaError(null);
+
+    if (!ideaTitle.trim() || !ideaDescription.trim()) {
+      setIdeaError('Please fill in all required fields.');
+      setIdeaSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/report/idea', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: ideaTitle.trim(),
+          description: ideaDescription.trim(),
+          pageUrl: pageUrl || undefined,
+          email: email.trim() || undefined,
+          steamId: steamId || undefined,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+
+      if (!res.ok) {
+        setIdeaError(data.error || 'Failed to submit report.');
+      } else {
+        setIdeaSubmitted(true);
+        setTimeout(() => {
+          setIdeaTitle('');
+          setIdeaDescription('');
+          setIdeaSubmitted(false);
+        }, 3000);
+      }
+    } catch (err: any) {
+      setIdeaError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setIdeaSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
@@ -85,16 +225,81 @@ export default function ReportItemPage() {
                   Help Us Improve
                 </p>
                 <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">
-                  Report Missing Item
+                  Report
                 </h1>
               </div>
             </div>
 
-            <p className="text-[10px] md:text-[11px] text-gray-400 mb-6 md:mb-8">
-              Found an item that's missing from SkinVaults? Let us know! We'll review your report and add it to our database.
-            </p>
+            <div className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-2 md:p-3 mb-6 md:mb-8 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => setTab('item')}
+                className={`flex-1 px-4 py-3 rounded-2xl transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest ${
+                  tab === 'item'
+                    ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20'
+                    : 'bg-black/30 border border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+                }`}
+              >
+                Missing Item
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('bug')}
+                className={`flex-1 px-4 py-3 rounded-2xl transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest ${
+                  tab === 'bug'
+                    ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
+                    : 'bg-black/30 border border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+                }`}
+              >
+                Bug
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('idea')}
+                className={`flex-1 px-4 py-3 rounded-2xl transition-all text-[10px] md:text-[11px] font-black uppercase tracking-widest ${
+                  tab === 'idea'
+                    ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20'
+                    : 'bg-black/30 border border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+                }`}
+              >
+                Idea
+              </button>
+            </div>
 
-            {submitted ? (
+            <div className="bg-[#11141d] border border-white/5 rounded-2xl p-4 md:p-5 mb-6 md:mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div>
+                  <label htmlFor="reportEmail" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    id="reportEmail"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                    placeholder="you@example.com"
+                    disabled={submitting || bugSubmitting || ideaSubmitting}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="reportPage" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    Page URL
+                  </label>
+                  <input
+                    type="url"
+                    id="reportPage"
+                    value={pageUrl}
+                    onChange={(e) => setPageUrl(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                    placeholder="https://skinvaults.online/..."
+                    disabled={submitting || bugSubmitting || ideaSubmitting}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {(tab === 'item' ? submitted : tab === 'bug' ? bugSubmitted : ideaSubmitted) ? (
               <div className="bg-[#11141d] border border-green-500/20 rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 mb-4">
                   <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -110,118 +315,305 @@ export default function ReportItemPage() {
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 space-y-6">
-                <div>
-                  <label htmlFor="itemName" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                    Item Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="itemName"
-                    value={itemName}
-                    onChange={(e) => setItemName(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="e.g., AK-47 | Redline (Field-Tested)"
-                    required
-                    disabled={submitting}
-                  />
-                  <p className="text-[9px] text-gray-500 mt-1">
-                    Enter the exact item name as it appears on Steam Market
-                  </p>
-                </div>
+              <>
+                {tab === 'item' && (
+                  <form onSubmit={handleSubmit} className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 space-y-6">
+                    <div>
+                      <label htmlFor="itemName" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Item Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="itemName"
+                        value={itemName}
+                        onChange={(e) => setItemName(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="e.g., AK-47 | Redline (Field-Tested)"
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="text-[9px] text-gray-500 mt-1">Enter the exact item name as it appears on Steam Market</p>
+                    </div>
 
-                <div>
-                  <label htmlFor="itemId" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                    Item ID (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    id="itemId"
-                    value={itemId}
-                    onChange={(e) => setItemId(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="e.g., skin-ak47-redline-ft"
-                    disabled={submitting}
-                  />
-                  <p className="text-[9px] text-gray-500 mt-1">
-                    You can find this in the Steam Market URL or item details
-                  </p>
-                </div>
+                    <div>
+                      <label htmlFor="itemId" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Item ID (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        id="itemId"
+                        value={itemId}
+                        onChange={(e) => setItemId(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="e.g., skin-ak47-redline-ft"
+                        disabled={submitting}
+                      />
+                      <p className="text-[9px] text-gray-500 mt-1">You can find this in the Steam Market URL or item details</p>
+                    </div>
 
-                <div>
-                  <label htmlFor="itemImage" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                    Item Image URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    id="itemImage"
-                    value={itemImage}
-                    onChange={(e) => setItemImage(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="https://community.cloudflare.steamstatic.com/economy/image/..."
-                    disabled={submitting}
-                  />
-                  <p className="text-[9px] text-gray-500 mt-1">
-                    Right-click the item image on Steam Market and copy image address
-                  </p>
-                </div>
+                    <div>
+                      <label htmlFor="itemImage" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Item Image URL (Optional)
+                      </label>
+                      <input
+                        type="url"
+                        id="itemImage"
+                        value={itemImage}
+                        onChange={(e) => setItemImage(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="https://community.cloudflare.steamstatic.com/economy/image/..."
+                        disabled={submitting}
+                      />
+                      <p className="text-[9px] text-gray-500 mt-1">Right-click the item image on Steam Market and copy image address</p>
+                    </div>
 
-                <div>
-                  <label htmlFor="reason" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                    Why is this item missing? *
-                  </label>
-                  <textarea
-                    id="reason"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
-                    placeholder="e.g., This item exists on Steam Market but I can't find it when searching on SkinVaults..."
-                    required
-                    disabled={submitting}
-                  />
-                  <p className="text-[9px] text-gray-500 mt-1">
-                    Be as specific as possible to help us locate and add the item
-                  </p>
-                </div>
+                    <div>
+                      <label htmlFor="reason" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Why is this item missing? *
+                      </label>
+                      <textarea
+                        id="reason"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                        placeholder="e.g., This item exists on Steam Market but I can't find it when searching on SkinVaults..."
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="text-[9px] text-gray-500 mt-1">Be as specific as possible to help us locate and add the item</p>
+                    </div>
 
-                {error && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                    <p className="text-red-400 text-sm">{error}</p>
-                  </div>
+                    {activeError && (
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                        <p className="text-red-400 text-sm">{activeError}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItemName('');
+                          setItemId('');
+                          setItemImage('');
+                          setReason('');
+                          setError(null);
+                        }}
+                        className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-black/40 text-gray-400 hover:text-white hover:border-white/20 transition-all text-xs font-black uppercase tracking-widest"
+                        disabled={submitting}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting || !itemName.trim() || !reason.trim()}
+                        className="flex-1 px-4 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit Report'
+                        )}
+                      </button>
+                    </div>
+                  </form>
                 )}
 
-                <div className="flex items-center gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setItemName('');
-                      setItemId('');
-                      setItemImage('');
-                      setReason('');
-                      setError(null);
-                    }}
-                    className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-black/40 text-gray-400 hover:text-white hover:border-white/20 transition-all text-xs font-black uppercase tracking-widest"
-                    disabled={submitting}
-                  >
-                    Clear
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting || !itemName.trim() || !reason.trim()}
-                    className="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      'Submit Report'
+                {tab === 'bug' && (
+                  <form onSubmit={handleBugSubmit} className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 space-y-6">
+                    <div>
+                      <label htmlFor="bugTitle" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Title *
+                      </label>
+                      <input
+                        type="text"
+                        id="bugTitle"
+                        value={bugTitle}
+                        onChange={(e) => setBugTitle(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="e.g., Currency resets after refresh"
+                        required
+                        disabled={bugSubmitting}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="bugDescription" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Description *
+                      </label>
+                      <textarea
+                        id="bugDescription"
+                        value={bugDescription}
+                        onChange={(e) => setBugDescription(e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                        placeholder="What happened?"
+                        required
+                        disabled={bugSubmitting}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="bugExpected" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                          Expected
+                        </label>
+                        <textarea
+                          id="bugExpected"
+                          value={bugExpected}
+                          onChange={(e) => setBugExpected(e.target.value)}
+                          rows={3}
+                          className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                          placeholder="What should happen?"
+                          disabled={bugSubmitting}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="bugActual" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                          Actual
+                        </label>
+                        <textarea
+                          id="bugActual"
+                          value={bugActual}
+                          onChange={(e) => setBugActual(e.target.value)}
+                          rows={3}
+                          className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                          placeholder="What actually happened?"
+                          disabled={bugSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="bugSteps" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Steps to Reproduce
+                      </label>
+                      <textarea
+                        id="bugSteps"
+                        value={bugSteps}
+                        onChange={(e) => setBugSteps(e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                        placeholder="1) ...\n2) ...\n3) ..."
+                        disabled={bugSubmitting}
+                      />
+                    </div>
+
+                    {activeError && (
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                        <p className="text-red-400 text-sm">{activeError}</p>
+                      </div>
                     )}
-                  </button>
-                </div>
-              </form>
+
+                    <div className="flex items-center gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBugTitle('');
+                          setBugDescription('');
+                          setBugSteps('');
+                          setBugExpected('');
+                          setBugActual('');
+                          setBugError(null);
+                        }}
+                        className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-black/40 text-gray-400 hover:text-white hover:border-white/20 transition-all text-xs font-black uppercase tracking-widest"
+                        disabled={bugSubmitting}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={bugSubmitting || !bugTitle.trim() || !bugDescription.trim()}
+                        className="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                      >
+                        {bugSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit Report'
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {tab === 'idea' && (
+                  <form onSubmit={handleIdeaSubmit} className="bg-[#11141d] border border-white/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 space-y-6">
+                    <div>
+                      <label htmlFor="ideaTitle" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Title *
+                      </label>
+                      <input
+                        type="text"
+                        id="ideaTitle"
+                        value={ideaTitle}
+                        onChange={(e) => setIdeaTitle(e.target.value)}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="e.g., Add report categories for bug/idea"
+                        required
+                        disabled={ideaSubmitting}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="ideaDescription" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        Description *
+                      </label>
+                      <textarea
+                        id="ideaDescription"
+                        value={ideaDescription}
+                        onChange={(e) => setIdeaDescription(e.target.value)}
+                        rows={5}
+                        className="w-full px-4 py-3 bg-[#08090d] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                        placeholder="Describe the feature and why it would help"
+                        required
+                        disabled={ideaSubmitting}
+                      />
+                    </div>
+
+                    {activeError && (
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                        <p className="text-red-400 text-sm">{activeError}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdeaTitle('');
+                          setIdeaDescription('');
+                          setIdeaError(null);
+                        }}
+                        className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-black/40 text-gray-400 hover:text-white hover:border-white/20 transition-all text-xs font-black uppercase tracking-widest"
+                        disabled={ideaSubmitting}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={ideaSubmitting || !ideaTitle.trim() || !ideaDescription.trim()}
+                        className="flex-1 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                      >
+                        {ideaSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit Report'
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </>
             )}
 
             <div className="mt-8 p-6 bg-[#11141d] border border-white/5 rounded-2xl">

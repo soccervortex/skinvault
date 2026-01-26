@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
-import { dbGet, dbSet, dbDelete } from '@/app/utils/database';
 
 const ADMIN_HEADER = 'x-admin-key';
 
@@ -77,12 +76,6 @@ export async function PATCH(request: Request) {
       { $set: update }
     );
 
-    // Also update in KV
-    const report = await dbGet(`item_report:${reportId}`);
-    if (report) {
-      await dbSet(`item_report:${reportId}`, { ...report, ...update });
-    }
-
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating report:', error);
@@ -120,12 +113,10 @@ export async function DELETE(request: Request) {
     
     // Delete the report
     await db.collection('item_reports').deleteOne({ id: reportId });
-    await dbDelete(`item_report:${reportId}`);
 
     // If there's a linked custom item, delete it as well
     if (customItem) {
       await db.collection('custom_items').deleteOne({ id: customItem.id });
-      await dbDelete(`custom_item:${customItem.id}`);
     }
 
     return NextResponse.json({ 

@@ -39,7 +39,11 @@ async function enqueueRoleSync(payload: { steamId: string; discordId?: string; r
 
 export async function GET(req: NextRequest) {
   const steamId = getSteamIdFromRequest(req);
-  if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!steamId) {
+    const res = NextResponse.json({ steamId: null, discordId: '' }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
+  }
 
   try {
     if (!hasMongoConfig()) {
@@ -49,7 +53,9 @@ export async function GET(req: NextRequest) {
     const db = await getDatabase();
     const col = db.collection<UserSettingsDoc>('user_settings');
     const doc = await col.findOne({ _id: steamId } as any);
-    return NextResponse.json({ steamId, discordId: String(doc?.discordId || '') }, { status: 200 });
+    const res = NextResponse.json({ steamId, discordId: String(doc?.discordId || '') }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
   } catch (e: any) {
     console.error('GET /api/user/discord-id failed', { name: e?.name, code: e?.code, message: e?.message });
     return NextResponse.json({ error: e?.message || 'Failed to load discord id' }, { status: 500 });

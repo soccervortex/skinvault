@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
-import { dbSet } from '@/app/utils/database';
 import { API_FILES, BASE_URL } from '@/data/api-endpoints';
 import { notifyItemReport } from '@/app/utils/discord-webhook';
 
@@ -84,9 +83,6 @@ export async function POST(request: Request) {
     try {
       const db = await getDatabase();
       await db.collection('item_reports').insertOne(report);
-      
-      // Also save to KV for quick access
-      await dbSet(`item_report:${reportId}`, report);
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Continue even if DB fails

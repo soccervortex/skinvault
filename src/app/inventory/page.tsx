@@ -1473,6 +1473,27 @@ function InventoryContent() {
         try {
           if (combinedUser && typeof window !== 'undefined') {
             if (isLoginCallback) {
+              let sessionOk = false;
+              try {
+                const sessionRes = await fetch('/api/auth/steam/session', { cache: 'no-store' });
+                const sessionJson = await sessionRes.json().catch(() => null);
+                const sessionSteamId = String(sessionJson?.steamId || '').trim();
+                sessionOk = sessionRes.ok && sessionSteamId === String(viewedSteamId);
+              } catch {
+                sessionOk = false;
+              }
+
+              if (!sessionOk) {
+                try {
+                  window.localStorage.setItem('sv_logout_ts', String(Date.now()));
+                  window.localStorage.removeItem('steam_user');
+                  window.localStorage.removeItem('user_inventory');
+                } catch {
+                }
+                toast.error('Steam session could not be verified. Please sign in again.');
+                return;
+              }
+
               // This is your actual login - record first login date (don't block on this)
               fetch('/api/user/first-login', {
                 method: 'POST',

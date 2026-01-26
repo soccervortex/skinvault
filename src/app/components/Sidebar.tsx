@@ -29,6 +29,8 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const didTrySessionHydrationRef = useRef(false);
+  const lastSessionValidationAtRef = useRef(0);
+  const sessionValidationInFlightRef = useRef(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [searchId, setSearchId] = useState("");
@@ -115,6 +117,42 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
             .catch(() => setUser(parsedUser));
         } else {
           setUser(parsedUser);
+        }
+
+        // Validate that client-side stored steam_user matches server session cookie.
+        // Prevents stale localStorage from causing endless 401 spam and broken profile actions.
+        if (parsedUser?.steamId && /^\d{17}$/.test(String(parsedUser.steamId))) {
+          const now = Date.now();
+          if (!sessionValidationInFlightRef.current && now - lastSessionValidationAtRef.current > 15000) {
+            lastSessionValidationAtRef.current = now;
+            sessionValidationInFlightRef.current = true;
+
+            void (async () => {
+              try {
+                const sessionRes = await fetchWithTimeout('/api/auth/steam/session', { cache: 'no-store' }, 6000);
+                if (!sessionRes.ok) return;
+                const sessionJson = await sessionRes.json().catch(() => null);
+                const sessionSteamId = String(sessionJson?.steamId || '').trim();
+
+                if (!sessionSteamId || !/^\d{17}$/.test(sessionSteamId) || sessionSteamId !== String(parsedUser.steamId)) {
+                  try {
+                    window.localStorage.setItem('sv_logout_ts', String(Date.now()));
+                    window.localStorage.removeItem('steam_user');
+                    window.localStorage.removeItem('user_inventory');
+                  } catch {
+                  }
+                  setUser(null);
+                  try {
+                    window.dispatchEvent(new CustomEvent('userUpdated'));
+                  } catch {
+                  }
+                }
+              } catch {
+              } finally {
+                sessionValidationInFlightRef.current = false;
+              }
+            })();
+          }
         }
       } catch {
         // Ignore localStorage errors

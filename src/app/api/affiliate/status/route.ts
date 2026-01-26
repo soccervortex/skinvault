@@ -23,7 +23,14 @@ export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   const steamId = getSteamIdFromRequest(req);
-  if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!steamId) {
+    const res = NextResponse.json(
+      { ok: true, steamId: null, referralCount: 0, milestones: [] },
+      { status: 200 }
+    );
+    res.headers.set('cache-control', 'no-store');
+    return res;
+  }
 
   try {
     if (!hasMongoConfig()) {

@@ -63,7 +63,11 @@ export async function GET(req: NextRequest) {
     const requesterSteamId = getSteamIdFromRequest(req);
 
     const steamId = bot ? requestedSteamId : (requestedSteamId || requesterSteamId);
-    if (!steamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!steamId) {
+      const res = NextResponse.json({ wishlist: [], count: 0 }, { status: 200 });
+      res.headers.set('cache-control', 'no-store');
+      return res;
+    }
 
     if (!bot && steamId !== requesterSteamId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

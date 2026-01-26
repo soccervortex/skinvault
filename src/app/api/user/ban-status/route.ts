@@ -23,15 +23,22 @@ export async function GET(req: NextRequest) {
   const requesterSteamId = getSteamIdFromRequest(req);
   const canCheck = requesterSteamId === steamId || isOwner(requesterSteamId);
   if (!canCheck) {
-    // Return 401 to avoid leaking ban status for arbitrary steamIds.
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Do not leak ban status for arbitrary steamIds.
+    // Return a safe default (banned: false) so the client doesn't spam 401s.
+    const res = NextResponse.json({ steamId, banned: false }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
   }
 
   try {
     const banned = (await dbGet<string[]>(BANNED_KEY)) || [];
-    return NextResponse.json({ steamId, banned: banned.includes(steamId) }, { status: 200 });
+    const res = NextResponse.json({ steamId, banned: banned.includes(steamId) }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
   } catch (error) {
     console.error('Failed to check ban status:', error);
-    return NextResponse.json({ steamId, banned: false }, { status: 200 });
+    const res = NextResponse.json({ steamId, banned: false }, { status: 200 });
+    res.headers.set('cache-control', 'no-store');
+    return res;
   }
 }

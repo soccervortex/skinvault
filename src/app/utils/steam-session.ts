@@ -3,6 +3,16 @@ import type { NextRequest } from 'next/server';
 
 const COOKIE_NAME = 'sv_steam_session';
 
+function getSessionSecret(): string {
+  return (
+    process.env.SESSION_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    (process.env as any).AUTH_SECRET ||
+    (process.env as any).JWT_SECRET ||
+    ''
+  );
+}
+
 function verifyCookie(value: string, secret: string): { steamId: string } | null {
   const v = String(value || '');
   const [payload, sig] = v.split('.');
@@ -27,7 +37,7 @@ function verifyCookie(value: string, secret: string): { steamId: string } | null
 
 export function getSteamIdFromRequest(req: NextRequest): string | null {
   const cookie = req.cookies.get(COOKIE_NAME)?.value || '';
-  const secret = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || '';
+  const secret = getSessionSecret();
   if (!cookie || !secret) return null;
   const data = verifyCookie(cookie, secret);
   const steamId = String(data?.steamId || '').trim();
