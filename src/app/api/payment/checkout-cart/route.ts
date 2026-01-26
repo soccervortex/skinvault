@@ -8,7 +8,6 @@ import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCreditsRestrictionStatus } from '@/app/utils/credits-restrictions';
-import { upsertCartTrackingMessage } from '@/app/utils/discord-webhook';
 
 async function getStripeInstance(): Promise<Stripe> {
   let testMode = false;
@@ -341,18 +340,6 @@ export async function POST(request: NextRequest) {
       testMode,
       createdAt: new Date().toISOString(),
     });
-
-    try {
-      await upsertCartTrackingMessage({
-        cartId,
-        steamId,
-        items,
-        status: 'checkout_started',
-        amount: totalMinor / 100,
-        currency: 'eur',
-      } as any);
-    } catch {
-    }
 
     const session = await createCheckoutSessionWithPaymentMethods(stripe, {
       line_items,

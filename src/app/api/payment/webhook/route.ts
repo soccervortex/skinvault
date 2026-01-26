@@ -4,7 +4,7 @@ import { grantPro } from '@/app/utils/pro-storage';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { captureError, captureMessage } from '@/app/lib/error-handler';
 import { sendInngestEvent } from '@/app/lib/inngest';
-import { notifyCartEvent, notifyCartPurchaseSuccess, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyPaymentFailed, notifyProPurchaseStrict, notifySpinsPurchaseStrict, upsertCartTrackingMessage } from '@/app/utils/discord-webhook';
+import { notifyCartPurchaseSuccess, notifyConsumablePurchaseStrict, notifyCreditsPurchaseStrict, notifyProPurchaseStrict, notifySpinsPurchaseStrict } from '@/app/utils/discord-webhook';
 import { getDatabase } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
 import { sanitizeEmail } from '@/app/utils/sanitize';
@@ -455,36 +455,12 @@ export async function POST(request: Request) {
         try {
           const amount = session.amount_total ? session.amount_total / 100 : 0;
           const currency = session.currency || 'eur';
-          await notifyCartEvent('🛒 Cart Purchase Successful', [
-            { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
-            { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
-            { name: 'Session ID', value: `\`${session.id}\``, inline: false },
-            { name: 'Amount', value: `${amount.toFixed(2)} ${String(currency).toUpperCase()}`, inline: true },
-            { name: 'Granted', value: `Credits: ${grantedCredits.toLocaleString('en-US')}\nSpins: ${grantedSpins.toLocaleString('en-US')}\nPro months: ${grantedProMonths}\nConsumables: ${consumablesGranted.map((c) => `${c.quantity}x ${c.consumableType}`).join(', ') || 'None'}`, inline: false },
-          ]);
-        } catch {
-        }
-
-        try {
-          const amount = session.amount_total ? session.amount_total / 100 : 0;
-          const currency = session.currency || 'eur';
           const grantedSummary = `Credits: ${grantedCredits.toLocaleString('en-US')}\nSpins: ${grantedSpins.toLocaleString('en-US')}\nPro months: ${grantedProMonths}\nConsumables: ${consumablesGranted.map((c) => `${c.quantity}x ${c.consumableType}`).join(', ') || 'None'}`;
 
           try {
             await notifyCartPurchaseSuccess(steamId, cartId, pendingItems, amount, String(currency), session.id, grantedSummary);
           } catch {
           }
-
-          await upsertCartTrackingMessage({
-            cartId,
-            steamId,
-            items: pendingItems,
-            status: 'paid',
-            amount,
-            currency,
-            sessionId: session.id,
-            grantedSummary,
-          } as any);
         } catch {
         }
 
@@ -506,56 +482,6 @@ export async function POST(request: Request) {
             currency: session.currency || 'eur',
           });
           await dbSet(failedKey, failed.slice(-200));
-        } catch {
-        }
-
-        try {
-          const amount = session.amount_total ? session.amount_total / 100 : 0;
-          const currency = session.currency || 'eur';
-          await notifyCartEvent('🛒 Cart Purchase Fulfillment Failed', [
-            { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
-            { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
-            { name: 'Session ID', value: `\`${session.id}\``, inline: false },
-            { name: 'Amount', value: `${amount.toFixed(2)} ${String(currency).toUpperCase()}`, inline: true },
-            { name: 'Error', value: `\`${error instanceof Error ? error.message : 'Unknown error'}\``, inline: false },
-          ], 0xff0000);
-        } catch {
-        }
-
-        try {
-          const amount = session.amount_total ? session.amount_total / 100 : 0;
-          const currency = session.currency || 'eur';
-          await upsertCartTrackingMessage({
-            cartId,
-            steamId,
-            items: (() => {
-              try {
-                const raw = (session.metadata as any)?.items;
-                if (Array.isArray(raw)) return raw;
-              } catch {
-              }
-              return [];
-            })(),
-            status: 'failed',
-            amount,
-            currency,
-            sessionId: session.id,
-            reason: error instanceof Error ? error.message : 'Unknown error',
-          } as any);
-        } catch {
-        }
-
-        try {
-          const amount = session.amount_total ? session.amount_total / 100 : 0;
-          const currency = session.currency || 'eur';
-          await notifyPaymentFailed('❌ Payment Fulfillment Failed (Cart)', [
-            { name: 'Steam ID', value: `\`${steamId}\``, inline: true },
-            { name: 'Type', value: 'cart', inline: true },
-            { name: 'Cart ID', value: `\`${cartId}\``, inline: true },
-            { name: 'Session ID', value: `\`${session.id}\``, inline: false },
-            { name: 'Amount', value: `${amount.toFixed(2)} ${String(currency).toUpperCase()}`, inline: true },
-            { name: 'Error', value: `\`${error instanceof Error ? error.message : 'Unknown error'}\``, inline: false },
-          ]);
         } catch {
         }
 
@@ -1222,33 +1148,6 @@ export async function POST(request: Request) {
     } catch {
     }
 
-    try {
-      await notifyPaymentFailed('⌛ Checkout Session Expired', [
-        { name: 'Steam ID', value: steamId ? `\`${steamId}\`` : 'N/A', inline: true },
-        { name: 'Type', value: type || 'N/A', inline: true },
-        { name: 'Session ID', value: `\`${session.id}\``, inline: false },
-        ...(customerEmail ? [{ name: 'Customer Email', value: customerEmail, inline: false }] : []),
-        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
-      ]);
-    } catch {
-    }
-
-    if (type === 'cart' && cartId && steamId) {
-      try {
-        await upsertCartTrackingMessage({
-          cartId,
-          steamId,
-          items: [],
-          status: 'expired',
-          amount,
-          currency,
-          sessionId: session.id,
-          reason: 'Checkout expired',
-        } as any);
-      } catch {
-      }
-    }
-
     return NextResponse.json({ received: true });
   }
 
@@ -1278,33 +1177,6 @@ export async function POST(request: Request) {
       });
       await dbSet(failedKey, failed.slice(-200));
     } catch {
-    }
-
-    try {
-      await notifyPaymentFailed('❌ Payment Intent Failed', [
-        { name: 'Steam ID', value: steamId ? `\`${steamId}\`` : 'N/A', inline: true },
-        { name: 'Type', value: type || 'N/A', inline: true },
-        { name: 'Payment Intent ID', value: `\`${pi.id}\``, inline: false },
-        ...(customerEmail ? [{ name: 'Customer Email', value: customerEmail, inline: false }] : []),
-        { name: 'Amount', value: `${amount.toFixed(2)} ${currency.toUpperCase()}`, inline: true },
-        { name: 'Error', value: `\`${errorMsg}\``, inline: false },
-      ]);
-    } catch {
-    }
-
-    if (type === 'cart' && cartId && steamId) {
-      try {
-        await upsertCartTrackingMessage({
-          cartId,
-          steamId,
-          items: [],
-          status: 'failed',
-          amount,
-          currency,
-          reason: errorMsg,
-        } as any);
-      } catch {
-      }
     }
 
     return NextResponse.json({ received: true });

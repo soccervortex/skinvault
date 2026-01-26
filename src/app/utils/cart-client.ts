@@ -1,8 +1,6 @@
 export const CART_KEY = 'sv_cart_v1';
 export const CART_ID_KEY = 'sv_cart_id';
 
-let lastCartTrackAt = 0;
-
 type AnyCartItem =
   | { kind: 'pro'; plan: string }
   | { kind: 'credits'; pack: string; quantity: number }
@@ -52,31 +50,6 @@ export function writeCart(items: AnyCartItem[]): void {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(CART_KEY, JSON.stringify(Array.isArray(items) ? items : []));
     window.dispatchEvent(new CustomEvent('sv-cart-updated'));
-
-    try {
-      const now = Date.now();
-      if (now - lastCartTrackAt < 750) return;
-      lastCartTrackAt = now;
-
-      const stored = window.localStorage.getItem('steam_user');
-      const user = stored ? JSON.parse(stored) : null;
-      const steamId = String(user?.steamId || '').trim();
-      if (!/^\d{17}$/.test(steamId)) return;
-
-      const cartId = getOrCreateCartId();
-
-      void fetch('/api/discord/cart-track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          steamId,
-          cartId,
-          items: Array.isArray(items) ? items : [],
-          status: 'updated',
-        }),
-      });
-    } catch {
-    }
   } catch {
   }
 }
