@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { normalizeSteamCurrencyCode } from '@/app/utils/currency-preference';
 
 type DiscordUserPrefs = {
-  currency?: '1' | '3';
+  currency?: string;
   updatedAt?: string;
 };
 
@@ -35,9 +36,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
     const discordId = body?.discordId;
-    const currency = body?.currency;
+    const currencyRaw = body?.currency;
+    const currency = normalizeSteamCurrencyCode(String(currencyRaw || ''));
 
-    if (!discordId || (currency !== '1' && currency !== '3')) {
+    if (!discordId || !currency) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 

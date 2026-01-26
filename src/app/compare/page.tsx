@@ -1,15 +1,17 @@
 "use client";
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronLeft, Swords, Shield, Target, Zap, Award, TrendingUp, BarChart3, Loader2, Heart, Bell } from 'lucide-react';
-import Link from 'next/link';
+import { Swords, Shield, Target, Zap, Award, TrendingUp, BarChart3, Loader2, Heart, Bell, Settings } from 'lucide-react';
 import Sidebar from '@/app/components/Sidebar';
 import ProUpgradeModal from '@/app/components/ProUpgradeModal';
 import PriceTrackerModal from '@/app/components/PriceTrackerModal';
+import CurrencySettingsModal from '@/app/components/CurrencySettingsModal';
+
 import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import { getWearFloatRange, getWearNameFromSkin } from '@/app/utils/skin-utils';
+import { getCurrencyMetaFromSteamCode, readCurrencyPreference, writeCurrencyPreference } from '@/app/utils/currency-preference';
 
 type CompareSkin = {
   id: string;
@@ -28,6 +30,8 @@ function CompareContent() {
   const [items, setItems] = useState<CompareSkin[]>([]);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState({ code: "3", symbol: "€" });
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
   const [priceMap, setPriceMap] = useState<
     Record<string, { lowest: string; median: string; volume: string } | null>
   >({});
@@ -132,11 +136,10 @@ function CompareContent() {
         }
         
         // Load currency
-        const stored = window.localStorage.getItem("sv_currency");
-        if (stored === "1") {
-          setCurrency({ code: "1", symbol: "$" });
-        } else if (stored === "3") {
-          setCurrency({ code: "3", symbol: "€" });
+        const stored = readCurrencyPreference();
+        if (stored) {
+          const meta = getCurrencyMetaFromSteamCode(stored);
+          setCurrency({ code: stored, symbol: meta.symbol });
         }
     } catch {
       // Ignore localStorage errors
@@ -146,6 +149,29 @@ function CompareContent() {
     }
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onCurrencyChange = (e: any) => {
+      const nextCode = String(e?.detail?.code || '').trim();
+      if (!nextCode) return;
+      const meta = getCurrencyMetaFromSteamCode(nextCode);
+      setCurrency({ code: nextCode, symbol: meta.symbol });
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('sv-currency-changed', onCurrencyChange as any);
+      window.addEventListener('storage', () => {
+        const stored = readCurrencyPreference();
+        if (!stored) return;
+        const meta = getCurrencyMetaFromSteamCode(stored);
+        setCurrency({ code: stored, symbol: meta.symbol });
+      });
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('sv-currency-changed', onCurrencyChange as any);
+      }
     };
   }, []);
 
@@ -223,273 +249,230 @@ function CompareContent() {
   return (
     <div className="flex h-dvh bg-[#08090d] text-white font-sans">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
         <div className="max-w-5xl mx-auto space-y-8 md:space-y-12 pb-32">
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
-            <div className="flex items-center gap-4 md:gap-6">
+            <div className="flex items-center gap-3 md:gap-4">
               <Swords className="text-blue-500 shrink-0" size={28} />
               <div>
-                <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">
-                  Compare Skins
-                </h1>
-                <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">
-                  Side-by-side comparison
-                </p>
+                <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none">Compare Skins</h1>
+                <p className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest mt-2">Side-by-side comparison</p>
               </div>
             </div>
-            <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-              <button
-                onClick={() => {
-                  setCurrency({ code: "3", symbol: "€" });
-                  try {
-                    if (typeof window !== "undefined") window.localStorage.setItem("sv_currency", "3");
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-                className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${
-                  currency.code === "3" ? "bg-blue-600 text-white" : "text-gray-500"
-                }`}
-              >
-                EUR
-              </button>
-              <button
-                onClick={() => {
-                  setCurrency({ code: "1", symbol: "$" });
-                  try {
-                    if (typeof window !== "undefined") window.localStorage.setItem("sv_currency", "1");
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-                className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${
-                  currency.code === "1" ? "bg-blue-600 text-white" : "text-gray-500"
-                }`}
-              >
-                USD
-              </button>
-            </div>
+            <button
+              onClick={() => setShowCurrencyModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-black/40 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-300 hover:text-white hover:border-white/10 transition-all"
+              title="Currency settings"
+            >
+              <Settings size={14} />
+              {currency.symbol} {currency.code}
+            </button>
           </header>
 
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          {items.map((skin) => {
-            const rarityColor = skin.rarity?.color || "#3b82f6";
-            const price = priceMap[skin.id];
-            const wishlistKey = (skin as any).market_hash_name || skin.name || skin.id;
-            const steamId = user?.steamId || null;
-            const isWishlisted = wishlist.some((w) => w.key === wishlistKey);
+            {items.map((skin) => {
+              const rarityColor = skin.rarity?.color || '#3b82f6';
+              const price = priceMap[skin.id];
+              const wishlistKey = (skin as any).market_hash_name || skin.name || skin.id;
+              const steamId = user?.steamId || null;
+              const isWishlisted = wishlist.some((w) => w.key === wishlistKey);
 
-            return (
-              <div
-                key={skin.id}
-                className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-2xl relative overflow-hidden"
-              >
+              return (
                 <div
-                  className="absolute inset-0 opacity-10 blur-[120px]"
-                  style={{ backgroundColor: rarityColor }}
-                />
-                <div className="relative z-10 space-y-4 md:space-y-6">
-                  <button
-                    onClick={async () => {
-                      const result = await toggleWishlistEntryServer(
-                        {
-                          key: wishlistKey,
-                          name: skin.name,
-                          image: skin.image,
-                          market_hash_name: (skin as any).market_hash_name,
-                          rarityName: skin.rarity?.name,
-                          rarityColor: skin.rarity?.color,
-                          weaponName: skin.weapon?.name,
-                        },
-                        steamId,
-                        isPro,
-                      );
-                      if (result.success) {
-                        setWishlist(result.newList);
-                      } else if (result.reason === 'limit_reached') {
-                        setShowUpgradeModal(true);
-                      }
-                    }}
-                    className="absolute top-3 md:top-4 right-3 md:right-4 inline-flex items-center justify-center p-2 md:p-2.5 rounded-xl md:rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
-                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                  >
-                    <Heart
-                      size={14}
-                      className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'}
-                    />
-                  </button>
-                  <div className="aspect-video flex items-center justify-center mb-3 md:mb-4">
-                    <img
-                      src={skin.image}
-                      alt={skin.name}
-                      className="w-full h-auto max-h-48 md:max-h-none object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
-                    />
-                  </div>
-                  
-                  {/* Price Tracker Button */}
-                  <div className="flex gap-2 mb-3 md:mb-4">
+                  key={skin.id}
+                  className="bg-[#11141d] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-2xl relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 opacity-10 blur-[120px]" style={{ backgroundColor: rarityColor }} />
+                  <div className="relative z-10 space-y-4 md:space-y-6">
                     <button
-                      onClick={() => setTrackerModalItem(skin)}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                      onClick={async () => {
+                        const result = await toggleWishlistEntryServer(
+                          {
+                            key: wishlistKey,
+                            name: skin.name,
+                            image: skin.image,
+                            market_hash_name: (skin as any).market_hash_name,
+                            rarityName: skin.rarity?.name,
+                            rarityColor: skin.rarity?.color,
+                            weaponName: skin.weapon?.name,
+                          },
+                          steamId,
+                          isPro,
+                        );
+                        if (result.success) {
+                          setWishlist(result.newList);
+                        } else if (result.reason === 'limit_reached') {
+                          setShowUpgradeModal(true);
+                        }
+                      }}
+                      className="absolute top-3 md:top-4 right-3 md:right-4 inline-flex items-center justify-center p-2 md:p-2.5 rounded-xl md:rounded-2xl border border-white/10 bg-black/60 hover:border-rose-500 hover:bg-rose-500/10 transition-all z-20"
+                      aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                     >
-                      <Bell size={12} />
-                      Price Tracker
+                      <Heart size={14} className={isWishlisted ? 'text-rose-500 fill-rose-500' : 'text-gray-400'} />
                     </button>
-                  </div>
-                  
-                  <p
-                    className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.4em] mb-1"
-                    style={{ color: rarityColor }}
-                  >
-                    {skin.rarity?.name || "Unknown Rarity"}
-                  </p>
-                  <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mb-2 md:mb-3 leading-tight">
-                    {skin.name}
-                  </h2>
-                  <div className="flex flex-wrap gap-2 text-[8px] md:text-[9px] uppercase">
-                    {skin.weapon?.name && (
-                      <span className="px-2 md:px-3 py-1 rounded-full bg-black/40 border border-white/10 text-gray-300">
-                        {skin.weapon.name}
-                      </span>
-                    )}
-                    {skin.collections?.[0]?.name && (
-                      <span className="px-2 md:px-3 py-1 rounded-full bg-black/40 border border-white/10 text-gray-400">
-                        {skin.collections[0].name}
-                      </span>
-                    )}
-                    {skin.team?.name && (
-                      <span className="px-2 md:px-3 py-1 rounded-full bg-black/40 border border-white/10 text-gray-400">
-                        {skin.team.name}
-                      </span>
-                    )}
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
-                    <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 relative overflow-hidden">
-                      <span className="text-[8px] md:text-[9px] font-black text-gray-500 uppercase block mb-1">
-                        Current Value
-                      </span>
-                      <p className="text-base md:text-lg font-black text-emerald-400 italic">
-                        {price?.lowest
-                          ? price.lowest
-                          : priceLoading
-                          ? <span className="text-[9px] md:text-[10px] text-gray-500 flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 animate-spin" /> SCANNING...
-                            </span>
-                          : <span className="text-[9px] md:text-[10px] text-gray-600">NO PRICE</span>}
-                      </p>
-                      <TrendingUp className="absolute right-2 md:right-3 bottom-2 md:bottom-3 text-emerald-500/10 w-8 h-8 md:w-10 md:h-10" />
+                    <div className="aspect-video flex items-center justify-center mb-3 md:mb-4">
+                      <img
+                        src={skin.image}
+                        alt={skin.name}
+                        className="w-full h-auto max-h-48 md:max-h-none object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
+                      />
                     </div>
-                    <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 relative overflow-hidden">
-                      <span className="text-[8px] md:text-[9px] font-black text-gray-500 uppercase block mb-1">
-                        24h Median / Vol.
-                      </span>
-                      <p className="text-base md:text-lg font-black text-white/90 italic">
-                        {price?.median
-                          ? <span>{price.median} <span className="text-xs text-gray-500">({price.volume})</span></span>
-                          : priceLoading
-                          ? <span className="text-[9px] md:text-[10px] text-gray-500 flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 animate-spin" /> SCANNING...
-                            </span>
-                          : <span className="text-[9px] md:text-[10px] text-gray-600">NO PRICE</span>}
-                      </p>
-                      <BarChart3 className="absolute right-2 md:right-3 bottom-2 md:bottom-3 text-white/10 w-8 h-8 md:w-10 md:h-10" />
+
+                    <div className="flex gap-2 mb-3 md:mb-4">
+                      <button
+                        onClick={() => setTrackerModalItem(skin)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        <Bell size={12} />
+                        Price Tracker
+                      </button>
+                    </div>
+
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.4em] mb-1" style={{ color: rarityColor }}>
+                      {skin.rarity?.name || 'Unknown Rarity'}
+                    </p>
+                    <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mb-2 md:mb-3 leading-tight">
+                      {skin.name}
+                    </h2>
+
+                    <div className="flex flex-wrap gap-2 text-[8px] md:text-[9px] uppercase">
+                      {skin.weapon?.name && (
+                        <span className="px-2 md:px-3 py-1 rounded-full bg-black/40 border border-white/10 text-gray-300">{skin.weapon.name}</span>
+                      )}
+                      {skin.collections?.[0]?.name && (
+                        <span className="px-2 md:px-3 py-1 rounded-full bg-black/40 border border-white/10 text-gray-400">{skin.collections[0].name}</span>
+                      )}
+                      {skin.team?.name && (
+                        <span className="px-2 md:px-3 py-1 rounded-full bg-black/40 border border-white/10 text-gray-400">{skin.team.name}</span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
+                      <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 relative overflow-hidden">
+                        <span className="text-[8px] md:text-[9px] font-black text-gray-500 uppercase block mb-1">Current Value</span>
+                        <p className="text-base md:text-lg font-black text-emerald-400 italic">
+                          {price?.lowest
+                            ? price.lowest
+                            : priceLoading
+                              ? (
+                                  <span className="text-[9px] md:text-[10px] text-gray-500 flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" /> SCANNING...
+                                  </span>
+                                )
+                              : (
+                                  <span className="text-[9px] md:text-[10px] text-gray-600">NO PRICE</span>
+                                )}
+                        </p>
+                        <TrendingUp className="absolute right-2 md:right-3 bottom-2 md:bottom-3 text-emerald-500/10 w-8 h-8 md:w-10 md:h-10" />
+                      </div>
+                      <div className="bg-black/40 p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 relative overflow-hidden">
+                        <span className="text-[8px] md:text-[9px] font-black text-gray-500 uppercase block mb-1">24h Median / Vol.</span>
+                        <p className="text-base md:text-lg font-black text-white/90 italic">
+                          {price?.median
+                            ? (
+                                <span>
+                                  {price.median} <span className="text-xs text-gray-500">({price.volume})</span>
+                                </span>
+                              )
+                            : priceLoading
+                              ? (
+                                  <span className="text-[9px] md:text-[10px] text-gray-500 flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" /> SCANNING...
+                                  </span>
+                                )
+                              : (
+                                  <span className="text-[9px] md:text-[10px] text-gray-600">NO PRICE</span>
+                                )}
+                        </p>
+                        <BarChart3 className="absolute right-2 md:right-3 bottom-2 md:bottom-3 text-white/10 w-8 h-8 md:w-10 md:h-10" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              );
+            })}
+          </section>
+
+          {(() => {
+            const collection1 = items[0]?.collections?.[0]?.name || '';
+            const collection2 = items[1]?.collections?.[0]?.name || '';
+            const showCollectionRow = !!(collection1 || collection2);
+
+            const wearName1 = getWearNameFromSkin(items[0]?.name || '') || '';
+            const wearName2 = getWearNameFromSkin(items[1]?.name || '') || '';
+            const floatRange1 = wearName1 ? getWearFloatRange(wearName1) : null;
+            const floatRange2 = wearName2 ? getWearFloatRange(wearName2) : null;
+
+            return (
+              <section className="space-y-3 md:space-y-4">
+                <div className="grid grid-cols-3 px-2 md:px-4 lg:px-10 mb-3 md:mb-4 gap-2">
+                  <div className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-500 truncate">
+                    {items[0]?.weapon?.name || items[0]?.name || 'Item 1'}
+                  </div>
+                  <div className="text-center text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-600">Metric</div>
+                  <div className="text-right text-[9px] md:text-[10px] font-black uppercase tracking-widest text-purple-500 truncate">
+                    {items[1]?.weapon?.name || items[1]?.name || 'Item 2'}
+                  </div>
+                </div>
+
+                <DuelRow label="Weapon" val1={items[0]?.weapon?.name || 'Unknown'} val2={items[1]?.weapon?.name || 'Unknown'} icon={<Shield size={14} />} />
+                <DuelRow label="Rarity" val1={items[0]?.rarity?.name || 'Unknown'} val2={items[1]?.rarity?.name || 'Unknown'} icon={<Award size={14} />} />
+                {showCollectionRow && (
+                  <DuelRow
+                    label="Collection"
+                    val1={collection1 || 'N/A'}
+                    val2={collection2 || 'N/A'}
+                    icon={<Target size={14} />}
+                  />
+                )}
+                {(floatRange1 || floatRange2) && (
+                  <DuelRow
+                    label="Float Range"
+                    val1={floatRange1 ? `${floatRange1.min.toFixed(2)} - ${floatRange1.max.toFixed(2)}` : 'N/A'}
+                    val2={floatRange2 ? `${floatRange2.min.toFixed(2)} - ${floatRange2.max.toFixed(2)}` : 'N/A'}
+                    icon={<BarChart3 size={14} />}
+                  />
+                )}
+                <DuelRow label="Team" val1={items[0]?.team?.name || 'Both'} val2={items[1]?.team?.name || 'Both'} icon={<Zap size={14} />} />
+              </section>
             );
-          })}
-        </section>
-
-        {/** derived values for bottom comparison rows */}
-        {(() => {
-          const collection1 = items[0]?.collections?.[0]?.name || "";
-          const collection2 = items[1]?.collections?.[0]?.name || "";
-          const showCollectionRow = !!(collection1 || collection2);
-
-          const wearName1 = getWearNameFromSkin(items[0]?.name || "");
-          const wearName2 = getWearNameFromSkin(items[1]?.name || "");
-          const floatRange1 = wearName1 ? getWearFloatRange(wearName1) : null;
-          const floatRange2 = wearName2 ? getWearFloatRange(wearName2) : null;
-
-          return (
-        <section className="space-y-3 md:space-y-4">
-          <div className="grid grid-cols-3 px-2 md:px-4 lg:px-10 mb-3 md:mb-4 gap-2">
-            <div className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-500 truncate">
-              {items[0]?.weapon?.name || items[0]?.name || "Item 1"}
-            </div>
-            <div className="text-center text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-600">
-              Metric
-            </div>
-            <div className="text-right text-[9px] md:text-[10px] font-black uppercase tracking-widest text-purple-500 truncate">
-              {items[1]?.weapon?.name || items[1]?.name || "Item 2"}
-            </div>
-          </div>
-
-          <DuelRow
-            label="Weapon"
-            val1={items[0]?.weapon?.name || "Unknown"}
-            val2={items[1]?.weapon?.name || "Unknown"}
-            icon={<Shield size={14} />}
-          />
-          <DuelRow
-            label="Rarity"
-            val1={items[0]?.rarity?.name || "Unknown"}
-            val2={items[1]?.rarity?.name || "Unknown"}
-            icon={<Award size={14} />}
-          />
-          {showCollectionRow && (
-            <DuelRow
-              label="Collection"
-              val1={collection1 || "N/A"}
-              val2={collection2 || "N/A"}
-              icon={<Target size={14} />}
-            />
-          )}
-          {(floatRange1 || floatRange2) && (
-            <DuelRow
-              label="Float Range"
-              val1={floatRange1 ? `${floatRange1.min.toFixed(2)} - ${floatRange1.max.toFixed(2)}` : "N/A"}
-              val2={floatRange2 ? `${floatRange2.min.toFixed(2)} - ${floatRange2.max.toFixed(2)}` : "N/A"}
-              icon={<BarChart3 size={14} />}
-            />
-          )}
-          <DuelRow
-            label="Team"
-            val1={items[0]?.team?.name || "Both"}
-            val2={items[1]?.team?.name || "Both"}
-            icon={<Zap size={14} />}
-          />
-        </section>
-          );
-        })()}
+          })()}
         </div>
-      </div>
-      
-      <ProUpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        title="Wishlist Limit Reached"
-        message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
-        feature="Wishlist"
-        limit={getWishlistLimitSync(false)}
-        currentCount={wishlist.length}
-      />
-      
-      {trackerModalItem && (
-        <PriceTrackerModal
-          isOpen={!!trackerModalItem}
-          onClose={() => setTrackerModalItem(null)}
-          item={trackerModalItem}
-          user={user}
-          isPro={isPro}
-          currency={currency}
+
+        <ProUpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          title="Wishlist Limit Reached"
+          message="You've reached the free tier limit of 10 wishlist items. Upgrade to Pro for unlimited wishlist items and access to advanced features."
+          feature="Wishlist"
+          limit={getWishlistLimitSync(false)}
+          currentCount={wishlist.length}
         />
-      )}
-        </div>
+
+        {trackerModalItem && (
+          <PriceTrackerModal
+            isOpen={!!trackerModalItem}
+            onClose={() => setTrackerModalItem(null)}
+            item={trackerModalItem as any}
+            user={user}
+            isPro={isPro}
+            currency={currency}
+          />
+        )}
+
+        <CurrencySettingsModal
+          isOpen={showCurrencyModal}
+          onClose={() => setShowCurrencyModal(false)}
+          currentCode={currency.code}
+          onSelect={(code) => {
+            const meta = getCurrencyMetaFromSteamCode(code);
+            setCurrency({ code, symbol: meta.symbol });
+            writeCurrencyPreference(code);
+          }}
+        />
       </div>
+    </div>
   );
 }
 

@@ -1,88 +1,15 @@
-make for the discord bot a command /announcesite this will let me enter the announcement channel or any channel with the select menu and thenn it will let me make their announcement for me automatically so example ouyr newest daily spin feature or if i make more features so we need to be carefull with this cause we are gonna make a automated systems thats looks what on the website new is and if there is a update he will send it in the discord in a nice embed with what there changed and some info about them also tag @everyone there
 
-Okay i have a few things you need to fix
-
-1. Ledger history should also include spins
-
-Ledger
-Refresh
-daily_claim
-2026-01-18T17:07:18.866Z
-+150
-Rollback
-No Balance
-Copy ID
-{
-  "day": "2026-01-18",
-  "pro": true
-}
-
-giveaway_entry
-2026-01-17T00:36:17.343Z
--25000
-Rollback
-No Balance
-Copy ID
-{
-  "giveawayId": "696983a3288d011346c5053d",
-  "entries": 1,
-  "creditsPerEntry": 25000
-}
-
-admin_adjust
-2026-01-17T00:35:00.332Z
-+25000
-Rollback
-No Balance
-Copy ID
-{
-  "adminSteamId": "76561199235618867",
-  "reason": "Sponsor"
-}
-
-daily_claim
-2026-01-17T00:33:18.319Z
-+150
-Rollback
-No Balance
-Copy ID
-{
-  "day": "2026-01-17",
-  "pro": true
-}
-
-admin_adjust
-2026-01-17T00:17:14.430Z
-+10000
-Rollback
-No Balance
-Copy ID
-{
-  "adminSteamId": "76561199235618867",
-  "reason": "Sponsor"
-
-2. Webpage optimization
-
-- on the first picture we see the styling for mobile is a bit nehh because of the modal not covering the full page we see a part  of the giveaway page in the bottom this is also on pc also we would like to see the top of the modal and the bottom with opencase its always in the screen make between that a scroll function so you can scroll through the cards 
-
-then for the second image we also see the same in the bottom a part of the giveaways tab we also see that we can see anything of the buttons in the top also we see a big screen with nothing under the animation lets put there your latest rewards so we can see a little stats highest value from a case something like that and make a feature where we can do auto spins so it automatically spins till your cases are finished it will go to the first modal then the case modal then the third modal and then again to the second modal auto include a turbo functions there to speed it a bit up you can control it with keyboard shortcuts and buttons
-
-then for the third image you did better and shows everything but the bottom part has the same thing
-
-look at image 4  and 5 together thats the admin panel but i dont see any spins thing in there also reorder it a bit to a nice ordered admin panel
-
-[{
-	"resource": "/d:/Codes/cs2-website/skin-vault/src/app/components/Sidebar.tsx",
-	"owner": "typescript",
-	"code": "17008",
-	"severity": 8,
-	"message": "JSX element 'div' has no corresponding closing tag.",
-	"source": "ts",
-	"startLineNumber": 420,
-	"startColumn": 14,
-	"endLineNumber": 420,
-	"endColumn": 17,
-	"origin": "extHost1"
-}]
-
-
+Buttons zijn niet naar beneden top padding is beetje raar bij edit profile en naam
+op de markt ook een knopje met nieuwste item dan lkaat hij een modal zien met dew 6 nieuwste en je kan nog naar verschillende paginas scrollen in dat modaltje zodat je weer de nieuwste kan zien met een prijs beschikbaar en de datum is heel belangrijk 
+plaats van dat ik alleen kan klikken op euro of usd wil ik ook alle currencys supporten die steam support daardoor moeten we in plaats van dat je nu op 1 van de twee kan kjlikken een soort van settings button toevoegen op elke plek waar je dit zou moeten kunnenn vervgangen zo kan je dingen van settings die je zelf ik kan stelllen op preference ofz aanpassen
+maak in de vault bij cs2 overview daaroonder in die zelfde box ook de stats die daar boven staan ziet er wat cleaner uit naar mijn idee
+bij image Schermafbeelding 2026-01-25 213154.png zie je de profiel in de vault denk dat we dit echt wel een stukje betetr kunnen maken beter css betere indeling alles wat duideliojker e niet gwn zo maar ergens neer gestampt
+mensen kunnen pingen in de chat dus bijvoorbeeld met / commands kunnen werken naar een command van ping kan je iemand pingen krijgen hun notificatie 
+commands manager toevoegen in de amin panels om meerdere commands te kunnen maken via de website zelf maar ook voor commands toe tevoegen te editen en te kunnen verwijderen of uit en aan zetten
+bij image Schermafbeelding 2026-01-25 222411.png zien we de trade url bij de vault waarom is huier niet zo een vraagteken met uitleg van hoe je hem kan vinden 
+ook is er iets mis met de connectie naar discord of hij disconnect de hele tijd of de button tript hem want soms zegt die dat ik hem moet connecten terwijl ik hem een paar dagen geleden al had geconnect waarom zo snel opnieuw
+shop wat cleaner maken nou is alles heel erg in elkaar gepropt denk dat we echt wel een modernere shop zouden kunnen maken 
+in de contact pagina zou echt wel de discord server moeten staan maar die staat er niet
+ook zou ik het nice vinden om nieuwsbrieven te kunnen versturen via email gwn met smtp ofz via bedrijfsemail van hostinger en dat mensen zich hier ook echt voor kunnen aanmelden en weer afkunnen melden met een nice admin dashboard waar hij een hele nete manier naar alle emails kan sturen die in de database zitten
+report item is a nice tab but i would like it more if it was report a bug then in that page you can see two buttons  to go to report a item or report a bug where you can report a bug and we will get a webhook notification in discord and a email thorugh smtp not nodemailer just a normal smtp also add a section with the same things for ideas to submit suggestios
+look for any functions we just have told you to makew and check if there is anything you should do with databases type of things or admin routes

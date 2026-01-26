@@ -8,6 +8,7 @@ import { Loader2, PackageOpen, Target, Skull, Award, Swords, TrendingUp, Lock, M
 import { getPriceScanConcurrencySync, getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
 import dynamic from 'next/dynamic';
+import HelpTooltip from '@/app/components/HelpTooltip';
 
 // Dynamic imports for modals to reduce initial bundle size
 const ManagePriceTrackers = dynamic(() => import('@/app/components/ManagePriceTrackers'), {
@@ -191,12 +192,18 @@ function hexToRgba(hex: string, alpha: number) {
 }
 
 function formatProfileName(name: string): string {
-  return String(name || '')
-    .replace(/\s*\|\s*/g, ' | ')
+  const normalized = String(name || '')
     .replace(/\s+/g, ' ')
     .trim();
-}
 
+  const withoutSiteSuffix = normalized
+    .replace(/\s*\|\s*(?:www\.)?skinvaults\.online\s*$/i, '')
+    .trim();
+
+  return withoutSiteSuffix
+    .replace(/\s*\|\s*/g, ' | ')
+    .trim();
+}
 function getItemDisplayName(item: InventoryItem): string {
   return (
     item.display_name ||
@@ -2065,7 +2072,7 @@ function InventoryContent() {
       )}
       <div className="flex h-dvh bg-[#08090d] text-white font-sans">
         <Sidebar />
-        <main id="main-content" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 custom-scrollbar">
         {websiteProfilePrivate && (
           <div className="max-w-6xl mx-auto space-y-10 pb-32">
             <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
@@ -2097,8 +2104,8 @@ function InventoryContent() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 w-full xl:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none truncate">
+                  <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                    <h1 className="w-full sm:flex-1 min-w-0 text-xl sm:text-2xl md:text-4xl font-black italic uppercase tracking-tighter leading-none sm:truncate">
                       {formatProfileName(viewedUser?.name || "User")}
                     </h1>
 
@@ -2141,7 +2148,7 @@ function InventoryContent() {
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (
-                    <div className="mt-2 md:mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:flex xl:items-center xl:gap-3 xl:flex-wrap">
+                    <div className="mt-5 md:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:flex xl:items-center xl:gap-3 xl:flex-wrap">
                       <button
                         onClick={() => setIsEditingProfile((v) => !v)}
                         className={`w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 text-white'}`}
@@ -2222,7 +2229,14 @@ function InventoryContent() {
                           </button>
 
                           <div className="w-full mt-2 bg-black/40 border border-white/5 rounded-[1.5rem] p-4">
-                            <div className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Trade URL</div>
+                            <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">
+                              Trade URL
+                              <HelpTooltip
+                                title="Where to find your Trade URL"
+                                content="Open Steam → Inventory → Trade Offers → Who can send me Trade Offers? → Copy your Trade URL"
+                                className="ml-1"
+                              />
+                            </div>
                             <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
                               <input
                                 value={tradeUrlInput}
@@ -2289,7 +2303,7 @@ function InventoryContent() {
                     </div>
                   )}
                   {viewingOwnProfile && viewAsOthers && (
-                    <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-3 md:mt-4">
+                    <div className="flex items-center gap-2 md:gap-3 flex-wrap mt-5 md:mt-6">
                       <button
                         onClick={() => setViewAsOthers(false)}
                         className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all"
@@ -2449,88 +2463,90 @@ function InventoryContent() {
                   </div>
                 </div>
               </div>
-            </header>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-              <StatCard
-                label="Total Items"
-                icon={<PackageOpen size={12} />}
-                val={Number.isFinite(Number(totalItems)) ? Number(totalItems).toLocaleString('en-US') : null}
-              />
+              <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-white/5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+                  <StatCard
+                    label="Total Items"
+                    icon={<PackageOpen size={12} />}
+                    val={Number.isFinite(Number(totalItems)) ? Number(totalItems).toLocaleString('en-US') : null}
+                  />
 
-              <StatCard
-                label="Priced"
-                icon={<TrendingUp size={12} />}
-                val={Number.isFinite(Number(pricedItems)) ? Number(pricedItems).toLocaleString('en-US') : null}
-              />
+                  <StatCard
+                    label="Priced"
+                    icon={<TrendingUp size={12} />}
+                    val={Number.isFinite(Number(pricedItems)) ? Number(pricedItems).toLocaleString('en-US') : null}
+                  />
 
-              <StatCard
-                label="Unpriced"
-                icon={<Target size={12} />}
-                val={Number.isFinite(Number(totalItems - pricedItems)) ? Number(totalItems - pricedItems).toLocaleString('en-US') : null}
-              />
+                  <StatCard
+                    label="Unpriced"
+                    icon={<Target size={12} />}
+                    val={Number.isFinite(Number(totalItems - pricedItems)) ? Number(totalItems - pricedItems).toLocaleString('en-US') : null}
+                  />
 
-              <StatCard
-                label="K/D"
-                icon={<Swords size={12} />}
-                val={playerStats?.kd ?? null}
-              />
+                  <StatCard
+                    label="K/D"
+                    icon={<Swords size={12} />}
+                    val={playerStats?.kd ?? null}
+                  />
 
-              <StatCard
-                label="HS%"
-                icon={<CheckCircle2 size={12} />}
-                val={playerStats?.hs ?? null}
-                unit={playerStats?.hs ? '%' : ''}
-              />
+                  <StatCard
+                    label="HS%"
+                    icon={<CheckCircle2 size={12} />}
+                    val={playerStats?.hs ?? null}
+                    unit={playerStats?.hs ? '%' : ''}
+                  />
 
-              <StatCard
-                label="Wins"
-                icon={<Award size={12} />}
-                val={playerStats?.wins ?? null}
-              />
-            </div>
+                  <StatCard
+                    label="Wins"
+                    icon={<Award size={12} />}
+                    val={playerStats?.wins ?? null}
+                  />
+                </div>
 
-            {isPro && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-                <StatCard
-                  label="ADR"
-                  icon={<Target size={12} />}
-                  val={playerStats?.adr ?? null}
-                />
+                {isPro && (
+                  <div className="mt-3 md:mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+                    <StatCard
+                      label="ADR"
+                      icon={<Target size={12} />}
+                      val={playerStats?.adr ?? null}
+                    />
 
-                <StatCard
-                  label="Accuracy"
-                  icon={<CheckCircle2 size={12} />}
-                  val={playerStats?.accuracy ?? null}
-                  unit={playerStats?.accuracy ? '%' : ''}
-                />
+                    <StatCard
+                      label="Accuracy"
+                      icon={<CheckCircle2 size={12} />}
+                      val={playerStats?.accuracy ?? null}
+                      unit={playerStats?.accuracy ? '%' : ''}
+                    />
 
-                <StatCard
-                  label="MVPs"
-                  icon={<Award size={12} />}
-                  val={playerStats?.mvps ?? null}
-                />
+                    <StatCard
+                      label="MVPs"
+                      icon={<Award size={12} />}
+                      val={playerStats?.mvps ?? null}
+                    />
 
-                <StatCard
-                  label="Faceit ELO"
-                  icon={<TrendingUp size={12} />}
-                  val={faceitStats?.elo ?? null}
-                />
+                    <StatCard
+                      label="Faceit ELO"
+                      icon={<TrendingUp size={12} />}
+                      val={faceitStats?.elo ?? null}
+                    />
 
-                <StatCard
-                  label="Faceit Level"
-                  icon={<Trophy size={12} />}
-                  val={faceitStats?.level ?? null}
-                />
+                    <StatCard
+                      label="Faceit Level"
+                      icon={<Trophy size={12} />}
+                      val={faceitStats?.level ?? null}
+                    />
 
-                <StatCard
-                  label="Faceit WR"
-                  icon={<Swords size={12} />}
-                  val={faceitStats?.winRate ?? null}
-                  unit={faceitStats?.winRate ? '%' : ''}
-                />
+                    <StatCard
+                      label="Faceit WR"
+                      icon={<Swords size={12} />}
+                      val={faceitStats?.winRate ?? null}
+                      unit={faceitStats?.winRate ? '%' : ''}
+                    />
+                  </div>
+                )}
               </div>
-            )}
+            </header>
 
             <section className="bg-[#11141d] p-5 md:p-7 rounded-[2rem] md:rounded-[3rem] border border-white/5 shadow-xl">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">

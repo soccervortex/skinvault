@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
-import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale, AlertTriangle, X } from 'lucide-react';
+import { ChevronLeft, TrendingUp, ExternalLink, Box, Image as ImageIcon, Info, Loader2, ShieldCheck, Tag, BarChart3, Coins, Heart, Bell, Scale, AlertTriangle, X, Settings } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import dynamic from 'next/dynamic';
 import ReportMissingItemModal from '@/app/components/ReportMissingItemModal';
+import CurrencySettingsModal from '@/app/components/CurrencySettingsModal';
 
 // Dynamic imports for modals to reduce initial bundle size
 const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal'), {
@@ -21,6 +22,7 @@ import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer, WishlistEntry } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { fetchWithProxyRotation, checkProStatus } from '@/app/utils/proxy-utils';
+import { getCurrencyMetaFromSteamCode, readCurrencyPreference, writeCurrencyPreference } from '@/app/utils/currency-preference';
 
 import { API_FILES, BASE_URL as API_BASE_URL } from '@/data/api-endpoints';
 
@@ -49,6 +51,7 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
   const [showTrackerModal, setShowTrackerModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const datasetCacheRef = useRef<Record<string, { data: any[]; timestamp: number }>>({});
   const priceCacheRef = useRef<Record<string, any>>({});
@@ -119,11 +122,10 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         const pc = window.localStorage.getItem(PRICE_CACHE_KEY);
         if (pc) priceCacheRef.current = JSON.parse(pc);
 
-        const storedCurrency = window.localStorage.getItem('sv_currency');
-        if (storedCurrency === '1') {
-          setCurrency({ code: '1', symbol: '$' });
-        } else if (storedCurrency === '3') {
-          setCurrency({ code: '3', symbol: '€' });
+        const stored = readCurrencyPreference();
+        if (stored) {
+          const meta = getCurrencyMetaFromSteamCode(stored);
+          setCurrency({ code: stored, symbol: meta.symbol });
         }
 
         const storedUser = window.localStorage.getItem('steam_user');
@@ -158,6 +160,31 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
     }
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onCurrencyChange = (e: any) => {
+      const nextCode = String(e?.detail?.code || '').trim();
+      if (!nextCode) return;
+      const meta = getCurrencyMetaFromSteamCode(nextCode);
+      setCurrency({ code: nextCode, symbol: meta.symbol });
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('sv-currency-changed', onCurrencyChange as any);
+      window.addEventListener('storage', () => {
+        const stored = readCurrencyPreference();
+        if (!stored) return;
+        const meta = getCurrencyMetaFromSteamCode(stored);
+        setCurrency({ code: stored, symbol: meta.symbol });
+      });
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('sv-currency-changed', onCurrencyChange as any);
+      }
     };
   }, []);
 
@@ -887,35 +914,14 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
                 </button>
               </div>
 
-              {/* CURRENCY SWITCHER */}
-              <div className="flex bg-[#11141d] p-1 rounded-lg border border-white/10">
-                <button
-                  onClick={() => {
-                    setCurrency({ code: '3', symbol: '€' });
-                    try {
-                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '3');
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                  className={`px-3 md:px-4 py-2 rounded-lg text-xs font-medium transition-all ${currency.code === '3' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                >
-                  EUR
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrency({ code: '1', symbol: '$' });
-                    try {
-                      if (typeof window !== 'undefined') window.localStorage.setItem('sv_currency', '1');
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                  className={`px-3 md:px-4 py-2 rounded-lg text-xs font-medium transition-all ${currency.code === '1' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
-                >
-                  USD
-                </button>
-              </div>
+              <button
+                onClick={() => setShowCurrencyModal(true)}
+                className="inline-flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg border border-white/10 bg-[#11141d] text-xs font-medium text-gray-300 hover:text-white transition-all"
+                title="Currency settings"
+              >
+                <Settings size={14} />
+                {currency.symbol} {currency.code}
+              </button>
             </div>
           </div>
 
@@ -1477,6 +1483,17 @@ export default function ItemDetailClient({ initialItem, itemId }: ItemDetailClie
         itemName={item?.name || decodedId}
         itemId={item?.id || decodedId}
         itemImage={item?.image}
+      />
+
+      <CurrencySettingsModal
+        isOpen={showCurrencyModal}
+        onClose={() => setShowCurrencyModal(false)}
+        currentCode={currency.code}
+        onSelect={(code) => {
+          const meta = getCurrencyMetaFromSteamCode(code);
+          setCurrency({ code, symbol: meta.symbol });
+          writeCurrencyPreference(code);
+        }}
       />
   </div>
   );

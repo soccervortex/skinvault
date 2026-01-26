@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
-import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell, Star, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Tag, Disc, User, Package, Crosshair, Zap, Shield, Target, CheckCircle2, X, Scale, Trash2, Dices, Heart, Bell, Star, ExternalLink, AlertTriangle, Clock, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import dynamic from 'next/dynamic';
 import InstallPrompt from '@/app/components/InstallPrompt';
+import CurrencySettingsModal from '@/app/components/CurrencySettingsModal';
 
 // Dynamic imports for modals to reduce initial bundle size
 const PriceTrackerModal = dynamic(() => import('@/app/components/PriceTrackerModal'), {
@@ -18,10 +19,14 @@ const ProUpgradeModal = dynamic(() => import('@/app/components/ProUpgradeModal')
 const SurpriseMeModal = dynamic(() => import('@/app/components/SurpriseMeModal'), {
   ssr: false,
 });
+const NewestItemsModal = dynamic(() => import('@/app/components/NewestItemsModal'), {
+  ssr: false,
+});
 import { ItemCardSkeleton } from '@/app/components/LoadingSkeleton';
 import { fetchWishlistFromServer, loadWishlist, saveWishlist, toggleWishlistEntryServer } from '@/app/utils/wishlist';
 import { getWishlistLimitSync } from '@/app/utils/pro-limits';
 import { checkProStatus } from '@/app/utils/proxy-utils';
+import { getCurrencyMetaFromSteamCode, readCurrencyPreference, writeCurrencyPreference } from '@/app/utils/currency-preference';
 
 type SortType =
   | 'rarity-desc'
@@ -152,7 +157,9 @@ export default function GlobalSkinSearch() {
   const [trackerModalItem, setTrackerModalItem] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showSurpriseModal, setShowSurpriseModal] = useState(false);
+  const [showNewestModal, setShowNewestModal] = useState(false);
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
   const wishlistHydrateSteamIdRef = useRef<string | null>(null);
 
@@ -211,12 +218,10 @@ export default function GlobalSkinSearch() {
           }
         }
         
-        // Load currency
-        const storedCurrency = window.localStorage.getItem('sv_currency');
-        if (storedCurrency === '1') {
-          setCurrency({ code: '1', symbol: '$' });
-        } else if (storedCurrency === '3') {
-          setCurrency({ code: '3', symbol: '€' });
+        const stored = readCurrencyPreference();
+        if (stored) {
+          const meta = getCurrencyMetaFromSteamCode(stored);
+          setCurrency({ code: stored, symbol: meta.symbol });
         }
       } catch (e: any) {
         // Silently ignore localStorage errors (browser privacy settings, sandboxed iframe, etc.)
@@ -226,7 +231,11 @@ export default function GlobalSkinSearch() {
 
     updateStates();
     window.addEventListener('storage', updateStates);
-    return () => window.removeEventListener('storage', updateStates);
+    window.addEventListener('sv-currency-changed', updateStates as any);
+    return () => {
+      window.removeEventListener('storage', updateStates);
+      window.removeEventListener('sv-currency-changed', updateStates as any);
+    };
   }, []);
 
   // Hydrate dataset cache
@@ -488,6 +497,15 @@ export default function GlobalSkinSearch() {
     }
   };
 
+  const openNewestModal = () => {
+    setShowNewestModal(true);
+    if (allMarketItems.length === 0) {
+      void loadAllMarketItems()
+        .then((all) => setAllMarketItems(all))
+        .catch(() => {});
+    }
+  };
+
   const toggleCompare = (item: any) => {
     if (compareList.find(i => i.id === item.id)) {
       setCompareList(compareList.filter(i => i.id !== item.id));
@@ -597,10 +615,23 @@ export default function GlobalSkinSearch() {
           </div>
           
           <div className="flex items-center gap-2 md:gap-3 w-full xl:w-auto justify-between xl:justify-end">
+            <button onClick={openNewestModal} className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 lg:py-3 rounded-lg md:rounded-xl text-[7px] md:text-[8px] lg:text-[9px] font-black uppercase border border-blue-500/30 bg-blue-500/5 text-blue-400 hover:bg-blue-600 hover:text-white transition-all whitespace-nowrap shrink-0">
+              <Clock size={12} />
+              <span className="hidden sm:inline">Newest</span>
+              <span className="sm:hidden">New</span>
+            </button>
             <button onClick={openSurpriseModal} className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 lg:py-3 rounded-lg md:rounded-xl text-[7px] md:text-[8px] lg:text-[9px] font-black uppercase border border-amber-500/30 bg-amber-500/5 text-amber-500 hover:bg-amber-500 hover:text-black transition-all whitespace-nowrap shrink-0">
               <Dices size={12} />
               <span className="hidden sm:inline">Surprise Me</span>
               <span className="sm:hidden">Random</span>
+            </button>
+            <button
+              onClick={() => setShowCurrencyModal(true)}
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 lg:py-3 rounded-lg md:rounded-xl text-[7px] md:text-[8px] lg:text-[9px] font-black uppercase border border-white/10 bg-black/30 text-gray-300 hover:text-white hover:border-white/20 transition-all whitespace-nowrap shrink-0"
+              title="Currency settings"
+            >
+              <Settings size={12} />
+              {currency.symbol} {currency.code}
             </button>
             <div className="hidden md:block h-6 w-[1px] bg-white/10 mx-2" />
             <div className="flex-1 xl:flex-none overflow-x-auto -mx-2 px-2">
@@ -830,10 +861,28 @@ export default function GlobalSkinSearch() {
         currentCount={wishlist.length}
       />
 
+      <NewestItemsModal
+        isOpen={showNewestModal}
+        onClose={() => setShowNewestModal(false)}
+        currency={currency}
+        allItems={allMarketItems.length ? allMarketItems : items}
+      />
+
       <SurpriseMeModal
         isOpen={showSurpriseModal}
         onClose={() => setShowSurpriseModal(false)}
         allItems={allMarketItems.length ? allMarketItems : items}
+      />
+
+      <CurrencySettingsModal
+        isOpen={showCurrencyModal}
+        onClose={() => setShowCurrencyModal(false)}
+        currentCode={currency.code}
+        onSelect={(code) => {
+          const meta = getCurrencyMetaFromSteamCode(code);
+          setCurrency({ code, symbol: meta.symbol });
+          writeCurrencyPreference(code);
+        }}
       />
 
       <InstallPrompt />

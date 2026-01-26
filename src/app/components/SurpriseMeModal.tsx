@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Dices, X, Search, Filter } from 'lucide-react';
+import { Dices, X, Search, Filter, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import CurrencySettingsModal from '@/app/components/CurrencySettingsModal';
+import { getCurrencyMetaFromSteamCode, readCurrencyPreference, writeCurrencyPreference } from '@/app/utils/currency-preference';
 
 interface SurpriseMeModalProps {
   isOpen: boolean;
@@ -104,6 +106,7 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   const [filteredCount, setFilteredCount] = useState(0);
   const [pricedCount, setPricedCount] = useState(0);
   const [currency, setCurrency] = useState({ code: '3', symbol: '€' });
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [priceIndex, setPriceIndex] = useState<Record<string, number> | null>(null);
   const [priceIndexLoaded, setPriceIndexLoaded] = useState(false);
   const [surpriseLoading, setSurpriseLoading] = useState(false);
@@ -111,12 +114,38 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
   useEffect(() => {
     try {
       if (typeof window === 'undefined') return;
-      const storedCurrency = window.localStorage.getItem('sv_currency');
-      if (storedCurrency === '1') setCurrency({ code: '1', symbol: '$' });
-      else setCurrency({ code: '3', symbol: '€' });
+      const stored = readCurrencyPreference();
+      if (!stored) return;
+      const meta = getCurrencyMetaFromSteamCode(stored);
+      setCurrency({ code: stored, symbol: meta.symbol });
     } catch {
       setCurrency({ code: '3', symbol: '€' });
     }
+  }, []);
+
+  useEffect(() => {
+    const onCurrencyChange = (e: any) => {
+      const nextCode = String(e?.detail?.code || '').trim();
+      if (!nextCode) return;
+      const meta = getCurrencyMetaFromSteamCode(nextCode);
+      setCurrency({ code: nextCode, symbol: meta.symbol });
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('sv-currency-changed', onCurrencyChange as any);
+      window.addEventListener('storage', () => {
+        const stored = readCurrencyPreference();
+        if (!stored) return;
+        const meta = getCurrencyMetaFromSteamCode(stored);
+        setCurrency({ code: stored, symbol: meta.symbol });
+      });
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('sv-currency-changed', onCurrencyChange as any);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -311,9 +340,19 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
             <Dices className="text-amber-500" size={20} />
             <h2 className="text-lg font-black uppercase tracking-wider text-white">Surprise Me</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCurrencyModal(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#11141d] border border-white/5 text-[10px] font-black uppercase tracking-widest text-gray-300 hover:text-white transition-all"
+              title="Currency settings"
+            >
+              <Settings size={14} />
+              {currency.symbol} {currency.code}
+            </button>
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-5">
@@ -422,6 +461,17 @@ export default function SurpriseMeModal({ isOpen, onClose, allItems }: SurpriseM
           </button>
         </div>
       </div>
+
+      <CurrencySettingsModal
+        isOpen={showCurrencyModal}
+        onClose={() => setShowCurrencyModal(false)}
+        currentCode={currency.code}
+        onSelect={(code) => {
+          const meta = getCurrencyMetaFromSteamCode(code);
+          setCurrency({ code, symbol: meta.symbol });
+          writeCurrencyPreference(code);
+        }}
+      />
     </div>
   );
 }

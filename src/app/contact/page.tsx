@@ -2,13 +2,14 @@
 
 import React, { useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
-import { Mail, Copy, Check } from 'lucide-react';
+import { Mail, Copy, Check, MessageSquare } from 'lucide-react';
 import { copyToClipboard } from '@/app/utils/clipboard';
 
 export default function ContactPage() {
   const [copied, setCopied] = useState(false);
 
   const contactEmail = 'contact@skinvaults.online';
+  const discordInvite = 'https://discord.gg/bGqf8bBhy5';
   
   const exampleTemplate = `Subject: [Reason] - [Your Name]
 
@@ -76,6 +77,26 @@ Description:
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-4 text-blue-400">
+                Discord Server
+              </h2>
+              <div className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 md:p-6 flex items-center justify-between gap-4">
+                <code className="text-[11px] md:text-[12px] text-blue-400 font-mono break-all">
+                  {discordInvite}
+                </code>
+                <a
+                  href={discordInvite}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all shrink-0"
+                >
+                  <MessageSquare size={14} />
+                  Join
+                </a>
               </div>
             </section>
 
