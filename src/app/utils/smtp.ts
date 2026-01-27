@@ -44,7 +44,7 @@ function getSmtpConfig(): SmtpConfig | null {
   const port = Number.parseInt(String(process.env.SMTP_PORT || ''), 10);
   const secure = String(process.env.SMTP_SECURE || '').trim().toLowerCase() === 'true' || port === 465;
 
-  const from = sanitizeString(String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '')).trim();
+  const from = String(process.env.SMTP_FROM || process.env.EMAIL_FROM || '').trim().slice(0, 300);
   if (!host || !Number.isFinite(port) || port <= 0 || !from) return null;
 
   const user = sanitizeString(String(process.env.SMTP_USER || '')).trim() || undefined;
