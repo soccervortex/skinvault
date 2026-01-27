@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isOwner } from '@/app/utils/owner-ids';
-import { sanitizeEmail, sanitizeString } from '@/app/utils/sanitize';
+import { escapeHtml, sanitizeEmail, sanitizeString } from '@/app/utils/sanitize';
 import { sendSmtpEmail } from '@/app/utils/smtp';
 
 export const runtime = 'nodejs';
@@ -34,6 +34,12 @@ export async function POST(req: NextRequest) {
     if (!html && !text) return NextResponse.json({ error: 'Missing message' }, { status: 400 });
 
     const baseUrl = sanitizeString(String(process.env.NEXT_PUBLIC_BASE_URL || '')).trim().replace(/\/$/, '');
+    const replyTo =
+      sanitizeEmail(String(process.env.SMTP_REPLY_TO || '').trim()) ||
+      sanitizeEmail(String(process.env.SMTP_USER || '').trim()) ||
+      undefined;
+
+    const logoUrl = baseUrl ? `${baseUrl}/icon.png` : '';
 
     const db = await getDatabase();
     const col = db.collection('newsletter_subscribers');
@@ -60,15 +66,26 @@ export async function POST(req: NextRequest) {
       const footerText = unsubscribeUrl ? `\n\nUnsubscribe: ${unsubscribeUrl}` : '';
       const nextText = text ? `${text}${footerText}` : footerText;
 
-      const nextHtml = html
-        ? `${html}${unsubscribeUrl ? `<hr/><p style="font-size:12px;color:#94a3b8">Unsubscribe: <a href="${unsubscribeUrl}">${unsubscribeUrl}</a></p>` : ''}`
-        : undefined;
+      const unsubscribeHtml = unsubscribeUrl
+        ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0"/><p style="margin:0;font-size:12px;line-height:1.4;color:#64748b">Unsubscribe: <a href="${unsubscribeUrl}" style="color:#2563eb;text-decoration:none">${unsubscribeUrl}</a></p>`
+        : '';
+
+      const headerHtml = logoUrl
+        ? `<div style="text-align:center;margin:0 0 18px"><img src="${logoUrl}" alt="SkinVaults" width="56" height="56" style="display:inline-block;border-radius:14px"/></div>`
+        : `<div style="text-align:center;margin:0 0 18px;font-size:22px;font-weight:800;letter-spacing:0.4px;color:#0b1220">SkinVaults</div>`;
+
+      const bodyHtml = html
+        ? html
+        : `<p style="margin:0;white-space:pre-wrap;font-size:14px;line-height:1.6;color:#0b1220">${escapeHtml(nextText || '')}</p>`;
+
+      const nextHtml = `<!doctype html><html><body style="margin:0;padding:24px;background:#0b0f19;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;padding:24px">${headerHtml}<div>${bodyHtml}</div>${unsubscribeHtml}</div></body></html>`;
 
       const res = await sendSmtpEmail({
         to,
         subject,
         text: nextText || '(no message)',
         html: nextHtml,
+        replyTo,
       });
 
       if (res.ok) sent++;
