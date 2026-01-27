@@ -1679,7 +1679,7 @@ function InventoryContent() {
       if (isPro) {
         // Pro users always have access
         setHasDiscordAccess(true);
-        fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+        fetch(`/api/discord/status?steamId=${viewedUser.steamId}`, { cache: 'no-store' })
           .then(res => res.ok ? res.json() : null)
           .then(data => {
             setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
@@ -1698,7 +1698,7 @@ function InventoryContent() {
             
             if (userHasAccess) {
               // Free user with Discord access - check connection status
-              fetch(`/api/discord/status?steamId=${viewedUser.steamId}`)
+              fetch(`/api/discord/status?steamId=${viewedUser.steamId}`, { cache: 'no-store' })
                 .then(res => res.ok ? res.json() : null)
                 .then(data => {
                   setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
@@ -1756,7 +1756,7 @@ function InventoryContent() {
       // Force refresh Discord status when coming back from OAuth
       const refreshDiscordStatus = async () => {
         try {
-          const res = await fetch(`/api/discord/status?steamId=${viewedUser.steamId}`);
+          const res = await fetch(`/api/discord/status?steamId=${viewedUser.steamId}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
             setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayCollectionName, getCollectionNamesForDays } from '@/app/utils/chat-collections';
-import { getChatDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase, getDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 interface ChatMessage {
   _id?: string;
@@ -22,6 +23,16 @@ interface UserInfo {
   steamName: string;
   avatar: string;
   isPro: boolean;
+}
+
+function parsePingCommand(input: string): { targetSteamId: string; note: string } | null {
+  const raw = String(input || '').trim();
+  const match = raw.match(/^\/ping\s+(\d{17})(?:\s+([\s\S]+))?$/i);
+  if (!match) return null;
+  const targetSteamId = String(match[1] || '').trim();
+  if (!/^\d{17}$/.test(targetSteamId)) return null;
+  const note = String(match[2] || '').trim().slice(0, 500);
+  return { targetSteamId, note };
 }
 
 // Fetch current Steam profile information using server-side API route
@@ -274,6 +285,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const ping = parsePingCommand(message);
+    const messageForStore = ping
+      ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
+      : message;
+
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
     const globalChatDisabled = (await dbGet<boolean>('global_chat_disabled', false)) || false;
@@ -309,7 +325,7 @@ export async function POST(request: Request) {
     try {
       const rawSettings = await dbGet<any>('chat_automod_settings', false);
       const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
-      const decision = checkAutomod(message, settings);
+      const decision = checkAutomod(messageForStore, settings);
       if (!decision.allowed) {
         await appendChatAutomodEvent({
           channel: 'global',
@@ -317,7 +333,7 @@ export async function POST(request: Request) {
           receiverId: null,
           dmId: null,
           reason: decision.reason || 'Message blocked by automod',
-          message: String(message || ''),
+          message: String(messageForStore || ''),
         });
         return NextResponse.json({ error: decision.reason || 'Message blocked by automod' }, { status: 400 });
       }
@@ -357,13 +373,32 @@ export async function POST(request: Request) {
       steamId,
       steamName: currentSteamName,
       avatar: currentAvatar,
-      message: message.trim(),
+      message: messageForStore.trim(),
       timestamp: new Date(),
       isPro: currentIsPro,
     };
 
     await collection.insertOne(chatMessage);
     // Don't close connection - it's pooled and reused
+
+    if (ping) {
+      try {
+        const coreDb = await getDatabase();
+        await createUserNotification(
+          coreDb,
+          ping.targetSteamId,
+          'chat_ping',
+          'You were pinged',
+          `${currentSteamName} pinged you in global chat${ping.note ? `: ${ping.note}` : ''}`,
+          {
+            channel: 'global',
+            fromSteamId: steamId,
+            targetSteamId: ping.targetSteamId,
+          }
+        );
+      } catch {
+      }
+    }
 
     // Trigger Pusher event for real-time updates
     try {

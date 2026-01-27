@@ -1,13 +1,25 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
 import { dbGet, dbSet } from '@/app/utils/database';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 // Disconnect Discord from Steam account
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const requesterSteamId = getSteamIdFromRequest(request);
+    if (!requesterSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { steamId } = await request.json();
     
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
+    }
+
+    if (String(steamId) !== requesterSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Remove Discord connection

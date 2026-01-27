@@ -79,7 +79,7 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
     });
 
     // Check Discord status
-    fetch(`/api/discord/status?steamId=${user.steamId}`)
+    fetch(`/api/discord/status?steamId=${user.steamId}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         setDiscordStatus(data);

@@ -2,11 +2,12 @@
 
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getTodayDMCollectionName } from '@/app/utils/chat-collections';
-import { getChatDatabase } from '@/app/utils/mongodb-client';
+import { getChatDatabase, getDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 import { fetchSteamProfile } from '@/app/api/chat/messages/route';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 interface DMMessage {
   _id?: string;
@@ -31,6 +32,16 @@ function generateDMId(steamId1: string, steamId2: string): string {
   return [steamId1, steamId2].sort().join('_');
 }
 
+function parsePingCommand(input: string): { targetSteamId: string; note: string } | null {
+  const raw = String(input || '').trim();
+  const match = raw.match(/^\/ping\s+(\d{17})(?:\s+([\s\S]+))?$/i);
+  if (!match) return null;
+  const targetSteamId = String(match[1] || '').trim();
+  if (!/^\d{17}$/.test(targetSteamId)) return null;
+  const note = String(match[2] || '').trim().slice(0, 500);
+  return { targetSteamId, note };
+}
+
 export async function sendDMMessage(
   senderId: string,
   receiverId: string,
@@ -42,6 +53,11 @@ export async function sendDMMessage(
     if (!senderId || !receiverId || !message?.trim()) {
       return { success: false, error: 'Missing required fields' };
     }
+
+    const ping = parsePingCommand(message);
+    const messageForStore = ping
+      ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
+      : message;
 
     // Check if DM chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -82,7 +98,7 @@ export async function sendDMMessage(
     try {
       const rawSettings = await dbGet<any>('chat_automod_settings', false);
       const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
-      const decision = checkAutomod(message, settings);
+      const decision = checkAutomod(messageForStore, settings);
       if (!decision.allowed) {
         await appendChatAutomodEvent({
           channel: 'dm',
@@ -90,7 +106,7 @@ export async function sendDMMessage(
           receiverId,
           dmId: generateDMId(senderId, receiverId),
           reason: decision.reason || 'Message blocked by automod',
-          message: String(message || ''),
+          message: String(messageForStore || ''),
         });
         return { success: false, error: decision.reason || 'Message blocked by automod' };
       }
@@ -142,12 +158,34 @@ export async function sendDMMessage(
       dmId,
       senderId,
       receiverId,
-      message: message.trim(),
+      message: messageForStore.trim(),
       timestamp: new Date(),
     };
 
     const result = await collection.insertOne(dmMessage);
     const insertedMessage = { ...dmMessage, _id: result.insertedId };
+
+    if (ping) {
+      try {
+        const coreDb = await getDatabase();
+        await createUserNotification(
+          coreDb,
+          ping.targetSteamId,
+          'chat_ping',
+          'You were pinged',
+          `${resolvedSenderName} pinged you in DM${ping.note ? `: ${ping.note}` : ''}`,
+          {
+            channel: 'dm',
+            fromSteamId: senderId,
+            toSteamId: receiverId,
+            targetSteamId: ping.targetSteamId,
+            dmId,
+            messageId: insertedMessage._id?.toString?.() || null,
+          }
+        );
+      } catch {
+      }
+    }
 
     // Trigger Pusher event for real-time updates to both users
     try {
@@ -380,6 +418,11 @@ export async function sendGlobalMessage(
       return { success: false, error: 'Missing required fields' };
     }
 
+    const ping = parsePingCommand(message);
+    const messageForStore = ping
+      ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
+      : message;
+
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
     const globalChatDisabled = (await dbGet<boolean>('global_chat_disabled', false)) || false;
@@ -412,7 +455,7 @@ export async function sendGlobalMessage(
     try {
       const rawSettings = await dbGet<any>('chat_automod_settings', false);
       const settings = coerceChatAutomodSettings(rawSettings || DEFAULT_CHAT_AUTOMOD_SETTINGS);
-      const decision = checkAutomod(message, settings);
+      const decision = checkAutomod(messageForStore, settings);
       if (!decision.allowed) {
         await appendChatAutomodEvent({
           channel: 'global',
@@ -420,7 +463,7 @@ export async function sendGlobalMessage(
           receiverId: null,
           dmId: null,
           reason: decision.reason || 'Message blocked by automod',
-          message: String(message || ''),
+          message: String(messageForStore || ''),
         });
         return { success: false, error: decision.reason || 'Message blocked by automod' };
       }
@@ -462,13 +505,33 @@ export async function sendGlobalMessage(
       steamId,
       steamName: currentSteamName,
       avatar: currentAvatar,
-      message: message.trim(),
+      message: messageForStore.trim(),
       timestamp: new Date(),
       isPro: currentIsPro,
     };
 
     const result = await collection.insertOne(globalMessage);
     const insertedMessage = { ...globalMessage, _id: result.insertedId };
+
+    if (ping) {
+      try {
+        const coreDb = await getDatabase();
+        await createUserNotification(
+          coreDb,
+          ping.targetSteamId,
+          'chat_ping',
+          'You were pinged',
+          `${currentSteamName} pinged you in global chat${ping.note ? `: ${ping.note}` : ''}`,
+          {
+            channel: 'global',
+            fromSteamId: steamId,
+            targetSteamId: ping.targetSteamId,
+            messageId: insertedMessage._id?.toString?.() || null,
+          }
+        );
+      } catch {
+      }
+    }
 
     // Trigger Pusher event for real-time updates
     try {

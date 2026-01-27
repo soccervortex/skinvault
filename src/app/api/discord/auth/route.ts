@@ -1,17 +1,29 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DEFAULT_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.skinvaults.online';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${DEFAULT_BASE_URL}/api/discord/callback`;
 
 // Generate Discord OAuth authorization URL
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const steamId = url.searchParams.get('steamId');
 
+    const requesterSteamId = getSteamIdFromRequest(request);
+    if (!requesterSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
+    }
+
+    if (String(steamId) !== requesterSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (!DISCORD_CLIENT_ID) {
