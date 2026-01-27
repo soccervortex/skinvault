@@ -7,7 +7,6 @@ import Pusher from 'pusher';
 import { fetchSteamProfile } from '@/app/api/chat/messages/route';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
-import { createUserNotification } from '@/app/utils/user-notifications';
 import { getEnabledChatCommandResponseTemplate, parseChatCommandInvocation, renderChatCommandResponse } from '@/app/utils/chat-commands';
 
 interface DMMessage {
@@ -33,41 +32,7 @@ function generateDMId(steamId1: string, steamId2: string): string {
   return [steamId1, steamId2].sort().join('_');
 }
 
-function parsePingCommand(input: string): { target: string; note: string } | null {
-  const raw = String(input || '').trim();
-  const match = raw.match(/^\/ping\s+([^\s]+)(?:\s+([\s\S]+))?$/i);
-  if (!match) return null;
-  const target = String(match[1] || '').trim();
-  if (!target) return null;
-  const note = String(match[2] || '').trim().slice(0, 500);
-  return { target, note };
-}
-
-async function resolveSteamIdFromQuery(query: string): Promise<string | null> {
-  const q = String(query || '').trim().replace(/^@+/, '');
-  if (!q) return null;
-  if (/^\d{17}$/.test(q)) return q;
-
-  try {
-    const baseUrl =
-      (process.env.NEXT_PUBLIC_BASE_URL && String(process.env.NEXT_PUBLIC_BASE_URL).trim()) ||
-      (process.env.VERCEL_URL && `https://${String(process.env.VERCEL_URL).trim()}`) ||
-      'http://localhost:3000';
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(`${baseUrl}/api/steam/resolve-username?query=${encodeURIComponent(q)}`,
-      { cache: 'no-store', signal: controller.signal }
-    );
-    clearTimeout(timeoutId);
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    const steamId = String((data as any)?.steamId || '').trim();
-    return /^\d{17}$/.test(steamId) ? steamId : null;
-  } catch {
-    return null;
-  }
-}
+// /ping intentionally removed
 
 export async function sendDMMessage(
   senderId: string,
@@ -81,31 +46,7 @@ export async function sendDMMessage(
       return { success: false, error: 'Missing required fields' };
     }
 
-    const parsedPing = parsePingCommand(message);
-    const ping = parsedPing
-      ? {
-          targetSteamId: await resolveSteamIdFromQuery(parsedPing.target),
-          note: parsedPing.note,
-        }
-      : null;
-
-    if (parsedPing && !ping?.targetSteamId) {
-      return { success: false, error: 'Could not resolve user for /ping' };
-    }
-
-    let pingTargetName = '';
-    if (ping?.targetSteamId) {
-      try {
-        const profile = await fetchSteamProfile(ping.targetSteamId);
-        pingTargetName = String(profile?.name || '').trim();
-      } catch {
-        pingTargetName = '';
-      }
-    }
-
-    const messageForStore = ping?.targetSteamId
-      ? `Pinged ${pingTargetName ? `${pingTargetName} (${ping.targetSteamId})` : ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
-      : message;
+    const messageForStore = message;
 
     // Check if DM chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -213,27 +154,7 @@ export async function sendDMMessage(
     const result = await collection.insertOne(dmMessage);
     const insertedMessage = { ...dmMessage, _id: result.insertedId };
 
-    if (ping?.targetSteamId) {
-      try {
-        const coreDb = await getDatabase();
-        await createUserNotification(
-          coreDb,
-          ping.targetSteamId,
-          'chat_ping',
-          'You were pinged',
-          `${resolvedSenderName} pinged you in DM${ping.note ? `: ${ping.note}` : ''}`,
-          {
-            channel: 'dm',
-            fromSteamId: senderId,
-            toSteamId: receiverId,
-            targetSteamId: ping.targetSteamId,
-            dmId,
-            messageId: insertedMessage._id?.toString?.() || null,
-          }
-        );
-      } catch {
-      }
-    }
+    // /ping notifications intentionally removed
 
     // Trigger Pusher event for real-time updates to both users
     try {
@@ -466,33 +387,9 @@ export async function sendGlobalMessage(
       return { success: false, error: 'Missing required fields' };
     }
 
-    const parsedPing = parsePingCommand(message);
-    const ping = parsedPing
-      ? {
-          targetSteamId: await resolveSteamIdFromQuery(parsedPing.target),
-          note: parsedPing.note,
-        }
-      : null;
+    const messageForStore = message;
 
-    if (parsedPing && !ping?.targetSteamId) {
-      return { success: false, error: 'Could not resolve user for /ping' };
-    }
-
-    let pingTargetName = '';
-    if (ping?.targetSteamId) {
-      try {
-        const profile = await fetchSteamProfile(ping.targetSteamId);
-        pingTargetName = String(profile?.name || '').trim();
-      } catch {
-        pingTargetName = '';
-      }
-    }
-
-    const messageForStore = ping?.targetSteamId
-      ? `Pinged ${pingTargetName ? `${pingTargetName} (${ping.targetSteamId})` : ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
-      : message;
-
-    const invocation = !ping ? parseChatCommandInvocation(message) : null;
+    const invocation = parseChatCommandInvocation(message);
 
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -584,25 +481,7 @@ export async function sendGlobalMessage(
     const result = await collection.insertOne(globalMessage);
     const insertedMessage = { ...globalMessage, _id: result.insertedId };
 
-    if (ping?.targetSteamId) {
-      try {
-        const coreDb = await getDatabase();
-        await createUserNotification(
-          coreDb,
-          ping.targetSteamId,
-          'chat_ping',
-          'You were pinged',
-          `${currentSteamName} pinged you in global chat${ping.note ? `: ${ping.note}` : ''}`,
-          {
-            channel: 'global',
-            fromSteamId: steamId,
-            targetSteamId: ping.targetSteamId,
-            messageId: insertedMessage._id?.toString?.() || null,
-          }
-        );
-      } catch {
-      }
-    }
+    // /ping notifications intentionally removed
 
     // Trigger Pusher event for real-time updates
     try {

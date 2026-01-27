@@ -5,7 +5,6 @@ import { getChatDatabase, getDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
-import { createUserNotification } from '@/app/utils/user-notifications';
 import { getEnabledChatCommandResponseTemplate, parseChatCommandInvocation, renderChatCommandResponse } from '@/app/utils/chat-commands';
 
 interface ChatMessage {
@@ -26,40 +25,62 @@ interface UserInfo {
   isPro: boolean;
 }
 
-function parsePingCommand(input: string): { target: string; note: string } | null {
+function parseItemCommand(input: string): { query: string } | null {
   const raw = String(input || '').trim();
-  const match = raw.match(/^\/ping\s+([^\s]+)(?:\s+([\s\S]+))?$/i);
+  const match = raw.match(/^\/item(?:\s+([\s\S]+))?$/i);
   if (!match) return null;
-  const target = String(match[1] || '').trim();
-  if (!target) return null;
-  const note = String(match[2] || '').trim().slice(0, 500);
-  return { target, note };
+  const query = String(match[1] || '').trim().slice(0, 200);
+  if (!query) return null;
+  return { query };
 }
 
-async function resolveSteamIdFromQuery(query: string): Promise<string | null> {
-  const q = String(query || '').trim().replace(/^@+/, '');
+async function buildItemBotPayload(query: string): Promise<string | null> {
+  const q = String(query || '').trim();
   if (!q) return null;
-  if (/^\d{17}$/.test(q)) return q;
+
+  const baseUrl =
+    (process.env.NEXT_PUBLIC_BASE_URL && String(process.env.NEXT_PUBLIC_BASE_URL).trim()) ||
+    (process.env.VERCEL_URL && `https://${String(process.env.VERCEL_URL).trim()}`) ||
+    'http://localhost:3000';
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const baseUrl =
-      (process.env.NEXT_PUBLIC_BASE_URL && String(process.env.NEXT_PUBLIC_BASE_URL).trim()) ||
-      (process.env.VERCEL_URL && `https://${String(process.env.VERCEL_URL).trim()}`) ||
-      'http://localhost:3000';
+    const infoRes = await fetch(`${baseUrl}/api/item/info?id=${encodeURIComponent(q)}&fuzzy=true`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    const info = await infoRes.json().catch(() => null);
+    const name = String((info as any)?.name || q).trim();
+    const marketHashName = String((info as any)?.market_hash_name || (info as any)?.marketHashName || name).trim();
+    const image = String((info as any)?.image || '').trim();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(`${baseUrl}/api/steam/resolve-username?query=${encodeURIComponent(q)}`,
-      { cache: 'no-store', signal: controller.signal }
-    );
+    let priceText = 'N/A';
+    try {
+      const priceRes = await fetch(`${baseUrl}/api/item/price?market_hash_name=${encodeURIComponent(marketHashName)}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      const price = await priceRes.json().catch(() => null);
+      const rawPrice = String((price as any)?.raw || '').trim();
+      if (rawPrice) priceText = rawPrice;
+    } catch {
+    }
+
+    const payload = {
+      v: 1,
+      type: 'item',
+      name,
+      marketHashName,
+      image,
+      price: priceText,
+    };
+
+    return `__SV_ITEM__:${Buffer.from(JSON.stringify(payload), 'utf8').toString('base64')}`;
+  } finally {
     clearTimeout(timeoutId);
-
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    const steamId = String((data as any)?.steamId || '').trim();
-    return /^\d{17}$/.test(steamId) ? steamId : null;
-  } catch {
-    return null;
+    controller.abort();
   }
 }
 
@@ -338,33 +359,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const parsedPing = parsePingCommand(message);
-    const ping = parsedPing
-      ? {
-          targetSteamId: await resolveSteamIdFromQuery(parsedPing.target),
-          note: parsedPing.note,
-        }
-      : null;
-
-    if (parsedPing && !ping?.targetSteamId) {
-      return NextResponse.json({ error: 'Could not resolve user for /ping' }, { status: 400 });
-    }
-
-    const invocation = !ping ? parseChatCommandInvocation(message) : null;
-
-    let pingTargetName = '';
-    if (ping?.targetSteamId) {
-      try {
-        const profile = await fetchSteamProfile(ping.targetSteamId);
-        pingTargetName = String(profile?.name || '').trim();
-      } catch {
-        pingTargetName = '';
-      }
-    }
-
-    const messageForStore = ping?.targetSteamId
-      ? `Pinged ${pingTargetName ? `${pingTargetName} (${ping.targetSteamId})` : ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
-      : message;
+    const itemInvocation = parseItemCommand(message);
+    const invocation = itemInvocation ? null : parseChatCommandInvocation(message);
+    const messageForStore = message;
 
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -457,21 +454,51 @@ export async function POST(request: Request) {
     const insertRes = await collection.insertOne(chatMessage);
     const insertedId = insertRes.insertedId?.toString?.() || '';
 
-    if (ping?.targetSteamId) {
+    if (itemInvocation) {
       try {
-        const coreDb = await getDatabase();
-        await createUserNotification(
-          coreDb,
-          ping.targetSteamId,
-          'chat_ping',
-          'You were pinged',
-          `${currentSteamName} pinged you in global chat${ping.note ? `: ${ping.note}` : ''}`,
-          {
-            channel: 'global',
-            fromSteamId: steamId,
-            targetSteamId: ping.targetSteamId,
+        const reply = await buildItemBotPayload(itemInvocation.query);
+        if (reply) {
+          const bot: ChatMessage = {
+            steamId: '0',
+            steamName: 'SkinVaults',
+            avatar: '/icon.png',
+            message: reply,
+            timestamp: new Date(),
+            isPro: false,
+          };
+
+          const botResult = await collection.insertOne(bot);
+          const botId = botResult.insertedId?.toString?.() || '';
+
+          try {
+            const pusherAppId = process.env.PUSHER_APP_ID;
+            const pusherSecret = process.env.PUSHER_SECRET;
+            const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+            if (pusherAppId && pusherSecret) {
+              const pusher = new Pusher({
+                appId: pusherAppId,
+                key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+                secret: pusherSecret,
+                cluster: pusherCluster,
+                useTLS: true,
+              });
+
+              await pusher.trigger('global', 'new_messages', {
+                type: 'new_messages',
+                messages: [{
+                  id: botId,
+                  steamId: bot.steamId,
+                  steamName: bot.steamName,
+                  avatar: bot.avatar,
+                  message: bot.message,
+                  timestamp: bot.timestamp,
+                  isPro: bot.isPro,
+                }],
+              });
+            }
+          } catch {
           }
-        );
+        }
       } catch {
       }
     }

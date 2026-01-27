@@ -17,6 +17,7 @@ export function normalizeChatCommandSlug(value: unknown): string | null {
   if (!cleaned) return null;
   if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(cleaned)) return null;
   if (cleaned === 'ping') return null;
+  if (cleaned === 'item') return null;
   return cleaned;
 }
 

@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export async function GET() {
   try {
     if (!hasMongoConfig()) {
-      const res = NextResponse.json({ commands: [{ slug: 'ping', description: 'Ping a user' }] });
+      const res = NextResponse.json({ commands: [{ slug: 'item', description: 'Show item price' }] });
       res.headers.set('cache-control', 'no-store');
       return res;
     }
@@ -21,7 +21,7 @@ export async function GET() {
       .limit(200)
       .toArray();
 
-    const commands = [{ slug: 'ping', description: 'Ping a user' }].concat(
+    const commands = [{ slug: 'item', description: 'Show item price' }].concat(
       (Array.isArray(rows) ? rows : [])
         .map((r: any) => ({
           slug: sanitizeString(String(r?.slug || r?._id || '')).trim().replace(/^\/+/, ''),
@@ -34,7 +34,7 @@ export async function GET() {
     res.headers.set('cache-control', 'no-store');
     return res;
   } catch (e: any) {
-    const res = NextResponse.json({ commands: [{ slug: 'ping', description: 'Ping a user' }] });
+    const res = NextResponse.json({ commands: [{ slug: 'item', description: 'Show item price' }] });
     res.headers.set('cache-control', 'no-store');
     return res;
   }

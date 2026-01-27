@@ -122,10 +122,6 @@ export default function ChatPage() {
   const [slashCommands, setSlashCommands] = useState<Array<{ slug: string; description?: string }>>([]);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
-  const [pingUsers, setPingUsers] = useState<Array<{ steamId: string; steamName: string; avatar?: string }>>([]);
-  const [pingOpen, setPingOpen] = useState(false);
-  const [pingActiveIndex, setPingActiveIndex] = useState(0);
-  const [pingLoading, setPingLoading] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevTabRef = useRef<'global' | 'dms'>('global');
   const [searchQuery, setSearchQuery] = useState('');
@@ -371,7 +367,7 @@ export default function ChatPage() {
         const cmds = Array.isArray((data as any)?.commands) ? (data as any).commands : [];
         setSlashCommands(cmds);
       } catch {
-        setSlashCommands([{ slug: 'ping', description: 'Ping a user' }]);
+        setSlashCommands([{ slug: 'item', description: 'Show item price' }]);
       }
     };
 
@@ -1248,76 +1244,12 @@ export default function ChatPage() {
         .slice(0, 8)
     : [];
 
-  const pingQueryRaw = activeTab === 'global' ? message : '';
-  const pingQuery = /^\/ping\s*/i.test(pingQueryRaw) ? String(pingQueryRaw.replace(/^\/ping\s*/i, '')).trim() : '';
-  const pingActive = activeTab === 'global' && message.toLowerCase().startsWith('/ping ');
-
-  useEffect(() => {
-    if (!pingActive) {
-      setPingUsers([]);
-      setPingLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    setPingLoading(true);
-    fetch(`/api/chat/ping-suggestions?query=${encodeURIComponent(pingQuery)}`, {
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (cancelled) return;
-        const users = Array.isArray(j?.users) ? j.users : [];
-        setPingUsers(
-          users
-            .map((u: any) => ({
-              steamId: String(u?.steamId || '').trim(),
-              steamName: String(u?.steamName || '').trim(),
-              avatar: String(u?.avatar || '').trim(),
-            }))
-            .filter((u: any) => /^\d{17}$/.test(u.steamId))
-            .slice(0, 8)
-        );
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setPingUsers([]);
-      })
-      .finally(() => {
-        clearTimeout(timeoutId);
-        if (cancelled) return;
-        setPingLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [pingActive, pingQuery]);
-
   const applySlashCommand = (slug: string) => {
     const cleaned = String(slug || '').trim().replace(/^\/+/, '');
     if (!cleaned) return;
     setMessage(`/${cleaned} `);
     setSlashOpen(false);
     setSlashActiveIndex(0);
-    setTimeout(() => {
-      const el = document.getElementById('chat-message-input') as HTMLInputElement | null;
-      el?.focus();
-    }, 0);
-  };
-
-  const applyPingUser = (steamId: string) => {
-    const id = String(steamId || '').trim();
-    if (!/^\d{17}$/.test(id)) return;
-    setMessage(`/ping ${id} `);
-    setPingOpen(false);
-    setPingActiveIndex(0);
     setTimeout(() => {
       const el = document.getElementById('chat-message-input') as HTMLInputElement | null;
       el?.focus();
@@ -2263,7 +2195,40 @@ export default function ChatPage() {
                       </div>
                     ) : (
                       <p className="text-sm text-gray-300 break-words whitespace-pre-wrap">
-                        {msg.message}
+                        {(() => {
+                          const raw = String(msg.message || '');
+                          if (raw.startsWith('__SV_ITEM__:')) {
+                            try {
+                              const b64 = raw.slice('__SV_ITEM__:'.length);
+                              const json = JSON.parse(atob(b64));
+                              if (json && json.type === 'item') {
+                                const name = String(json.name || '').trim();
+                                const price = String(json.price || '').trim();
+                                const image = String(json.image || '').trim();
+                                const marketHashName = String(json.marketHashName || '').trim();
+                                return (
+                                  <span className="block">
+                                    <span className="block bg-black/30 border border-white/10 rounded-xl p-3">
+                                      <span className="flex items-center gap-3">
+                                        {image ? (
+                                          <img src={image} alt="" className="w-10 h-10 rounded-lg border border-white/10" />
+                                        ) : (
+                                          <span className="w-10 h-10 rounded-lg border border-white/10 bg-white/5" />
+                                        )}
+                                        <span className="min-w-0">
+                                          <span className="block font-black text-white truncate">{name || marketHashName || 'Item'}</span>
+                                          <span className="block text-[11px] text-gray-400 truncate">{price ? `Price: ${price}` : 'Price: N/A'}</span>
+                                        </span>
+                                      </span>
+                                    </span>
+                                  </span>
+                                );
+                              }
+                            } catch {
+                            }
+                          }
+                          return <>{msg.message}</>;
+                        })()}
                         {msg.editedAt && (
                           <span className="text-xs text-gray-500 ml-2 italic">(edited)</span>
                         )}
@@ -2600,7 +2565,40 @@ export default function ChatPage() {
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-300 break-words whitespace-pre-wrap">
-                                  {msg.message}
+                                  {(() => {
+                                    const raw = String(msg.message || '');
+                                    if (raw.startsWith('__SV_ITEM__:')) {
+                                      try {
+                                        const b64 = raw.slice('__SV_ITEM__:'.length);
+                                        const json = JSON.parse(atob(b64));
+                                        if (json && json.type === 'item') {
+                                          const name = String(json.name || '').trim();
+                                          const price = String(json.price || '').trim();
+                                          const image = String(json.image || '').trim();
+                                          const marketHashName = String(json.marketHashName || '').trim();
+                                          return (
+                                            <span className="block">
+                                              <span className="block bg-black/30 border border-white/10 rounded-xl p-3">
+                                                <span className="flex items-center gap-3">
+                                                  {image ? (
+                                                    <img src={image} alt="" className="w-10 h-10 rounded-lg border border-white/10" />
+                                                  ) : (
+                                                    <span className="w-10 h-10 rounded-lg border border-white/10 bg-white/5" />
+                                                  )}
+                                                  <span className="min-w-0">
+                                                    <span className="block font-black text-white truncate">{name || marketHashName || 'Item'}</span>
+                                                    <span className="block text-[11px] text-gray-400 truncate">{price ? `Price: ${price}` : 'Price: N/A'}</span>
+                                                  </span>
+                                                </span>
+                                              </span>
+                                            </span>
+                                          );
+                                        }
+                                      } catch {
+                                      }
+                                    }
+                                    return <>{msg.message}</>;
+                                  })()}
                                   {msg.editedAt && (
                                     <span className="text-xs text-gray-500 ml-2 italic">(edited)</span>
                                   )}
@@ -2754,54 +2752,15 @@ export default function ChatPage() {
                   const v = e.target.value;
                   setMessage(v);
 
-                  if (activeTab === 'global') {
-                    const isPing = /^\/ping(\s|$)/i.test(v);
-                    const pingMode = v.toLowerCase().startsWith('/ping ');
-                    if (isPing && pingMode) {
-                      setPingOpen(true);
-                      setPingActiveIndex(0);
-                      setSlashOpen(false);
-                    } else {
-                      setPingOpen(false);
-                      if (v.startsWith('/')) {
-                        setSlashOpen(true);
-                        setSlashActiveIndex(0);
-                      } else {
-                        setSlashOpen(false);
-                      }
-                    }
+                  if (activeTab === 'global' && v.startsWith('/')) {
+                    setSlashOpen(true);
+                    setSlashActiveIndex(0);
                   } else {
-                    setPingOpen(false);
                     setSlashOpen(false);
                   }
                   handleTyping();
                 }}
                 onKeyDown={(e) => {
-                  if (pingOpen && pingUsers.length > 0) {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setPingActiveIndex((i) => Math.min(pingUsers.length - 1, i + 1));
-                      return;
-                    }
-                    if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setPingActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === 'Tab' || e.key === 'Enter') {
-                      if (!e.shiftKey) {
-                        e.preventDefault();
-                        const pick = pingUsers[pingActiveIndex];
-                        if (pick?.steamId) applyPingUser(pick.steamId);
-                        return;
-                      }
-                    }
-                    if (e.key === 'Escape') {
-                      e.preventDefault();
-                      setPingOpen(false);
-                      return;
-                    }
-                  }
                   if (slashOpen && filteredSlashCommands.length > 0) {
                     if (e.key === 'ArrowDown') {
                       e.preventDefault();
@@ -2837,44 +2796,6 @@ export default function ChatPage() {
                 maxLength={500}
                 disabled={activeTab === 'global' ? globalChatDisabled : dmChatDisabled || !!editingMessage}
               />
-              {activeTab === 'global' && pingOpen && (pingLoading || pingUsers.length > 0) && (
-                <div className="absolute left-0 right-[120px] bottom-[52px] bg-[#0b0f19] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
-                  <div className="px-3 py-2 text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black border-b border-white/10">
-                    Users
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                    {pingUsers.map((u, idx) => (
-                      <button
-                        key={u.steamId}
-                        type="button"
-                        onClick={() => applyPingUser(u.steamId)}
-                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center justify-between gap-3 hover:bg-white/5 ${
-                          idx === pingActiveIndex ? 'bg-white/5' : ''
-                        }`}
-                      >
-                        <div className="min-w-0 flex items-center gap-3">
-                          {u.avatar ? (
-                            <img src={u.avatar} alt="" className="w-6 h-6 rounded-full border border-white/10" />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full border border-white/10 bg-white/5" />
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-black text-white truncate">{u.steamName || u.steamId}</div>
-                            <div className="text-[10px] text-gray-400 truncate">{u.steamId}</div>
-                          </div>
-                        </div>
-                        <div className="text-[9px] text-gray-500 font-black uppercase">Tab</div>
-                      </button>
-                    ))}
-
-                    {pingLoading && pingUsers.length === 0 ? (
-                      <div className="px-3 py-3 text-[10px] text-gray-400 flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={14} /> Loading...
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )}
               {activeTab === 'global' && slashOpen && filteredSlashCommands.length > 0 && (
                 <div className="absolute left-0 right-[120px] bottom-[52px] bg-[#0b0f19] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                   <div className="px-3 py-2 text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black border-b border-white/10">
