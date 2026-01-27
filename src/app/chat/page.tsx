@@ -118,6 +118,10 @@ export default function ChatPage() {
   const [editing, setEditing] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Array<{ steamId: string; steamName: string }>>([]);
   const [isTyping, setIsTyping] = useState(false);
+
+  const [slashCommands, setSlashCommands] = useState<Array<{ slug: string; description?: string }>>([]);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevTabRef = useRef<'global' | 'dms'>('global');
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,9 +208,6 @@ export default function ChatPage() {
                 name: data.name || parsedUser.name || 'User',
                 avatar: data.avatar || parsedUser.avatar || ''
               };
-              window.localStorage.setItem('steam_user', JSON.stringify(parsedUser));
-              // Notify sidebar and other components of user update
-              window.dispatchEvent(new CustomEvent('userUpdated'));
             }
           } catch (error) {
             // Silently fail - don't spam console
@@ -357,6 +358,21 @@ export default function ChatPage() {
       clearInterval(chatStatusInterval);
     };
   }, [toast, router, isAdmin]);
+
+  useEffect(() => {
+    const loadCommands = async () => {
+      try {
+        const res = await fetch('/api/chat/commands', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        const cmds = Array.isArray((data as any)?.commands) ? (data as any).commands : [];
+        setSlashCommands(cmds);
+      } catch {
+        setSlashCommands([{ slug: 'ping', description: 'Ping a user' }]);
+      }
+    };
+
+    void loadCommands();
+  }, []);
 
   const fetchMessages = async (beforeCursor: string | null = null, append = false) => {
     try {
@@ -1145,6 +1161,7 @@ export default function ChatPage() {
 
     // Clear input immediately
     setMessage('');
+    setSlashOpen(false);
     setSending(true);
     setIsTyping(false);
     if (typingTimeoutRef.current) {
@@ -1203,6 +1220,29 @@ export default function ChatPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  const slashQuery = message.startsWith('/') ? message.slice(1).split(/\s+/)[0].toLowerCase() : '';
+  const filteredSlashCommands = message.startsWith('/')
+    ? slashCommands
+        .filter((c) => {
+          const s = String(c?.slug || '').toLowerCase();
+          if (!s) return false;
+          return !slashQuery || s.startsWith(slashQuery);
+        })
+        .slice(0, 8)
+    : [];
+
+  const applySlashCommand = (slug: string) => {
+    const cleaned = String(slug || '').trim().replace(/^\/+/, '');
+    if (!cleaned) return;
+    setMessage(`/${cleaned} `);
+    setSlashOpen(false);
+    setSlashActiveIndex(0);
+    setTimeout(() => {
+      const el = document.getElementById('chat-message-input') as HTMLInputElement | null;
+      el?.focus();
+    }, 0);
   };
 
   const handleSendDMInvite = async () => {
@@ -2625,7 +2665,7 @@ export default function ChatPage() {
               </div>
             )}
           <form onSubmit={handleSend} className="bg-[#11141d] border-t border-white/5 p-4">
-            <div className="flex gap-3">
+            <div className="flex gap-3 relative">
               <label htmlFor="chat-message-input" className="sr-only">{activeTab === 'global' ? 'Type a message' : 'Type a DM'}</label>
               <input
                 id="chat-message-input"
@@ -2633,9 +2673,40 @@ export default function ChatPage() {
                 value={message}
                 onChange={(e) => {
                   setMessage(e.target.value);
+                  if (e.target.value.startsWith('/') && activeTab === 'global') {
+                    setSlashOpen(true);
+                    setSlashActiveIndex(0);
+                  } else {
+                    setSlashOpen(false);
+                  }
                   handleTyping();
                 }}
                 onKeyDown={(e) => {
+                  if (slashOpen && filteredSlashCommands.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setSlashActiveIndex((i) => Math.min(filteredSlashCommands.length - 1, i + 1));
+                      return;
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setSlashActiveIndex((i) => Math.max(0, i - 1));
+                      return;
+                    }
+                    if (e.key === 'Tab' || e.key === 'Enter') {
+                      if (!e.shiftKey) {
+                        e.preventDefault();
+                        const pick = filteredSlashCommands[slashActiveIndex];
+                        if (pick?.slug) applySlashCommand(pick.slug);
+                        return;
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setSlashOpen(false);
+                      return;
+                    }
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend(e);
@@ -2646,6 +2717,33 @@ export default function ChatPage() {
                 maxLength={500}
                 disabled={activeTab === 'global' ? globalChatDisabled : dmChatDisabled || !!editingMessage}
               />
+              {activeTab === 'global' && slashOpen && filteredSlashCommands.length > 0 && (
+                <div className="absolute left-0 right-[120px] bottom-[52px] bg-[#0b0f19] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                  <div className="px-3 py-2 text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black border-b border-white/10">
+                    Commands
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredSlashCommands.map((c, idx) => (
+                      <button
+                        key={c.slug}
+                        type="button"
+                        onClick={() => applySlashCommand(c.slug)}
+                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center justify-between gap-3 hover:bg-white/5 ${
+                          idx === slashActiveIndex ? 'bg-white/5' : ''
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-black text-white truncate">/{c.slug}</div>
+                          {c.description ? (
+                            <div className="text-[10px] text-gray-400 truncate">{c.description}</div>
+                          ) : null}
+                        </div>
+                        <div className="text-[9px] text-gray-500 font-black uppercase">Tab</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={!message.trim() || sending || (activeTab === 'dms' && !selectedDM) || (activeTab === 'global' && globalChatDisabled) || (activeTab === 'dms' && dmChatDisabled)}

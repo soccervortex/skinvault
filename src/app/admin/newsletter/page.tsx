@@ -23,6 +23,99 @@ export default function AdminNewsletterPage() {
   const [max, setMax] = useState('5000');
   const [sending, setSending] = useState(false);
 
+  const templates = useMemo(() => {
+    const shopUrl = 'https://www.skinvaults.online/';
+
+    return [
+      {
+        id: 'infra_speed',
+        name: 'Infra + Discount (FAST)',
+        subject: '⚡ FAST! SkinVaults is now 100x faster (+ 20% Discount Code!)',
+        text:
+          `Hi SkinVaults Member,\n\n` +
+          `We’ve been working hard behind the scenes to give you the best possible experience. Today, we’re excited to announce our biggest technical upgrade yet!\n\n` +
+          `🚀 Massive Site Overhaul\n` +
+          `We’ve officially migrated our infrastructure to Hetzner & Coolify. Here is what that means for you:\n\n` +
+          `- 100x Loading Speeds: The site is now incredibly fast.\n` +
+          `- Real-Time Data: Your balance and giveaway entries now update instantly.\n` +
+          `- New Checkout & Cart System: Add multiple items to your cart for a smoother experience.\n\n` +
+          `🎁 Celebration Promo Code\n` +
+          `CODE: dio1v1\n` +
+          `Use it at checkout for 20% OFF all site purchases.\n\n` +
+          `Visit: ${shopUrl}\n\n` +
+          `Best regards,\nThe SkinVaults Team`,
+        html:
+          `<h1 style="margin:0 0 10px;font-size:22px;line-height:1.2;color:#0b1220">⚡ FAST! SkinVaults is now 100x faster</h1>` +
+          `<p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#334155">Hi SkinVaults Member,</p>` +
+          `<p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#334155">We’ve been working hard behind the scenes to give you the best possible experience. Today, we’re excited to announce our biggest technical upgrade yet!</p>` +
+          `<h2 style="margin:18px 0 10px;font-size:16px;line-height:1.3;color:#0b1220">🚀 Massive Site Overhaul</h2>` +
+          `<ul style="margin:0 0 16px;padding-left:18px;font-size:14px;line-height:1.7;color:#334155">` +
+          `<li><strong>100x Loading Speeds</strong> — the site feels instant.</li>` +
+          `<li><strong>Real-Time Data</strong> — balance and giveaway entries update with zero delay.</li>` +
+          `<li><strong>New Checkout & Cart</strong> — buy multiple items in one go.</li>` +
+          `</ul>` +
+          `<h2 style="margin:18px 0 10px;font-size:16px;line-height:1.3;color:#0b1220">🎁 Celebration Promo Code</h2>` +
+          `<div style="border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;padding:14px;margin:0 0 16px">` +
+          `<div style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#64748b;font-weight:800">Code</div>` +
+          `<div style="font-size:20px;font-weight:900;color:#0b1220;margin-top:6px">dio1v1</div>` +
+          `<div style="font-size:12px;color:#64748b;margin-top:6px">Use at checkout for <strong>20% OFF</strong></div>` +
+          `</div>` +
+          `<div style="margin:18px 0 0">` +
+          `<a href="${shopUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:900;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;padding:12px 16px;border-radius:12px">Visit SkinVaults</a>` +
+          `</div>` +
+          `<p style="margin:18px 0 0;font-size:13px;line-height:1.7;color:#334155">Best regards,<br/>The SkinVaults Team</p>`,
+      },
+      {
+        id: 'giveaways',
+        name: 'Giveaways Update',
+        subject: '🎉 New Giveaways are Live on SkinVaults',
+        text:
+          `Hi SkinVaults Member,\n\n` +
+          `New giveaways are live right now. Don’t forget to use your credits and check the latest skins.\n\n` +
+          `Open SkinVaults: ${shopUrl}\n\n` +
+          `Good luck!\nThe SkinVaults Team`,
+        html:
+          `<h1 style="margin:0 0 10px;font-size:22px;line-height:1.2;color:#0b1220">🎉 New Giveaways are Live</h1>` +
+          `<p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#334155">Hi SkinVaults Member,</p>` +
+          `<p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#334155">New giveaways are live right now. Use your credits and enter while they’re fresh.</p>` +
+          `<a href="${shopUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:900;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;padding:12px 16px;border-radius:12px">Open Giveaways</a>` +
+          `<p style="margin:18px 0 0;font-size:13px;line-height:1.7;color:#334155">Good luck!<br/>The SkinVaults Team</p>`,
+      },
+      {
+        id: 'quick_announcement',
+        name: 'Quick Announcement',
+        subject: '📣 Update from SkinVaults',
+        text:
+          `Hi SkinVaults Member,\n\n` +
+          `Quick update: \n\n` +
+          `- (write your update here)\n\n` +
+          `Thanks for being part of SkinVaults.\n\n` +
+          `Open: ${shopUrl}\n\n` +
+          `The SkinVaults Team`,
+        html:
+          `<h1 style="margin:0 0 10px;font-size:22px;line-height:1.2;color:#0b1220">📣 Update from SkinVaults</h1>` +
+          `<p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#334155">Hi SkinVaults Member,</p>` +
+          `<p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#334155">Quick update:</p>` +
+          `<ul style="margin:0 0 16px;padding-left:18px;font-size:14px;line-height:1.7;color:#334155">` +
+          `<li>(write your update here)</li>` +
+          `</ul>` +
+          `<a href="${shopUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:900;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;padding:12px 16px;border-radius:12px">Open SkinVaults</a>` +
+          `<p style="margin:18px 0 0;font-size:13px;line-height:1.7;color:#334155">The SkinVaults Team</p>`,
+      },
+    ];
+  }, []);
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('infra_speed');
+
+  const loadTemplate = () => {
+    const t = templates.find((x) => x.id === selectedTemplateId);
+    if (!t) return;
+    setSubject(t.subject);
+    setText(t.text);
+    setHtml(t.html);
+    toast.success(`Loaded template: ${t.name}`);
+  };
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
@@ -189,6 +282,30 @@ export default function AdminNewsletterPage() {
             </div>
 
             <form onSubmit={handleSend} className="space-y-3 md:space-y-4 text-[10px] md:text-[11px]">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Template</label>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-xs md:text-sm font-black text-white outline-none focus:border-blue-500 transition-all"
+                  >
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-1 flex items-end">
+                  <button
+                    type="button"
+                    onClick={loadTemplate}
+                    className="w-full bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl md:rounded-2xl py-2.5 md:py-3 px-3 md:px-4 text-[10px] md:text-xs font-black uppercase tracking-widest"
+                  >
+                    Load Template
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-2">Subject</label>

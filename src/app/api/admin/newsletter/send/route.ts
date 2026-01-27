@@ -64,10 +64,11 @@ export async function POST(req: NextRequest) {
       const unsubscribeUrl = baseUrl ? `${baseUrl}/api/newsletter/unsubscribe?token=${encodeURIComponent(token)}` : '';
 
       const footerText = unsubscribeUrl ? `\n\nUnsubscribe: ${unsubscribeUrl}` : '';
-      const nextText = text ? `${text}${footerText}` : footerText;
+      const plainText = text || '';
+      const nextText = plainText ? `${plainText}${footerText}` : footerText;
 
       const unsubscribeHtml = unsubscribeUrl
-        ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0"/><p style="margin:0;font-size:12px;line-height:1.4;color:#64748b">Unsubscribe: <a href="${unsubscribeUrl}" style="color:#2563eb;text-decoration:none">${unsubscribeUrl}</a></p>`
+        ? `<div style="margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb"><p style="margin:0;font-size:12px;line-height:1.4;color:#64748b">You’re receiving this because you subscribed to SkinVaults updates.</p><p style="margin:8px 0 0;font-size:12px;line-height:1.4;color:#64748b">Unsubscribe: <a href="${unsubscribeUrl}" style="color:#2563eb;text-decoration:none">${unsubscribeUrl}</a></p></div>`
         : '';
 
       const headerHtml = logoUrl
@@ -76,9 +77,30 @@ export async function POST(req: NextRequest) {
 
       const bodyHtml = html
         ? html
-        : `<p style="margin:0;white-space:pre-wrap;font-size:14px;line-height:1.6;color:#0b1220">${escapeHtml(nextText || '')}</p>`;
+        : `<p style="margin:0;white-space:pre-wrap;font-size:14px;line-height:1.7;color:#0b1220">${escapeHtml(plainText || '')}</p>`;
 
-      const nextHtml = `<!doctype html><html><body style="margin:0;padding:24px;background:#0b0f19;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;padding:24px">${headerHtml}<div>${bodyHtml}</div>${unsubscribeHtml}</div></body></html>`;
+      const nextHtml = `<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body style="margin:0;padding:0;background:#0b0f19;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#0b0f19;padding:24px 12px">
+        <tr>
+          <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;background:#ffffff;border-radius:18px;overflow:hidden">
+              <tr>
+                <td style="padding:22px 22px 0">
+                  ${headerHtml}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:14px 22px 22px">
+                  <div style="font-size:14px;line-height:1.7;color:#0b1220">${bodyHtml}</div>
+                  ${unsubscribeHtml}
+                </td>
+              </tr>
+            </table>
+            <div style="max-width:640px;margin:10px auto 0;text-align:center;font-size:12px;line-height:1.4;color:#94a3b8">SkinVaults • Updates & Giveaways</div>
+          </td>
+        </tr>
+      </table>
+      </body></html>`;
 
       const res = await sendSmtpEmail({
         to,
