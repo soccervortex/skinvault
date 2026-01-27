@@ -2125,60 +2125,66 @@ function InventoryContent() {
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <h1 className="flex-1 min-w-0 font-black italic leading-none whitespace-normal break-words">
+                  <div className="space-y-2">
+                    <h1 className="w-full min-w-0 font-black italic leading-none">
                       {(() => {
-                        const n = String(viewedUser?.name || 'User');
-                        const len = n.length;
-                        const reduce = Math.max(0, len - 12) * 0.07;
-                        const tracking = len > 20 ? 'tracking-tight' : 'tracking-tighter';
+                        const raw = String(viewedUser?.name || 'User');
+                        const parts = raw
+                          .split('|')
+                          .map((p) => String(p || '').trim())
+                          .filter(Boolean);
+                        const n = parts.length > 0 ? parts : [raw];
+                        const tracking = raw.length > 20 ? 'tracking-tight' : 'tracking-tighter';
                         return (
-                          <span
-                            className={tracking}
-                            style={{ fontSize: `clamp(1.25rem, calc(4.2vw - ${reduce}rem), 2.5rem)` }}
-                          >
-                            {n}
+                          <span className={tracking} style={{ fontSize: 'clamp(1.25rem, 4.2vw, 2.5rem)' }}>
+                            {n.map((p, idx) => (
+                              <span key={`${p}-${idx}`} className="whitespace-nowrap">
+                                {idx === 0 ? p : ` | ${p}`}
+                              </span>
+                            ))}
                           </span>
                         );
                       })()}
                     </h1>
 
-                    {vaultRank && (
-                      <span
-                        className="px-2 md:px-3 py-0.5 md:py-1 rounded-full border text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] shrink-0"
-                        style={{
-                          color: vaultRank.color,
-                          borderColor: hexToRgba(vaultRank.color, 0.5),
-                          backgroundColor: hexToRgba(vaultRank.color, 0.12),
-                        }}
-                      >
-                        {vaultRank.name}
-                      </span>
-                    )}
-                    {viewedIsPro && (
-                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
-                        Pro
-                      </span>
-                    )}
-                    {isPrime && (
-                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-blue-500/15 border border-blue-500/50 text-[8px] md:text-[9px] font-black uppercase tracking-[0.12em] text-blue-400 shrink-0">
-                        Prime
-                      </span>
-                    )}
-                    {isPartner && (
-                      <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-yellow-500/10 border border-yellow-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-yellow-300 shrink-0">
-                        Partner
-                      </span>
-                    )}
-                    {/* Discord Connection Status (Show if Pro or has Discord access AND connected) */}
-                    {(isPro || hasDiscordAccess) && discordStatus?.connected && (
-                      <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 border border-indigo-500/40 shrink-0">
-                        <MessageSquare size={10} className="text-indigo-400" />
-                        <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
-                          Discord
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {vaultRank && (
+                        <span
+                          className="px-2 md:px-3 py-0.5 md:py-1 rounded-full border text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] shrink-0"
+                          style={{
+                            color: vaultRank.color,
+                            borderColor: hexToRgba(vaultRank.color, 0.5),
+                            backgroundColor: hexToRgba(vaultRank.color, 0.12),
+                          }}
+                        >
+                          {vaultRank.name}
                         </span>
-                      </div>
-                    )}
+                      )}
+                      {viewedIsPro && (
+                        <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-emerald-400 shrink-0">
+                          Pro
+                        </span>
+                      )}
+                      {isPrime && (
+                        <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-blue-500/15 border border-blue-500/50 text-[8px] md:text-[9px] font-black uppercase tracking-[0.12em] text-blue-400 shrink-0">
+                          Prime
+                        </span>
+                      )}
+                      {isPartner && (
+                        <span className="px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-yellow-500/10 border border-yellow-500/40 text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-yellow-300 shrink-0">
+                          Partner
+                        </span>
+                      )}
+                      {/* Discord Connection Status (Show if Pro or has Discord access AND connected) */}
+                      {(isPro || hasDiscordAccess) && discordStatus?.connected && (
+                        <div className="flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 border border-indigo-500/40 shrink-0">
+                          <MessageSquare size={10} className="text-indigo-400" />
+                          <span className="text-[8px] md:text-[9px] font-black uppercase tracking-[0.25em] text-indigo-400">
+                            Discord
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {/* Action Buttons (only for own profile) */}
                   {effectiveIsOwner && (

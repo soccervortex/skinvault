@@ -8,6 +8,8 @@ import { resolveVoucherSku } from '@/app/utils/voucher-skus';
 
 export const runtime = 'nodejs';
 
+const VOUCHERS_ENABLED = process.env.ENABLE_VOUCHERS === 'true';
+
 type VoucherCodeDoc = {
   _id: string;
   skuId: string;
@@ -39,6 +41,10 @@ function makeVoucherCode(): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (!VOUCHERS_ENABLED) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

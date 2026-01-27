@@ -9,6 +9,8 @@ import { createUserNotification } from '@/app/utils/user-notifications';
 
 export const runtime = 'nodejs';
 
+const VOUCHERS_ENABLED = process.env.ENABLE_VOUCHERS === 'true';
+
 type VoucherCodeDoc = {
   _id: string;
   skuId: string;
@@ -51,6 +53,10 @@ function hashVoucherCode(normalizedCode: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (!VOUCHERS_ENABLED) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const steamId = getSteamIdFromRequest(req);
   if (!steamId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
