@@ -105,13 +105,13 @@ function buildMessage(args: { from: string; to: string; subject: string; replyTo
   return lines.join('\r\n');
 }
 
-async function readResponse(socket: net.Socket, timeoutMs: number): Promise<string> {
+async function readResponse(socket: net.Socket, timeoutMs: number, label: string): Promise<string> {
   return await new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const onData = (d: Buffer) => {
       chunks.push(d);
       const text = Buffer.concat(chunks).toString('utf8');
-      if (/\r?\n\d{3} /m.test(text)) {
+      if (/(^|\r?\n)\d{3} /m.test(text)) {
         cleanup();
         resolve(text);
       }
@@ -122,7 +122,7 @@ async function readResponse(socket: net.Socket, timeoutMs: number): Promise<stri
     };
     const onTimeout = () => {
       cleanup();
-      reject(new Error('SMTP timeout'));
+      reject(new Error(`SMTP timeout (${label})`));
     };
     const cleanup = () => {
       socket.off('data', onData);
@@ -138,14 +138,14 @@ async function readResponse(socket: net.Socket, timeoutMs: number): Promise<stri
 }
 
 function parseCapabilities(ehloResponse: string): { starttls: boolean; authLogin: boolean } {
-  const starttls = /\n250[\- ]STARTTLS\r?\n/i.test(ehloResponse);
-  const authLogin = /\n250[\- ]AUTH\s+.*\bLOGIN\b/i.test(ehloResponse) || /\n250[\- ]AUTH\s+LOGIN\b/i.test(ehloResponse);
+  const starttls = /(^|\n)250[\- ]STARTTLS(\r?\n|$)/i.test(ehloResponse);
+  const authLogin = /(^|\n)250[\- ]AUTH\s+.*\bLOGIN\b/i.test(ehloResponse) || /(^|\n)250[\- ]AUTH\s+LOGIN\b/i.test(ehloResponse);
   return { starttls, authLogin };
 }
 
 async function sendCmd(socket: net.Socket, cmd: string, expect2xx: boolean = true, timeoutMs: number = 10_000): Promise<string> {
   socket.write(cmd + '\r\n');
-  const resp = await readResponse(socket, timeoutMs);
+  const resp = await readResponse(socket, timeoutMs, cmd);
   if (expect2xx) {
     const ok = /^2\d\d[\- ]/m.test(resp) || /^3\d\d[\- ]/m.test(resp);
     if (!ok) throw new Error(`SMTP command failed: ${cmd} :: ${resp.slice(0, 800)}`);
@@ -234,7 +234,7 @@ export async function sendSmtpEmail(args: SendSmtpEmailArgs): Promise<{ ok: bool
       });
     });
 
-    const greet = await readResponse(socket, timeLeftMs(deadline, 15_000));
+    const greet = await readResponse(socket, timeLeftMs(deadline, 15_000), 'greeting');
     if (!/^220[\- ]/m.test(greet)) {
       throw new Error(`SMTP greeting failed: ${greet.slice(0, 800)}`);
     }
@@ -256,7 +256,7 @@ export async function sendSmtpEmail(args: SendSmtpEmailArgs): Promise<{ ok: bool
 
     await sendCmd(socket, 'DATA', true, timeLeftMs(deadline, 15_000));
     socket.write(message.replace(/\r?\n/g, '\r\n') + '\r\n.\r\n');
-    const dataResp = await readResponse(socket, timeLeftMs(deadline, 20_000));
+    const dataResp = await readResponse(socket, timeLeftMs(deadline, 20_000), 'DATA');
     if (!/^250[\- ]/m.test(dataResp)) {
       throw new Error(`SMTP DATA failed: ${dataResp.slice(0, 800)}`);
     }
