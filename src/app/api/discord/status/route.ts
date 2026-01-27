@@ -68,13 +68,6 @@ export async function GET(request: Request) {
     const hasAccess = await hasDiscordAccess(steamId);
 
     if (!hasAccess) {
-      // User doesn't have access, disconnect them if they have a connection
-      const discordConnectionsKey = 'discord_connections';
-      const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
-      if (connections[steamId]) {
-        delete connections[steamId];
-        await dbSet(discordConnectionsKey, connections);
-      }
       return NextResponse.json({ 
         connected: false, 
         reason: 'Pro subscription or Discord access required',

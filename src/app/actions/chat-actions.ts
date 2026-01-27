@@ -33,14 +33,40 @@ function generateDMId(steamId1: string, steamId2: string): string {
   return [steamId1, steamId2].sort().join('_');
 }
 
-function parsePingCommand(input: string): { targetSteamId: string; note: string } | null {
+function parsePingCommand(input: string): { target: string; note: string } | null {
   const raw = String(input || '').trim();
-  const match = raw.match(/^\/ping\s+(\d{17})(?:\s+([\s\S]+))?$/i);
+  const match = raw.match(/^\/ping\s+([^\s]+)(?:\s+([\s\S]+))?$/i);
   if (!match) return null;
-  const targetSteamId = String(match[1] || '').trim();
-  if (!/^\d{17}$/.test(targetSteamId)) return null;
+  const target = String(match[1] || '').trim();
+  if (!target) return null;
   const note = String(match[2] || '').trim().slice(0, 500);
-  return { targetSteamId, note };
+  return { target, note };
+}
+
+async function resolveSteamIdFromQuery(query: string): Promise<string | null> {
+  const q = String(query || '').trim().replace(/^@+/, '');
+  if (!q) return null;
+  if (/^\d{17}$/.test(q)) return q;
+
+  try {
+    const baseUrl =
+      (process.env.NEXT_PUBLIC_BASE_URL && String(process.env.NEXT_PUBLIC_BASE_URL).trim()) ||
+      (process.env.VERCEL_URL && `https://${String(process.env.VERCEL_URL).trim()}`) ||
+      'http://localhost:3000';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(`${baseUrl}/api/steam/resolve-username?query=${encodeURIComponent(q)}`,
+      { cache: 'no-store', signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const steamId = String((data as any)?.steamId || '').trim();
+    return /^\d{17}$/.test(steamId) ? steamId : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendDMMessage(
@@ -55,9 +81,30 @@ export async function sendDMMessage(
       return { success: false, error: 'Missing required fields' };
     }
 
-    const ping = parsePingCommand(message);
-    const messageForStore = ping
-      ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
+    const parsedPing = parsePingCommand(message);
+    const ping = parsedPing
+      ? {
+          targetSteamId: await resolveSteamIdFromQuery(parsedPing.target),
+          note: parsedPing.note,
+        }
+      : null;
+
+    if (parsedPing && !ping?.targetSteamId) {
+      return { success: false, error: 'Could not resolve user for /ping' };
+    }
+
+    let pingTargetName = '';
+    if (ping?.targetSteamId) {
+      try {
+        const profile = await fetchSteamProfile(ping.targetSteamId);
+        pingTargetName = String(profile?.name || '').trim();
+      } catch {
+        pingTargetName = '';
+      }
+    }
+
+    const messageForStore = ping?.targetSteamId
+      ? `Pinged ${pingTargetName ? `${pingTargetName} (${ping.targetSteamId})` : ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
       : message;
 
     // Check if DM chat is disabled
@@ -166,7 +213,7 @@ export async function sendDMMessage(
     const result = await collection.insertOne(dmMessage);
     const insertedMessage = { ...dmMessage, _id: result.insertedId };
 
-    if (ping) {
+    if (ping?.targetSteamId) {
       try {
         const coreDb = await getDatabase();
         await createUserNotification(
@@ -419,9 +466,30 @@ export async function sendGlobalMessage(
       return { success: false, error: 'Missing required fields' };
     }
 
-    const ping = parsePingCommand(message);
-    const messageForStore = ping
-      ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
+    const parsedPing = parsePingCommand(message);
+    const ping = parsedPing
+      ? {
+          targetSteamId: await resolveSteamIdFromQuery(parsedPing.target),
+          note: parsedPing.note,
+        }
+      : null;
+
+    if (parsedPing && !ping?.targetSteamId) {
+      return { success: false, error: 'Could not resolve user for /ping' };
+    }
+
+    let pingTargetName = '';
+    if (ping?.targetSteamId) {
+      try {
+        const profile = await fetchSteamProfile(ping.targetSteamId);
+        pingTargetName = String(profile?.name || '').trim();
+      } catch {
+        pingTargetName = '';
+      }
+    }
+
+    const messageForStore = ping?.targetSteamId
+      ? `Pinged ${pingTargetName ? `${pingTargetName} (${ping.targetSteamId})` : ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
       : message;
 
     const invocation = !ping ? parseChatCommandInvocation(message) : null;
@@ -516,7 +584,7 @@ export async function sendGlobalMessage(
     const result = await collection.insertOne(globalMessage);
     const insertedMessage = { ...globalMessage, _id: result.insertedId };
 
-    if (ping) {
+    if (ping?.targetSteamId) {
       try {
         const coreDb = await getDatabase();
         await createUserNotification(
