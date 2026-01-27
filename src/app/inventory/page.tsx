@@ -2126,7 +2126,7 @@ function InventoryContent() {
                 <img src={viewedUser.avatar} className="w-16 h-16 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-blue-600 shadow-2xl shrink-0" alt="avatar" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
-                    <h1 className="flex-1 min-w-0 font-black italic leading-none whitespace-nowrap">
+                    <h1 className="flex-1 min-w-0 font-black italic leading-none whitespace-normal break-words">
                       {(() => {
                         const n = String(viewedUser?.name || 'User');
                         const len = n.length;

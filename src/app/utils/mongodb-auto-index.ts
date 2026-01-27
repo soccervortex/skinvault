@@ -86,6 +86,24 @@ export async function setupCoreIndexes(db: Db): Promise<void> {
       undefined,
       undefined
     );
+
+    await createIndexSafe(
+      db.collection('voucher_codes'),
+      { status: 1, expiresAt: 1, createdAt: -1 },
+      { name: 'voucher_status_expires_created_desc' },
+      undefined,
+      undefined,
+      undefined
+    );
+
+    await createIndexSafe(
+      db.collection('voucher_codes'),
+      { redeemedBySteamId: 1, redeemedAt: -1 },
+      { name: 'voucher_redeemer_redeemedAt_desc' },
+      undefined,
+      undefined,
+      undefined
+    );
   } catch {
   }
 }
