@@ -1,5 +1,6 @@
 import net from 'node:net';
 import tls from 'node:tls';
+import { lookup } from 'node:dns/promises';
 import { sanitizeEmail, sanitizeString } from '@/app/utils/sanitize';
 
 type SendSmtpEmailArgs = {
@@ -23,7 +24,7 @@ type SmtpConfig = {
 function getOverallTimeoutMs(): number {
   const raw = Number.parseInt(String(process.env.SMTP_TIMEOUT_MS || ''), 10);
   const ms = Number.isFinite(raw) ? raw : 0;
-  return Math.min(120_000, Math.max(5_000, ms || 25_000));
+  return Math.min(120_000, Math.max(5_000, ms || 60_000));
 }
 
 function timeLeftMs(deadline: number, fallbackMs: number): number {
@@ -37,6 +38,21 @@ function extractEnvelopeFrom(fromHeader: string): string | null {
   const m = /<([^>]+)>/.exec(raw);
   const candidate = m?.[1] || raw;
   return sanitizeEmail(candidate);
+}
+
+async function resolveIpv4(host: string, timeoutMs: number): Promise<string> {
+  const safeHost = String(host || '').trim();
+  if (!safeHost) return safeHost;
+
+  try {
+    const res = await Promise.race([
+      lookup(safeHost, { family: 4 }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('DNS timeout')), timeoutMs)),
+    ]);
+    return (res as any)?.address || safeHost;
+  } catch {
+    return safeHost;
+  }
 }
 
 function getSmtpConfig(): SmtpConfig | null {
@@ -127,7 +143,7 @@ function parseCapabilities(ehloResponse: string): { starttls: boolean; authLogin
   return { starttls, authLogin };
 }
 
-async function sendCmd(socket: net.Socket, cmd: string, expect2xx: boolean = true, timeoutMs: number = 5_000): Promise<string> {
+async function sendCmd(socket: net.Socket, cmd: string, expect2xx: boolean = true, timeoutMs: number = 10_000): Promise<string> {
   socket.write(cmd + '\r\n');
   const resp = await readResponse(socket, timeoutMs);
   if (expect2xx) {
@@ -190,9 +206,11 @@ export async function sendSmtpEmail(args: SendSmtpEmailArgs): Promise<{ ok: bool
 
   let socket: net.Socket | tls.TLSSocket | null = null;
   try {
+    const connectHost = await resolveIpv4(config.host, timeLeftMs(deadline, 6_000));
+
     socket = config.secure
-      ? tls.connect({ host: config.host, port: config.port, servername: config.host, rejectUnauthorized: false })
-      : net.connect({ host: config.host, port: config.port });
+      ? tls.connect({ host: connectHost, port: config.port, servername: config.host, rejectUnauthorized: false })
+      : net.connect({ host: connectHost, port: config.port, family: 4 });
 
     socket.setTimeout(timeLeftMs(deadline, 25_000), () => {
       try {
@@ -202,7 +220,10 @@ export async function sendSmtpEmail(args: SendSmtpEmailArgs): Promise<{ ok: bool
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('SMTP connect timeout')), timeLeftMs(deadline, 5_000));
+      const timer = setTimeout(
+        () => reject(new Error(`SMTP connect timeout (${config.host}:${config.port})`)),
+        timeLeftMs(deadline, 15_000)
+      );
       socket!.once('connect', () => {
         clearTimeout(timer);
         resolve();
@@ -213,29 +234,29 @@ export async function sendSmtpEmail(args: SendSmtpEmailArgs): Promise<{ ok: bool
       });
     });
 
-    const greet = await readResponse(socket, timeLeftMs(deadline, 5_000));
+    const greet = await readResponse(socket, timeLeftMs(deadline, 15_000));
     if (!/^220[\- ]/m.test(greet)) {
       throw new Error(`SMTP greeting failed: ${greet.slice(0, 800)}`);
     }
 
-    const ehlo = await sendCmd(socket, `EHLO ${config.host}`, true, timeLeftMs(deadline, 5_000));
+    const ehlo = await sendCmd(socket, `EHLO ${config.host}`, true, timeLeftMs(deadline, 15_000));
     const caps = parseCapabilities(ehlo);
 
     if (!config.secure && caps.starttls) {
       socket = await upgradeToStartTls(socket, config.host);
-      await sendCmd(socket, `EHLO ${config.host}`, true, timeLeftMs(deadline, 5_000));
+      await sendCmd(socket, `EHLO ${config.host}`, true, timeLeftMs(deadline, 15_000));
     }
 
     if (config.user && config.pass) {
       await authLogin(socket, config.user, config.pass);
     }
 
-    await sendCmd(socket, `MAIL FROM:<${envelopeFrom}>`, true, timeLeftMs(deadline, 5_000));
-    await sendCmd(socket, `RCPT TO:<${to}>`, true, timeLeftMs(deadline, 5_000));
+    await sendCmd(socket, `MAIL FROM:<${envelopeFrom}>`, true, timeLeftMs(deadline, 15_000));
+    await sendCmd(socket, `RCPT TO:<${to}>`, true, timeLeftMs(deadline, 15_000));
 
-    await sendCmd(socket, 'DATA', true, timeLeftMs(deadline, 5_000));
+    await sendCmd(socket, 'DATA', true, timeLeftMs(deadline, 15_000));
     socket.write(message.replace(/\r?\n/g, '\r\n') + '\r\n.\r\n');
-    const dataResp = await readResponse(socket, timeLeftMs(deadline, 10_000));
+    const dataResp = await readResponse(socket, timeLeftMs(deadline, 20_000));
     if (!/^250[\- ]/m.test(dataResp)) {
       throw new Error(`SMTP DATA failed: ${dataResp.slice(0, 800)}`);
     }
