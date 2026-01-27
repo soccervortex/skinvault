@@ -24,6 +24,7 @@ import {
   Search,
   Flag,
   MessageSquare,
+  Terminal,
   Bell,
   Twitter,
   Tag,
@@ -1514,6 +1515,17 @@ function AdminPageInner() {
                     <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Chat</div>
                   </div>
                   <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Chat Admin</div>
+                </button>
+
+                <button
+                  onClick={() => router.push('/admin/commands')}
+                  className="bg-black/40 border border-white/10 rounded-xl md:rounded-2xl p-4 text-left hover:border-white/20 transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Terminal className="text-blue-400" size={16} />
+                    <div className="text-[9px] uppercase tracking-[0.35em] text-gray-500 font-black">Chat</div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-black uppercase tracking-wider">Commands Manager</div>
                 </button>
 
                 <button

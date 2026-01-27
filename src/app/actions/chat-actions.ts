@@ -8,6 +8,7 @@ import { fetchSteamProfile } from '@/app/api/chat/messages/route';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import { getEnabledChatCommandResponseTemplate, parseChatCommandInvocation, renderChatCommandResponse } from '@/app/utils/chat-commands';
 
 interface DMMessage {
   _id?: string;
@@ -423,6 +424,8 @@ export async function sendGlobalMessage(
       ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
       : message;
 
+    const invocation = !ping ? parseChatCommandInvocation(message) : null;
+
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
     const globalChatDisabled = (await dbGet<boolean>('global_chat_disabled', false)) || false;
@@ -566,6 +569,65 @@ export async function sendGlobalMessage(
     } catch (pusherError) {
       console.error('Failed to trigger Pusher event:', pusherError);
       // Don't fail the request if Pusher fails
+    }
+
+    // Custom commands: if user typed /<command>, post an automated SkinVaults reply
+    if (invocation) {
+      try {
+        const coreDb = await getDatabase();
+        const template = await getEnabledChatCommandResponseTemplate(coreDb, invocation.slug);
+        if (template) {
+          const reply = renderChatCommandResponse(template, {
+            userName: currentSteamName,
+            steamId,
+            args: invocation.args,
+          });
+
+          if (reply) {
+            const botMessage: GlobalMessage = {
+              steamId: '0',
+              steamName: 'SkinVaults',
+              avatar: '/icon.png',
+              message: reply,
+              timestamp: new Date(),
+              isPro: false,
+            };
+
+            const botInsert = await collection.insertOne(botMessage);
+            const insertedBot = { ...botMessage, _id: botInsert.insertedId };
+
+            try {
+              const pusherAppId = process.env.PUSHER_APP_ID;
+              const pusherSecret = process.env.PUSHER_SECRET;
+              const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+              if (pusherAppId && pusherSecret) {
+                const pusher = new Pusher({
+                  appId: pusherAppId,
+                  key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+                  secret: pusherSecret,
+                  cluster: pusherCluster,
+                  useTLS: true,
+                });
+
+                await pusher.trigger('global', 'new_messages', {
+                  type: 'new_messages',
+                  messages: [{
+                    id: insertedBot._id?.toString() || '',
+                    steamId: insertedBot.steamId,
+                    steamName: insertedBot.steamName,
+                    avatar: insertedBot.avatar,
+                    message: insertedBot.message,
+                    timestamp: insertedBot.timestamp,
+                    isPro: insertedBot.isPro,
+                  }],
+                });
+              }
+            } catch {
+            }
+          }
+        }
+      } catch {
+      }
     }
 
     return { success: true, message: insertedMessage };

@@ -6,6 +6,7 @@ import Pusher from 'pusher';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import { getEnabledChatCommandResponseTemplate, parseChatCommandInvocation, renderChatCommandResponse } from '@/app/utils/chat-commands';
 
 interface ChatMessage {
   _id?: string;
@@ -67,6 +68,14 @@ export async function getCurrentUserInfo(uniqueSteamIds: string[]): Promise<Map<
   // Fetch all user info in parallel
   const userInfoPromises = uniqueSteamIds.map(async (steamId) => {
     try {
+      if (!/^\d{17}$/.test(String(steamId || '').trim())) {
+        return {
+          steamId,
+          steamName: 'Unknown User',
+          avatar: '',
+          isPro: false,
+        };
+      }
       const [profileInfo, proUntil] = await Promise.all([
         fetchSteamProfile(steamId),
         getProUntil(steamId),
@@ -230,6 +239,23 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ 
       messages: messages.reverse().map(msg => { // Reverse to show oldest first in chat
+        if (String(msg.steamId || '') === '0') {
+          const messageId = msg._id?.toString() || '';
+          const isPinned = pinnedMessages[messageId]?.messageType === 'global';
+          return {
+            id: messageId,
+            steamId: '0',
+            steamName: 'SkinVaults',
+            avatar: '/icon.png',
+            message: msg.message,
+            timestamp: msg.timestamp,
+            editedAt: msg.editedAt,
+            isPro: false,
+            isBanned: false,
+            isTimedOut: false,
+            isPinned,
+          };
+        }
         const currentUserInfo = userInfoMap.get(msg.steamId);
         const isBanned = bannedUsers.includes(msg.steamId);
         const timeoutUntil = timeoutUsers[msg.steamId];
@@ -286,6 +312,7 @@ export async function POST(request: Request) {
     }
 
     const ping = parsePingCommand(message);
+    const invocation = !ping ? parseChatCommandInvocation(message) : null;
     const messageForStore = ping
       ? `Pinged ${ping.targetSteamId}${ping.note ? `: ${ping.note}` : ''}`
       : message;
@@ -378,8 +405,8 @@ export async function POST(request: Request) {
       isPro: currentIsPro,
     };
 
-    await collection.insertOne(chatMessage);
-    // Don't close connection - it's pooled and reused
+    const insertRes = await collection.insertOne(chatMessage);
+    const insertedId = insertRes.insertedId?.toString?.() || '';
 
     if (ping) {
       try {
@@ -418,7 +445,7 @@ export async function POST(request: Request) {
         await pusher.trigger('global', 'new_messages', {
           type: 'new_messages',
           messages: [{
-            id: chatMessage._id?.toString() || '',
+            id: insertedId,
             steamId: chatMessage.steamId,
             steamName: chatMessage.steamName,
             avatar: chatMessage.avatar,
@@ -431,6 +458,64 @@ export async function POST(request: Request) {
     } catch (pusherError) {
       console.error('Failed to trigger Pusher event:', pusherError);
       // Don't fail the request if Pusher fails
+    }
+
+    if (invocation) {
+      try {
+        const coreDb = await getDatabase();
+        const template = await getEnabledChatCommandResponseTemplate(coreDb, invocation.slug);
+        if (template) {
+          const reply = renderChatCommandResponse(template, {
+            userName: currentSteamName,
+            steamId,
+            args: invocation.args,
+          });
+
+          if (reply) {
+            const bot: ChatMessage = {
+              steamId: '0',
+              steamName: 'SkinVaults',
+              avatar: '/icon.png',
+              message: reply,
+              timestamp: new Date(),
+              isPro: false,
+            };
+
+            const botResult = await collection.insertOne(bot);
+            const botId = botResult.insertedId?.toString?.() || '';
+
+            try {
+              const pusherAppId = process.env.PUSHER_APP_ID;
+              const pusherSecret = process.env.PUSHER_SECRET;
+              const pusherCluster = process.env.PUSHER_CLUSTER || 'eu';
+              if (pusherAppId && pusherSecret) {
+                const pusher = new Pusher({
+                  appId: pusherAppId,
+                  key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+                  secret: pusherSecret,
+                  cluster: pusherCluster,
+                  useTLS: true,
+                });
+
+                await pusher.trigger('global', 'new_messages', {
+                  type: 'new_messages',
+                  messages: [{
+                    id: botId,
+                    steamId: bot.steamId,
+                    steamName: bot.steamName,
+                    avatar: bot.avatar,
+                    message: bot.message,
+                    timestamp: bot.timestamp,
+                    isPro: bot.isPro,
+                  }],
+                });
+              }
+            } catch {
+            }
+          }
+        }
+      } catch {
+      }
     }
 
     return NextResponse.json({ success: true, message: chatMessage });

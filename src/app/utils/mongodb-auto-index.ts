@@ -104,6 +104,15 @@ export async function setupCoreIndexes(db: Db): Promise<void> {
       undefined,
       undefined
     );
+
+    await createIndexSafe(
+      db.collection('chat_commands'),
+      { updatedAt: -1 },
+      { name: 'chat_commands_updatedAt_desc' },
+      undefined,
+      undefined,
+      undefined
+    );
   } catch {
   }
 }
