@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
 
     let sent = 0;
     let failed = 0;
+    const failures: { to: string; error: string }[] = [];
 
     for (const s of subs as any[]) {
       const to = sanitizeEmail(String(s?.email || ''));
@@ -71,10 +72,15 @@ export async function POST(req: NextRequest) {
       });
 
       if (res.ok) sent++;
-      else failed++;
+      else {
+        failed++;
+        if (failures.length < 5) {
+          failures.push({ to, error: sanitizeString(String(res.error || 'Failed to send')).slice(0, 800) });
+        }
+      }
     }
 
-    return NextResponse.json({ ok: true, sent, failed, total: subs.length });
+    return NextResponse.json({ ok: true, sent, failed, total: subs.length, failures });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to send newsletter' }, { status: 500 });
   }

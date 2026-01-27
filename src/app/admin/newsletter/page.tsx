@@ -81,7 +81,13 @@ export default function AdminNewsletterPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error((json as any)?.error || 'Failed to send');
 
-      toast.success(`Sent: ${(json as any)?.sent || 0} • Failed: ${(json as any)?.failed || 0}`);
+      const sent = Number((json as any)?.sent || 0);
+      const failed = Number((json as any)?.failed || 0);
+      toast.success(`Sent: ${sent} • Failed: ${failed}`);
+      const firstFailure = (json as any)?.failures?.[0];
+      if (failed > 0 && firstFailure?.error) {
+        toast.error(String(firstFailure.error));
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to send newsletter');
     } finally {
