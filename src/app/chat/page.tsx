@@ -421,15 +421,19 @@ export default function ChatPage() {
           });
         } else {
           setMessages(prev => {
-            // Only update if messages are different
-            if (prev.length !== newMessages.length) return newMessages;
-            const prevIds = new Set(prev.map(m => m.id));
+            const temp = prev.filter((m) => String(m?.id || '').startsWith('temp_'));
+
+            // Only update if messages are different (ignoring temp messages)
+            const prevNonTemp = prev.filter((m) => !String(m?.id || '').startsWith('temp_'));
+            if (prevNonTemp.length !== newMessages.length) return [...newMessages, ...temp];
+
+            const prevIds = new Set(prevNonTemp.map(m => m.id));
             const newIds = new Set(newMessages.map((m: any) => m.id));
-            if (prevIds.size !== newIds.size) return newMessages;
+            if (prevIds.size !== newIds.size) return [...newMessages, ...temp];
             for (const id of prevIds) {
-              if (!newIds.has(id)) return newMessages;
+              if (!newIds.has(id)) return [...newMessages, ...temp];
             }
-            return prev; // No changes, keep previous state
+            return [...prevNonTemp, ...temp];
           });
         }
         setHasMoreMessages(data.hasMore || false);
@@ -1124,7 +1128,14 @@ export default function ChatPage() {
 
     if (activeTab === 'global') {
       // Use useOptimistic to add message optimistically
-      addOptimisticMessage(optimisticMessage);
+      setMessages((prev) => {
+        const next = [...prev, optimisticMessage];
+        try {
+          setCachedMessages('global', next, messageCursor, 'global');
+        } catch {
+        }
+        return next;
+      });
     } else if (activeTab === 'dms' && selectedDM) {
       const [steamId1, steamId2] = selectedDM.split('_');
       const receiverId = steamId1 === user.steamId ? steamId2 : steamId1;
