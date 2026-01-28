@@ -118,12 +118,7 @@ export default function AffiliateUserAdminPage() {
       qs.set('page', String(page));
       qs.set('limit', String(limit));
 
-      const res = await fetch(`/api/admin/affiliate-user?${qs.toString()}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
-        cache: 'no-store',
-      });
+      const res = await fetch(`/api/admin/affiliate-user?${qs.toString()}`, { cache: 'no-store' });
       const json = (await res.json().catch(() => null)) as ApiResponse | null;
       if (!res.ok || !json) {
         setError((json as any)?.error || 'Failed to load affiliate');
@@ -190,7 +185,6 @@ export default function AffiliateUserAdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action, referrerSteamId: steamId, referredSteamId: ref }),
       });

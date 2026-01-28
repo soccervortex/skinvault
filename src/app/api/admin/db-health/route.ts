@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
 import { checkDbHealth, getDbStatus } from '@/app/utils/database';
-import { isOwner } from '@/app/utils/owner-ids';
 import { hasMongoConfig } from '@/app/utils/mongodb-client';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
-
-export async function GET(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
+export async function GET(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

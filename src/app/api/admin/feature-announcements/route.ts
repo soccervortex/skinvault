@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 import {
   getAllFeatureAnnouncements,
   createFeatureAnnouncement,
@@ -12,10 +13,7 @@ import {
  */
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request as NextRequest)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,10 +30,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request as NextRequest)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -60,10 +55,9 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
     const id = url.searchParams.get('id');
 
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request as NextRequest)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

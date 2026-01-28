@@ -40,6 +40,15 @@ export default function ReportItemPage() {
     if (typeof window === 'undefined') return;
 
     try {
+      const url = new URL(window.location.href);
+      const t = String(url.searchParams.get('tab') || '').trim().toLowerCase();
+      if (t === 'bug' || t === 'idea' || t === 'item') {
+        setTab(t as any);
+      }
+    } catch {
+    }
+
+    try {
       const stored = window.localStorage.getItem('steam_user');
       const parsed = stored ? JSON.parse(stored) : null;
       const sid = String(parsed?.steamId || '').trim();

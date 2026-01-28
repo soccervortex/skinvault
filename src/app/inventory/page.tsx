@@ -1682,7 +1682,7 @@ function InventoryContent() {
         fetch(`/api/discord/status?steamId=${viewedUser.steamId}`, { cache: 'no-store' })
           .then(res => res.ok ? res.json() : null)
           .then(data => {
-            setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
+            setDiscordStatus(data && typeof data === 'object' ? data : { connected: false, requiresPro: false });
           })
           .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
       } else {
@@ -1701,7 +1701,7 @@ function InventoryContent() {
               fetch(`/api/discord/status?steamId=${viewedUser.steamId}`, { cache: 'no-store' })
                 .then(res => res.ok ? res.json() : null)
                 .then(data => {
-                  setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
+                  setDiscordStatus(data && typeof data === 'object' ? data : { connected: false, requiresPro: false });
                 })
                 .catch(() => setDiscordStatus({ connected: false, requiresPro: false }));
             } else {
@@ -1759,7 +1759,7 @@ function InventoryContent() {
           const res = await fetch(`/api/discord/status?steamId=${viewedUser.steamId}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
-            setDiscordStatus(data?.connected ? data : { connected: false, requiresPro: false });
+            setDiscordStatus(data && typeof data === 'object' ? data : { connected: false, requiresPro: false });
             
             // Remove the parameter from URL without reload
             if (typeof window !== 'undefined') {
@@ -2233,28 +2233,50 @@ function InventoryContent() {
                             Connect Discord
                           </button>
                         ) : (
-                          <button
-                            onClick={async () => {
-                              if (!loggedInUser?.steamId) return;
-                              try {
-                                const res = await fetch('/api/discord/disconnect', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ steamId: loggedInUser.steamId }),
-                                });
-                                if (res.ok) {
-                                  setDiscordStatus({ connected: false });
-                                  window.location.reload();
+                          <>
+                            <button
+                              onClick={async () => {
+                                if (!loggedInUser?.steamId) return;
+                                try {
+                                  const res = await fetch('/api/discord/disconnect', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ steamId: loggedInUser.steamId }),
+                                  });
+                                  if (res.ok) {
+                                    setDiscordStatus({ connected: false });
+                                    window.location.reload();
+                                  }
+                                } catch (error) {
+                                  console.error('Failed to disconnect Discord:', error);
                                 }
-                              } catch (error) {
-                                console.error('Failed to disconnect Discord:', error);
-                              }
-                            }}
-                            className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] font-black uppercase tracking-widest"
-                          >
-                            <MessageSquare size={12} />
-                            Disconnect Discord
-                          </button>
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-red-600 hover:bg-red-500 rounded-lg md:rounded-xl text-[9px] font-black uppercase tracking-widest"
+                            >
+                              <MessageSquare size={12} />
+                              Disconnect Discord
+                            </button>
+
+                            {discordStatus?.needsReconnect && (
+                              <button
+                                onClick={() => {
+                                  if (!loggedInUser?.steamId) return;
+                                  fetch(`/api/discord/auth?steamId=${loggedInUser.steamId}`)
+                                    .then(res => res.json())
+                                    .then(data => {
+                                      if (data.authUrl) {
+                                        window.location.href = data.authUrl;
+                                      }
+                                    })
+                                    .catch(console.error);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg md:rounded-xl text-[9px] font-black uppercase tracking-widest"
+                              >
+                                <MessageSquare size={12} />
+                                Reconnect Discord
+                              </button>
+                            )}
+                          </>
                         )
                       )}
 

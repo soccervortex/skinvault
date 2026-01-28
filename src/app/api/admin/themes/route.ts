@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getThemeSettings, setThemeEnabled, ThemeType } from '@/app/utils/theme-storage';
-import { isAdminRequest } from '@/app/utils/admin-auth';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 // Get all theme settings
 export async function GET(request: NextRequest) {
   try {
-    if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Always bypass cache to get fresh settings
     const settings = await getThemeSettings(true);
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 // Update theme setting
 export async function POST(request: NextRequest) {
   try {
-    if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json().catch(() => null);
     const { theme, enabled } = body as { theme: ThemeType; enabled: boolean };

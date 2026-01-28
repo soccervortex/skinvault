@@ -2,16 +2,11 @@ import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
-
-export async function POST(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const { steamId } = await request.json();

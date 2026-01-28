@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
-import { getSteamIdFromRequest } from '@/app/utils/steam-session';
-import { isOwner } from '@/app/utils/owner-ids';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { getAdminAccess, hasAdminPermission } from '@/app/utils/admin-auth';
 
 function parseRange(raw: string | null): { mode: 'days'; days: number } | { mode: 'all' } {
   const s = String(raw || '').trim().toLowerCase();
@@ -34,15 +31,9 @@ function toDayString(d: Date): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const requesterSteamId = getSteamIdFromRequest(request);
-    if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!isOwner(requesterSteamId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const access = await getAdminAccess(request);
+    if (!access.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!hasAdminPermission(access, 'creator_users')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 400 });

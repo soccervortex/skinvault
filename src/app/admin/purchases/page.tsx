@@ -37,9 +37,6 @@ export default function AdminPurchasesPage() {
     try {
       const res = await fetch('/api/admin/purchases', {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       if (res.ok) {
         const data = await res.json().catch(() => null);
@@ -57,9 +54,6 @@ export default function AdminPurchasesPage() {
     try {
       const res = await fetch('/api/admin/failed-purchases', {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       if (res.ok) {
         const data = await res.json().catch(() => null);
@@ -115,7 +109,6 @@ export default function AdminPurchasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'retry_discord', sessionId }),
       });
@@ -155,7 +148,6 @@ export default function AdminPurchasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'hide', sessionId }),
       });

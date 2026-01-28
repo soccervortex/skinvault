@@ -13,16 +13,22 @@ export async function GET(request: Request) {
     }
 
     const discordConnectionsKey = 'discord_connections';
-    const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = await dbGet<Record<string, any>>(discordConnectionsKey, false) || {};
     
     // Find Steam ID by Discord ID
     for (const [steamId, connection] of Object.entries(connections)) {
       if (connection && connection.discordId === discordId) {
         // Check if connection is still valid
-        if (connection.expiresAt && Date.now() > connection.expiresAt) {
-          continue; // Skip expired connections
-        }
-        return NextResponse.json({ steamId, discordId, username: connection.discordUsername });
+        const tokenExpired = Boolean(connection.expiresAt && Date.now() > connection.expiresAt);
+        const res = NextResponse.json({
+          steamId,
+          discordId,
+          username: connection.discordUsername,
+          tokenExpired,
+          needsReconnect: tokenExpired,
+        });
+        res.headers.set('cache-control', 'no-store');
+        return res;
       }
     }
 
@@ -34,7 +40,9 @@ export async function GET(request: Request) {
         const doc = await col.findOne({ discordId: String(discordId) } as any);
         const steamId = String(doc?._id || doc?.steamId || '').trim();
         if (/^\d{17}$/.test(steamId)) {
-          return NextResponse.json({ steamId, discordId, username: null });
+          const res = NextResponse.json({ steamId, discordId, username: null });
+          res.headers.set('cache-control', 'no-store');
+          return res;
         }
       }
     } catch {

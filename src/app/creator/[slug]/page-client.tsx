@@ -217,16 +217,23 @@ export default function CreatorPageClient({ slug }: { slug: string }) {
   };
 
   const saveEdit = async () => {
-    if (!adminSteamId) return;
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/creators?adminSteamId=${encodeURIComponent(adminSteamId)}&slug=${encodeURIComponent(slug)}`,
+        `/api/creators?slug=${encodeURIComponent(slug)}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(edit),
+          body: JSON.stringify({
+            displayName: edit.displayName,
+            tagline: edit.tagline || undefined,
+            avatarUrl: edit.avatarUrl || undefined,
+            tiktokUsername: edit.tiktokUsername || undefined,
+            youtubeChannelId: edit.youtubeChannelId || undefined,
+            twitchLogin: edit.twitchLogin || undefined,
+            partnerSteamId: edit.partnerSteamId || undefined,
+          }),
         }
       );
       const json = await res.json();

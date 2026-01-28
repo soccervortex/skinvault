@@ -147,6 +147,12 @@ async function runAutoAnnounceOnce() {
   }
 }
 
+async function getRoleByAliasesOrCreate(guild, preferredName, aliases, options = {}) {
+  const role = findRoleByNames(guild, [preferredName, ...(Array.isArray(aliases) ? aliases : [aliases])]);
+  if (role) return role;
+  return await getOrCreateRole(guild, preferredName, options);
+}
+
 function startAutoAnnouncer() {
   if (!AUTO_ANNOUNCE_ENABLED) {
     log('ℹ️ Auto site announcements are disabled (AUTO_SITE_ANNOUNCE_ENABLED!=true).');
@@ -580,13 +586,53 @@ async function processQueuedMessages() {
 // Get user's Steam ID from Discord ID
 async function getSteamIdFromDiscord(discordId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${discordId}`);
+    const response = await fetch(`${API_BASE_URL}/api/discord/get-steam-id?discordId=${encodeURIComponent(discordId)}`);
     if (!response.ok) return null;
     const data = await response.json();
+    if (data?.needsReconnect) {
+      log(`ℹ️ Discord link exists but needs reconnect for Discord ID ${discordId}`);
+    }
     return data.steamId;
   } catch (error) {
     console.error('Error getting Steam ID:', error);
     return null;
+  }
+}
+
+function findRoleByNames(guild, names) {
+  const wanted = (Array.isArray(names) ? names : [names])
+    .map((n) => normalizeRoleName(n))
+    .filter(Boolean);
+  if (!wanted.length) return null;
+  return (
+    guild.roles.cache.find((r) => {
+      const roleName = normalizeRoleName(r?.name);
+      return roleName && wanted.includes(roleName);
+    }) || null
+  );
+}
+
+function normalizeRoleName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+async function removeRolesByNames(member, names) {
+  const guild = member.guild;
+  const wanted = (Array.isArray(names) ? names : [names])
+    .map((n) => normalizeRoleName(n))
+    .filter(Boolean);
+
+  for (const role of guild.roles.cache.values()) {
+    const roleName = normalizeRoleName(role?.name);
+    if (!wanted.includes(roleName)) continue;
+    if (!member.roles.cache.has(role.id)) continue;
+    try {
+      await member.roles.remove(role);
+    } catch {
+    }
   }
 }
 
@@ -2646,6 +2692,15 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+client.on('guildMemberRemove', async (member) => {
+  try {
+    if (!member) return;
+    if (member.guild?.id !== GUILD_ID) return;
+    log(`👋 Member left: ${member.user?.tag || member.user?.id || 'unknown'} (${member.user?.id || 'unknown'})`);
+  } catch {
+  }
+});
+
 // Helper function to get or create a channel
 async function getOrCreateChannel(guild, channelName, options = {}) {
   try {
@@ -3080,10 +3135,8 @@ async function sendWelcomeChannelMessage(member) {
 // Get or create a role by name
 async function getOrCreateRole(guild, roleName, options = {}) {
   try {
-    // Try to find exact match first
-    let role = guild.roles.cache.find(
-      r => r.name.toLowerCase() === roleName.toLowerCase()
-    );
+    const wanted = normalizeRoleName(roleName);
+    let role = guild.roles.cache.find((r) => normalizeRoleName(r?.name) === wanted);
 
     if (!role && options.create !== false) {
       log(`⚠️ Role "${roleName}" not found in ${guild.name}, creating one...`);
@@ -3115,7 +3168,7 @@ async function assignRoles(member) {
     const steamId = await getSteamIdFromDiscord(discordId);
 
     // Always assign Member role
-    const memberRole = await getOrCreateRole(guild, 'Member', { color: 0x808080 });
+    const memberRole = await getRoleByAliasesOrCreate(guild, 'Members', ['Member'], { color: 0x808080 });
     if (memberRole) {
       try {
         await member.roles.add(memberRole);
@@ -3148,7 +3201,7 @@ async function assignRoles(member) {
       // Check Pro status
       const isPro = await checkProStatus(steamId);
       if (isPro) {
-        const proRole = await getOrCreateRole(guild, 'Pro Member', { color: 0x5865F2 }); // Discord blue
+        const proRole = await getRoleByAliasesOrCreate(guild, 'Pro Member', ['Pro Members'], { color: 0x5865F2 }); // Discord blue
         if (proRole) {
           try {
             await member.roles.add(proRole);
@@ -3158,19 +3211,12 @@ async function assignRoles(member) {
           }
         }
       } else {
-        const proRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'pro member');
-        if (proRole && member.roles.cache.has(proRole.id)) {
-          try {
-            await member.roles.remove(proRole);
-            log(`✅ Removed Pro Member role from ${member.user.tag} (not Pro)`);
-          } catch (error) {
-            log(`⚠️ Could not remove Pro Member role: ${error.message}`);
-          }
-        }
+        await removeRolesByNames(member, ['pro member', 'pro members']);
+        log(`✅ Removed Pro role from ${member.user.tag} (not Pro)`);
       }
 
       // Discord bot/community access role (Pro OR discord_access purchase)
-      const accessRole = await getOrCreateRole(guild, 'Discord Access', { color: 0x5865F2 });
+      const accessRole = await getRoleByAliasesOrCreate(guild, 'Discord Access', ['Discord access'], { color: 0x5865F2 });
       if (accessRole) {
         if (hasAccess) {
           if (!member.roles.cache.has(accessRole.id)) {
@@ -3192,7 +3238,7 @@ async function assignRoles(member) {
       }
 
       // Verified role only if user has access
-      const verifiedRole = await getOrCreateRole(guild, 'Verified', { color: 0x5865F2 }); // Discord blue
+      const verifiedRole = await getRoleByAliasesOrCreate(guild, 'Verified', [], { color: 0x5865F2 }); // Discord blue
       if (verifiedRole) {
         if (hasAccess) {
           if (!member.roles.cache.has(verifiedRole.id)) {
@@ -3215,29 +3261,9 @@ async function assignRoles(member) {
     } else {
       log(`ℹ️ No Steam ID found for ${member.user.tag} - Discord not connected yet`);
 
-      const verifiedRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'verified');
-      if (verifiedRole && member.roles.cache.has(verifiedRole.id)) {
-        try {
-          await member.roles.remove(verifiedRole);
-        } catch {
-        }
-      }
-
-      const proRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'pro member');
-      if (proRole && member.roles.cache.has(proRole.id)) {
-        try {
-          await member.roles.remove(proRole);
-        } catch {
-        }
-      }
-
-      const accessRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'discord access');
-      if (accessRole && member.roles.cache.has(accessRole.id)) {
-        try {
-          await member.roles.remove(accessRole);
-        } catch {
-        }
-      }
+      await removeRolesByNames(member, ['verified']);
+      await removeRolesByNames(member, ['pro member', 'pro members']);
+      await removeRolesByNames(member, ['discord access']);
     }
 
   } catch (error) {

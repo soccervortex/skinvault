@@ -113,7 +113,6 @@ export default function AdminProPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ steamId: id, months: m }),
       });
@@ -140,7 +139,6 @@ export default function AdminProPage() {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
       });
       const data = await res.json().catch(() => null);
@@ -161,7 +159,6 @@ export default function AdminProPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ steamId: steamIdToEdit, proUntil: newDate }),
       });

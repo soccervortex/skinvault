@@ -31,11 +31,7 @@ export default function AdminStripePage() {
     if (!userIsOwner) return;
     setLoadingTestMode(true);
     try {
-      const res = await fetch(`/api/admin/stripe-test-mode?steamId=${encodeURIComponent(String(user?.steamId || ''))}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
-      });
+      const res = await fetch('/api/admin/stripe-test-mode');
       if (res.ok) {
         const data = await res.json().catch(() => null);
         setTestMode((data as any)?.testMode === true);
@@ -61,7 +57,6 @@ export default function AdminStripePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ testMode: enabled }),
       });

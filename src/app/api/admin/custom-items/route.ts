@@ -3,10 +3,14 @@ import { getDatabase } from '@/app/utils/mongodb-client';
 import { dbGet, dbSet, dbDelete } from '@/app/utils/database';
 import { submitItemToIndexNow } from '@/app/utils/indexnow';
 import { submitItemToGoogleIndexing } from '@/app/utils/google-indexing';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 // Get all custom items
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const db = await getDatabase();
     const customItems = await db.collection('custom_items')
       .find({})
@@ -24,8 +28,10 @@ export async function GET(request: Request) {
 }
 
 // Create or update custom item
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = await request.json();
     const {
       id,
@@ -117,8 +123,10 @@ export async function POST(request: Request) {
 }
 
 // Delete custom item
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const itemId = searchParams.get('itemId');
 

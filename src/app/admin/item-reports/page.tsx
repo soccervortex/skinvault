@@ -61,11 +61,7 @@ export default function ItemReportsPage() {
   const loadReports = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/item-reports?status=${filter}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
-      });
+      const res = await fetch(`/api/admin/item-reports?status=${filter}`);
       const data = await res.json();
       if (res.ok) {
         // Handle both { reports: [...] } and direct array response
@@ -89,7 +85,6 @@ export default function ItemReportsPage() {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           reportId,
@@ -120,9 +115,6 @@ export default function ItemReportsPage() {
     try {
       const res = await fetch(`/api/admin/item-reports?reportId=${reportId}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
 
       if (res.ok) {
@@ -571,7 +563,6 @@ function AddCustomItemModal({
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           ...formData,

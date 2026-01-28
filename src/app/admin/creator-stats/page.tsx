@@ -246,9 +246,6 @@ export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPage
       params.set('includeLeaderboard', '1');
 
       const res = await fetch(`/api/admin/creator-stats?${params.toString()}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
         cache: 'no-store',
       });
       const json = (await res.json().catch(() => null)) as ApiResponse | null;
@@ -278,9 +275,6 @@ export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPage
       params.set('includeLeaderboard', '0');
 
       const res = await fetch(`/api/admin/creator-stats?${params.toString()}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
         cache: 'no-store',
       });
       const json = (await res.json().catch(() => null)) as ApiResponse | null;
@@ -316,9 +310,6 @@ export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPage
       if (usersQ.trim()) params.set('q', usersQ.trim());
 
       const res = await fetch(`/api/admin/creator-users?${params.toString()}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
         cache: 'no-store',
       });
 
@@ -356,7 +347,6 @@ export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPage
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ dryRun: true }),
       });
@@ -378,7 +368,6 @@ export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPage
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ dryRun: false }),
       });
@@ -420,7 +409,6 @@ export function CreatorStatsAdminPageInner({ forcedSlug }: CreatorStatsAdminPage
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           steamId,

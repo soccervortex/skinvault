@@ -686,7 +686,7 @@ export default function GlobalSkinSearch() {
                 We couldn't find any items matching "{query}". Try a different search term or check the spelling.
               </p>
               <Link
-                href="/report-item"
+                href="/report"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-black uppercase tracking-widest transition-all"
               >
                 <AlertTriangle size={16} />

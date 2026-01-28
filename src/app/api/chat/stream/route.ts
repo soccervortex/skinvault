@@ -83,10 +83,6 @@ export async function GET(request: Request) {
       send({ type: 'connected', channel });
 
       // Start heartbeat (MongoDB connection will be checked when needed)
-      heartbeatInterval = setInterval(() => {
-        send({ type: 'heartbeat', timestamp: Date.now() });
-      }, 30000);
-
       // Start heartbeat (keep connection alive)
       heartbeatInterval = setInterval(() => {
         if (isActive) {

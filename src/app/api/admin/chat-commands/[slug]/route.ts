@@ -1,26 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
-import { getSteamIdFromRequest } from '@/app/utils/steam-session';
-import { isOwner } from '@/app/utils/owner-ids';
 import { sanitizeString } from '@/app/utils/sanitize';
 import { listChatCommands, normalizeChatCommandSlug } from '@/app/utils/chat-commands';
+import { getAdminAccess, hasAdminPermission } from '@/app/utils/admin-auth';
 
 export const runtime = 'nodejs';
-
-const ADMIN_HEADER = 'x-admin-key';
-
-function isAuthorized(request: NextRequest): boolean {
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  const adminKey = request.headers.get(ADMIN_HEADER);
-
-  if (expected && adminKey === expected) return true;
-
-  const steamId = getSteamIdFromRequest(request);
-  if (steamId && isOwner(steamId)) return true;
-
-  return false;
-}
 
 type PatchBody = {
   description?: string | null;
@@ -30,9 +15,8 @@ type PatchBody = {
 
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await getAdminAccess(request);
+    if (!hasAdminPermission(access, 'chat_commands')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
@@ -85,9 +69,8 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ slug:
 
 export async function DELETE(request: NextRequest, ctx: { params: Promise<{ slug: string }> | { slug: string } }) {
   try {
-    if (!isAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await getAdminAccess(request);
+    if (!hasAdminPermission(access, 'chat_commands')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 503 });

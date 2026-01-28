@@ -74,9 +74,7 @@ export default function ReportsPage() {
     const loadReports = async () => {
       setLoading(true);
       try {
-        const url = statusFilter === 'all' 
-          ? `/api/chat/report?adminSteamId=${user?.steamId}`
-          : `/api/chat/report?adminSteamId=${user?.steamId}&status=${statusFilter}`;
+        const url = statusFilter === 'all' ? '/api/chat/report' : `/api/chat/report?status=${statusFilter}`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -103,7 +101,6 @@ export default function ReportsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reportId,
-          adminSteamId: user?.steamId,
           status: newStatus,
           adminNotes: adminNotes || undefined,
         }),
@@ -118,9 +115,7 @@ export default function ReportsPage() {
         // Don't clear adminNotes if we're just updating status
         // setAdminNotes('');
         // Reload reports
-        const url = statusFilter === 'all' 
-          ? `/api/chat/report?adminSteamId=${user?.steamId}`
-          : `/api/chat/report?adminSteamId=${user?.steamId}&status=${statusFilter}`;
+        const url = statusFilter === 'all' ? '/api/chat/report' : `/api/chat/report?status=${statusFilter}`;
         const reloadRes = await fetch(url);
         if (reloadRes.ok) {
           const data = await reloadRes.json();
@@ -318,7 +313,6 @@ export default function ReportsPage() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             reportId: selectedReport.id,
-                            adminSteamId: user?.steamId,
                             status: selectedReport.status, // Keep current status
                             adminNotes: adminNotes || undefined,
                           }),

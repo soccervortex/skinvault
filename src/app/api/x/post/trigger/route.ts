@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
 import { createAutomatedXPostWithImage, getNextItemFromAllDatasets, getItemPrice } from '@/app/lib/inngest-functions';
 import { dbGet, dbSet } from '@/app/utils/database';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 /**
  * Manually trigger automated X posting
@@ -9,12 +10,7 @@ import { dbGet, dbSet } from '@/app/utils/database';
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { adminSteamId } = body;
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request as NextRequest)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Check if X posting is enabled
     const enabled = (await dbGet<boolean>('x_posting_enabled')) || false;
@@ -97,12 +93,7 @@ export async function POST(request: Request) {
  */
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request as NextRequest)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const enabled = (await dbGet<boolean>('x_posting_enabled')) || false;
     const lastPost = await dbGet<string>('x_posting_last_post');

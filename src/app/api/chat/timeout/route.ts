@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { isOwner } from '@/app/utils/owner-ids';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 const TIMEOUT_USERS_KEY = 'timeout_users';
 const TIMEOUT_REASONS_KEY = 'timeout_reasons';
@@ -16,24 +17,40 @@ const TIMEOUT_DURATIONS: Record<string, number> = {
   '1day': 24 * 60 * 60 * 1000,
 };
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { steamId, duration, adminSteamId } = body;
+function normalizeDurationKey(raw: unknown): string | null {
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (TIMEOUT_DURATIONS[s]) return s;
+  }
 
-    // Verify admin
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const minutes = Math.floor(n);
+  if (minutes <= 1) return '1min';
+  if (minutes <= 5) return '5min';
+  if (minutes <= 30) return '30min';
+  if (minutes <= 60) return '60min';
+  return '1day';
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (!steamId || !duration || !TIMEOUT_DURATIONS[duration]) {
+    const body = await request.json();
+    const { steamId } = body;
+    const durationKey = normalizeDurationKey(body?.duration ?? body?.minutes);
+
+    if (!steamId || !durationKey || !TIMEOUT_DURATIONS[durationKey]) {
       return NextResponse.json({ 
         error: 'Invalid parameters. Duration must be: 1min, 5min, 30min, 60min, or 1day' 
       }, { status: 400 });
     }
 
     const timeoutUsers = await dbGet<Record<string, string>>(TIMEOUT_USERS_KEY) || {};
-    const timeoutUntil = new Date(Date.now() + TIMEOUT_DURATIONS[duration]);
+    const timeoutUntil = new Date(Date.now() + TIMEOUT_DURATIONS[durationKey]);
     
     timeoutUsers[steamId] = timeoutUntil.toISOString();
     const success = await dbSet(TIMEOUT_USERS_KEY, timeoutUsers);
@@ -58,7 +75,7 @@ export async function POST(request: Request) {
         next[String(steamId)] = {
           reason,
           at: new Date().toISOString(),
-          by: adminSteamId ? String(adminSteamId) : null,
+          by: null,
         };
         await dbSet(TIMEOUT_REASONS_KEY, next);
       } catch {
@@ -77,7 +94,7 @@ export async function POST(request: Request) {
           reason
             ? `You have been timed out from chat until ${untilIso}. Reason: ${reason}`
             : `You have been timed out from chat until ${untilIso}.`,
-          { bySteamId: adminSteamId, timeoutUntil: untilIso, duration }
+          { bySteamId: null, timeoutUntil: untilIso, duration: durationKey }
         );
       }
     } catch {
@@ -85,7 +102,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: `User ${steamId} timed out for ${duration}`,
+      message: `User ${steamId} timed out for ${durationKey}`,
       timeoutUntil: timeoutUntil.toISOString(),
     });
   } catch (error) {
@@ -94,16 +111,14 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const steamId = searchParams.get('steamId');
-    const adminSteamId = searchParams.get('adminSteamId');
-
-    // Verify admin
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
+
+    const { searchParams } = new URL(request.url);
+    const steamId = searchParams.get('steamId');
 
     if (!steamId) {
       return NextResponse.json({ error: 'Missing steamId' }, { status: 400 });
@@ -130,7 +145,7 @@ export async function DELETE(request: Request) {
           'chat_timeout_removed',
           'Chat Timeout Removed',
           'Your chat timeout was removed. You can chat again.',
-          { bySteamId: adminSteamId }
+          { bySteamId: null }
         );
       }
     } catch {

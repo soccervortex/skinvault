@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
     })).toString('base64');
 
     // Discord OAuth2 scopes for user installs
-    // Using 'identify' and 'applications.commands' for user installs
+    // Include offline_access so we get a refresh token and can keep the connection alive.
     // integration_type=1 indicates this is a user install (not guild install)
-    const scopes = ['identify', 'applications.commands'];
+    const scopes = ['identify', 'applications.commands', 'offline_access'];
     
     console.log('[Discord Auth] Generating OAuth URL for user install with scopes:', scopes.join(' '));
     

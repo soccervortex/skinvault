@@ -1,18 +1,15 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { getAdminSteamId, isOwnerRequest } from '@/app/utils/admin-auth';
 
 const PINNED_MESSAGES_KEY = 'pinned_messages'; // Format: { "messageId": { messageType: 'global'|'dm', pinnedAt: Date, pinnedBy: steamId } }
 
 // POST: Pin a message
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    const adminSteamId = getAdminSteamId(request);
 
     const body = await request.json();
     const { messageId, messageType = 'global' } = body;
@@ -39,15 +36,9 @@ export async function POST(request: Request) {
 }
 
 // DELETE: Unpin a message
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
-
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     const { searchParams: bodyParams } = new URL(request.url);
     const messageId = bodyParams.get('messageId');
 

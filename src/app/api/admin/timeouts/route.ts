@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
 import { dbGet } from '@/app/utils/database';
-import { isOwner } from '@/app/utils/owner-ids';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 const TIMEOUT_USERS_KEY = 'timeout_users';
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-
-    // Verify admin
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request as any)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

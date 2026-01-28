@@ -131,9 +131,6 @@ export default function AdminSpinsPage() {
 
       const res = await fetch(`/api/admin/spins/history?${qs.toString()}`, {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const json = (await res.json().catch(() => null)) as ApiResponse | null;
       if (!res.ok || !json) throw new Error((json as any)?.error || 'Failed');
@@ -178,9 +175,6 @@ export default function AdminSpinsPage() {
 
       const res = await fetch(`/api/admin/spins/grants?${qs.toString()}`, {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const json = (await res.json().catch(() => null)) as GrantsResponse | null;
       if (!res.ok || !json) throw new Error((json as any)?.error || 'Failed');
@@ -224,7 +218,6 @@ export default function AdminSpinsPage() {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ steamId: normalizedSteamId, amount, reason: String(grantReason || '').trim() || undefined }),
       });
@@ -251,7 +244,6 @@ export default function AdminSpinsPage() {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ grantId, reason: String(reason || '').trim() || undefined }),
       });
@@ -278,7 +270,6 @@ export default function AdminSpinsPage() {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ spinId, reason: String(reason || '').trim() || undefined }),
       });

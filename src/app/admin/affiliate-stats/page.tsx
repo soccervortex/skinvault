@@ -174,9 +174,6 @@ export default function AffiliateStatsAdminPage() {
       params.set('rangeDays', rangeDays === 'all' ? 'all' : String(rangeDays));
 
       const res = await fetch(`/api/admin/affiliate-stats?${params.toString()}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
         cache: 'no-store',
       });
 
@@ -373,7 +370,6 @@ export default function AffiliateStatsAdminPage() {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
-                                'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
                               },
                               body: JSON.stringify({
                                 fromSteamId: from,

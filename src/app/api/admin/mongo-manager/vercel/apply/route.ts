@@ -1,15 +1,8 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 export const runtime = 'nodejs';
-
-const ADMIN_HEADER = 'x-admin-key';
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) return false;
-  return true;
-}
 
 function safeHostFromUri(uri: string): string | null {
   try {
@@ -20,8 +13,8 @@ function safeHostFromUri(uri: string): string | null {
   }
 }
 
-export async function POST(request: Request) {
-  if (!checkAuth(request)) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

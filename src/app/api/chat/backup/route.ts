@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
 import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays } from '@/app/utils/chat-collections';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 // Backup current chat messages before clearing
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { adminSteamId } = body;
-
-    // Verify admin
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 
     if (!hasChatMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
@@ -65,15 +60,9 @@ export async function POST(request: Request) {
 }
 
 // Get backup history (admin only)
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-
-    // Verify admin
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 
     if (!hasChatMongoConfig()) {
       return NextResponse.json({ backups: [] });

@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
-import { isOwner } from '@/app/utils/owner-ids';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Shield, Terminal, Trash2 } from 'lucide-react';
 
 type CommandDoc = {
@@ -17,9 +16,18 @@ type CommandDoc = {
   updatedAt?: string;
 };
 
+type Access = {
+  steamId: string | null;
+  isAdmin: boolean;
+  isOwner: boolean;
+  via: string;
+  permissions: string[];
+};
+
 export default function AdminCommandsPage() {
-  const [user, setUser] = useState<any>(null);
-  const userIsOwner = useMemo(() => isOwner(user?.steamId), [user?.steamId]);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [access, setAccess] = useState<Access | null>(null);
+  const [canUseCommands, setCanUseCommands] = useState(false);
 
   const [commands, setCommands] = useState<CommandDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,12 +41,33 @@ export default function AdminCommandsPage() {
   const [newEnabled, setNewEnabled] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = typeof window !== 'undefined' ? window.localStorage.getItem('steam_user') : null;
-      setUser(stored ? JSON.parse(stored) : null);
-    } catch {
-      setUser(null);
-    }
+    let cancelled = false;
+    const loadAccess = async () => {
+      setAccessLoading(true);
+      try {
+        const res = await fetch('/api/admin/access', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        const nextAccess = ((data as any)?.access || null) as Access | null;
+        const perms = Array.isArray((nextAccess as any)?.permissions) ? (nextAccess as any).permissions : [];
+        const via = String((nextAccess as any)?.via || 'none');
+        const allowed = via === 'owner' || perms.includes('*') || perms.includes('chat_commands');
+        if (!cancelled) {
+          setAccess(nextAccess);
+          setCanUseCommands(allowed);
+        }
+      } catch {
+        if (!cancelled) {
+          setAccess(null);
+          setCanUseCommands(false);
+        }
+      } finally {
+        if (!cancelled) setAccessLoading(false);
+      }
+    };
+    void loadAccess();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadCommands = async () => {
@@ -48,7 +77,6 @@ export default function AdminCommandsPage() {
       const res = await fetch('/api/admin/chat-commands', {
         cache: 'no-store',
         headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
           'Cache-Control': 'no-cache',
         },
       });
@@ -66,9 +94,9 @@ export default function AdminCommandsPage() {
   };
 
   useEffect(() => {
-    if (!userIsOwner) return;
+    if (!canUseCommands) return;
     void loadCommands();
-  }, [userIsOwner]);
+  }, [canUseCommands]);
 
   const updateCommand = async (slug: string, patch: Record<string, any>) => {
     setSaving(slug);
@@ -79,7 +107,6 @@ export default function AdminCommandsPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify(patch),
       });
@@ -111,9 +138,6 @@ export default function AdminCommandsPage() {
     try {
       const res = await fetch(`/api/admin/chat-commands/${encodeURIComponent(slug)}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -145,7 +169,6 @@ export default function AdminCommandsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ slug, description, response, enabled: newEnabled }),
       });
@@ -176,7 +199,16 @@ export default function AdminCommandsPage() {
     }
   };
 
-  if (!user) {
+  if (accessLoading) {
+    return (
+      <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <div className="flex-1 overflow-y-auto p-10 flex items-center justify-center text-gray-500 text-[11px]">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!access?.steamId) {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
@@ -185,7 +217,7 @@ export default function AdminCommandsPage() {
     );
   }
 
-  if (!userIsOwner) {
+  if (!canUseCommands) {
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
@@ -210,13 +242,13 @@ export default function AdminCommandsPage() {
           <header className="bg-[#11141d] p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] border border-white/5 shadow-2xl">
             <div className="flex items-start justify-between gap-6 flex-wrap">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Owner</p>
+                <p className="text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">{access?.isOwner ? 'Owner' : 'Admin'}</p>
                 <h1 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter">Commands</h1>
                 <p className="text-[11px] md:text-xs text-gray-400 mt-2">Create custom chat commands like /rules.</p>
               </div>
               <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-5 py-4 rounded-[1.5rem]">
                 <Shield className="text-emerald-400" size={18} />
-                <div className="text-[10px] uppercase tracking-widest font-black text-emerald-300">Owner only</div>
+                <div className="text-[10px] uppercase tracking-widest font-black text-emerald-300">{access?.isOwner ? 'Owner' : 'Admin'}</div>
               </div>
             </div>
           </header>

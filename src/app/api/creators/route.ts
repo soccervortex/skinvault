@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { dbDelete, dbGet, dbSet } from '@/app/utils/database';
-import { isOwner } from '@/app/utils/owner-ids';
 import { CREATORS, type CreatorProfile } from '@/data/creators';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 const CREATORS_KEY = 'creators_v1';
 
@@ -52,14 +53,9 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
 
@@ -97,15 +93,11 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
     const slug = String(url.searchParams.get('slug') || '').trim().toLowerCase();
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!slug) {
       return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
@@ -131,15 +123,11 @@ export async function DELETE(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
     const slug = String(url.searchParams.get('slug') || '').trim().toLowerCase();
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!slug) {
       return NextResponse.json({ error: 'Missing slug' }, { status: 400 });

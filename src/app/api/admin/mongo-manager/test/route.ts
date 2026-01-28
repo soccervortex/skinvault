@@ -1,8 +1,9 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
 const TESTS_KEY = 'admin_mongo_connection_tests';
 
 type TestResult = {
@@ -12,13 +13,6 @@ type TestResult = {
   error: string | null;
   checkedAt: string;
 };
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) return false;
-  return true;
-}
 
 function safeHostFromUri(uri: string): string | null {
   try {
@@ -40,8 +34,8 @@ async function readTests(): Promise<Record<string, TestResult>> {
   return raw && typeof raw === 'object' ? raw : {};
 }
 
-export async function POST(request: Request) {
-  if (!checkAuth(request)) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

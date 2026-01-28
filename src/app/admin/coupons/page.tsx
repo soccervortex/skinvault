@@ -132,7 +132,6 @@ export default function AdminCouponsPage() {
     try {
       const payload: any = {
         action: 'update',
-        steamId: user?.steamId,
         promoCodeId: editing.promoCodeId,
         name: editName,
         maxRedemptions: editMaxRedemptions,
@@ -148,7 +147,6 @@ export default function AdminCouponsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify(payload),
       });
@@ -182,12 +180,9 @@ export default function AdminCouponsPage() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/admin/coupons?steamId=${encodeURIComponent(String(user?.steamId || ''))}&includeLive=1`,
+        `/api/admin/coupons?includeLive=1`,
         {
           cache: 'no-store',
-          headers: {
-            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          },
         }
       );
       const json = await res.json().catch(() => null);
@@ -219,7 +214,6 @@ export default function AdminCouponsPage() {
     try {
       const payload: any = {
         action: 'create',
-        steamId: user?.steamId,
         code,
         name,
         singleUsePerUser,
@@ -239,7 +233,6 @@ export default function AdminCouponsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify(payload),
       });
@@ -277,9 +270,8 @@ export default function AdminCouponsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
-        body: JSON.stringify({ action: 'set_active', steamId: user?.steamId, promoCodeId, active: nextActive }),
+        body: JSON.stringify({ action: 'set_active', promoCodeId, active: nextActive }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -302,9 +294,8 @@ export default function AdminCouponsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
-        body: JSON.stringify({ action: 'delete', steamId: user?.steamId, promoCodeId }),
+        body: JSON.stringify({ action: 'delete', promoCodeId }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {

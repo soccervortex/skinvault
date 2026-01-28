@@ -83,7 +83,7 @@ export default function CreatorsIndexClient() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/creators?adminSteamId=${encodeURIComponent(adminSteamId)}`,
+      const res = await fetch('/api/creators',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -128,7 +128,7 @@ export default function CreatorsIndexClient() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/creators?adminSteamId=${encodeURIComponent(adminSteamId)}&slug=${encodeURIComponent(slug)}`,
+        `/api/creators?slug=${encodeURIComponent(slug)}`,
         { method: 'DELETE' }
       );
       const data = await res.json();

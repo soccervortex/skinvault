@@ -47,10 +47,6 @@ export default function AdminThemesPage() {
       const timestamp = Date.now();
       const res = await fetch(`/api/admin/themes?_t=${timestamp}`, {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          'Cache-Control': 'no-cache',
-        },
       });
       const data = await res.json().catch(() => null);
       if (res.ok) {
@@ -80,7 +76,6 @@ export default function AdminThemesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ theme, enabled }),
       });

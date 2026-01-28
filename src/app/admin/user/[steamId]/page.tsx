@@ -70,7 +70,7 @@ export default function UserManagementPage() {
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/admin/user/${steamId}?adminSteamId=${user?.steamId}&time=${timeFilter}&search=${encodeURIComponent(searchQuery)}`
+          `/api/admin/user/${steamId}?time=${timeFilter}&search=${encodeURIComponent(searchQuery)}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -136,7 +136,7 @@ export default function UserManagementPage() {
     setSelectedDMOtherUserId(otherUserId);
     try {
       const [steamId1, steamId2] = dmId.split('_');
-      const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}&currentUserId=${steamId}&adminSteamId=${user?.steamId}`);
+      const res = await fetch(`/api/chat/dms?steamId1=${steamId1}&steamId2=${steamId2}`);
       if (res.ok) {
         const data = await res.json();
         setSelectedDMMessages(data.messages || []);
@@ -160,14 +160,13 @@ export default function UserManagementPage() {
         body: JSON.stringify({
           steamId,
           duration: timeoutDuration,
-          adminSteamId: user?.steamId,
         }),
       });
 
       if (res.ok) {
         toast.success(`User timed out for ${timeoutDuration}`);
         // Reload user info
-        const reloadRes = await fetch(`/api/admin/user/${steamId}?adminSteamId=${user?.steamId}`);
+        const reloadRes = await fetch(`/api/admin/user/${steamId}`);
         if (reloadRes.ok) {
           const data = await reloadRes.json();
           setUserInfo(data.user);
@@ -189,18 +188,17 @@ export default function UserManagementPage() {
 
     setBanning(true);
     try {
-      const res = await fetch(`/api/admin/ban?steamId=${steamId}`, {
+      const res = await fetch(`/api/admin/ban`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
+        body: JSON.stringify({ steamId: String(steamId || '').trim() }),
       });
-
       if (res.ok) {
         toast.success('User has been banned');
         // Reload user info
-        const reloadRes = await fetch(`/api/admin/user/${steamId}?adminSteamId=${user?.steamId}`);
+        const reloadRes = await fetch(`/api/admin/user/${steamId}`);
         if (reloadRes.ok) {
           const data = await reloadRes.json();
           setUserInfo(data.user);
@@ -221,14 +219,14 @@ export default function UserManagementPage() {
     if (!steamId || !userIsOwner) return;
 
     try {
-      const res = await fetch(`/api/chat/timeout?steamId=${steamId}&adminSteamId=${user?.steamId}`, {
+      const res = await fetch(`/api/chat/timeout?steamId=${steamId}`, {
         method: 'DELETE',
       });
 
       if (res.ok) {
         toast.success('Timeout removed');
         // Reload user info
-        const reloadRes = await fetch(`/api/admin/user/${steamId}?adminSteamId=${user?.steamId}`);
+        const reloadRes = await fetch(`/api/admin/user/${steamId}`);
         if (reloadRes.ok) {
           const data = await reloadRes.json();
           setUserInfo(data.user);
@@ -263,7 +261,7 @@ export default function UserManagementPage() {
         toast.success('Message deleted');
         // Reload messages
         const reloadRes = await fetch(
-          `/api/admin/user/${steamId}?adminSteamId=${user?.steamId}&time=${timeFilter}&search=${encodeURIComponent(searchQuery)}`
+          `/api/admin/user/${steamId}?time=${timeFilter}&search=${encodeURIComponent(searchQuery)}`
         );
         if (reloadRes.ok) {
           const data = await reloadRes.json();
@@ -380,13 +378,10 @@ export default function UserManagementPage() {
                             try {
                               const res = await fetch(`/api/admin/ban?steamId=${steamId}`, {
                                 method: 'DELETE',
-                                headers: {
-                                  'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-                                },
                               });
                               if (res.ok) {
                                 toast.success('User unbanned');
-                                const reloadRes = await fetch(`/api/admin/user/${steamId}?adminSteamId=${user?.steamId}`);
+                                const reloadRes = await fetch(`/api/admin/user/${steamId}`);
                                 if (reloadRes.ok) {
                                   const data = await reloadRes.json();
                                   setUserInfo(data.user);

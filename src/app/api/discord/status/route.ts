@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getProUntil } from '@/app/utils/pro-storage';
 import { dbGet, dbSet, hasDiscordAccessServer } from '@/app/utils/database';
+import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
@@ -8,7 +8,11 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 // Helper to check if user has Discord access (Pro or consumable)
 async function hasDiscordAccess(steamId: string): Promise<boolean> {
   // Check Pro status
-  const proUntil = await getProUntil(steamId);
+  const data = (await dbGet<Record<string, string>>('pro_users', false)) || {};
+  let proUntil = data[steamId] || null;
+  if ((OWNER_STEAM_IDS as any).includes(steamId) && !proUntil) {
+    proUntil = '2999-01-01T00:00:00.000Z';
+  }
   const isPro = !!(proUntil && new Date(proUntil) > new Date());
   if (isPro) return true;
 
@@ -67,20 +71,52 @@ export async function GET(request: Request) {
     // Check if user has Discord access (Pro or consumable)
     const hasAccess = await hasDiscordAccess(steamId);
 
-    if (!hasAccess) {
-      return NextResponse.json({ 
-        connected: false, 
-        reason: 'Pro subscription or Discord access required',
-        requiresPro: true 
-      });
-    }
-
     const discordConnectionsKey = 'discord_connections';
-    const connections = await dbGet<Record<string, any>>(discordConnectionsKey) || {};
+    const connections = await dbGet<Record<string, any>>(discordConnectionsKey, false) || {};
     const connection = connections[steamId];
 
     if (!connection) {
-      return NextResponse.json({ connected: false, requiresPro: false });
+      if (!hasAccess) {
+        return NextResponse.json({
+          connected: false,
+          hasAccess: false,
+          reason: 'Pro subscription or Discord access required',
+          requiresPro: true,
+        });
+      }
+      return NextResponse.json({ connected: false, hasAccess: true, requiresPro: false });
+    }
+
+    // We consider the account "linked" as long as a Discord ID exists.
+    const discordId = String(connection.discordId || '').trim() || null;
+    const discordUsername = connection.discordUsername;
+    const discordAvatar = connection.discordAvatar;
+    const connectedAt = connection.connectedAt;
+
+    if (!discordId) {
+      if (!hasAccess) {
+        return NextResponse.json({
+          connected: false,
+          hasAccess: false,
+          reason: 'Pro subscription or Discord access required',
+          requiresPro: true,
+        });
+      }
+      return NextResponse.json({ connected: false, hasAccess: true, requiresPro: false });
+    }
+
+    // If the user doesn't currently have access, keep the link but report that access is missing.
+    if (!hasAccess) {
+      return NextResponse.json({
+        connected: true,
+        hasAccess: false,
+        reason: 'Pro subscription or Discord access required',
+        requiresPro: true,
+        discordId,
+        discordUsername,
+        discordAvatar,
+        connectedAt,
+      });
     }
 
     // Check if connection is expired
@@ -88,10 +124,18 @@ export async function GET(request: Request) {
       const refreshToken = String(connection.refreshToken || '').trim();
       const refreshed = refreshToken ? await refreshDiscordAccessToken(refreshToken) : null;
       if (!refreshed) {
-        // Remove expired connection if it can't be refreshed
-        delete connections[steamId];
-        await dbSet(discordConnectionsKey, connections);
-        return NextResponse.json({ connected: false, expired: true, requiresPro: false });
+        // Do not delete the stored link; just signal that a reconnect may be needed.
+        return NextResponse.json({
+          connected: true,
+          hasAccess: true,
+          requiresPro: false,
+          discordId,
+          discordUsername,
+          discordAvatar,
+          connectedAt,
+          tokenExpired: true,
+          needsReconnect: true,
+        });
       }
 
       connections[steamId] = {
@@ -104,6 +148,8 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         connected: true,
+        hasAccess: true,
+        requiresPro: false,
         discordId: connections[steamId].discordId,
         discordUsername: connections[steamId].discordUsername,
         discordAvatar: connections[steamId].discordAvatar,
@@ -113,10 +159,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       connected: true,
-      discordId: connection.discordId,
-      discordUsername: connection.discordUsername,
-      discordAvatar: connection.discordAvatar,
-      connectedAt: connection.connectedAt,
+      hasAccess: true,
+      requiresPro: false,
+      discordId,
+      discordUsername,
+      discordAvatar,
+      connectedAt,
     });
   } catch (error) {
     console.error('Discord status error:', error);

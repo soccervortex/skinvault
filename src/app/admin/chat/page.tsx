@@ -63,7 +63,7 @@ export default function AdminChatPage() {
     const loadChatControl = async () => {
       setLoadingChatControl(true);
       try {
-        const res = await fetch(`/api/admin/chat-control?adminSteamId=${user?.steamId}`);
+        const res = await fetch('/api/admin/chat-control');
         if (res.ok) {
           const data = await res.json();
           if (cancelled) return;
@@ -80,7 +80,7 @@ export default function AdminChatPage() {
       setAutomodLoading(true);
       setAutomodError(null);
       try {
-        const res = await fetch(`/api/admin/chat-automod?adminSteamId=${user?.steamId}`, { cache: 'no-store' });
+        const res = await fetch('/api/admin/chat-automod', { cache: 'no-store' });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error((data as any)?.error || 'Failed to load automod settings');
         const settings = (data as any)?.settings as ChatAutomodSettings;
@@ -117,7 +117,7 @@ export default function AdminChatPage() {
       setAutomodEventsLoading(true);
       setAutomodEventsError(null);
       try {
-        const res = await fetch(`/api/admin/chat-automod/events?adminSteamId=${user?.steamId}`, { cache: 'no-store' });
+        const res = await fetch('/api/admin/chat-automod/events', { cache: 'no-store' });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error((data as any)?.error || 'Failed to load automod events');
         if (!cancelled) setAutomodEvents(Array.isArray((data as any)?.events) ? (data as any).events : []);
@@ -168,11 +168,12 @@ export default function AdminChatPage() {
         bannedRegex: parseLines(automodBannedRegexText),
       };
 
-      const res = await fetch(`/api/admin/chat-automod?adminSteamId=${user.steamId}`, {
+      const res = await fetch('/api/admin/chat-automod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: next }),
       });
+      
 
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as any)?.error || 'Failed to save automod settings');
@@ -190,7 +191,7 @@ export default function AdminChatPage() {
     setChatControlError(null);
 
     try {
-      const res = await fetch(`/api/admin/chat-control?adminSteamId=${user?.steamId}`, {
+      const res = await fetch('/api/admin/chat-control', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -238,7 +239,6 @@ export default function AdminChatPage() {
         body: JSON.stringify({
           steamId,
           duration: quickTimeoutDuration,
-          adminSteamId: user.steamId,
           timeoutReason: 'Admin panel',
         }),
       });
@@ -253,7 +253,7 @@ export default function AdminChatPage() {
   const quickUntimeout = async (steamId: string) => {
     if (!user?.steamId || !steamId) return;
     try {
-      const res = await fetch(`/api/chat/timeout?steamId=${steamId}&adminSteamId=${user.steamId}`, {
+      const res = await fetch(`/api/chat/timeout?steamId=${steamId}`, {
         method: 'DELETE',
       });
       const data = await res.json().catch(() => null);
@@ -271,9 +271,8 @@ export default function AdminChatPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
-        body: JSON.stringify({ steamId, bannedBy: user?.steamId || null, reason: 'Admin panel' }),
+        body: JSON.stringify({ steamId, reason: 'Admin panel' }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as any)?.error || 'Failed to ban user');
@@ -286,11 +285,8 @@ export default function AdminChatPage() {
   const quickUnban = async (steamId: string) => {
     if (!steamId) return;
     try {
-      const res = await fetch(`/api/admin/ban?steamId=${steamId}&unbannedBy=${encodeURIComponent(String(user?.steamId || ''))}`, {
+      const res = await fetch(`/api/admin/ban?steamId=${steamId}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as any)?.error || 'Failed to unban user');
@@ -303,7 +299,7 @@ export default function AdminChatPage() {
   const clearAutomodEvents = async () => {
     if (!user?.steamId || !userIsOwner) return;
     try {
-      const res = await fetch(`/api/admin/chat-automod/events?adminSteamId=${user.steamId}`, {
+      const res = await fetch('/api/admin/chat-automod/events', {
         method: 'DELETE',
       });
       const data = await res.json().catch(() => null);

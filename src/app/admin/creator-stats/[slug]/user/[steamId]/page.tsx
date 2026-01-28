@@ -132,12 +132,7 @@ export default function CreatorUserStatsPage() {
         qs.set('steamId', steamId);
         qs.set('range', range);
 
-        const res = await fetch(`/api/admin/creator-user-stats?${qs.toString()}`, {
-          headers: {
-            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          },
-          cache: 'no-store',
-        });
+        const res = await fetch(`/api/admin/creator-user-stats?${qs.toString()}`, { cache: 'no-store' });
 
         const json = (await res.json().catch(() => null)) as ApiResponse | null;
         if (!res.ok || !json) {
@@ -173,7 +168,6 @@ export default function CreatorUserStatsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           mode,
@@ -219,7 +213,6 @@ export default function CreatorUserStatsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           steamId,
@@ -247,7 +240,6 @@ export default function CreatorUserStatsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           steamId,

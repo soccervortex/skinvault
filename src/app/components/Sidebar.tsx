@@ -28,6 +28,7 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [canSeeAdminPanel, setCanSeeAdminPanel] = useState(false);
   const didTrySessionHydrationRef = useRef(false);
   const lastSessionValidationAtRef = useRef(0);
   const sessionValidationInFlightRef = useRef(false);
@@ -175,6 +176,34 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAccess = async () => {
+      try {
+        const owner = isOwner(user?.steamId);
+        if (owner) {
+          if (!cancelled) setCanSeeAdminPanel(true);
+          return;
+        }
+        if (!user?.steamId) {
+          if (!cancelled) setCanSeeAdminPanel(false);
+          return;
+        }
+
+        const res = await fetchWithTimeout('/api/admin/access', { cache: 'no-store' }, 5000);
+        const data = await res.json().catch(() => null);
+        const isAdmin = (data as any)?.access?.isAdmin === true;
+        if (!cancelled) setCanSeeAdminPanel(isAdmin);
+      } catch {
+        if (!cancelled) setCanSeeAdminPanel(isOwner(user?.steamId));
+      }
+    };
+    void loadAccess();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.steamId]);
 
   // Sync theme state (works for logged in and not logged in users)
   useEffect(() => {
@@ -550,11 +579,11 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
                 <Mail size={16} /> Contact
               </Link>
-              <Link href="/report-item" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
-                <AlertTriangle size={16} /> Report Item
+              <Link href="/report" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report">
+                <AlertTriangle size={16} /> Report
               </Link>
 
-              {isOwner(user?.steamId) && (
+              {canSeeAdminPanel && (
                   <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname?.startsWith('/admin') ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-300 hover:text-white'}`}> 
                     <Shield size={16} /> Admin Panel
                   </Link>
@@ -789,8 +818,8 @@ export default function Sidebar({ categories, activeCat, setActiveCat }: any) {
           <Link href="/contact" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/contact' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:text-white'}`} aria-label="Contact">
             <Mail size={16} /> Contact
           </Link>
-          <Link href="/report-item" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report-item' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report Missing Item">
-            <AlertTriangle size={16} /> Report Item
+          <Link href="/report" className={`flex items-center gap-4 px-6 py-4 min-h-[44px] rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${pathname === '/report' ? 'bg-yellow-600 text-white shadow-xl shadow-yellow-600/20' : 'text-yellow-400 hover:text-yellow-300'}`} aria-label="Report">
+            <AlertTriangle size={16} /> Report
           </Link>
 
           {isOwner(user?.steamId) && (

@@ -1,20 +1,16 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
 import { DEFAULT_CHAT_AUTOMOD_SETTINGS, coerceChatAutomodSettings } from '@/app/utils/chat-automod';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 const SETTINGS_KEY = 'chat_automod_settings';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const raw = (await dbGet<any>(SETTINGS_KEY, false)) ?? null;
     const settings = coerceChatAutomodSettings(raw || DEFAULT_CHAT_AUTOMOD_SETTINGS);
@@ -26,14 +22,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json().catch(() => null);
     if (!body) {

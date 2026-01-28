@@ -10,25 +10,16 @@ import {
   notifyChatReport,
   notifyItemReport,
 } from '@/app/utils/discord-webhook';
-
-const ADMIN_HEADER = 'x-admin-key';
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) {
-    return false;
-  }
-  return true;
-}
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 /**
  * Test endpoint to verify all Discord webhooks are working
  * GET /api/admin/test-webhooks?adminKey=YOUR_ADMIN_KEY
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    if (!checkAuth(request)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

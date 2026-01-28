@@ -75,6 +75,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
   const fetchingRef = useRef<string | null>(null); // Track which DM is currently being fetched
+  const lastGlobalResyncAtRef = useRef<number>(0);
   
   // Optimistic state for global messages using useOptimistic
   const [optimisticMessages, addOptimisticMessage] = useOptimistic(
@@ -338,7 +339,7 @@ export default function ChatPage() {
         const stored = window.localStorage.getItem('steam_user');
         const currentUser = stored ? JSON.parse(stored) : null;
         if (isAdmin && currentUser?.steamId) {
-          const res = await fetch(`/api/admin/chat-control?adminSteamId=${currentUser.steamId}`);
+          const res = await fetch('/api/admin/chat-control');
       if (res.ok) {
         const data = await res.json();
             setGlobalChatDisabled(data.globalChatDisabled || false);
@@ -479,10 +480,8 @@ export default function ChatPage() {
       const params = new URLSearchParams({
         steamId1,
         steamId2,
-        currentUserId: user.steamId,
         limit: '100', // Load more messages initially
       });
-      if (isAdmin) params.set('adminSteamId', user.steamId);
       if (loadAll) {
         params.set('loadAll', 'true');
       } else {
@@ -680,8 +679,11 @@ export default function ChatPage() {
     // Only poll if SSE is not connected OR filters/search are active
     const interval = setInterval(() => {
       if (activeTab === 'global') {
-        const shouldPoll = !globalStream.isConnected || searchQuery || filterUser || filterDateFrom || filterDateTo || filterPinnedOnly || filterProOnly;
-        if (shouldPoll && !globalChatDisabled) {
+        const isVisible = typeof document === 'undefined' ? true : document.visibilityState === 'visible';
+        const shouldResync = globalStream.isConnected && (Date.now() - lastGlobalResyncAtRef.current > 60000);
+        const shouldPoll = !globalStream.isConnected || shouldResync || searchQuery || filterUser || filterDateFrom || filterDateTo || filterPinnedOnly || filterProOnly;
+        if (isVisible && shouldPoll && !globalChatDisabled) {
+          lastGlobalResyncAtRef.current = Date.now();
           fetchMessages(null, false); // Reset cursor, load from beginning
         }
       } else {
@@ -1502,7 +1504,6 @@ export default function ChatPage() {
         body: JSON.stringify({
           steamId: timeoutUser.steamId,
           duration: timeoutDuration,
-          adminSteamId: user?.steamId,
         }),
       });
 
@@ -1529,10 +1530,7 @@ export default function ChatPage() {
     try {
       const res = await fetch(`/api/admin/ban?steamId=${banUser.steamId}`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (res.ok) {
@@ -1558,10 +1556,6 @@ export default function ChatPage() {
     try {
       const res = await fetch(`/api/admin/ban?steamId=${unbanUser.steamId}`, {
         method: 'DELETE',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
 
       if (res.ok) {
@@ -1665,7 +1659,7 @@ export default function ChatPage() {
     if (!isAdmin || !user?.steamId) return;
 
     try {
-      const res = await fetch(`/api/admin/chat/pin?adminSteamId=${user.steamId}`, {
+      const res = await fetch('/api/admin/chat/pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messageId, messageType }),
@@ -1693,7 +1687,7 @@ export default function ChatPage() {
     if (!isAdmin || !user?.steamId) return;
 
     try {
-      const res = await fetch(`/api/admin/chat/pin?adminSteamId=${user.steamId}&messageId=${messageId}`, {
+      const res = await fetch(`/api/admin/chat/pin?messageId=${messageId}`, {
         method: 'DELETE',
       });
 

@@ -185,8 +185,8 @@ export default function ShopPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 items-stretch">
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 items-stretch">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
                   <p className="text-lg font-black">500 Credits</p>
@@ -210,7 +210,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Value</p>
                   <p className="text-lg font-black">1500 Credits</p>
@@ -234,7 +234,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Mega</p>
                   <p className="text-lg font-black">4000 Credits</p>
@@ -258,7 +258,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Giant</p>
                   <p className="text-lg font-black">10000 Credits</p>
@@ -282,7 +282,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Whale</p>
                   <p className="text-lg font-black">30000 Credits</p>
@@ -306,7 +306,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Titan</p>
                   <p className="text-lg font-black">50000 Credits</p>
@@ -330,7 +330,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Legend</p>
                   <p className="text-lg font-black">75000 Credits</p>
@@ -370,8 +370,8 @@ export default function ShopPage() {
               Spins are added as bonus spins and can be used after your daily spin limit.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 items-stretch">
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 items-stretch">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Starter</p>
                   <p className="text-lg font-black">5 Spins</p>
@@ -395,7 +395,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Value</p>
                   <p className="text-lg font-black">15 Spins</p>
@@ -419,7 +419,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Mega</p>
                   <p className="text-lg font-black">40 Spins</p>
@@ -443,7 +443,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Giant</p>
                   <p className="text-lg font-black">100 Spins</p>
@@ -467,7 +467,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Whale</p>
                   <p className="text-lg font-black">300 Spins</p>
@@ -491,7 +491,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Titan</p>
                   <p className="text-lg font-black">500 Spins</p>
@@ -515,7 +515,7 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col h-full">
+              <div className="bg-black/30 border border-white/10 hover:border-white/20 rounded-xl p-4 flex flex-col h-full transition-all">
                 <div className="space-y-0.5">
                   <p className="text-[9px] uppercase tracking-[0.3em] text-gray-500 font-black">Legend</p>
                   <p className="text-lg font-black">750 Spins</p>

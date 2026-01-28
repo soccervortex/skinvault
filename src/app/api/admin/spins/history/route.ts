@@ -5,8 +5,7 @@ import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { isOwner, OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 import { readCreators } from '@/app/api/creators/route';
 import { getProUntil } from '@/app/utils/pro-storage';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { getAdminAccess, hasAdminPermission } from '@/app/utils/admin-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -157,16 +156,12 @@ async function getRoleAndLimit(steamId: string): Promise<{ role: 'owner' | 'crea
 }
 
 export async function GET(request: NextRequest) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
+  const access = await getAdminAccess(request);
+  if (!access.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!hasAdminPermission(access, 'spins')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  if (expected && adminKey !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const requesterSteamId = getSteamIdFromRequest(request);
+  const requesterSteamId = access.steamId;
   if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!isOwner(requesterSteamId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   if (!hasMongoConfig()) {
     return NextResponse.json(

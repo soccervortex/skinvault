@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createHash, randomBytes } from 'crypto';
 
-import { isAdminRequest, getAdminSteamId } from '@/app/utils/admin-auth';
+import { isOwnerRequest, getAdminSteamId } from '@/app/utils/admin-auth';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { resolveVoucherSku } from '@/app/utils/voucher-skus';
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  if (!isAdminRequest(req)) {
+  if (!isOwnerRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

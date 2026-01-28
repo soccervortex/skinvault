@@ -1,19 +1,15 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
 import { dbGet, dbSet } from '@/app/utils/database';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 const X_POSTING_ENABLED_KEY = 'x_posting_enabled';
 const X_POSTING_LAST_POST_KEY = 'x_posting_last_post';
 
 // GET: Get X posting status
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const enabled = (await dbGet<boolean>(X_POSTING_ENABLED_KEY)) || false;
     const lastPost = await dbGet<string>(X_POSTING_LAST_POST_KEY);
@@ -29,14 +25,9 @@ export async function GET(request: Request) {
 }
 
 // POST: Update X posting status
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
     const { enabled } = body;
@@ -57,12 +48,13 @@ export async function POST(request: Request) {
         // Await the response to catch errors
         try {
           console.log('[X Posting] Triggering test post to:', `${baseUrl}/api/x/post/test`);
+          const cookie = request.headers.get('cookie') || '';
           const testPostResponse = await fetch(`${baseUrl}/api/x/post/test`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...(cookie ? { cookie } : {}),
             },
-            body: JSON.stringify({ adminSteamId }),
           });
           
           const testPostData = await testPostResponse.json();

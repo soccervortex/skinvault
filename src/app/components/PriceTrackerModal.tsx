@@ -160,7 +160,10 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
   }, [isOpen, onClose]);
 
   const handleCreate = async () => {
-    if (!user?.steamId || !targetPrice || !discordStatus?.connected) return;
+    if (!user?.steamId || !targetPrice) return;
+    if (!discordStatus?.connected) return;
+    if (discordStatus?.needsReconnect) return;
+    if (discordStatus?.hasAccess === false) return;
 
     setCreating(true);
     try {
@@ -298,12 +301,33 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
                   <span className="text-[9px] font-black uppercase tracking-widest">Checking Discord...</span>
                 </div>
               ) : discordStatus?.connected ? (
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <CheckCircle2 size={12} />
-                  <span className="text-[9px] font-black uppercase tracking-widest">
-                    Discord: {discordStatus.discordUsername}
-                  </span>
-                </div>
+                discordStatus?.needsReconnect ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <MessageSquare size={12} />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Discord needs reconnect</span>
+                    </div>
+                    <button
+                      onClick={handleConnectDiscord}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <MessageSquare size={12} />
+                      Reconnect Discord
+                    </button>
+                  </div>
+                ) : discordStatus?.hasAccess === false ? (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <MessageSquare size={12} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Discord linked (Pro required)</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <CheckCircle2 size={12} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">
+                      Discord: {discordStatus.discordUsername}
+                    </span>
+                  </div>
+                )
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-gray-500">
@@ -328,10 +352,10 @@ export default function PriceTrackerModal({ isOpen, onClose, item, user, isPro, 
                 Please sign in with Steam to create price trackers
               </p>
             </div>
-          ) : !discordStatus?.connected ? (
+          ) : (!discordStatus?.connected || discordStatus?.needsReconnect) ? (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
               <p className="text-[10px] text-blue-400">
-                Connect Discord to receive price alerts via DM
+                {discordStatus?.needsReconnect ? 'Reconnect Discord to receive price alerts via DM' : 'Connect Discord to receive price alerts via DM'}
               </p>
             </div>
           ) : (

@@ -13,17 +13,14 @@ import {
   createFeatureAnnouncementPost,
   checkForMilestonesOrAlerts,
 } from '@/app/lib/x-post-types';
+import type { NextRequest } from 'next/server';
+import { getAdminAccess, hasAdminPermission } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await getAdminAccess(request);
+    if (!access.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!hasAdminPermission(access, 'x_post')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await request.json();
     const { postType } = body; // 'weekly', 'monthly', 'giveaways', 'test', 'daily', 'milestone', or 'new_user'
@@ -115,14 +112,11 @@ export async function POST(request: Request) {
 }
 
 // GET: Get date ranges and post statistics
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const access = await getAdminAccess(request);
+    if (!access.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!hasAdminPermission(access, 'x_post')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const now = new Date();
     const currentYear = now.getFullYear();

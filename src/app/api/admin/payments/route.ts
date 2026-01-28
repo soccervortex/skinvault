@@ -4,7 +4,7 @@ import { dbGet, dbSet } from '@/app/utils/database';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
-import { isAdminRequest } from '@/app/utils/admin-auth';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 import Stripe from 'stripe';
 
 type PaymentStatus = 'paid' | 'payment_failed' | 'expired' | 'unfulfilled' | 'unknown';
@@ -412,7 +412,7 @@ async function patchFailed(id: string, patch: Record<string, any>) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const url = new URL(request.url);
@@ -696,7 +696,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await request.json().catch(() => ({}));

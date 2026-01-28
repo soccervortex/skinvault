@@ -1,20 +1,16 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/app/utils/mongodb-client';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 // Get all item reports
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Optional admin check (can be removed if not needed)
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-    
-    // Only check if ADMIN_PRO_TOKEN is set
-    if (expected && adminKey !== expected) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Optional admin check (can be removed if not needed)
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
 
@@ -42,12 +38,9 @@ export async function GET(request: Request) {
 }
 
 // Update report status
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -87,12 +80,9 @@ export async function PATCH(request: Request) {
 }
 
 // Delete report
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-
-    if (expected && adminKey !== expected) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

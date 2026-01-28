@@ -59,10 +59,6 @@ export default function AdminPluginsPage() {
     try {
       const res = await fetch('/api/admin/plugins', {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          'Cache-Control': 'no-cache',
-        },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -92,7 +88,6 @@ export default function AdminPluginsPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify(patch),
       });
@@ -125,9 +120,6 @@ export default function AdminPluginsPage() {
     try {
       const res = await fetch(`/api/admin/plugins/${encodeURIComponent(slug)}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -165,7 +157,6 @@ export default function AdminPluginsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ slug, name, type: newType, enabled: newEnabled, config }),
       });

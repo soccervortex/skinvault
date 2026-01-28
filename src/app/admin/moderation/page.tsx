@@ -37,7 +37,7 @@ export default function AdminModerationPage() {
     if (!userIsOwner) return;
     setLoadingTimeouts(true);
     try {
-      const res = await fetch(`/api/admin/timeouts?adminSteamId=${encodeURIComponent(String(user?.steamId || ''))}`);
+      const res = await fetch('/api/admin/timeouts');
       if (res.ok) {
         const data = await res.json().catch(() => null);
         setTimeouts(Array.isArray((data as any)?.timeouts) ? (data as any).timeouts : []);
@@ -71,11 +71,7 @@ export default function AdminModerationPage() {
     setLoadingBanStatus(true);
     setBanStatus(null);
     try {
-      const res = await fetch(`/api/admin/ban?steamId=${encodeURIComponent(id)}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
-      });
+      const res = await fetch(`/api/admin/ban?steamId=${encodeURIComponent(id)}`);
       const data = await res.json().catch(() => null);
       if (res.ok) {
         setBanStatus({ steamId: id, banned: (data as any)?.banned === true });
@@ -97,7 +93,6 @@ export default function AdminModerationPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ steamId: banStatus.steamId }),
       });
@@ -121,9 +116,6 @@ export default function AdminModerationPage() {
     try {
       const res = await fetch(`/api/admin/ban?steamId=${encodeURIComponent(banStatus.steamId)}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const data = await res.json().catch(() => null);
       if (res.ok) {
@@ -143,7 +135,7 @@ export default function AdminModerationPage() {
     const sid = String(steamId || '').trim();
     if (!sid) return;
     try {
-      const res = await fetch(`/api/chat/timeout?steamId=${encodeURIComponent(sid)}&adminSteamId=${encodeURIComponent(String(user?.steamId || ''))}`, {
+      const res = await fetch(`/api/chat/timeout?steamId=${encodeURIComponent(sid)}`, {
         method: 'DELETE',
       });
       if (res.ok) {

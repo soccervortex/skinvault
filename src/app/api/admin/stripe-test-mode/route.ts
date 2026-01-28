@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 import { dbGet, dbSet } from '@/app/utils/database';
-import { isAdminRequest } from '@/app/utils/admin-auth';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 const TEST_MODE_KEY = 'stripe_test_mode';
 
 // GET: Get test mode status
 export async function GET(request: NextRequest) {
   try {
-    if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     try {
       const testMode = await dbGet<boolean>(TEST_MODE_KEY);
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 // POST: Set test mode status
 export async function POST(request: NextRequest) {
   try {
-    if (!isAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json().catch(() => null);
     if (!body) {

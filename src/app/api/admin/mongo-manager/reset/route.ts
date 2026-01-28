@@ -1,7 +1,7 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { closeConnection, getCachedMongoUri } from '@/app/utils/mongodb-client';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 function safeHostFromUri(uri: string): string | null {
   try {
@@ -12,15 +12,8 @@ function safeHostFromUri(uri: string): string | null {
   }
 }
 
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) return false;
-  return true;
-}
-
-export async function POST(request: Request) {
-  if (!checkAuth(request)) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

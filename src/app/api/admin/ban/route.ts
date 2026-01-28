@@ -6,16 +6,18 @@ import { notifyUserBan, notifyUserUnban } from '@/app/utils/discord-webhook';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
 
-import { isAdminRequest } from '@/app/utils/admin-auth';
+import { getAdminSteamId, isOwnerRequest } from '@/app/utils/admin-auth';
 
 const BANNED_KEY = 'banned_steam_ids';
 const BAN_REASONS_KEY = 'ban_reasons';
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isAdminRequest(request)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const adminSteamId = getAdminSteamId(request);
 
     // Check if user is owner
     const url = new URL(request.url);
@@ -33,8 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const reason = String(body?.reason || '').trim();
-    const bySteamIdRaw = String(body?.bannedBy || '').trim();
-    const bySteamId = /^\d{17}$/.test(bySteamIdRaw) ? bySteamIdRaw : null;
+    const bySteamId = adminSteamId;
 
     // Store banned Steam IDs (uses database abstraction - KV + MongoDB)
     try {
@@ -44,8 +45,7 @@ export async function POST(request: NextRequest) {
         await dbSet(BANNED_KEY, banned);
         
         // Send Discord notification for user ban
-        const bannedBy = body?.bannedBy as string | undefined;
-        notifyUserBan(steamId, bannedBy).catch(error => {
+        notifyUserBan(steamId, adminSteamId || undefined).catch(error => {
           console.error('Failed to send ban notification:', error);
         });
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
           next[steamId] = {
             reason,
             at: new Date().toISOString(),
-            by: body?.bannedBy ? String(body.bannedBy) : null,
+            by: adminSteamId,
           };
           await dbSet(BAN_REASONS_KEY, next);
         } catch {
@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
 }
 
 // GET: Check if Steam ID is banned
-export async function GET(request: Request) {
-  if (!isAdminRequest(request as any)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(request: NextRequest) {
+  if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const url = new URL(request.url);
@@ -116,10 +116,11 @@ export async function GET(request: Request) {
 }
 
 // DELETE: Unban a Steam ID
-export async function DELETE(request: Request) {
-  if (!isAdminRequest(request as any)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function DELETE(request: NextRequest) {
+  if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const adminSteamId = getAdminSteamId(request);
     const url = new URL(request.url);
     const rawSteamId = url.searchParams.get('steamId');
     const steamId = rawSteamId ? sanitizeSteamId(rawSteamId) : null;
@@ -144,17 +145,14 @@ export async function DELETE(request: Request) {
       
       // Send Discord notification for user unban
       if (wasBanned) {
-        const url = new URL(request.url);
-        const unbannedBy = url.searchParams.get('unbannedBy') || undefined;
-        notifyUserUnban(steamId, unbannedBy).catch(error => {
+        notifyUserUnban(steamId, adminSteamId || undefined).catch(error => {
           console.error('Failed to send unban notification:', error);
         });
 
         try {
           if (hasMongoConfig()) {
             const db = await getDatabase();
-            const byRaw = String(unbannedBy || '').trim();
-            const bySteamId = /^\d{17}$/.test(byRaw) ? byRaw : null;
+            const bySteamId = adminSteamId;
             await createUserNotification(
               db,
               steamId,

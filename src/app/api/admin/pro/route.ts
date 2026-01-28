@@ -1,24 +1,15 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { grantPro, getProUntil, getAllProUsers } from '@/app/utils/pro-storage';
 import { sanitizeSteamId } from '@/app/utils/sanitize';
 import { notifyNewProUser } from '@/app/utils/discord-webhook';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { createUserNotification } from '@/app/utils/user-notifications';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) {
-    return false;
-  }
-  return true;
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    if (!checkAuth(request)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -76,7 +67,7 @@ export async function POST(request: Request) {
 // DELETE: Remove Pro status
 export async function DELETE(request: Request) {
   try {
-    if (!checkAuth(request)) {
+    if (!isOwnerRequest(request as any)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -131,7 +122,7 @@ export async function DELETE(request: Request) {
 // PATCH: Edit Pro status (set specific expiry date)
 export async function PATCH(request: Request) {
   try {
-    if (!checkAuth(request)) {
+    if (!isOwnerRequest(request as any)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

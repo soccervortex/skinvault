@@ -6,6 +6,9 @@ import { getChatDatabase } from '@/app/utils/mongodb-client';
 import Pusher from 'pusher';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
+import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 
 interface DMMessage {
   _id?: string;
@@ -31,27 +34,23 @@ function generateDMId(steamId1: string, steamId2: string): string {
 }
 
 // GET: Get DM messages for a specific DM
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const steamId1 = searchParams.get('steamId1');
     const steamId2 = searchParams.get('steamId2');
-    const currentUserId = searchParams.get('currentUserId'); // Current user making the request
-    const adminSteamId = searchParams.get('adminSteamId');
 
     if (!steamId1 || !steamId2) {
       return NextResponse.json({ error: 'Missing steamId1 or steamId2' }, { status: 400 });
     }
 
-    // Check if admin is trying to view someone else's DM
-    const { isOwner } = await import('@/app/utils/owner-ids');
-    const isAdmin = adminSteamId && isOwner(adminSteamId);
-    
-    // Verify current user is a participant in this DM (or admin)
-    // If admin, allow access without currentUserId requirement
-    const isParticipant = currentUserId && (steamId1 === currentUserId || steamId2 === currentUserId);
+    const sessionSteamId = getSteamIdFromRequest(request);
+    if (!sessionSteamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Admins can view any DM, participants can view their own DMs
+    const isAdmin = isOwnerRequest(request);
+    const isParticipant = steamId1 === sessionSteamId || steamId2 === sessionSteamId;
     if (!isAdmin && !isParticipant) {
       return NextResponse.json({ error: 'Unauthorized - you are not a participant in this DM' }, { status: 403 });
     }

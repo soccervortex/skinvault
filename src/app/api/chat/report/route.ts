@@ -4,6 +4,8 @@ import { dbGet } from '@/app/utils/database';
 import { getChatDatabase, hasChatMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 import { notifyChatReport } from '@/app/utils/discord-webhook';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 interface Report {
   _id?: string;
@@ -153,15 +155,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ reports: [] });
     }
 
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-    const status = searchParams.get('status'); // 'pending', 'reviewed', 'resolved', or null for all
-
-    // Verify admin
-    const { isOwner } = await import('@/app/utils/owner-ids');
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request as NextRequest)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status'); // 'pending', 'reviewed', 'resolved', or null for all
 
     const db = await getChatDatabase();
     const reportsCollection = db.collection<Report>('chat_reports');
@@ -207,14 +206,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const body = await request.json();
-    const { reportId, adminSteamId, status, adminNotes } = body;
-
-    // Verify admin
-    const { isOwner } = await import('@/app/utils/owner-ids');
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request as NextRequest)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
+
+    const body = await request.json();
+    const { reportId, status, adminNotes } = body;
 
     if (!reportId || !status) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

@@ -45,11 +45,7 @@ export default function XPostAdminPage() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/x-post/manual', {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
-      });
+      const res = await fetch('/api/admin/x-post/manual');
 
       if (res.ok) {
         const data = await res.json();
@@ -79,7 +75,6 @@ export default function XPostAdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ postType }),
       });

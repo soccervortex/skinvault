@@ -221,9 +221,6 @@ export default function AdminDatabasesPage() {
     try {
       const res = await fetch('/api/admin/mongo-manager/status', {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed to load status');
@@ -244,7 +241,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           dryRun,
@@ -275,7 +271,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           dryRun,
@@ -300,9 +295,6 @@ export default function AdminDatabasesPage() {
     try {
       const res = await fetch('/api/admin/mongo-manager/reset', {
         method: 'POST',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
@@ -324,7 +316,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ envKey }),
       });
@@ -349,7 +340,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ envKey }),
       });
@@ -382,7 +372,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ idx, uri }),
       });
@@ -406,9 +395,6 @@ export default function AdminDatabasesPage() {
     try {
       const res = await fetch(`/api/admin/mongo-manager/pending?envKey=${encodeURIComponent(envKey)}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
@@ -442,7 +428,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ idx, uri, target }),
       });
@@ -467,7 +452,6 @@ export default function AdminDatabasesPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
           },
           body: JSON.stringify({ idx, uri }),
         });
@@ -505,7 +489,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ envKey, collection, confirm }),
       });
@@ -537,7 +520,6 @@ export default function AdminDatabasesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ envKey, confirm }),
       });

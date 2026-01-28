@@ -31,7 +31,7 @@ export default function AdminXPostingPage() {
     if (!userIsOwner) return;
     setLoadingXPosting(true);
     try {
-      const res = await fetch(`/api/admin/x-posting?adminSteamId=${encodeURIComponent(String(user?.steamId || ''))}`);
+      const res = await fetch('/api/admin/x-posting');
       if (res.ok) {
         const data = await res.json().catch(() => null);
         setXPostingEnabled((data as any)?.enabled || false);
@@ -57,7 +57,7 @@ export default function AdminXPostingPage() {
     setXPostingMessage(null);
 
     try {
-      const res = await fetch(`/api/admin/x-posting?adminSteamId=${encodeURIComponent(String(user?.steamId || ''))}`, {
+      const res = await fetch('/api/admin/x-posting', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,6 @@ export default function AdminXPostingPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ adminSteamId: user?.steamId }),
       });
 
       const data = await res.json().catch(() => null);
@@ -114,7 +113,7 @@ export default function AdminXPostingPage() {
       } else {
         setXPostingMessage(`Post created successfully! ${(data as any)?.postUrl ? `View: ${(data as any).postUrl}` : ''}`);
         setXPostingLastPost(new Date().toISOString());
-        const statusRes = await fetch(`/api/x/post/trigger?adminSteamId=${encodeURIComponent(String(user?.steamId || ''))}`);
+        const statusRes = await fetch('/api/x/post/trigger');
         const statusData = await statusRes.json().catch(() => null);
         if (statusRes.ok) {
           setXPostingStatus(statusData);

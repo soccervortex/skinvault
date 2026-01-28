@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
-import { isOwner } from '@/app/utils/owner-ids';
+import type { NextRequest } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
 const GLOBAL_CHAT_DISABLED_KEY = 'global_chat_disabled';
 const DM_CHAT_DISABLED_KEY = 'dm_chat_disabled';
 
 // GET: Get chat control status
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -30,12 +27,9 @@ export async function GET(request: Request) {
 }
 
 // POST: Update chat control status
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const adminSteamId = url.searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

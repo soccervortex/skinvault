@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
-import { getSteamIdFromRequest } from '@/app/utils/steam-session';
-import { isOwner } from '@/app/utils/owner-ids';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { getAdminAccess, hasAdminPermission } from '@/app/utils/admin-auth';
 
 function safeInt(v: string | null, def: number, min: number, max: number): number {
   const n = Number(v);
@@ -36,15 +33,9 @@ type GrantRow = {
 
 export async function GET(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const requesterSteamId = getSteamIdFromRequest(request);
-    if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!isOwner(requesterSteamId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const access = await getAdminAccess(request);
+    if (!access.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!hasAdminPermission(access, 'spins')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 503 });

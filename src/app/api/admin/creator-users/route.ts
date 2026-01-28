@@ -6,8 +6,7 @@ import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
 import { isOwner } from '@/app/utils/owner-ids';
 import { getSteamIdFromRequest } from '@/app/utils/steam-session';
 import { CREATORS, type CreatorProfile } from '@/data/creators';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { getAdminAccess, hasAdminPermission } from '@/app/utils/admin-auth';
 const CREATORS_KEY = 'creators_v1';
 
 function safeInt(v: string | null, def: number, min: number, max: number): number {
@@ -69,15 +68,9 @@ function collectExcludedSteamIds(creators: CreatorProfile[]): string[] {
 
 export async function GET(request: NextRequest) {
   try {
-    const adminKey = request.headers.get(ADMIN_HEADER);
-    const expected = process.env.ADMIN_PRO_TOKEN;
-    if (expected && adminKey !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const requesterSteamId = getSteamIdFromRequest(request);
-    if (!requesterSteamId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!isOwner(requesterSteamId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const access = await getAdminAccess(request);
+    if (!access.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!hasAdminPermission(access, 'creator_users')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 400 });

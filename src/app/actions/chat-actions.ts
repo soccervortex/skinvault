@@ -8,6 +8,7 @@ import { fetchSteamProfile } from '@/app/api/chat/messages/route';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 import { getEnabledChatCommandResponseTemplate, parseChatCommandInvocation, renderChatCommandResponse } from '@/app/utils/chat-commands';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 interface DMMessage {
   _id?: string;
@@ -45,7 +46,6 @@ export async function sendDMMessage(
     if (!senderId || !receiverId || !message?.trim()) {
       return { success: false, error: 'Missing required fields' };
     }
-
     const messageForStore = message;
 
     // Check if DM chat is disabled
@@ -387,9 +387,23 @@ export async function sendGlobalMessage(
       return { success: false, error: 'Missing required fields' };
     }
 
-    const messageForStore = message;
+    const parsePing = (input: string): { targetSteamId: string; note: string } | null => {
+      const raw = String(input || '').trim();
+      const match = raw.match(/^\/ping\s+(\d{17})(?:\s+([\s\S]+))?$/i);
+      if (!match) return null;
+      const targetSteamId = String(match[1] || '').trim();
+      const note = String(match[2] || '').trim().slice(0, 200);
+      if (!/^\d{17}$/.test(targetSteamId)) return null;
+      return { targetSteamId, note };
+    };
 
-    const invocation = parseChatCommandInvocation(message);
+    const ping = parsePing(message);
+
+    const messageForStore = ping
+      ? `@${ping.targetSteamId}${ping.note ? ` ${ping.note}` : ''}`
+      : message;
+
+    const invocation = ping ? null : parseChatCommandInvocation(message);
 
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -417,6 +431,25 @@ export async function sendGlobalMessage(
         delete timeoutUsers[steamId];
         await dbSet('timeout_users', timeoutUsers);
       }
+    }
+
+    if (ping) {
+      if (ping.targetSteamId === steamId) {
+        return { success: false, error: 'You cannot ping yourself' };
+      }
+
+      const userBlocks = await dbGet<Record<string, boolean>>('user_blocks', false) || {};
+      const blockKey = [steamId, ping.targetSteamId].sort().join('_');
+      if (userBlocks[blockKey] === true) {
+        return { success: false, error: 'Cannot ping this user' };
+      }
+
+      const lastPingKey = `chat_ping_last_${steamId}`;
+      const lastPingAt = (await dbGet<number>(lastPingKey, false)) || 0;
+      if (Number.isFinite(lastPingAt) && Date.now() - Number(lastPingAt) < 15000) {
+        return { success: false, error: 'Slow down' };
+      }
+      await dbSet(lastPingKey, Date.now());
     }
 
     // Automod
@@ -481,7 +514,19 @@ export async function sendGlobalMessage(
     const result = await collection.insertOne(globalMessage);
     const insertedMessage = { ...globalMessage, _id: result.insertedId };
 
-    // /ping notifications intentionally removed
+    if (ping) {
+      try {
+        const coreDb = await getDatabase();
+        const title = 'You were pinged in chat';
+        const text = `${currentSteamName}${ping.note ? `: ${ping.note}` : ' pinged you'}`;
+        await createUserNotification(coreDb, ping.targetSteamId, 'ping', title, text, {
+          bySteamId: steamId,
+          byName: currentSteamName,
+          scope: 'chat_ping',
+        });
+      } catch {
+      }
+    }
 
     // Trigger Pusher event for real-time updates
     try {

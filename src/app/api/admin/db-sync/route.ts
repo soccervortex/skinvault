@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { syncAllDataToKV, checkDbHealth } from '@/app/utils/database';
-
-const ADMIN_HEADER = 'x-admin-key';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 /**
  * POST /api/admin/db-sync
  * Manually trigger sync from MongoDB to KV
  * Useful when KV recovers after being down
  */
-export async function POST(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

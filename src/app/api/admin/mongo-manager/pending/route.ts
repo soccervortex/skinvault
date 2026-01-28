@@ -1,7 +1,8 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
 const PENDING_KEY = 'admin_pending_mongo_clusters';
 
 type PendingCluster = {
@@ -12,13 +13,6 @@ type PendingCluster = {
   deployed?: boolean;
   deployedAt?: string;
 };
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) return false;
-  return true;
-}
 
 function safeHostFromUri(uri: string): string | null {
   try {
@@ -34,8 +28,8 @@ async function readPending(): Promise<PendingCluster[]> {
   return Array.isArray(raw) ? raw : [];
 }
 
-export async function GET(request: Request) {
-  if (!checkAuth(request)) {
+export async function GET(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -43,8 +37,8 @@ export async function GET(request: Request) {
   return NextResponse.json({ pending });
 }
 
-export async function POST(request: Request) {
-  if (!checkAuth(request)) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -91,8 +85,8 @@ export async function POST(request: Request) {
   return NextResponse.json({ success: true, pending: entry });
 }
 
-export async function DELETE(request: Request) {
-  if (!checkAuth(request)) {
+export async function DELETE(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

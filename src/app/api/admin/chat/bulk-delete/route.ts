@@ -1,21 +1,19 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { isOwner } from '@/app/utils/owner-ids';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForDays, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 // POST: Bulk delete messages
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     if (!hasMongoConfig()) {
       return NextResponse.json({ error: 'MongoDB not configured' }, { status: 500 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-    
-    if (!adminSteamId || !isOwner(adminSteamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!isOwnerRequest(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();

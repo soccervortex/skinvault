@@ -1,19 +1,10 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { dbGet, dbSet } from '@/app/utils/database';
-import { isOwner } from '@/app/utils/owner-ids';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
 const STORAGE_KEY = 'admin_stripe_coupons';
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) {
-    return false;
-  }
-  return true;
-}
 
 function parseBool(value: any): boolean {
   const v = String(value ?? '').trim().toLowerCase();
@@ -137,18 +128,11 @@ async function listWithLiveData(stripe: Stripe, rows: StoredPromo[]) {
   return out;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    if (!checkAuth(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const url = new URL(request.url);
-    const steamId = String(url.searchParams.get('steamId') || '').trim();
-    if (!steamId || !isOwner(steamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const includeDeleted = parseBool(url.searchParams.get('includeDeleted'));
     const includeAllModes = parseBool(url.searchParams.get('includeAllModes'));
     const includeLive = parseBool(url.searchParams.get('includeLive'));
@@ -206,20 +190,13 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    if (!checkAuth(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!isOwnerRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-    }
-
-    const steamId = String(body?.steamId || '').trim();
-    if (!steamId || !isOwner(steamId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const action = String(body?.action || '').trim();

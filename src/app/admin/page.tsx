@@ -2,6 +2,7 @@
 
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from 'next/link';
 import Sidebar from "@/app/components/Sidebar";
 import {
   Loader2,
@@ -54,6 +55,8 @@ function AdminPageInner() {
   const searchParams = useSearchParams();
   const toast = useToast();
   const [user, setUser] = useState<any>(null);
+  const [adminAccess, setAdminAccess] = useState<any>(null);
+  const [adminAccessLoading, setAdminAccessLoading] = useState(false);
   const [steamId, setSteamId] = useState("");
   const [months, setMonths] = useState("1");
   const [submitting, setSubmitting] = useState(false);
@@ -220,6 +223,9 @@ function AdminPageInner() {
   }, [user?.steamId]);
 
   const userIsOwner = isOwner(user?.steamId);
+  const accessIsAdmin = adminAccess?.isAdmin === true;
+  const accessPermissions: string[] = Array.isArray(adminAccess?.permissions) ? adminAccess.permissions : [];
+  const canUseCommands = accessIsAdmin && (adminAccess?.via === 'owner' || accessPermissions.includes('*') || accessPermissions.includes('chat_commands'));
   const legacyMode = useMemo(() => {
     try {
       return String(searchParams?.get('legacy') || '').trim() === '1';
@@ -227,6 +233,32 @@ function AdminPageInner() {
       return false;
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAdminAccess = async () => {
+      if (!user?.steamId) {
+        if (!cancelled) setAdminAccess(null);
+        return;
+      }
+      setAdminAccessLoading(true);
+      try {
+        const res = await fetch('/api/admin/access', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        if (!cancelled) setAdminAccess((data as any)?.access || null);
+      } catch {
+        if (!cancelled) setAdminAccess(null);
+      } finally {
+        if (!cancelled) setAdminAccessLoading(false);
+      }
+    };
+
+    void loadAdminAccess();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.steamId]);
 
   const formatCurrencyAmount = (amount: number, currency: string) => {
     const cur = String(currency || 'eur').toUpperCase();
@@ -307,7 +339,6 @@ function AdminPageInner() {
         const res = await fetch(`/api/admin/themes?_t=${timestamp}`, {
           cache: 'no-store',
           headers: {
-            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
             'Cache-Control': 'no-cache',
           },
         });
@@ -327,7 +358,7 @@ function AdminPageInner() {
       if (!userIsOwner) return;
       setLoadingChatControl(true);
       try {
-        const res = await fetch(`/api/admin/chat-control?adminSteamId=${user?.steamId}`);
+        const res = await fetch('/api/admin/chat-control');
         if (res.ok) {
           const data = await res.json();
           setGlobalChatDisabled(data.globalChatDisabled || false);
@@ -346,7 +377,7 @@ function AdminPageInner() {
       setAutomodLoading(true);
       setAutomodError(null);
       try {
-        const res = await fetch(`/api/admin/chat-automod?adminSteamId=${user?.steamId}`, { cache: 'no-store' });
+        const res = await fetch('/api/admin/chat-automod', { cache: 'no-store' });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error((data as any)?.error || 'Failed to load automod settings');
         const settings = (data as any)?.settings as ChatAutomodSettings;
@@ -386,7 +417,7 @@ function AdminPageInner() {
       setAutomodEventsLoading(true);
       setAutomodEventsError(null);
       try {
-        const res = await fetch(`/api/admin/chat-automod/events?adminSteamId=${user?.steamId}`, { cache: 'no-store' });
+        const res = await fetch('/api/admin/chat-automod/events', { cache: 'no-store' });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error((data as any)?.error || 'Failed to load automod events');
         setAutomodEvents(Array.isArray((data as any)?.events) ? (data as any).events : []);
@@ -410,7 +441,7 @@ function AdminPageInner() {
       if (!userIsOwner) return;
       setLoadingXPosting(true);
       try {
-        const res = await fetch(`/api/admin/x-posting?adminSteamId=${user?.steamId}`);
+        const res = await fetch('/api/admin/x-posting');
         if (res.ok) {
           const data = await res.json();
           setXPostingEnabled(data.enabled || false);
@@ -431,9 +462,6 @@ function AdminPageInner() {
         // Load ALL purchases (no steamId filter for admin view)
         const res = await fetch(`/api/admin/purchases`, {
           cache: 'no-store',
-          headers: {
-            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -451,11 +479,7 @@ function AdminPageInner() {
       if (!userIsOwner) return;
       setLoadingTestMode(true);
       try {
-        const res = await fetch(`/api/admin/stripe-test-mode?steamId=${user?.steamId}`, {
-          headers: {
-            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-          },
-        });
+        const res = await fetch('/api/admin/stripe-test-mode');
         if (res.ok) {
           const data = await res.json();
           setTestMode(data.testMode === true);
@@ -475,9 +499,6 @@ function AdminPageInner() {
         // Load ALL failed purchases (no steamId filter for admin view)
         const res = await fetch(`/api/admin/failed-purchases`, {
           cache: 'no-store',
-          headers: {
-            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -514,9 +535,6 @@ function AdminPageInner() {
       try {
         const res = await fetch('/api/admin/payments?statsOnly=1', {
           cache: 'no-store',
-          headers: {
-            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          },
         });
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
@@ -535,7 +553,7 @@ function AdminPageInner() {
       if (!userIsOwner) return;
       setLoadingTimeouts(true);
       try {
-        const res = await fetch(`/api/admin/timeouts?adminSteamId=${user?.steamId}`);
+        const res = await fetch('/api/admin/timeouts');
         if (res.ok) {
           const data = await res.json();
           setTimeouts(data.timeouts || []);
@@ -577,7 +595,7 @@ function AdminPageInner() {
         bannedRegex: parseLines(automodBannedRegexText),
       };
 
-      const res = await fetch(`/api/admin/chat-automod?adminSteamId=${user.steamId}`, {
+      const res = await fetch('/api/admin/chat-automod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: next }),
@@ -618,7 +636,6 @@ function AdminPageInner() {
         body: JSON.stringify({
           steamId,
           duration: quickTimeoutDuration,
-          adminSteamId: user.steamId,
           timeoutReason: 'Admin panel',
         }),
       });
@@ -633,7 +650,7 @@ function AdminPageInner() {
   const quickUntimeout = async (steamId: string) => {
     if (!user?.steamId || !steamId) return;
     try {
-      const res = await fetch(`/api/chat/timeout?steamId=${steamId}&adminSteamId=${user.steamId}`, {
+      const res = await fetch(`/api/chat/timeout?steamId=${steamId}`, {
         method: 'DELETE',
       });
       const data = await res.json().catch(() => null);
@@ -651,9 +668,8 @@ function AdminPageInner() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
-        body: JSON.stringify({ steamId, bannedBy: user?.steamId || null, reason: 'Admin panel' }),
+        body: JSON.stringify({ steamId, reason: 'Admin panel' }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as any)?.error || 'Failed to ban user');
@@ -666,11 +682,8 @@ function AdminPageInner() {
   const quickUnban = async (steamId: string) => {
     if (!steamId) return;
     try {
-      const res = await fetch(`/api/admin/ban?steamId=${steamId}&unbannedBy=${encodeURIComponent(String(user?.steamId || ''))}`, {
+      const res = await fetch(`/api/admin/ban?steamId=${steamId}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data as any)?.error || 'Failed to unban user');
@@ -683,7 +696,7 @@ function AdminPageInner() {
   const clearAutomodEvents = async () => {
     if (!user?.steamId || !userIsOwner) return;
     try {
-      const res = await fetch(`/api/admin/chat-automod/events?adminSteamId=${user.steamId}`, {
+      const res = await fetch('/api/admin/chat-automod/events', {
         method: 'DELETE',
       });
       const data = await res.json().catch(() => null);
@@ -711,7 +724,6 @@ function AdminPageInner() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
         body: JSON.stringify({ steamId, months: Number(months) }),
       });
@@ -808,7 +820,6 @@ function AdminPageInner() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
         body: JSON.stringify({ theme, enabled }),
       });
@@ -879,7 +890,6 @@ function AdminPageInner() {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
       });
 
@@ -911,7 +921,6 @@ function AdminPageInner() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
         body: JSON.stringify({ steamId: steamIdToEdit, proUntil: newDate }),
       });
@@ -945,7 +954,7 @@ function AdminPageInner() {
     setChatControlError(null);
     
     try {
-      const res = await fetch(`/api/admin/chat-control?adminSteamId=${user?.steamId}`, {
+      const res = await fetch('/api/admin/chat-control', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -974,7 +983,7 @@ function AdminPageInner() {
     setXPostingMessage(null);
 
     try {
-      const res = await fetch(`/api/admin/x-posting?adminSteamId=${user?.steamId}`, {
+      const res = await fetch('/api/admin/x-posting', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1023,7 +1032,6 @@ function AdminPageInner() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ adminSteamId: user?.steamId }),
       });
 
       const data = await res.json();
@@ -1033,7 +1041,7 @@ function AdminPageInner() {
         setXPostingMessage(`Post created successfully! ${data.postUrl ? `View: ${data.postUrl}` : ''}`);
         setXPostingLastPost(new Date().toISOString());
         // Reload status
-        const statusRes = await fetch(`/api/x/post/trigger?adminSteamId=${user?.steamId}`);
+        const statusRes = await fetch('/api/x/post/trigger');
         const statusData = await statusRes.json();
         if (statusRes.ok) {
           setXPostingStatus(statusData);
@@ -1056,7 +1064,6 @@ function AdminPageInner() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
         body: JSON.stringify({ testMode: enabled }),
       });
@@ -1086,9 +1093,6 @@ function AdminPageInner() {
     setMessage(null);
     try {
       const res = await fetch(`/api/admin/ban?steamId=${banSteamId}`, {
-        headers: {
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-        },
       });
 
       const data = await res.json();
@@ -1114,7 +1118,6 @@ function AdminPageInner() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
         },
         body: JSON.stringify({ steamId: banStatus.steamId }),
       });
@@ -1141,9 +1144,6 @@ function AdminPageInner() {
     try {
       const res = await fetch(`/api/admin/ban?steamId=${banStatus.steamId}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-        },
       });
 
       const data = await res.json();
@@ -1196,9 +1196,6 @@ function AdminPageInner() {
 
     try {
       const res = await fetch(`/api/admin/purchases?steamId=${fixSteamId}`, {
-        headers: {
-          "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-        },
       });
 
       const data = await res.json();
@@ -1236,9 +1233,6 @@ function AdminPageInner() {
         setFixMessage(data.message || "Purchase fixed successfully!");
         // Reload user purchases
         const reloadRes = await fetch(`/api/admin/purchases?steamId=${steamId}`, {
-          headers: {
-            "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "",
-          },
         });
         const reloadData = await reloadRes.json();
         if (reloadRes.ok) {
@@ -1273,18 +1267,99 @@ function AdminPageInner() {
   }
 
   if (!userIsOwner) {
+    if (adminAccessLoading) {
+      return (
+        <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+          <Sidebar />
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+            <Loader2 className="animate-spin text-gray-500" size={26} />
+          </div>
+        </div>
+      );
+    }
+
+    if (!accessIsAdmin) {
+      return (
+        <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
+          <Sidebar />
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <AlertTriangle className="mx-auto text-amber-400 mb-2" />
+              <p className="text-xs uppercase tracking-[0.4em] text-gray-500">
+                Access denied
+              </p>
+              <p className="text-sm text-gray-400">
+                You do not have access to the admin panel.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex h-screen bg-[#08090d] text-white overflow-hidden font-sans">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <AlertTriangle className="mx-auto text-amber-400 mb-2" />
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-500">
-              Access denied
-            </p>
-            <p className="text-sm text-gray-400">
-              This admin panel is only available to the site owner.
-            </p>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 custom-scrollbar">
+          <div className="w-full max-w-5xl mx-auto bg-[#11141d] border border-white/10 p-6 md:p-8 lg:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl space-y-6 md:space-y-8">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/40 shrink-0">
+                  <Shield className="text-blue-400" size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] md:text-[10px] uppercase tracking-[0.4em] text-gray-500 font-black">Admin</p>
+                  <h1 className="text-xl md:text-2xl lg:text-3xl font-black italic uppercase tracking-tighter">Admin Panel</h1>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {canUseCommands ? (
+                <Link
+                  href="/admin/commands"
+                  className="group bg-black/40 border border-blue-500/20 hover:border-blue-500/40 rounded-2xl p-5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                      <Terminal className="text-blue-400" size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase tracking-[0.4em] text-gray-500 font-black">Chat</p>
+                      <p className="text-sm font-black uppercase tracking-wide">Commands</p>
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="bg-black/30 border border-white/10 rounded-2xl p-5 opacity-60">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                      <Terminal className="text-gray-500" size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase tracking-[0.4em] text-gray-500 font-black">Chat</p>
+                      <p className="text-sm font-black uppercase tracking-wide">Commands</p>
+                      <p className="text-[11px] text-gray-500 mt-1">No permission</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Link
+                href="/admin/newsletter"
+                className="group bg-black/40 border border-emerald-500/20 hover:border-emerald-500/40 rounded-2xl p-5 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                    <Mail className="text-emerald-400" size={16} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.4em] text-gray-500 font-black">Email</p>
+                    <p className="text-sm font-black uppercase tracking-wide">Newsletter</p>
+                  </div>
+                </div>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -2253,7 +2328,6 @@ function AdminPageInner() {
                                 setMessage(`Purchase fulfilled: ${data.message}`);
                                 // Reload failed purchases
                                 const reloadRes = await fetch(`/api/admin/failed-purchases`, {
-                                  headers: { "x-admin-key": process.env.NEXT_PUBLIC_ADMIN_KEY || "" },
                                 });
                                 if (reloadRes.ok) {
                                   const reloadData = await reloadRes.json();
@@ -2437,7 +2511,6 @@ function AdminPageInner() {
                                   method: 'POST',
                                   headers: {
                                     'Content-Type': 'application/json',
-                                    'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
                                   },
                                   body: JSON.stringify({ action: 'retry_discord', sessionId: sid }),
                                 });
@@ -2480,7 +2553,6 @@ function AdminPageInner() {
                                 method: 'POST',
                                 headers: {
                                   'Content-Type': 'application/json',
-                                  'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
                                 },
                                 body: JSON.stringify({ action: 'hide', sessionId: sid }),
                               });
@@ -2684,7 +2756,6 @@ function AdminPageInner() {
                                   method: 'POST',
                                   headers: {
                                     'Content-Type': 'application/json',
-                                    'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
                                   },
                                   body: JSON.stringify({ action: 'hide', sessionId: sid }),
                                 });
@@ -3320,7 +3391,7 @@ function AdminPageInner() {
                     <button
                       onClick={async () => {
                         try {
-                          const res = await fetch(`/api/chat/timeout?steamId=${timeout.steamId}&adminSteamId=${user?.steamId}`, {
+                          const res = await fetch(`/api/chat/timeout?steamId=${timeout.steamId}`, {
                             method: 'DELETE',
                           });
                           if (res.ok) {

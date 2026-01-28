@@ -6,6 +6,7 @@ import Pusher from 'pusher';
 import { checkAutomod, coerceChatAutomodSettings, DEFAULT_CHAT_AUTOMOD_SETTINGS } from '@/app/utils/chat-automod';
 import { appendChatAutomodEvent } from '@/app/utils/chat-automod-log';
 import { getEnabledChatCommandResponseTemplate, parseChatCommandInvocation, renderChatCommandResponse } from '@/app/utils/chat-commands';
+import { createUserNotification } from '@/app/utils/user-notifications';
 
 interface ChatMessage {
   _id?: string;
@@ -359,9 +360,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const itemInvocation = parseItemCommand(message);
-    const invocation = itemInvocation ? null : parseChatCommandInvocation(message);
-    const messageForStore = message;
+    const parsePing = (input: string): { targetSteamId: string; note: string } | null => {
+      const raw = String(input || '').trim();
+      const match = raw.match(/^\/ping\s+(\d{17})(?:\s+([\s\S]+))?$/i);
+      if (!match) return null;
+      const targetSteamId = String(match[1] || '').trim();
+      const note = String(match[2] || '').trim().slice(0, 200);
+      if (!/^\d{17}$/.test(targetSteamId)) return null;
+      return { targetSteamId, note };
+    };
+
+    const ping = parsePing(message);
+    const itemInvocation = ping ? null : parseItemCommand(message);
+    const invocation = itemInvocation ? null : (ping ? null : parseChatCommandInvocation(message));
+    const messageForStore = ping
+      ? `@${ping.targetSteamId}${ping.note ? ` ${ping.note}` : ''}`
+      : message;
 
     // Check if global chat is disabled
     const { dbGet, dbSet } = await import('@/app/utils/database');
@@ -453,6 +467,20 @@ export async function POST(request: Request) {
 
     const insertRes = await collection.insertOne(chatMessage);
     const insertedId = insertRes.insertedId?.toString?.() || '';
+
+    if (ping) {
+      try {
+        const coreDb = await getDatabase();
+        const title = 'You were pinged in chat';
+        const text = `${currentSteamName}${ping.note ? `: ${ping.note}` : ' pinged you'}`;
+        await createUserNotification(coreDb, ping.targetSteamId, 'ping', title, text, {
+          bySteamId: steamId,
+          byName: currentSteamName,
+          scope: 'chat_ping',
+        });
+      } catch {
+      }
+    }
 
     if (itemInvocation) {
       try {

@@ -1,8 +1,9 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getCachedMongoUri, getMongoClient, getMongoUriCandidates, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { dbGet, dbSet } from '@/app/utils/database';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
-const ADMIN_HEADER = 'x-admin-key';
 const PENDING_KEY = 'admin_pending_mongo_clusters';
 
 type PendingCluster = {
@@ -23,13 +24,6 @@ type ConnectionInfo = {
   active: boolean;
   inUse: boolean;
 };
-
-function checkAuth(request: Request): boolean {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-  if (expected && adminKey !== expected) return false;
-  return true;
-}
 
 function safeHostFromUri(uri: string): string | null {
   try {
@@ -111,8 +105,8 @@ function buildConnections(): ConnectionInfo[] {
   return out;
 }
 
-export async function GET(request: Request) {
-  if (!checkAuth(request)) {
+export async function GET(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

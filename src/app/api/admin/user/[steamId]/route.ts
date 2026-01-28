@@ -1,23 +1,23 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { dbGet } from '@/app/utils/database';
-import { isOwner } from '@/app/utils/owner-ids';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 import { getProUntil } from '@/app/utils/pro-storage';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { getCollectionNamesForRange, getChatCollectionName, getDMCollectionNamesForDays } from '@/app/utils/chat-collections';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ steamId: string }> }
 ) {
   try {
     const { steamId } = await params;
     const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
     const timeFilter = searchParams.get('time') || 'lifetime'; // 30min, 1hour, 24hours, lifetime
     const searchQuery = searchParams.get('search') || '';
 
     // Verify admin
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

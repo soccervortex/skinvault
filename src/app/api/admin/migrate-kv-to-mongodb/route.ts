@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
-import { isOwner } from '@/app/utils/owner-ids';
-
-const ADMIN_HEADER = 'x-admin-key';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 // All KV keys used in the application
 const KV_KEYS = [
@@ -32,11 +31,8 @@ const KV_KEYS = [
  * POST /api/admin/migrate-kv-to-mongodb
  * Migrate all KV data to MongoDB
  */
-export async function POST(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -134,11 +130,8 @@ export async function POST(request: Request) {
  * GET /api/admin/migrate-kv-to-mongodb
  * Check migration status (compare KV and MongoDB)
  */
-export async function GET(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
+export async function GET(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

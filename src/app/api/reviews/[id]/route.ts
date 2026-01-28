@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { isOwner } from '@/app/utils/owner-ids';
+import type { NextRequest } from 'next/server';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 // Initialize Supabase client
 function getSupabaseClient() {
@@ -15,16 +16,12 @@ function getSupabaseClient() {
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(request.url);
-    const adminSteamId = searchParams.get('adminSteamId');
-
-    // Check if user is owner
-    if (!adminSteamId || !isOwner(adminSteamId)) {
+    if (!isOwnerRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized - Owner access required' }, { status: 401 });
     }
     const supabase = getSupabaseClient();

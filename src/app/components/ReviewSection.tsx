@@ -108,7 +108,7 @@ export default function ReviewSection() {
 
     setDeletingId(reviewId);
     try {
-      const res = await fetch(`/api/reviews/${reviewId}?adminSteamId=${user.steamId}`, {
+      const res = await fetch(`/api/reviews/${reviewId}`, {
         method: 'DELETE',
       });
 

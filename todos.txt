@@ -1,10 +1,3 @@
-
-Buttons zijn niet naar beneden top padding is beetje raar bij edit profile en naam
-op de markt ook een knopje met nieuwste item dan lkaat hij een modal zien met dew 6 nieuwste en je kan nog naar verschillende paginas scrollen in dat modaltje zodat je weer de nieuwste kan zien met een prijs beschikbaar en de datum is heel belangrijk 
-plaats van dat ik alleen kan klikken op euro of usd wil ik ook alle currencys supporten die steam support daardoor moeten we in plaats van dat je nu op 1 van de twee kan kjlikken een soort van settings button toevoegen op elke plek waar je dit zou moeten kunnenn vervgangen zo kan je dingen van settings die je zelf ik kan stelllen op preference ofz aanpassen
-maak in de vault bij cs2 overview daaroonder in die zelfde box ook de stats die daar boven staan ziet er wat cleaner uit naar mijn idee
-bij image Schermafbeelding 2026-01-25 213154.png zie je de profiel in de vault denk dat we dit echt wel een stukje betetr kunnen maken beter css betere indeling alles wat duideliojker e niet gwn zo maar ergens neer gestampt
-mensen kunnen pingen in de chat dus bijvoorbeeld met / commands kunnen werken naar een command van ping kan je iemand pingen krijgen hun notificatie 
 commands manager toevoegen in de amin panels om meerdere commands te kunnen maken via de website zelf maar ook voor commands toe tevoegen te editen en te kunnen verwijderen of uit en aan zetten
 bij image Schermafbeelding 2026-01-25 222411.png zien we de trade url bij de vault waarom is huier niet zo een vraagteken met uitleg van hoe je hem kan vinden 
 ook is er iets mis met de connectie naar discord of hij disconnect de hele tijd of de button tript hem want soms zegt die dat ik hem moet connecten terwijl ik hem een paar dagen geleden al had geconnect waarom zo snel opnieuw

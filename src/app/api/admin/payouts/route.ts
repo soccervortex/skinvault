@@ -1,13 +1,13 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { dbGet } from '@/app/utils/database';
 import { sanitizeEmail } from '@/app/utils/sanitize';
 import { getDatabase, hasMongoConfig } from '@/app/utils/mongodb-client';
 import { OWNER_STEAM_IDS } from '@/app/utils/owner-ids';
+import { isOwnerRequest } from '@/app/utils/admin-auth';
 
 export const runtime = 'nodejs';
-
-const ADMIN_HEADER = 'x-admin-key';
 
 type PaymentStatus = 'paid' | 'payment_failed' | 'expired' | 'unfulfilled' | 'unknown';
 
@@ -203,11 +203,8 @@ async function fetchFrankfurterRates(dateIso: string, currencies: string[]): Pro
   return out;
 }
 
-export async function GET(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
+export async function GET(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -534,11 +531,8 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
-  const adminKey = request.headers.get(ADMIN_HEADER);
-  const expected = process.env.ADMIN_PRO_TOKEN;
-
-  if (expected && adminKey !== expected) {
+export async function POST(request: NextRequest) {
+  if (!isOwnerRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

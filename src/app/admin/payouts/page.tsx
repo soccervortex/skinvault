@@ -105,9 +105,6 @@ export default function AdminPayoutsPage() {
       qs.set('month', monthKey);
       const res = await fetch(`/api/admin/payouts?${qs.toString()}`, {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(String(json?.error || 'Failed to load payouts'));
@@ -134,7 +131,6 @@ export default function AdminPayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'delete_stakeholder', steamId: sid }),
       });
@@ -165,7 +161,6 @@ export default function AdminPayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           action: 'upsert_stakeholder',
@@ -227,7 +222,6 @@ export default function AdminPayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           action: 'upsert_stakeholder',
@@ -255,7 +249,6 @@ export default function AdminPayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           action: 'set_fx_rate',
@@ -299,7 +292,6 @@ export default function AdminPayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           action: 'add_payment',
@@ -328,7 +320,6 @@ export default function AdminPayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'delete_payment', id, monthKey, steamId }),
       });

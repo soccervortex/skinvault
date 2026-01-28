@@ -43,11 +43,7 @@ export default function AdminFixPurchasePage() {
     setUserPurchases([]);
 
     try {
-      const res = await fetch(`/api/admin/purchases?steamId=${encodeURIComponent(String(fixSteamId || '').trim())}`, {
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
-      });
+      const res = await fetch(`/api/admin/purchases?steamId=${encodeURIComponent(String(fixSteamId || '').trim())}`);
 
       const data = await res.json().catch(() => null);
       if (res.ok) {
@@ -85,11 +81,7 @@ export default function AdminFixPurchasePage() {
         setFixMessage(String((data as any)?.message || 'Purchase fixed successfully!'));
         toast.success('Purchase fixed');
 
-        const reloadRes = await fetch(`/api/admin/purchases?steamId=${encodeURIComponent(String(steamId || '').trim())}`, {
-          headers: {
-            'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-          },
-        });
+        const reloadRes = await fetch(`/api/admin/purchases?steamId=${encodeURIComponent(String(steamId || '').trim())}`);
         const reloadData = await reloadRes.json().catch(() => null);
         if (reloadRes.ok) {
           setUserPurchases(Array.isArray((reloadData as any)?.purchases) ? (reloadData as any).purchases : []);
@@ -121,7 +113,6 @@ export default function AdminFixPurchasePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'hide', sessionId: sid }),
       });

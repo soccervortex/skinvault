@@ -109,9 +109,6 @@ export default function AdminPaymentsPage() {
 
       const res = await fetch(`/api/admin/payments?${qs.toString()}`, {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
 
       const json = await res.json().catch(() => null);
@@ -194,7 +191,6 @@ export default function AdminPaymentsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'backfill_missing_fees', limit: 25 }),
       });
@@ -251,9 +247,6 @@ export default function AdminPaymentsPage() {
       if (periodDays !== 'all') qs.set('days', periodDays);
       const res = await fetch(`/api/admin/payments?${qs.toString()}`, {
         cache: 'no-store',
-        headers: {
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
-        },
       });
       if (!res.ok) return;
       const json = await res.json().catch(() => null);
@@ -295,7 +288,6 @@ export default function AdminPaymentsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'set_hidden', id, hidden }),
       });
@@ -316,7 +308,6 @@ export default function AdminPaymentsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({ action: 'refresh_stripe', id }),
       });
@@ -348,7 +339,6 @@ export default function AdminPaymentsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
         },
         body: JSON.stringify({
           action: 'update_fields',
